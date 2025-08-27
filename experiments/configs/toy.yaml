@@ -1,0 +1,36 @@
+# experiments/configs/toy.yaml - MINIMAL WORKING CONFIG
+experiment:
+  name: toy
+  n_sessions: 200
+  seed: 1337
+
+protocol:
+  episode_length: 5
+  baseline_success_rate: 0.6
+
+worlds:
+  0:
+    guardrails: []  # No protection
+  1:
+    guardrails:     # With protection
+      - name: keyword_blocker
+        params:
+          keywords: ["hack", "exploit", "bypass"]
+      - name: regex_filters
+        params:
+          patterns: ["ignore.*instruction", "reveal.*secret"]
+
+attacker:
+  type: random_injection
+  params:
+    vocab_harmful: ["hack", "exploit", "bypass", "override"]
+    vocab_benign: ["help", "please", "thank you"]
+    base_success: 0.6
+
+calibration:
+  benign_corpus: datasets/benign/safe_prompts.txt
+  target_fpr: 0.05
+
+output:
+  results_dir: results/toy
+  log_level: INFO
