@@ -1,41 +1,167 @@
-"""
-.PHONY: install test reproduce-mvp clean setup verify-invariants
+# ======================================================================
+# CC-Framework • Makefile (Tier A)
+# Goals: one-command reproducibility, quality gates, and clean ergonomics
+# ======================================================================
 
-install:
-\tpython -m venv .venv && . .venv/bin/activate && pip install -e .[dev]
+# -------- Config ----------
+SHELL := /bin/bash
+.ONESHELL:
+.SHELLFLAGS := -eu -o pipefail -c
 
-setup:
-\tmake install
-\tpre-commit install
+PY        ?= python3
+PIP       ?= pip
+VENV_DIR  ?= .venv
+ACT       := source $(VENV_DIR)/bin/activate
 
-test:
-\t. .venv/bin/activate && pytest
+PKG_NAME  := cc
+SRC_DIR   := src/cc
+COV_MIN   ?= 80
 
-reproduce-smoke:
-\t. .venv/bin/activate && python src/cc/exp/run_two_world.py --n 200 --config src/cc/exp/configs/smoke_test.yaml
+# Experiments (Tier A only)
+SESS_SMOKE ?= 200
+SESS_MVP   ?= 5000
 
-reproduce-mvp:
-\t. .venv/bin/activate && python src/cc/exp/run_two_world.py --n 5000 --config src/cc/exp/configs/toy_A.yaml
+CONFIG_SMOKE ?= experiments/configs/toy.yaml
+CONFIG_MVP   ?= experiments/configs/two_world.yaml
 
-reproduce-main:
-\t. .venv/bin/activate && python src/cc/exp/run_two_world.py --n 20000 --config src/cc/exp/configs/main_study.yaml
+reproduce-smoke: install
+	$(ACT); python -m experiments.run --config $(CONFIG_SMOKE) --n $(SESS_SMOKE) \
+	  --results-dir results --seed 1337
 
-reproduce-figures:
-\t. .venv/bin/activate && python src/cc/analysis/generate_figures.py
+reproduce-mvp: install
+	$(ACT); python -m experiments.run --config $(CONFIG_MVP) --n $(SESS_MVP) \
+	  --results-dir results --seed 1337
 
-reproduce-paper:
-\tmake reproduce-figures && cd paper && pdflatex main.tex
+# -------- Phony ----------
+.PHONY: help install setup lock deps fmt lint type test test-unit test-int cov bench \
+        reproduce-smoke reproduce-mvp figures reports docs docs-serve \
+        verify-invariants verify-statistics verify-audit \
+        precommit docker-build docker-run clean distclean
 
-verify-invariants:
-\t. .venv/bin/activate && python src/cc/tests/test_invariants.py
+# -------- Help -----------
+help:
+	@echo ""
+	@echo "CC-Framework • Make targets"
+	@echo "-------------------------------------------------------------"
+	@echo "setup                Create venv, install deps, install pre-commit"
+	@echo "install              Install package (editable) + [dev,docs,notebooks] extras"
+	@echo "lock                 Freeze runtime deps to requirements.lock.txt"
+	@echo "fmt                  Auto-format (black, isort) + ruff --fix"
+	@echo "lint                 Ruff/Black/Isort checks (no changes)"
+	@echo "type                 mypy type-checking"
+	@echo "test                 Unit+integration tests with coverage (>= $(COV_MIN)%)"
+	@echo "reproduce-smoke      $(SESS_SMOKE) sessions quick run (CPU)"
+	@echo "reproduce-mvp        $(SESS_MVP) sessions main Tier A run (CPU)"
+	@echo "figures              Generate plots (paper/figures, results/artifacts)"
+	@echo "reports              Build evaluation reports (evaluation/reports)"
+	@echo "docs                 Build MkDocs site to site/"
+	@echo "docs-serve           Local preview at http://127.0.0.1:8000"
+	@echo "verify-*             Stats, invariants, audit-chain checks"
+	@echo "docker-build/run     CPU docker image for fully pinned env"
+	@echo "clean/distclean      Clean artifacts / wipe venv, locks"
+	@echo "-------------------------------------------------------------"
+	@echo ""
 
-verify-statistics:
-\t. .venv/bin/activate && python src/cc/tests/test_bootstrap.py
+# -------- Environment ----
+$(VENV_DIR)/bin/activate:
+	$(PY) -m venv $(VENV_DIR)
+	$(ACT); $(PIP) install --upgrade pip wheel setuptools
 
-verify-audit:
-\t. .venv/bin/activate && python src/cc/tests/test_audit_chain.py
+install: $(VENV_DIR)/bin/activate
+	$(ACT); $(PIP) install -e .[dev,docs,notebooks]
 
+setup: install
+	$(ACT); pre-commit install
+
+lock: install
+	$(ACT); python -c "import pkgutil, sys; print('Python:', sys.version)"
+	$(ACT); pip freeze --all | sed '/@ file:\/\//d' > requirements.lock.txt
+	@echo "Wrote requirements.lock.txt"
+
+deps: install ## alias
+	@true
+
+# -------- Code Quality ----
+fmt: install
+	$(ACT); ruff check --fix .
+	$(ACT); isort .
+	$(ACT); black .
+
+lint: install
+	$(ACT); ruff check .
+	$(ACT); isort --check-only .
+	$(ACT); black --check .
+
+type: install
+	$(ACT); mypy $(SRC_DIR)
+
+# -------- Tests -----------
+test: install
+	$(ACT); pytest -q --maxfail=1 --disable-warnings \
+	  --cov=$(SRC_DIR) --cov-report=term-missing --cov-fail-under=$(COV_MIN)
+
+test-unit: install
+	$(ACT); pytest tests/unit -q --disable-warnings
+
+test-int: install
+	$(ACT); pytest tests/integration -q --disable-warnings
+
+cov: test ## alias
+	@true
+
+bench: install
+	$(ACT); pytest benchmarks -q || true
+
+# -------- Reproduce Runs (Tier A) -------
+reproduce-smoke: install
+	$(ACT); python -m experiments.run --config $(CONFIG_SMOKE) --n $(SESS_SMOKE) \
+	  --results-dir results --seed 1337
+
+reproduce-mvp: install
+	$(ACT); python -m experiments.run --config $(CONFIG_MVP) --n $(SESS_MVP) \
+	  --results-dir results --seed 1337
+
+# -------- Analysis / Figures / Reports ---
+figures: install
+	$(ACT); python scripts/plot_cc_curves.py
+	$(ACT); python scripts/summarize_results.py
+
+reports: install
+	$(ACT); python -c "from cc.analysis.reporting import build_all; build_all()"
+
+# -------- Docs --------------
+docs: install
+	$(ACT); mkdocs build --strict
+
+docs-serve: install
+	$(ACT); mkdocs serve -a 127.0.0.1:8000
+
+# -------- Verifications -----
+verify-invariants: install
+	$(ACT); python -c "from cc.utils.validation import run_invariant_suite; run_invariant_suite()"
+
+verify-statistics: install
+	$(ACT); python -c "from cc.analysis.cc_estimation import self_check; self_check()"
+
+verify-audit: install
+	$(ACT); python -c "from cc.io.storage import verify_hash_chain; verify_hash_chain('results/raw')"
+
+# -------- Docker (CPU) -----
+docker-build:
+	docker build -f deployment/docker/Dockerfile -t cc-framework:cpu .
+
+docker-run:
+	docker run --rm -it \
+	  -v $$PWD:/workspace -w /workspace \
+	  cc-framework:cpu bash
+
+# -------- Clean -------------
 clean:
-\trm -rf .venv .pytest_cache .coverage dist build logs
-\tfind . -name __pycache__ -type d -exec rm -rf {} +
-"""
+	rm -rf .pytest_cache .coverage htmlcov site dist build \
+	  results/aggregates results/artifacts \
+	  paper/figures paper/tables \
+	  benchmarks/results || true
+	find . -name "__pycache__" -type d -prune -exec rm -rf {} +
+
+distclean: clean
+	rm -rf $(VENV_DIR) requirements.lock.txt

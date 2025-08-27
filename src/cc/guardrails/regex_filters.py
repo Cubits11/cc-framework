@@ -1,24 +1,26 @@
 # src/cc/guardrails/regex_filter.py
 """Regular expression based guardrail"""
+
 import re
-from typing import List
+
 from .base import Guardrail
+
 
 class RegexFilter(Guardrail):
     """Regular expression based content filter"""
-    
+
     def __init__(self, pattern: str, flags: int = 0):
         self.pattern = re.compile(pattern, flags)
         self.threshold = 0.5  # Binary for regex
-    
+
     def blocks(self, text: str) -> bool:
         """Check if text matches blocking pattern"""
         return bool(self.pattern.search(text))
-    
+
     def score(self, text: str) -> float:
         """Return binary score (0 or 1)"""
         return 1.0 if self.blocks(text) else 0.0
-    
+
     def calibrate(self, benign_texts: list, target_fpr: float = 0.05) -> None:
         """Regex is binary - calibration not applicable"""
         # Calculate actual FPR for logging
