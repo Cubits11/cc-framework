@@ -1,41 +1,83 @@
+# experiments/run.py - Enhanced delegation
 """
-Simple entrypoint to run experiments from YAML configs while delegating to
-the existing runner at src/cc/exp/run_two_world.py. Keeps backwards compatibility.
+Main experiment runner with proper delegation to two-world protocol
 """
-
 import argparse
-import importlib
-import sys
-
 import yaml
-
+import sys
+from pathlib import Path
+from typing import Dict, Any, Optional
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--config", required=True, help="Path to YAML config")
-    p.add_argument("--n", type=int, default=None, help="Override n_sessions")
-    p.add_argument("--results-dir", default=None, help="Override results dir")
-    p.add_argument("--seed", type=int, default=None, help="Override seed")
-    args = p.parse_args()
-
-    with open(args.config, "r") as f:
-        cfg = yaml.safe_load(f)
-
-    # Apply CLI overrides (optional)
+    parser = argparse.ArgumentParser(description='CC Framework experiment runner')
+    parser.add_argument('--config', required=True, help='YAML configuration file')
+    parser.add_argument('--n', type=int, help='Override number of sessions')
+    parser.add_argument('--seed', type=int, help='Override random seed')
+    parser.add_argument('--results-dir', default='results', help='Results directory')
+    parser.add_argument('--log-level', default='INFO', help='Logging level')
+    
+    args = parser.parse_args()
+    
+    # Load and merge configurations
+    config = load_config(args.config)
+    
+    # Apply CLI overrides
     if args.n is not None:
-        cfg.setdefault("experiment", {})["n_sessions"] = args.n
-    if args.results_dir is not None:
-        cfg.setdefault("experiment", {})["results_dir"] = args.results_dir
+        config['experiment']['n_sessions'] = args.n
     if args.seed is not None:
-        cfg.setdefault("experiment", {})["seed"] = args.seed
+        config['protocol']['seed'] = args.seed
+    
+    # Delegate to two-world runner with proper config structure
+    from cc.exp.run_two_world import run_experiment
+    
+    try:
+        results = run_experiment(
+            config=config,
+            output_dir=Path(args.results_dir),
+            verbose=args.log_level == 'DEBUG'
+        )
+        
+        # Print summary
+        print(f"\n{'='*60}")
+        print(f"Experiment Complete: {config['experiment']['name']}")
+        print(f"{'='*60}")
+        print(f"Sessions completed: {results['n_sessions']}")
+        print(f"J-statistic: {results['j_statistic']:.4f}")
+        print(f"CC_max: {results['cc_max']:.4f}")
+        print(f"95% CI width: {results['ci_width']:.4f}")
+        
+        if results['cc_max'] < 0.95:
+            print("✓ Constructive interaction detected")
+        elif results['cc_max'] > 1.05:
+            print("⚠ Destructive interaction detected")
+        else:
+            print("= Independent operation")
+            
+        return 0
+        
+    except Exception as e:
+        print(f"Experiment failed: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
 
-    # Delegate to your existing runner
-    mod = importlib.import_module("cc.exp.run_two_world")
-    if not hasattr(mod, "main"):
-        print("Expected cc.exp.run_two_world.main(config_dict) to exist.", file=sys.stderr)
-        sys.exit(2)
-    return mod.main(cfg)
-
+def load_config(path: str) -> Dict[str, Any]:
+    """Load and validate configuration"""
+    with open(path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Ensure required sections exist
+    required_sections = ['experiment', 'protocol', 'attacker', 'guardrails']
+    for section in required_sections:
+        if section not in config:
+            config[section] = {}
+    
+    # Set defaults
+    config['experiment'].setdefault('n_sessions', 5000)
+    config['protocol'].setdefault('seed', 1337)
+    config['protocol'].setdefault('episode_length', 10)
+    
+    return config
 
 if __name__ == "__main__":
     sys.exit(main())
