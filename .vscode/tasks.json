@@ -1,0 +1,8 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      { "label": "Run Smoke", "type": "shell", "command": "make reproduce-smoke" },
+      { "label": "Run MVP", "type": "shell", "command": "make reproduce-mvp" },
+      { "label": "Verify Audit", "type": "shell", "command": "make verify-audit" }
+    ]
+  }

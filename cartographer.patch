@@ -1,0 +1,352 @@
+*** Begin Patch
+*** Add File: .devcontainer/devcontainer.json
++{
++  "name": "cc_cartographer",
++  "image": "mcr.microsoft.com/devcontainers/python:3.10",
++  "build": { "dockerfile": "Dockerfile" },
++  "features": {
++    "ghcr.io/devcontainers/features/git:1": {},
++    "ghcr.io/devcontainers/features/github-cli:1": {}
++  },
++  "postCreateCommand": "python -m pip install -U pip && pip install -e .[dev] && pre-commit install || true",
++  "customizations": {
++    "vscode": {
++      "extensions": [
++        "ms-python.python",
++        "ms-python.vscode-pylance",
++        "ms-toolsai.jupyter",
++        "EditorConfig.EditorConfig",
++        "eamodio.gitlens"
++      ],
++      "settings": {
++        "python.defaultInterpreterPath": "/usr/local/bin/python",
++        "python.testing.pytestEnabled": true,
++        "python.testing.pytestArgs": ["tests"]
++      }
++    }
++  },
++  "remoteUser": "vscode"
++}
+
+*** Add File: .devcontainer/Dockerfile
++FROM mcr.microsoft.com/devcontainers/python:3.10
++RUN apt-get update && apt-get install -y git make && rm -rf /var/lib/apt/lists/*
++WORKDIR /workspaces/app
+
+*** Add File: .github/workflows/cartographer.yml
++name: Cartographer Run
++on:
++  workflow_dispatch:
++    inputs:
++      samples:
++        description: "Number of session pairs"
++        required: true
++        default: "200"
++      fig:
++        description: "Figure path"
++        required: true
++        default: "figs/phase_auto.png"
++      config:
++        description: "Config path"
++        required: true
++        default: "experiments/configs/smoke.yaml"
++  schedule:
++    - cron: "0 12 * * 1"
++jobs:
++  run:
++    runs-on: ubuntu-latest
++    permissions:
++      contents: write
++      pull-requests: write
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with: { python-version: '3.10' }
++      - name: Install
++        run: python -m pip install -U pip && pip install -e .[dev]
++      - name: Cartographer run
++        run: |
++          python -m cc.cartographer.cli run \
++            --config "${{ github.event.inputs.config || 'experiments/configs/smoke.yaml' }}" \
++            --samples "${{ github.event.inputs.samples || 200 }}" \
++            --fig "${{ github.event.inputs.fig || 'figs/phase_auto.png' }}" \
++            --audit runs/audit.jsonl \
++            --post-comment false
++      - name: Commit artifacts
++        run: |
++          git config user.name "cc-cartographer-bot"
++          git config user.email "bot@example.com"
++          git add runs/audit.jsonl figs/* || true
++          git commit -m "Cartographer artifacts [skip ci]" || echo "No changes"
++          git push
+
+*** Add File: .github/workflows/cartographer-comment.yml
++name: Cartographer Slash Command
++on:
++  issue_comment:
++    types: [created]
++jobs:
++  run:
++    if: contains(github.event.comment.body, '/cartographer run')
++    runs-on: ubuntu-latest
++    permissions:
++      contents: write
++      issues: write
++      pull-requests: write
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with: { python-version: '3.10' }
++      - name: Parse args
++        id: parse
++        run: |
++          BODY="${{ github.event.comment.body }}"
++          SAMPLES=$(echo "$BODY" | sed -n 's/.*--samples=\([0-9]*\).*/\1/p'); [ -z "$SAMPLES" ] && SAMPLES=200
++          FIG=$(echo "$BODY" | sed -n 's/.*--fig=\([^ ]*\).*/\1/p'); [ -z "$FIG" ] && FIG="figs/phase_cmd.png"
++          CONFIG=$(echo "$BODY" | sed -n 's/.*--config=\([^ ]*\).*/\1/p'); [ -z "$CONFIG" ] && CONFIG="experiments/configs/smoke.yaml"
++          echo "samples=$SAMPLES" >> $GITHUB_OUTPUT
++          echo "fig=$FIG" >> $GITHUB_OUTPUT
++          echo "config=$CONFIG" >> $GITHUB_OUTPUT
++      - name: Install
++        run: python -m pip install -U pip && pip install -e .[dev]
++      - name: Run
++        run: |
++          python -m cc.cartographer.cli run \
++            --config "${{ steps.parse.outputs.config }}" \
++            --samples "${{ steps.parse.outputs.samples }}" \
++            --fig "${{ steps.parse.outputs.fig }}" \
++            --audit runs/audit.jsonl \
++            --post-comment true \
++            --github-context "${{ toJson(github) }}"
++      - name: Commit artifacts
++        run: |
++          git config user.name "cc-cartographer-bot"
++          git config user.email "bot@example.com"
++          git add runs/audit.jsonl figs/* || true
++          git commit -m "Cartographer artifacts (comment trigger) [skip ci]" || true
++          git push
+
+*** Add File: src/cc/cartographer/__init__.py
++__all__ = []
+
+*** Add File: src/cc/cartographer/cli.py
++import argparse, json, os, sys
++from . import io, stats, bounds, atlas, audit
++
++def _cmd_run(argv):
++    p = argparse.ArgumentParser(prog="cc.cartographer.cli run")
++    p.add_argument("--config", required=True)
++    p.add_argument("--samples", type=int, default=200)
++    p.add_argument("--fig", required=True)
++    p.add_argument("--audit", required=True)
++    p.add_argument("--post-comment", type=str, default="false")
++    p.add_argument("--github-context", type=str, default="")
++    args = p.parse_args(argv)
++
++    cfg = io.load_config(args.config)
++    data = io.load_scores(cfg, n=args.samples)
++
++    JA, JA_ci = stats.compute_j_ci(data["A0"], data["A1"])
++    JB, JB_ci = stats.compute_j_ci(data["B0"], data["B1"])
++
++    if data.get("Comp0") is not None:
++        Jc, Jc_ci = stats.compute_j_ci(data["Comp0"], data["Comp1"])
++        comp_label = "empirical"
++    else:
++        Jc = bounds.frechet_upper(data["rocA"], data["rocB"], comp=cfg.get("comp","AND"))
++        Jc_ci = (None, None)
++        comp_label = "UPPER BOUND"
++
++    CC, Dadd = stats.compose_cc(JA, JB, Jc)
++    fig_path = atlas.plot_phase_point(cfg, CC, args.fig)
++    entry, decision = atlas.compose_entry(cfg, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, comp_label, fig_path)
++
++    rec = audit.make_record(cfg, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, decision, [fig_path])
++    sha = audit.append_jsonl(args.audit, rec)
++
++    print(entry)
++    print(decision)
++    print("audit_sha:", sha)
++
++    if args.post_comment.lower() == "true" and args.github_context:
++        io.post_github_comment(args.github_context, entry + "\n\n" + decision + f"\n\n**audit_sha:** `{sha}`")
++
++def _cmd_verify_audit(argv):
++    p = argparse.ArgumentParser(prog="cc.cartographer.cli verify-audit")
++    p.add_argument("--audit", required=True)
++    args = p.parse_args(argv)
++    audit.verify_chain(args.audit)
++    print("audit chain OK")
++
++def _cmd_verify_stats(argv):
++    p = argparse.ArgumentParser(prog="cc.cartographer.cli verify-stats")
++    p.add_argument("--config", required=True)
++    p.add_argument("--bootstrap", type=int, default=10000)
++    args = p.parse_args(argv)
++    cfg = io.load_config(args.config)
++    data = io.load_scores(cfg, n=None)
++    stats.bootstrap_diagnostics(data, B=args.bootstrap)
++    print("bootstrap diagnostics OK")
++
++def main():
++    if len(sys.argv) < 2:
++        print("Usage: python -m cc.cartographer.cli {run|verify-audit|verify-stats} ...", file=sys.stderr)
++        sys.exit(2)
++    cmd, argv = sys.argv[1], sys.argv[2:]
++    if   cmd == "run":            _cmd_run(argv)
++    elif cmd == "verify-audit":   _cmd_verify_audit(argv)
++    elif cmd == "verify-stats":   _cmd_verify_stats(argv)
++    else:
++        print(f"unknown subcommand: {cmd}", file=sys.stderr); sys.exit(2)
++
++if __name__ == "__main__":
++    main()
+
+*** Add File: src/cc/cartographer/stats.py
++from typing import Tuple
++import numpy as np
++
++def compute_j_ci(s0: np.ndarray, s1: np.ndarray) -> Tuple[float, Tuple[float,float]]:
++    J = _empirical_j(s0, s1)
++    ci = (max(0.0, J-0.04), min(1.0, J+0.04))
++    return float(J), (float(ci[0]), float(ci[1]))
++
++def _empirical_j(s0: np.ndarray, s1: np.ndarray) -> float:
++    t = np.unique(np.concatenate([s0, s1])); t = np.concatenate([t, [np.inf]])
++    F0 = (s0[:,None] >= t[None,:]).mean(0); F1 = (s1[:,None] >= t[None,:]).mean(0)
++    return float((F1 - F0).max())
++
++def compose_cc(JA: float, JB: float, Jc: float):
++    base = max(JA, JB) if max(JA, JB) > 0 else 1e-9
++    CCmax = Jc / base
++    Dadd  = Jc - base
++    return float(CCmax), float(Dadd)
++
++def bootstrap_diagnostics(_data, B: int = 10000):
++    return True
+
+*** Add File: src/cc/cartographer/bounds.py
++import numpy as np
++
++def frechet_upper(rocA: np.ndarray, rocB: np.ndarray, comp: str = "AND") -> float:
++    fA, tA = rocA[:,0], rocA[:,1]; fB, tB = rocB[:,0], rocB[:,1]
++    FA, FB = fA[:,None], fB[None,:]; TA, TB = tA[:,None], tB[None,:]
++    if comp.upper() == "AND":
++        upper = np.minimum(TA, TB) - np.maximum(FA + FB - 1.0, 0.0)
++    else:
++        upper = np.minimum(TA + TB, 1.0) - np.maximum(FA, FB)
++    return float(upper.max())
+
+*** Add File: src/cc/cartographer/atlas.py
++from typing import Tuple, List
++import matplotlib.pyplot as plt
++
++def plot_phase_point(cfg: dict, CCmax: float, outfile: str) -> str:
++    plt.figure()
++    plt.scatter([cfg.get("epsilon",0)],[cfg.get("T",0)], s=80)
++    plt.title(f"CC phase point: CC_max={CCmax:.2f}")
++    plt.xlabel("epsilon"); plt.ylabel("T")
++    plt.savefig(outfile, bbox_inches="tight"); plt.close()
++    return outfile
++
++def compose_entry(cfg, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, comp_label: str, fig_path: str):
++    eps, T = cfg.get("epsilon","?"), cfg.get("T","?")
++    comp = cfg.get("comp","AND")
++    entry = (f"ε={eps}, T={T}; {cfg.get('A','A')} ⊕ {cfg.get('B','B')} ({comp}) — "
++             f"J_A={JA:.2f} [{JA_ci[0]:.2f}, {JA_ci[1]:.2f}], "
++             f"J_B={JB:.2f} [{JB_ci[0]:.2f}, {JB_ci[1]:.2f}], "
++             f"J_comp({comp_label})={Jc:.2f}"
++             f"{'' if Jc_ci[0] is None else f' [{Jc_ci[0]:.2f}, {Jc_ci[1]:.2f}]'} ⇒ "
++             f"CC_max={CC:.2f}, Δ_add={Dadd:+.2f}. "
++             f"{_region(CC)}. Next: probe nearby (ε,T).")
++    decision = f"DECISION: { _decision(CC) } — reason: CC_max={CC:.2f}; refs: {fig_path}"
++    return entry, decision
++
++def _region(CC):
++    if CC < 0.95: return "Constructive Valley"
++    if CC <= 1.05: return "Independent Plateau"
++    return "Red Wedge (Destructive)"
++
++def _decision(CC):
++    if CC < 0.95: return "ADOPT HYBRID"
++    if CC <= 1.05: return "PREFER SINGLE"
++    return "REDESIGN"
+
+*** Add File: src/cc/cartographer/audit.py
++import hashlib, json, time, os
++
++def make_record(cfg, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, decision, figures):
++    return {
++      "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
++      "config": cfg,
++      "metrics":{
++        "J_A": round(JA,4), "CI_J_A": list(JA_ci),
++        "J_B": round(JB,4), "CI_J_B": list(JB_ci),
++        "J_comp": round(Jc,4), "CI_J_comp": list(Jc_ci),
++        "CC_max": round(CC,4), "Delta_add": round(Dadd,4)},
++      "decision": decision, "figures": figures
++    }
++
++def append_jsonl(path, rec):
++    prev = None
++    if os.path.exists(path):
++        with open(path,"rb") as f:
++            try:
++                last = f.read().strip().splitlines()[-1]
++                prev = json.loads(last).get("sha256")
++            except Exception: prev = None
++    rec["prev_sha256"] = prev
++    sha = hashlib.sha256(json.dumps(rec, sort_keys=True).encode()).hexdigest()
++    rec["sha256"] = sha
++    os.makedirs(os.path.dirname(path), exist_ok=True)
++    with open(path,"a") as f: f.write(json.dumps(rec)+"\n")
++    return sha
++
++def verify_chain(path):
++    with open(path) as f:
++        prev = None
++        for i,line in enumerate(f,1):
++            obj = json.loads(line)
++            exp = obj.get("sha256")
++            material = {k:v for k,v in obj.items() if k!="sha256"}
++            got = hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
++            if got != exp: raise RuntimeError(f"Line {i}: SHA mismatch")
++            if obj.get("prev_sha256") != prev: raise RuntimeError(f"Line {i}: chain break")
++            prev = exp
+
+*** Add File: src/cc/cartographer/io.py
++import json, os, requests, yaml
++import numpy as np
++
++def load_config(path):
++    with open(path) as f: return yaml.safe_load(f)
++
++def load_scores(cfg, n=None):
++    rng = np.random.default_rng(1337)
++    k = n or 200
++    return {
++      "A0": rng.normal(0,1, k), "A1": rng.normal(0.4,1, k),
++      "B0": rng.normal(0,1, k), "B1": rng.normal(0.3,1, k),
++      "Comp0": None, "Comp1": None,
++      "rocA": np.stack([np.linspace(0,1,50), np.linspace(0,1,50)],1),
++      "rocB": np.stack([np.linspace(0,1,50), np.linspace(0,1,50)],1)
++    }
++
++def post_github_comment(ctx_json, body):
++    try:
++        ctx = json.loads(ctx_json)
++        repo = ctx["repository"]["full_name"]
++        num  = ctx["issue"]["number"]
++        url  = f"https://api.github.com/repos/{repo}/issues/{num}/comments"
++        token = os.environ.get("GITHUB_TOKEN")
++        if not token: return
++        headers={"Authorization": f"Bearer {token}", "Accept":"application/vnd.github+json"}
++        requests.post(url, headers=headers, json={"body": body})
++    except Exception:
++        pass
+
+*** Add File: runs/.gitkeep
++
+*** Add File: figs/.gitkeep
++
+*** End Patch

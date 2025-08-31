@@ -24,19 +24,12 @@ SESS_MVP   ?= 5000
 CONFIG_SMOKE ?= experiments/configs/toy.yaml
 CONFIG_MVP   ?= experiments/configs/two_world.yaml
 
-reproduce-smoke: install
-	$(ACT); python -m experiments.run --config $(CONFIG_SMOKE) --n $(SESS_SMOKE) \
-	  --results-dir results --seed 1337
-
-reproduce-mvp: install
-	$(ACT); python -m experiments.run --config $(CONFIG_MVP) --n $(SESS_MVP) \
-	  --results-dir results --seed 1337
-
 # -------- Phony ----------
 .PHONY: help install setup lock deps fmt lint type test test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp figures reports docs docs-serve \
         verify-invariants verify-statistics verify-audit \
-        precommit docker-build docker-run clean distclean
+        docker-build docker-run clean distclean \
+        carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest
 
 # -------- Help -----------
 help:
@@ -46,8 +39,8 @@ help:
 	@echo "setup                Create venv, install deps, install pre-commit"
 	@echo "install              Install package (editable) + [dev,docs,notebooks] extras"
 	@echo "lock                 Freeze runtime deps to requirements.lock.txt"
-	@echo "fmt                  Auto-format (black, isort) + ruff --fix"
-	@echo "lint                 Ruff/Black/Isort checks (no changes)"
+	@echo "fmt                  Auto-format (ruff --fix, isort, black)"
+	@echo "lint                 Ruff/Isort/Black checks (no changes)"
 	@echo "type                 mypy type-checking"
 	@echo "test                 Unit+integration tests with coverage (>= $(COV_MIN)%)"
 	@echo "reproduce-smoke      $(SESS_SMOKE) sessions quick run (CPU)"
@@ -58,6 +51,7 @@ help:
 	@echo "docs-serve           Local preview at http://127.0.0.1:8000"
 	@echo "verify-*             Stats, invariants, audit-chain checks"
 	@echo "docker-build/run     CPU docker image for fully pinned env"
+	@echo "carto-*              Cartographer agent CLI entrypoints"
 	@echo "clean/distclean      Clean artifacts / wipe venv, locks"
 	@echo "-------------------------------------------------------------"
 	@echo ""
@@ -165,3 +159,34 @@ clean:
 
 distclean: clean
 	rm -rf $(VENV_DIR) requirements.lock.txt
+
+# -------- Cartographer Agent (CLI) ----------
+carto-install:
+	python -m pip install -U pip && pip install -e .[dev]
+
+carto-smoke: carto-install
+	python -m cc.cartographer.cli run \
+		--config experiments/configs/smoke.yaml \
+		--samples 200 \
+		--fig figs/phase_smoke.png \
+		--audit runs/audit.jsonl
+
+carto-mvp: carto-install
+	python -m cc.cartographer.cli run \
+		--config experiments/configs/mvp.yaml \
+		--samples 5000 \
+		--fig figs/phase_e2_T10.png \
+		--audit runs/audit.jsonl
+
+carto-verify-audit: carto-install
+	python -m cc.cartographer.cli verify-audit --audit runs/audit.jsonl
+
+carto-verify-stats: carto-install
+	python -m cc.cartographer.cli verify-stats \
+		--config experiments/configs/mvp.yaml \
+		--bootstrap 10000
+
+carto-suggest: carto-install
+	python -m cc.cartographer.cli suggest \
+		--history runs/audit.jsonl \
+		--out experiments/grids/next.json

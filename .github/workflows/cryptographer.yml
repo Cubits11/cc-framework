@@ -1,0 +1,46 @@
+name: Cartographer Run
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "Number of session pairs"
+        required: true
+        default: "200"
+      fig:
+        description: "Figure path"
+        required: true
+        default: "figs/phase_auto.png"
+      config:
+        description: "Config path"
+        required: true
+        default: "experiments/configs/smoke.yaml"
+  schedule:
+    - cron: "0 12 * * 1"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.10' }
+      - name: Install
+        run: python -m pip install -U pip && pip install -e .[dev]
+      - name: Cartographer run
+        run: |
+          python -m cc.cartographer.cli run \
+            --config "${{ github.event.inputs.config || 'experiments/configs/smoke.yaml' }}" \
+            --samples "${{ github.event.inputs.samples || 200 }}" \
+            --fig "${{ github.event.inputs.fig || 'figs/phase_auto.png' }}" \
+            --audit runs/audit.jsonl \
+            --post-comment false
+      - name: Commit artifacts
+        run: |
+          git config user.name "cc-cartographer-bot"
+          git config user.email "bot@example.com"
+          git add runs/audit.jsonl figs/* || true
+          git commit -m "Cartographer artifacts [skip ci]" || echo "No changes"
+          git push
