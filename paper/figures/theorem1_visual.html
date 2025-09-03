@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fréchet–Hoeffding Bounds — Interactive Visual Abstract</title>
+  <meta name="description" content="Interactive exploration of Fréchet-Hoeffding bounds with live calculators and visualizations" />
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [["$", "$"]],
+        displayMath: [["$$", "$$"]]
+      },
+      startup: {
+        ready: () => {
+          MathJax.startup.defaultReady();
+          MathJax.startup.promise.then(() => {
+            setTimeout(initializeEverything, 500);
+          });
+        }
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.9);
+      --card-bg: rgba(255, 255, 255, 0.98);
+      --card-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+      --and-color: #10b981;
+      --or-color: #ef4444;
+      --ind-color: #3b82f6;
+      --accent-color: #8b5cf6;
+      --gold-color: #f59e0b;
+      --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #e2e8f0;
+      --bg-tertiary: #cbd5e1;
+      --text-primary: #0f172a;
+      --text-secondary: #1e293b;
+      --card-bg: rgba(255, 255, 255, 0.98);
+      --card-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+      min-height: 100vh;
+      padding: 20px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      transition: background 0.3s ease;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Floating particles */
+    .particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: rgba(59, 130, 246, 0.4);
+      border-radius: 50%;
+      animation: float 12s infinite ease-in-out;
+    }
+
+    @keyframes float {
+      0%, 100% { 
+        transform: translateY(100vh) rotate(0deg); 
+        opacity: 0; 
+      }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      50% { 
+        transform: translateY(-10vh) rotate(180deg); 
+        opacity: 1;
+      }
+    }
+
+    /* Main container */
+    .infographic {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: var(--card-shadow);
+      position: relative;
+      z-index: 2;
+      transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .infographic:hover {
+      transform: translateY(-2px);
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #334155 100%);
+      position: relative;
+      overflow: hidden;
+      padding: 60px;
+      text-align: center;
+    }
+
+    [data-theme="light"] .header {
+      background: linear-gradient(135deg, #1f2937 0%, #374151 40%, #4b5563 100%);
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
+      animation: headerPulse 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes headerPulse {
+      from { opacity: 0.7; }
+      to { opacity: 1; }
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .title {
+      font-size: clamp(2.5em, 5vw, 3.5em);
+      font-weight: 900;
+      color: white;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .title:hover {
+      transform: scale(1.02);
+      text-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .subtitle {
+      font-size: 1.4em;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 500;
+      opacity: 0;
+      animation: fadeInUp 1s ease 0.5s forwards;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Controls */
+    .controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .control-btn {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      padding: 10px 15px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-2px);
+    }
+
+    .control-btn:focus {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    /* Main grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      min-height: 800px;
+    }
+
+    @media (max-width: 1200px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      padding: 50px;
+      position: relative;
+    }
+
+    .math-panel {
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+
+    [data-theme="light"] .math-panel {
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+
+    .roc-panel {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    [data-theme="light"] .roc-panel {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .panel-title {
+      font-size: 1.8em;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    [data-theme="light"] .panel-title {
+      color: #0f172a;
+    }
+
+    /* Calculator Section */
+    .calculator {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .calculator:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15);
+    }
+
+    .calculator-title {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .input-group {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .input-label {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: #e2e8f0;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #2563eb;
+      transform: scale(1.2);
+    }
+
+    input[type="number"] {
+      width: 80px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-family: inherit;
+      font-size: 1em;
+      text-align: center;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .result-box {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .result-title {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .result-value {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: #3b82f6;
+    }
+
+    .regime-indicator {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8em;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .regime-r1 {
+      background: rgba(239, 68, 68, 0.15);
+      color: #dc2626;
+    }
+
+    .regime-r2 {
+      background: rgba(16, 185, 129, 0.15);
+      color: #059669;
+    }
+
+    /* Two-world leakage panel */
+    .leakage-panel {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .leakage-panel:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15);
+    }
+
+    .leakage-title {
+      font-size: 1.4em;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .world-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    .world {
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .world-title {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .leakage-results {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .leakage-result {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    /* Theorem showcase */
+    .theorem-showcase {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(59, 130, 246, 0.3);
+      cursor: pointer;
+      transition: all 0.4s ease;
+      transform: perspective(1000px) rotateX(1deg);
+    }
+
+    .theorem-showcase:hover {
+      transform: perspective(1000px) rotateX(0deg) translateY(-4px);
+      box-shadow: 0 25px 50px rgba(59, 130, 246, 0.4);
+    }
+
+    .theorem-showcase.clicked {
+      animation: theoremPulse 0.6s ease;
+    }
+
+    @keyframes theoremPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    .theorem-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .theorem-title {
+      color: white;
+      font-size: 1.5em;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 24px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .marginal-display {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      text-align: center;
+      backdrop-filter: blur(10px);
+    }
+
+    .marginal-labels {
+      color: #1e293b;
+      font-weight: 600;
+      font-size: 1.1em;
+    }
+
+    .bounds-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 24px 0;
+    }
+
+    @media (max-width: 768px) {
+      .bounds-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bound-box {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .bound-box:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .bound-box.animate {
+      animation: boundPulse 0.8s ease;
+    }
+
+    @keyframes boundPulse {
+      0% { transform: scale(1) rotateY(0deg); }
+      50% { transform: scale(1.05) rotateY(5deg); }
+      100% { transform: scale(1) rotateY(0deg); }
+    }
+
+    .operation-label {
+      font-size: 1.3em;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 16px;
+    }
+
+    .formula-display {
+      font-size: 1.1em;
+      color: #334155;
+      line-height: 1.6;
+    }
+
+    /* Visualizations */
+    .visualization {
+      background: white;
+      border-radius: 20px;
+      padding: 32px;
+      margin: 32px 0;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .visualization:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15);
+    }
+
+    .viz-title {
+      text-align: center;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 24px;
+      font-size: 1.2em;
+    }
+
+    /* Condition cards */
+    .conditions-showcase {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 32px 0;
+    }
+
+    @media (max-width: 768px) {
+      .conditions-showcase {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .condition-highlight {
+      padding: 28px;
+      border-radius: 16px;
+      text-align: center;
+      color: white;
+      font-weight: 600;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .condition-highlight:hover {
+      transform: translateY(-4px);
+    }
+
+    .condition-highlight.sparkle {
+      animation: sparkleEffect 0.6s ease;
+    }
+
+    @keyframes sparkleEffect {
+      0% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.05); filter: brightness(1.2); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+
+    .comonotone-card {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .counter-monotone-card {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .condition-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .condition-title {
+      font-size: 1.3em;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .condition-desc {
+      font-size: 0.95em;
+      opacity: 0.9;
+      margin-bottom: 8px;
+    }
+
+    .condition-result {
+      font-size: 0.9em;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      display: inline-block;
+    }
+
+    /* Interpretation matrix */
+    .interpretation-matrix {
+      display: grid;
+      gap: 16px;
+      margin: 32px 0;
+    }
+
+    .interp-item {
+      padding: 20px 24px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+    }
+
+    .interp-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .constructive-interp { background: linear-gradient(90deg, #10b981, #059669); color: white; }
+    .independent-interp { background: linear-gradient(90deg, #6b7280, #4b5563); color: white; }
+    .destructive-interp { background: linear-gradient(90deg, #ef4444, #dc2626); color: white; }
+
+    .interp-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+    }
+
+    /* Insight boxes */
+    .insight-highlight, .mathematical-beauty {
+      padding: 28px 32px;
+      border-radius: 20px;
+      margin: 32px 0;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .insight-highlight:hover, .mathematical-beauty:hover {
+      transform: translateY(-2px);
+    }
+
+    .insight-highlight {
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      color: white;
+    }
+
+    .mathematical-beauty {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: white;
+    }
+
+    .insight-title {
+      font-size: 1.3em;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tagline */
+    .tagline-epic {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #ea580c 100%);
+      color: white;
+      padding: 40px 60px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tagline-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .tagline-main {
+      font-size: clamp(1.6em, 4vw, 2em);
+      font-weight: 800;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .tagline-sub {
+      font-size: clamp(1em, 2.5vw, 1.2em);
+      font-weight: 500;
+      opacity: 0.95;
+      line-height: 1.4;
+    }
+
+    /* Footer */
+    .footer {
+      background: #0f172a;
+      color: rgba(255, 255, 255, 0.9);
+      padding: 24px 60px;
+      text-align: center;
+      font-size: 1em;
+    }
+
+    /* SVG styles */
+    .interactive-svg {
+      transition: all 0.3s ease;
+    }
+
+    .premium-axis {
+      stroke: #1e293b;
+      stroke-width: 3;
+    }
+
+    .premium-grid {
+      stroke: #e2e8f0;
+      stroke-width: 1;
+      opacity: 0.7;
+    }
+
+    .premium-label {
+      font-family: "Inter", sans-serif;
+      font-size: 14px;
+      fill: #374151;
+      font-weight: 600;
+    }
+
+    .and-region {
+      fill: rgba(16, 185, 129, 0.4);
+      stroke: #10b981;
+      stroke-width: 2;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .and-region:hover {
+      fill: rgba(16, 185, 129, 0.6);
+      stroke-width: 3;
+    }
+
+    .or-region {
+      fill: rgba(239, 68, 68, 0.4);
+      stroke: #ef4444;
+      stroke-width: 2;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .or-region:hover {
+      fill: rgba(239, 68, 68, 0.6);
+      stroke-width: 3;
+    }
+
+    .extreme-point {
+      stroke: white;
+      stroke-width: 3;
+      r: 6;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .extreme-point:hover {
+      r: 8;
+      stroke-width: 4;
+    }
+
+    .extreme-point.pulse {
+      animation: pointPulse 0.6s ease;
+    }
+
+    @keyframes pointPulse {
+      0% { r: 6; }
+      50% { r: 12; }
+      100% { r: 6; }
+    }
+
+    .comonotone-pt { fill: #10b981; }
+    .counter-monotone-pt { fill: #ef4444; }
+    .independent-pt { fill: #3b82f6; }
+
+    .roc-curve-premium {
+      fill: none;
+      stroke: #3b82f6;
+      stroke-width: 3;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .roc-curve-premium:hover {
+      stroke-width: 4;
+    }
+
+    .ceiling-line-premium {
+      stroke: #ef4444;
+      stroke-width: 3;
+      stroke-dasharray: 12, 6;
+    }
+
+    .youden-highlight {
+      stroke: #10b981;
+      stroke-width: 4;
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9em;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      max-width: 250px;
+      text-align: center;
+    }
+
+    .tooltip.show {
+      opacity: 1;
+    }
+
+    /* Animation classes */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.6s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Focus styles for accessibility */
+    button:focus,
+    input:focus,
+    .bound-box:focus,
+    .condition-highlight:focus,
+    .interp-item:focus {
+      outline: none;
+      box-shadow: var(--focus-ring);
+
+    /* --- Responsive quality-of-life fixes --- */
+    html { color-scheme: light dark; scroll-behavior: smooth; }
+
+    /* Safer viewport height (iOS Safari toolbars) */
+    body {
+      min-height: 100svh; /* replaces 100vh issues on mobile */
+    }
+
+    /* Make the top controls wrap on mobile and avoid overlap */
+    @media (max-width: 768px) {
+      .controls {
+        position: static;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .header { padding: 28px 18px; }
+      .panel { padding: 22px 18px; }
+      .tagline-epic { padding: 28px 18px; }
+    }
+
+    /* Tighten the main grid & eliminate horizontal overflow on small screens */
+    .main-grid {
+      grid-template-columns: 1.2fr 1fr;
+    }
+    @media (max-width: 1200px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Make SVGs and visual blocks fluid */
+    .visualization svg,
+    .interactive-svg {
+      width: 100%;
+      height: auto;           /* let height follow width */
+      max-height: 60vh;       /* never exceed viewport height */
+      aspect-ratio: 4 / 3;    /* keep a nice proportion when height is auto */
+    }
+
+    /* De-intensify large corners & shadows on small screens for more content fit */
+    @media (max-width: 768px) {
+      .infographic { border-radius: 16px; }
+      .theorem-showcase,
+      .visualization,
+      .calculator,
+      .leakage-panel { box-shadow: 0 10px 20px rgba(0,0,0,.12); }
+    }
+
+    /* Accessibility: show focus only when using keyboard */
+    :focus { outline: none; }
+    :focus-visible { box-shadow: var(--focus-ring); }
+
+    /* Print-friendly version (for PDFs to send faculty) */
+    @media print {
+      body {
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 0;
+      }
+      .particles, .controls, .tagline-epic { display: none !important; }
+      .header, .math-panel, .roc-panel, .visualization,
+      .calculator, .leakage-panel {
+        background: #fff !important;
+        box-shadow: none !important;
+      }
+      .infographic { border-radius: 0; box-shadow: none; }
+      .panel { padding: 22px; page-break-inside: avoid; }
+      .interactive-svg { max-height: none; aspect-ratio: auto; }
+    }
+      
+    }
+      
+  </style>
+</head>
+<body>
+  <!-- Floating particles -->
+  <div class="particles" id="particles"></div>
+  
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip"></div>
+
+  <div class="infographic">
+    <!-- Header -->
+    <div class="header">
+      <div class="controls">
+        <button class="control-btn" id="themeToggle" aria-label="Toggle light/dark mode">
+          <span>🌓</span> Theme
+        </button>
+        <button class="control-btn" id="copyBtn" aria-label="Copy equations to clipboard">
+          <span>📋</span> Copy
+        </button>
+        <button class="control-btn" id="printBtn" aria-label="Print or save as PDF">
+          <span>🖨️</span> Print
+        </button>
+      </div>
+      <div class="header-content">
+        <h1 class="title" id="mainTitle">Theorem 1 — Fréchet–Hoeffding Bounds</h1>
+        <p class="subtitle">for Guardrail Composition</p>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Mathematical Foundation Panel -->
+      <div class="panel math-panel">
+        <h2 class="panel-title fade-in">🔬 Mathematical Foundation</h2>
+
+        <!-- Core Theorem Display -->
+        <div class="theorem-showcase fade-in" id="theoremBox" tabindex="0" aria-describedby="theoremDesc">
+          <div class="theorem-content">
+            <div class="theorem-title">Sharp Probability Bounds Under Fixed Marginals</div>
+
+            <div class="marginal-display">
+              <div class="marginal-labels">
+                Given: $\alpha = P(A)$ and $\beta = P(B)$
+              </div>
+            </div>
+
+            <div class="bounds-container">
+              <div class="bound-box" id="andBound" tabindex="0">
+                <div class="operation-label">⋀ AND Operation</div>
+                <div class="formula-display">
+                  $$P(A \wedge B)\;\in\;\big[\max\{0,\;\alpha+\beta-1\},\;\min\{\alpha,\;\beta\}\big]$$
+                </div>
+              </div>
+
+              <div class="bound-box" id="orBound" tabindex="0">
+                <div class="operation-label">⋁ OR Operation</div>
+                <div class="formula-display">
+                  $$P(A \vee B)\;\in\;\big[\max\{\alpha,\;\beta\},\;\min\{1,\;\alpha+\beta\}\big]$$
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="theoremDesc" class="sr-only">
+            Fréchet-Hoeffding bounds define the tightest possible range for joint probabilities given fixed marginal probabilities.
+            The AND operation has a lower bound of max(0, α+β-1) and upper bound of min(α, β).
+            The OR operation has a lower bound of max(α, β) and upper bound of min(1, α+β).
+          </div>
+        </div>
+
+        <!-- Live Calculator -->
+        <div class="calculator fade-in">
+          <h3 class="calculator-title">🧮 Live Bounds Calculator</h3>
+          
+          <div class="input-group">
+            <span class="input-label">α = P(A)</span>
+            <div class="slider-container">
+              <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.6" aria-valuetext="0.6">
+              <output id="alphaValue">0.6</output>
+            </div>
+            <input type="number" id="alphaInput" min="0" max="1" step="0.01" value="0.6" aria-label="Alpha value">
+          </div>
+          
+          <div class="input-group">
+            <span class="input-label">β = P(B)</span>
+            <div class="slider-container">
+              <input type="range" id="betaSlider" min="0" max="1" step="0.01" value="0.4" aria-valuetext="0.4">
+              <output id="betaValue">0.4</output>
+            </div>
+            <input type="number" id="betaInput" min="0" max="1" step="0.01" value="0.4" aria-label="Beta value">
+          </div>
+          
+          <div class="results">
+            <div class="result-box">
+              <div class="result-title">
+                <span>AND Bounds</span>
+              </div>
+              <div class="result-value" id="andBoundsResult">[0.00, 0.40]</div>
+              <div class="regime-indicator regime-r1" id="regimeIndicator">R1: α+β ≤ 1</div>
+            </div>
+            
+            <div class="result-box">
+              <div class="result-title">
+                <span>OR Bounds</span>
+              </div>
+              <div class="result-value" id="orBoundsResult">[0.60, 1.00]</div>
+              <div id="orBoundsNote">Upper bound is min(1, α+β)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-world Leakage Envelope -->
+        <div class="leakage-panel fade-in">
+          <h3 class="leakage-title">🌍 Two-World Leakage Envelope</h3>
+          
+          <div class="world-inputs">
+            <div class="world">
+              <div class="world-title">World 0 (Baseline)</div>
+              <div class="input-group">
+                <span class="input-label">α₀</span>
+                <input type="number" id="alpha0Input" min="0" max="1" step="0.01" value="0.1" aria-label="Alpha zero">
+              </div>
+              <div class="input-group">
+                <span class="input-label">β₀</span>
+                <input type="number" id="beta0Input" min="0" max="1" step="0.01" value="0.2" aria-label="Beta zero">
+              </div>
+            </div>
+            
+            <div class="world">
+              <div class="world-title">World 1 (Intervention)</div>
+              <div class="input-group">
+                <span class="input-label">α₁</span>
+                <input type="number" id="alpha1Input" min="0" max="1" step="0.01" value="0.3" aria-label="Alpha one">
+              </div>
+              <div class="input-group">
+                <span class="input-label">β₁</span>
+                <input type="number" id="beta1Input" min="0" max="1" step="0.01" value="0.4" aria-label="Beta one">
+              </div>
+            </div>
+          </div>
+          
+          <div class="leakage-results">
+            <div class="leakage-result">
+              <div class="result-title">Δ∧ (AND Leakage)</div>
+              <div class="result-value" id="deltaAndResult">[-0.10, 0.30]</div>
+              <div id="deltaAndNote">Difference in AND probabilities</div>
+            </div>
+            
+            <div class="leakage-result">
+              <div class="result-title">Δ∨ (OR Leakage)</div>
+              <div class="result-value" id="deltaOrResult">[-0.10, 0.30]</div>
+              <div id="deltaOrNote">Difference in OR probabilities</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Geometric Visualization -->
+        <div class="visualization fade-in">
+          <div class="viz-title">Feasible Regions in Probability Space</div>
+          <svg width="100%" height="400" viewBox="0 0 400 400" class="interactive-svg" aria-labelledby="vizTitle" role="img">
+            <title id="vizTitle">Visualization of Fréchet-Hoeffding bounds showing feasible regions for joint probabilities</title>
+            <defs>
+              <pattern id="premium-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                <path d="M 30 0 L 0 0 0 30" fill="none" class="premium-grid" />
+              </pattern>
+            </defs>
+
+            <!-- Background grid -->
+            <rect width="400" height="400" fill="url(#premium-grid)" />
+
+            <!-- Unit square -->
+            <rect x="60" y="60" width="280" height="280" fill="rgba(248,250,252,0.9)" stroke="#cbd5e1" stroke-width="2" />
+
+            <!-- AND feasible region -->
+            <polygon points="60,340 200,200 340,200 340,340" class="and-region" id="andRegion" />
+
+            <!-- OR feasible region -->
+            <polygon points="60,60 60,200 200,200 340,60" class="or-region" id="orRegion" />
+
+            <!-- Axes -->
+            <line x1="60" y1="340" x2="340" y2="340" class="premium-axis" />
+            <line x1="60" y1="340" x2="60" y2="60" class="premium-axis" />
+
+            <!-- Extremal points -->
+            <circle cx="60" cy="340" class="extreme-point counter-monotone-pt" id="point1" />
+            <circle cx="340" cy="200" class="extreme-point comonotone-pt" id="point2" />
+            <circle cx="200" cy="200" class="extreme-point independent-pt" id="point3" />
+            <circle cx="60" cy="60" class="extreme-point counter-monotone-pt" id="point4" />
+            <circle cx="340" cy="60" class="extreme-point comonotone-pt" id="point5" />
+
+            <!-- Labels -->
+            <text x="200" y="370" text-anchor="middle" class="premium-label">α = P(A)</text>
+            <text x="30" y="205" text-anchor="middle" class="premium-label" transform="rotate(-90 30 205)">β = P(B)</text>
+
+            <!-- Corner annotations -->
+            <text x="65" y="355" class="premium-label" style="font-size:12px;">(0,0)</text>
+            <text x="315" y="355" class="premium-label" style="font-size:12px;">(1,0)</text>
+            <text x="65" y="50" class="premium-label" style="font-size:12px;">(0,1)</text>
+            <text x="315" y="50" class="premium-label" style="font-size:12px;">(1,1)</text>
+
+            <!-- Region labels -->
+            <text x="150" y="280" class="premium-label" style="fill:#10b981;font-weight:700;font-size:16px;">AND</text>
+            <text x="150" y="120" class="premium-label" style="fill:#ef4444;font-weight:700;font-size:16px;">OR</text>
+            <text x="210" y="195" class="premium-label" style="fill:#3b82f6;font-weight:600;font-size:12px;">Independent</text>
+          </svg>
+        </div>
+
+        <!-- Conditions -->
+        <div class="conditions-showcase fade-in">
+          <div class="condition-highlight comonotone-card" id="comonotoneCard" tabindex="0">
+            <div class="condition-content">
+              <div class="condition-title">Comonotone Coupling</div>
+              <div class="condition-desc">Nested sets: $A \subseteq B$ or $B \subseteq A$</div>
+              <div class="condition-result">AND achieves maximum<br />OR achieves minimum</div>
+            </div>
+          </div>
+
+          <div class="condition-highlight counter-monotone-card" id="counterMonotoneCard" tabindex="0">
+            <div class="condition-content">
+              <div class="condition-title">Counter-monotone</div>
+              <div class="condition-desc">Disjoint complements: $A \cap B = \varnothing$</div>
+              <div class="condition-result">AND achieves minimum<br />OR achieves maximum</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROC Analysis Panel -->
+      <div class="panel roc-panel">
+        <h2 class="panel-title fade-in">📈 ROC Analysis & Performance Limits</h2>
+
+        <!-- ROC Visualization -->
+        <div class="visualization fade-in">
+          <div class="viz-title">ROC Space with Fréchet–Hoeffding Ceilings</div>
+          <svg width="100%" height="350" viewBox="0 0 360 350" class="interactive-svg" aria-labelledby="rocVizTitle" role="img">
+            <title id="rocVizTitle">ROC curve visualization showing Fréchet-Hoeffding ceilings</title>
+            <!-- Background -->
+            <rect width="360" height="350" fill="rgba(248,250,252,0.8)" />
+
+            <!-- Axes -->
+            <line x1="60" y1="290" x2="320" y2="290" class="premium-axis" />
+            <line x1="60" y1="290" x2="60" y2="40" class="premium-axis" />
+
+            <!-- Random classifier line -->
+            <line x1="60" y1="290" x2="320" y2="40" stroke="#9ca3af" stroke-width="2" stroke-dasharray="8,4" opacity="0.7" />
+
+            <!-- FH ceiling -->
+            <line x1="60" y1="100" x2="320" y2="100" class="ceiling-line-premium" />
+
+            <!-- ROC curve -->
+            <path d="M 60,290 Q 100,240 140,180 Q 180,120 220,80 Q 260,55 320,40" class="roc-curve-premium" id="rocCurve" />
+
+            <!-- Youden J marker -->
+            <line x1="160" y1="160" x2="160" y2="210" class="youden-highlight" />
+            <circle cx="160" cy="160" r="4" fill="#3b82f6" stroke="white" stroke-width="2" />
+            <circle cx="160" cy="210" r="4" fill="#9ca3af" stroke="white" stroke-width="2" />
+
+            <!-- Labels -->
+            <text x="190" y="320" text-anchor="middle" class="premium-label">False Positive Rate</text>
+            <text x="25" y="170" text-anchor="middle" class="premium-label" transform="rotate(-90 25 170)">True Positive Rate</text>
+
+            <!-- Annotations -->
+            <text x="170" y="185" class="premium-label" style="fill:#10b981;font-weight:700;font-size:16px;">J</text>
+            <text x="240" y="95" class="premium-label" style="fill:#ef4444;font-weight:700;">FH Ceiling</text>
+            <text x="240" y="60" class="premium-label" style="fill:#3b82f6;font-weight:700;">ROC Curve</text>
+          </svg>
+        </div>
+
+        <!-- Interpretation Matrix -->
+        <div class="interpretation-matrix fade-in">
+          <div class="interp-item constructive-interp" id="constructive" tabindex="0">
+            <div class="interp-icon">+</div>
+            <div><strong>Constructive Correlation:</strong> Approaches FH upper bound, maximizes positive synergy</div>
+          </div>
+          <div class="interp-item independent-interp" id="independent" tabindex="0">
+            <div class="interp-icon">○</div>
+            <div><strong>Statistical Independence:</strong> Baseline performance, no correlation effects</div>
+          </div>
+          <div class="interp-item destructive-interp" id="destructive" tabindex="0">
+            <div class="interp-icon">−</div>
+            <div><strong>Destructive Correlation:</strong> Below independence baseline, negative synergy</div>
+          </div>
+        </div>
+
+        <!-- Mathematical Insight -->
+        <div class="mathematical-beauty fade-in" id="mathInsight" tabindex="0">
+          <div class="insight-title">⚡ Critical Mathematical Insight</div>
+          <p style="margin:0;font-size:1em;line-height:1.5;opacity:0.95;">
+            Fréchet–Hoeffding bounds establish <strong>absolute performance ceilings</strong> that no guardrail composition can exceed.
+            These bounds represent the fundamental <em>physics of correlation</em> — the immutable laws governing how probability masses
+            can be distributed across joint events.
+          </p>
+
+          <div style="margin-top:20px;padding:16px;background:rgba(255,255,255,0.1);border-radius:12px;">
+            <div style="font-weight:700;margin-bottom:8px;">Key Relationship:</div>
+            <div style="font-size:0.95em;opacity:0.9;">
+              Youden's $J \;\le\;$ FH ceiling $=\; \min\{\alpha,\beta\} - \max\{0,\alpha+\beta-1\}$
+            </div>
+          </div>
+        </div>
+
+        <!-- Practical Implications -->
+        <div class="insight-highlight fade-in" id="practicalInsight" tabindex="0">
+          <div class="insight-title">🎯 Practical Implications</div>
+          <p style="margin:0;font-size:1em;line-height:1.4;margin-bottom:16px;">
+            Understanding these bounds allows AI safety engineers to:
+          </p>
+          <ul style="margin:0;padding-left:20px;font-size:0.95em;line-height:1.5;">
+            <li>Set realistic performance expectations for multi-guardrail systems</li>
+            <li>Identify when correlation optimization can yield meaningful gains</li>
+            <li>Recognize fundamental limits that no amount of tuning can overcome</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tagline -->
+    <div class="tagline-epic">
+      <div class="tagline-content">
+        <div class="tagline-main">"FH bounds = Physics of Guardrail Composition"</div>
+        <div class="tagline-sub">
+          They define the possibility space. Correlation coefficients + confidence intervals tell us where we are inside it.
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <strong>Pranav Bhave</strong> • Pennsylvania State University • Fall 2025 • AI Safety Research
+    </div>
+  </div>
+
+  <script>
+    // Global variables
+    let tooltip = null;
+    let clickCount = 0;
+    let currentTheme = 'dark';
+
+    // Main initialization function
+    function initializeEverything() {
+      console.log('Initializing interactive features...');
+      
+      // Get tooltip element
+      tooltip = document.getElementById('tooltip');
+      if (!tooltip) {
+        console.error('Tooltip element not found');
+        return;
+      }
+
+      // Initialize all features
+      createParticles();
+      setupTooltips();
+      setupTheorem();
+      setupSVGInteractions();
+      setupCards();
+      setupScrollAnimations();
+      setupEasterEgg();
+      setupCalculators();
+      setupThemeToggle();
+      setupCopyFunctionality();
+      setupPrintFunctionality();
+
+      console.log('All features initialized successfully!');
+    }
+
+    // Create floating particles
+    function createParticles() {
+      const container = document.getElementById('particles');
+      if (!container) return;
+
+      const colors = ['#3b82f6', '#10b981', '#ef4444', '#8b5cf6'];
+      
+      for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 12 + 's';
+        particle.style.animationDuration = (10 + Math.random() * 4) + 's';
+        particle.style.background = colors[Math.floor(Math.random() * colors.length)] + '60';
+        container.appendChild(particle);
+      }
+    }
+
+    // Setup tooltip system
+    function setupTooltips() {
+      const tooltipData = {
+        'theoremBox': 'Click to animate the bounds! This shows the fundamental theorem.',
+        'andBound': 'AND operation bounds - intersection probability limits',
+        'orBound': 'OR operation bounds - union probability limits',
+        'andRegion': 'AND feasible region - all possible AND probabilities',
+        'orRegion': 'OR feasible region - all possible OR probabilities',
+        'point1': 'Counter-monotone coupling at (0,0)',
+        'point2': 'Comonotone coupling at (1,0.5)',
+        'point3': 'Independent coupling - baseline case',
+        'point4': 'Counter-monotone coupling at (0,1)',
+        'point5': 'Comonotone coupling at (1,1)',
+        'rocCurve': 'Click to see curve redraw animation!',
+        'comonotoneCard': 'Click for sparkle effect! Maximum positive correlation',
+        'counterMonotoneCard': 'Click for sparkle effect! Maximum negative correlation',
+        'constructive': 'Positive synergy between guardrails',
+        'independent': 'No correlation effects - baseline',
+        'destructive': 'Negative synergy degrades performance',
+        'mathInsight': 'The fundamental mathematics behind guardrail limits',
+        'practicalInsight': 'Real-world applications for AI safety'
+      };
+
+      Object.entries(tooltipData).forEach(([id, text]) => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.addEventListener('mouseenter', (e) => showTooltip(e, text));
+          element.addEventListener('mousemove', updateTooltip);
+          element.addEventListener('mouseleave', hideTooltip);
+          element.addEventListener('focus', (e) => showTooltip(e, text));
+          element.addEventListener('blur', hideTooltip);
+        }
+      });
+    }
+
+    function showTooltip(e, text) {
+      if (!tooltip) return;
+      tooltip.textContent = text;
+      tooltip.classList.add('show');
+      updateTooltip(e);
+    }
+
+    function updateTooltip(e) {
+      if (!tooltip) return;
+      const x = e.clientX + 10;
+      const y = e.clientY - 10;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    function hideTooltip() {
+      if (!tooltip) return;
+      tooltip.classList.remove('show');
+    }
+
+    // Setup theorem interactions
+    function setupTheorem() {
+      const theoremBox = document.getElementById('theoremBox');
+      const andBound = document.getElementById('andBound');
+      const orBound = document.getElementById('orBound');
+
+      if (theoremBox && andBound && orBound) {
+        theoremBox.addEventListener('click', () => {
+          theoremBox.classList.add('clicked');
+          
+          setTimeout(() => {
+            andBound.classList.add('animate');
+          }, 200);
+          
+          setTimeout(() => {
+            orBound.classList.add('animate');
+          }, 400);
+
+          setTimeout(() => {
+            theoremBox.classList.remove('clicked');
+            andBound.classList.remove('animate');
+            orBound.classList.remove('animate');
+          }, 1200);
+        });
+      }
+    }
+
+    // Setup SVG interactions
+    function setupSVGInteractions() {
+      // Extreme points
+      const points = ['point1', 'point2', 'point3', 'point4', 'point5'];
+      points.forEach(pointId => {
+        const point = document.getElementById(pointId);
+        if (point) {
+          point.addEventListener('click', () => {
+            point.classList.add('pulse');
+            setTimeout(() => point.classList.remove('pulse'), 600);
+          });
+          point.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              point.classList.add('pulse');
+              setTimeout(() => point.classList.remove('pulse'), 600);
+            }
+          });
+        }
+      });
+
+      // ROC curve
+      const rocCurve = document.getElementById('rocCurve');
+      if (rocCurve) {
+        rocCurve.addEventListener('click', () => {
+          const path = rocCurve;
+          const length = path.getTotalLength();
+          
+          path.style.strokeDasharray = length;
+          path.style.strokeDashoffset = length;
+          path.style.transition = 'stroke-dashoffset 2s ease-in-out';
+          
+          setTimeout(() => {
+            path.style.strokeDashoffset = '0';
+          }, 50);
+          
+          setTimeout(() => {
+            path.style.strokeDasharray = 'none';
+            path.style.transition = '';
+          }, 2100);
+        });
+      }
+    }
+
+    // Setup card interactions
+    function setupCards() {
+      const cards = [
+        'comonotoneCard', 
+        'counterMonotoneCard', 
+        'constructive', 
+        'independent', 
+        'destructive',
+        'mathInsight',
+        'practicalInsight'
+      ];
+
+      cards.forEach(cardId => {
+        const card = document.getElementById(cardId);
+        if (card) {
+          card.addEventListener('click', () => {
+            card.classList.add('sparkle');
+            setTimeout(() => card.classList.remove('sparkle'), 600);
+            
+            // Create sparkle particles
+            createSparkles(card);
+          });
+          
+          card.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              card.classList.add('sparkle');
+              setTimeout(() => card.classList.remove('sparkle'), 600);
+              createSparkles(card);
+            }
+          });
+        }
+      });
+    }
+
+    function createSparkles(element) {
+      const rect = element.getBoundingClientRect();
+      const colors = ['#fbbf24', '#f59e0b', '#ffffff'];
+      
+      for (let i = 0; i < 8; i++) {
+        const sparkle = document.createElement('div');
+        sparkle.style.position = 'fixed';
+        sparkle.style.left = (rect.left + Math.random() * rect.width) + 'px';
+        sparkle.style.top = (rect.top + Math.random() * rect.height) + 'px';
+        sparkle.style.width = '6px';
+        sparkle.style.height = '6px';
+        sparkle.style.background = colors[Math.floor(Math.random() * colors.length)];
+        sparkle.style.borderRadius = '50%';
+        sparkle.style.pointerEvents = 'none';
+        sparkle.style.zIndex = '10000';
+        sparkle.style.opacity = '0';
+        
+        document.body.appendChild(sparkle);
+        
+        // Animate sparkle
+        sparkle.animate([
+          { opacity: 0, transform: 'scale(0) translateY(0px)', offset: 0 },
+          { opacity: 1, transform: 'scale(1) translateY(-10px)', offset: 0.3 },
+          { opacity: 1, transform: 'scale(1) translateY(-20px)', offset: 0.7 },
+          { opacity: 0, transform: 'scale(0) translateY(-30px)', offset: 1 }
+        ], {
+          duration: 1000,
+          delay: i * 100,
+          easing: 'ease-out'
+        }).onfinish = () => sparkle.remove();
+      }
+    }
+
+    // Setup scroll animations
+    function setupScrollAnimations() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry, index) => {
+          if (entry.isIntersecting) {
+            setTimeout(() => {
+              entry.target.classList.add('visible');
+            }, index * 150);
+          }
+        });
+      }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+      });
+
+      document.querySelectorAll('.fade-in').forEach(el => {
+        observer.observe(el);
+      });
+    }
+
+    // Easter egg
+    function setupEasterEgg() {
+      const title = document.getElementById('mainTitle');
+      if (title) {
+        title.addEventListener('click', () => {
+          clickCount++;
+          if (clickCount === 5) {
+            // Rainbow effect
+            document.body.style.filter = 'hue-rotate(0deg)';
+            document.body.style.transition = 'filter 2s ease';
+            
+            let hue = 0;
+            const rainbow = setInterval(() => {
+              hue += 10;
+              document.body.style.filter = `hue-rotate(${hue}deg)`;
+              if (hue >= 360) {
+                clearInterval(rainbow);
+                setTimeout(() => {
+                  document.body.style.filter = '';
+                  document.body.style.transition = '';
+                  clickCount = 0;
+                }, 500);
+              }
+            }, 50);
+          }
+        });
+      }
+    }
+
+    // Setup calculators
+    function setupCalculators() {
+      // Single world calculator
+      const alphaSlider = document.getElementById('alphaSlider');
+      const alphaInput = document.getElementById('alphaInput');
+      const alphaValue = document.getElementById('alphaValue');
+      const betaSlider = document.getElementById('betaSlider');
+      const betaInput = document.getElementById('betaInput');
+      const betaValue = document.getElementById('betaValue');
+      
+      const andBoundsResult = document.getElementById('andBoundsResult');
+      const orBoundsResult = document.getElementById('orBoundsResult');
+      const regimeIndicator = document.getElementById('regimeIndicator');
+      
+      // Two-world leakage calculator
+      const alpha0Input = document.getElementById('alpha0Input');
+      const beta0Input = document.getElementById('beta0Input');
+      const alpha1Input = document.getElementById('alpha1Input');
+      const beta1Input = document.getElementById('beta1Input');
+      
+      const deltaAndResult = document.getElementById('deltaAndResult');
+      const deltaOrResult = document.getElementById('deltaOrResult');
+      
+      // Update single world calculator
+      function updateSingleWorldCalculator() {
+        const alpha = parseFloat(alphaSlider.value);
+        const beta = parseFloat(betaSlider.value);
+        
+        // Update displayed values
+        alphaValue.textContent = alpha.toFixed(2);
+        alphaInput.value = alpha;
+        betaValue.textContent = beta.toFixed(2);
+        betaInput.value = beta;
+        
+        // Calculate bounds
+        const andLower = Math.max(0, alpha + beta - 1);
+        const andUpper = Math.min(alpha, beta);
+        const orLower = Math.max(alpha, beta);
+        const orUpper = Math.min(1, alpha + beta);
+        
+        // Update results
+        andBoundsResult.textContent = `[${andLower.toFixed(2)}, ${andUpper.toFixed(2)}]`;
+        orBoundsResult.textContent = `[${orLower.toFixed(2)}, ${orUpper.toFixed(2)}]`;
+        
+        // Update regime indicator
+        if (alpha + beta <= 1) {
+          regimeIndicator.textContent = 'R1: α+β ≤ 1';
+          regimeIndicator.className = 'regime-indicator regime-r1';
+        } else {
+          regimeIndicator.textContent = 'R2: α+β > 1';
+          regimeIndicator.className = 'regime-indicator regime-r2';
+        }
+      }
+      
+      // Update two-world leakage calculator
+      function updateTwoWorldCalculator() {
+        const alpha0 = parseFloat(alpha0Input.value) || 0;
+        const beta0 = parseFloat(beta0Input.value) || 0;
+        const alpha1 = parseFloat(alpha1Input.value) || 0;
+        const beta1 = parseFloat(beta1Input.value) || 0;
+        
+        // Calculate bounds for each world
+        const andLower0 = Math.max(0, alpha0 + beta0 - 1);
+        const andUpper0 = Math.min(alpha0, beta0);
+        const andLower1 = Math.max(0, alpha1 + beta1 - 1);
+        const andUpper1 = Math.min(alpha1, beta1);
+        
+        const orLower0 = Math.max(alpha0, beta0);
+        const orUpper0 = Math.min(1, alpha0 + beta0);
+        const orLower1 = Math.max(alpha1, beta1);
+        const orUpper1 = Math.min(1, alpha1 + beta1);
+        
+        // Calculate leakage intervals
+        const deltaAndLower = andLower1 - andUpper0;
+        const deltaAndUpper = andUpper1 - andLower0;
+        
+        const deltaOrLower = orLower1 - orUpper0;
+        const deltaOrUpper = orUpper1 - orLower0;
+        
+        // Update results
+        deltaAndResult.textContent = `[${deltaAndLower.toFixed(2)}, ${deltaAndUpper.toFixed(2)}]`;
+        deltaOrResult.textContent = `[${deltaOrLower.toFixed(2)}, ${deltaOrUpper.toFixed(2)}]`;
+      }
+      
+      // Add event listeners for single world calculator
+      alphaSlider.addEventListener('input', updateSingleWorldCalculator);
+      alphaInput.addEventListener('input', () => {
+        let value = parseFloat(alphaInput.value);
+        if (isNaN(value)) value = 0;
+        value = Math.max(0, Math.min(1, value));
+        alphaSlider.value = value;
+        updateSingleWorldCalculator();
+      });
+      
+      betaSlider.addEventListener('input', updateSingleWorldCalculator);
+      betaInput.addEventListener('input', () => {
+        let value = parseFloat(betaInput.value);
+        if (isNaN(value)) value = 0;
+        value = Math.max(0, Math.min(1, value));
+        betaSlider.value = value;
+        updateSingleWorldCalculator();
+      });
+      
+      // Add event listeners for two-world calculator
+      const twoWorldInputs = [alpha0Input, beta0Input, alpha1Input, beta1Input];
+      twoWorldInputs.forEach(input => {
+        input.addEventListener('input', updateTwoWorldCalculator);
+      });
+      
+      // Initialize calculators
+      updateSingleWorldCalculator();
+      updateTwoWorldCalculator();
+    }
+    
+    // Setup theme toggle
+    function setupThemeToggle() {
+      const themeToggle = document.getElementById('themeToggle');
+      
+      themeToggle.addEventListener('click', () => {
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        themeToggle.setAttribute('aria-label', `Toggle ${currentTheme === 'dark' ? 'light' : 'dark'} mode`);
+      });
+    }
+    
+    // Setup copy functionality
+    function setupCopyFunctionality() {
+      const copyBtn = document.getElementById('copyBtn');
+      
+      copyBtn.addEventListener('click', () => {
+        const andFormula = 'P(A∧B) ∈ [max{0, α+β−1}, min{α,β}]';
+        const orFormula = 'P(A∨B) ∈ [max{α,β}, min{1, α+β}]';
+        
+        const textToCopy = `Fréchet–Hoeffding Bounds:\n${andFormula}\n${orFormula}`;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          // Show success feedback
+          const originalText = copyBtn.innerHTML;
+          copyBtn.innerHTML = '<span>✓</span> Copied!';
+          
+          setTimeout(() => {
+            copyBtn.innerHTML = originalText;
+          }, 2000);
+        }).catch(err => {
+          console.error('Failed to copy: ', err);
+        });
+      });
+    }
+    
+    // Setup print functionality
+    function setupPrintFunctionality() {
+      const printBtn = document.getElementById('printBtn');
+      
+      printBtn.addEventListener('click', () => {
+        window.print();
+      });
+    }
+
+    // Parallax scrolling
+    window.addEventListener('scroll', () => {
+      const scrolled = window.pageYOffset;
+      const rate = scrolled * -0.2;
+      const header = document.querySelector('.header');
+      if (header) {
+        header.style.transform = `translateY(${rate}px)`;
+      }
+    });
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeEverything);
+    } else {
+      // DOM already loaded, but wait for MathJax
+      setTimeout(initializeEverything, 100);
+    }
+  </script>
+</body>
+</html>

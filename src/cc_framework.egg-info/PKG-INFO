@@ -4,19 +4,19 @@ Version: 0.1.0
 Summary: Composability Coefficient (CC) framework for measuring guardrail interactions
 Author: Pranav Bhave
 License: MIT License
-
+        
         Copyright (c) 2025 Cubits11
-
+        
         Permission is hereby granted, free of charge, to any person obtaining a copy
         of this software and associated documentation files (the "Software"), to deal
         in the Software without restriction, including without limitation the rights
         to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
         copies of the Software, and to permit persons to whom the Software is
         furnished to do so, subject to the following conditions:
-
+        
         The above copyright notice and this permission notice shall be included in all
         copies or substantial portions of the Software.
-
+        
         THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
         IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
         FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -24,7 +24,7 @@ License: MIT License
         LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
         OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
         SOFTWARE.
-
+        
 Project-URL: Homepage, https://github.com/Cubits11/cc-framework
 Project-URL: Repository, https://github.com/Cubits11/cc-framework
 Project-URL: Issues, https://github.com/Cubits11/cc-framework/issues
@@ -90,7 +90,7 @@ The Composability Coefficient (CC) Framework provides empirical methods to quant
 ### Key Innovation
 
 - **CC < 0.95**: 🟢 **Constructive** - Mechanisms synergize beyond individual capabilities
-- **0.95 ≤ CC ≤ 1.05**: 🟡 **Independent** - No interaction effects, prefer single best mechanism
+- **0.95 ≤ CC ≤ 1.05**: 🟡 **Independent** - No interaction effects, prefer single best mechanism  
 - **CC > 1.05**: 🔴 **Destructive** - Composition creates vulnerabilities absent individually
 
 ### Research Impact
@@ -106,7 +106,7 @@ This framework bridges the gap between theoretical security composition (differe
 git clone https://github.com/pranavbhave/cc-framework
 cd cc-framework
 
-# Install dependencies
+# Install dependencies  
 make install
 
 # Run smoke test (< 5 minutes)
@@ -167,7 +167,7 @@ Where J ∈ [0,1] with J=0 indicating perfect privacy and J=1 indicating complet
 
 **Tier A (CPU-Safe)**:
 - Random Injection: Vocabulary-based prompt generation
-- Genetic Algorithm: Evolution-based optimization
+- Genetic Algorithm: Evolution-based optimization  
 
 **Tier B (GPU-Required)**:
 - Deep RL Attackers: PPO-trained adaptive adversaries
@@ -176,7 +176,7 @@ Where J ∈ [0,1] with J=0 indicating perfect privacy and J=1 indicating complet
 ### Guardrail Types
 
 - **Keyword Blocking**: Pattern-based filtering with fuzzy matching
-- **Semantic Filtering**: Embedding similarity to harmful templates
+- **Semantic Filtering**: Embedding similarity to harmful templates  
 - **Regex Filtering**: Regular expression based blocking
 - **Composition**: Arbitrary combinations with utility matching
 
@@ -193,7 +193,7 @@ Where J ∈ [0,1] with J=0 indicating perfect privacy and J=1 indicating complet
 cc-framework/
 ├── src/cc/
 │   ├── core/           # Framework core
-│   │   ├── models.py   # Data structures
+│   │   ├── models.py   # Data structures  
 │   │   ├── stats.py    # Statistical methods
 │   │   ├── protocol.py # Two-world implementation
 │   │   ├── attackers.py # Attack strategies
@@ -211,7 +211,7 @@ cc-framework/
 │   └── tests/         # Test suite
 ├── logs/              # Audit logs (JSONL)
 ├── results/           # Analysis outputs
-├── figures/           # Generated plots
+├── figures/           # Generated plots  
 ├── paper/             # LaTeX manuscript
 └── docs/              # Documentation
 ```
@@ -240,7 +240,7 @@ guardrails:
       keywords: ["exploit", "hack"]
       fuzzy_threshold: 0.8
     fpr_target: 0.05
-
+    
   - name: "semantic"
     params:
       harmful_templates: ["bypass security controls"]
@@ -258,14 +258,14 @@ from cc.guardrails.base import Guardrail
 class MyCustomGuardrail(Guardrail):
     def __init__(self, threshold=0.5):
         self.threshold = threshold
-
+    
     def blocks(self, text: str) -> bool:
         return self.score(text) > self.threshold
-
+        
     def score(self, text: str) -> float:
         # Your custom scoring logic
         return my_ml_model.predict_proba(text)[1]
-
+        
     def calibrate(self, benign_texts, target_fpr=0.05):
         scores = [self.score(text) for text in benign_texts]
         self.threshold = np.percentile(scores, 100 * (1 - target_fpr))
@@ -280,11 +280,11 @@ class MyAttacker(AttackStrategy):
     def generate_attack(self, history):
         # Generate attack based on history
         return {"attack_id": "custom_001", "prompt": "..."}
-
+    
     def update_strategy(self, attack, result):
         # Learn from attack result
         pass
-
+        
     def reset(self):
         # Reset for new experiment
         pass
@@ -296,7 +296,7 @@ class MyAttacker(AttackStrategy):
 # Run parameter sweep
 configs = [
     "configs/toy_A.yaml",
-    "configs/toy_B.yaml",
+    "configs/toy_B.yaml", 
     "configs/main_study.yaml"
 ]
 
@@ -324,7 +324,7 @@ make reproduce-paper
 ### Key Outputs
 
 1. **CC Phase Diagram**: Interaction effects across parameter space
-2. **Bootstrap CI Plots**: Statistical confidence visualization
+2. **Bootstrap CI Plots**: Statistical confidence visualization  
 3. **Metrics Dashboard**: CC_max, Δ_add, effect sizes
 4. **Audit Logs**: Complete experiment provenance with hash chaining
 
@@ -355,7 +355,7 @@ make reproduce-paper
 # Test bootstrap coverage
 make verify-statistics
 
-# Test guardrail calibration
+# Test guardrail calibration  
 make verify-invariants
 
 # Test audit chain integrity
@@ -368,7 +368,7 @@ make test
 ## 📚 Academic Context
 
 ### IST 496 Independent Study (Fall 2025)
-- **Student**: Pranav Bhave
+- **Student**: Pranav Bhave  
 - **Advisor**: Dr. Peng Liu
 - **Institution**: Penn State University
 - **Credits**: 3 (135 hours)
@@ -383,7 +383,7 @@ make test
 This framework builds on:
 - **Differential Privacy**: Composition theorems and privacy accounting
 - **Cryptographic Security**: Two-world distinguishability games
-- **Medical Diagnostics**: ROC analysis and Youden's J-statistic
+- **Medical Diagnostics**: ROC analysis and Youden's J-statistic  
 - **Quantitative Information Flow**: Decision-theoretic leakage metrics
 - **AI Safety**: Constitutional AI, guardrail engineering practices
 
@@ -402,7 +402,7 @@ pre-commit install
 # Run tests
 pytest
 
-# Format code
+# Format code  
 black src/ tests/
 ```
 
@@ -419,7 +419,7 @@ black src/ tests/
 Interested in collaboration? Areas of active development:
 
 - **N-way Composition**: Beyond pairwise interactions
-- **Theoretical Bounds**: Analytical CC limits for guardrail families
+- **Theoretical Bounds**: Analytical CC limits for guardrail families  
 - **Industry Applications**: Real-world deployment case studies
 - **Standardization**: IEEE/ISO standard development
 
@@ -450,7 +450,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ### Documentation
 - 📖 [Full Documentation](docs/)
-- 🎥 [Video Tutorials](docs/tutorials/)
+- 🎥 [Video Tutorials](docs/tutorials/)  
 - 📊 [Example Notebooks](examples/)
 
 ### Getting Help

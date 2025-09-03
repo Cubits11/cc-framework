@@ -1,45 +1,111 @@
-from typing import Tuple, List
+"""
+Module: atlas
+Purpose: Plot the CC phase point and compose human-readable decision log lines
+Dependencies: matplotlib
+Author: Pranav Bhave
+Date: 2025-08-31
+"""
+from __future__ import annotations
+
+import os
+from typing import Any, Final, Mapping, Optional, Tuple
+
 import matplotlib.pyplot as plt
 
+__all__ = ["plot_phase_point", "compose_entry"]
 
-def plot_phase_point(cfg: dict, CCmax: float, outfile: str) -> str:
-    plt.figure()
-    plt.scatter([cfg.get("epsilon", 0)], [cfg.get("T", 0)], s=80)
-    plt.title(f"CC phase point: CC_max={CCmax:.2f}")
-    plt.xlabel("epsilon")
-    plt.ylabel("T")
-    plt.savefig(outfile, bbox_inches="tight")
-    plt.close()
+# Thresholds for interpreting CC_max (hard invariants for CLI policy)
+_CC_CONSTRUCTIVE_MAX: Final[float] = 0.95
+_CC_INDEPENDENT_MAX: Final[float] = 1.05
+
+
+def plot_phase_point(cfg: Mapping[str, Any], cc_max: float, outfile: str) -> str:
+    """
+    Save a small phase-point plot marking (epsilon, T) and return the output path.
+    """
+    parent = os.path.dirname(outfile) or "."
+    os.makedirs(parent, exist_ok=True)
+
+    def _to_float(x: Any, default: float = 0.0) -> float:
+        if x is None:
+            return default
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return default
+
+    eps = _to_float(cfg.get("epsilon"), 0.0)
+    T = _to_float(cfg.get("T"), 0.0)
+
+    fig, ax = plt.subplots(figsize=(4, 3), dpi=150)
+    ax.scatter([eps], [T], s=80)
+    ax.set_title(f"CC phase point: CC_max={cc_max:.2f}")
+    ax.set_xlabel("epsilon")
+    ax.set_ylabel("T")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    fig.savefig(outfile, bbox_inches="tight")
+    plt.close(fig)
     return outfile
 
 
-def compose_entry(cfg, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, comp_label: str, fig_path: str):
-    eps, T = cfg.get("epsilon", "?"), cfg.get("T", "?")
-    comp = cfg.get("comp", "AND")
+def compose_entry(
+    cfg: Mapping[str, Any],
+    j_a: float,
+    j_a_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_b: float,
+    j_b_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_comp: float,
+    j_comp_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    cc_max: float,
+    delta_add: float,
+    comp_label: str,
+    fig_path: str,
+) -> Tuple[str, str]:
+    """
+    Compose a human-readable log entry and a decision line for CLI output.
+    """
+    eps = cfg.get("epsilon", "?")
+    T = cfg.get("T", "?")
+    name_a = str(cfg.get("A", "A"))
+    name_b = str(cfg.get("B", "B"))
+    comp = str(cfg.get("comp", "AND"))
+
+    def _fmt_ci(ci: Optional[Tuple[Optional[float], Optional[float]]]) -> str:
+        # Show CI only when both bounds are present
+        if ci is None:
+            return ""
+        lo, hi = ci
+        if lo is None or hi is None:
+            return ""
+        return f" [{lo:.2f}, {hi:.2f}]"
+
     entry = (
-        f"ε={eps}, T={T}; {cfg.get('A','A')} ⊕ {cfg.get('B','B')} ({comp}) — "
-        f"J_A={JA:.2f} [{JA_ci[0]:.2f}, {JA_ci[1]:.2f}], "
-        f"J_B={JB:.2f} [{JB_ci[0]:.2f}, {JB_ci[1]:.2f}], "
-        f"J_comp({comp_label})={Jc:.2f}"
-        f"{'' if Jc_ci[0] is None else f' [{Jc_ci[0]:.2f}, {Jc_ci[1]:.2f}]'} ⇒ "
-        f"CC_max={CC:.2f}, Δ_add={Dadd:+.2f}. "
-        f"{_region(CC)}. Next: probe nearby (ε,T)."
+        f"ε={eps}, T={T}; {name_a} ⊕ {name_b} ({comp}) — "
+        f"J_A={j_a:.2f}{_fmt_ci(j_a_ci)}, "
+        f"J_B={j_b:.2f}{_fmt_ci(j_b_ci)}, "
+        f"J_comp({comp_label})={j_comp:.2f}{_fmt_ci(j_comp_ci)} ⇒ "
+        f"CC_max={cc_max:.2f}, Δ_add={delta_add:+.2f}. "
+        f"{_region(cc_max)}. Next: probe nearby (ε,T)."
     )
-    decision = f"DECISION: {_decision(CC)} — reason: CC_max={CC:.2f}; refs: {fig_path}"
+    decision = f"DECISION: {_decision(cc_max)} — reason: CC_max={cc_max:.2f}; refs: {fig_path}"
     return entry, decision
 
 
-def _region(CC):
-    if CC < 0.95:
+# --- Internals ---------------------------------------------------------------
+
+def _region(cc_max: float) -> str:
+    if cc_max < _CC_CONSTRUCTIVE_MAX:
         return "Constructive Valley"
-    if CC <= 1.05:
+    if cc_max <= _CC_INDEPENDENT_MAX:
         return "Independent Plateau"
     return "Red Wedge (Destructive)"
 
 
-def _decision(CC):
-    if CC < 0.95:
+def _decision(cc_max: float) -> str:
+    if cc_max < _CC_CONSTRUCTIVE_MAX:
         return "ADOPT HYBRID"
-    if CC <= 1.05:
+    if cc_max <= _CC_INDEPENDENT_MAX:
         return "PREFER SINGLE"
     return "REDESIGN"
