@@ -1,0 +1,38 @@
+[
+  {
+    "epsilon": 0.0,
+    "T": 1.0,
+    "comp": "OR",
+    "rationale": "destructive wedge: retreat and flip rule"
+  },
+  {
+    "epsilon": 0.0,
+    "T": 3.0,
+    "comp": "OR",
+    "rationale": "destructive wedge: retreat and flip rule"
+  },
+  {
+    "epsilon": 0.0,
+    "T": 4.0,
+    "comp": "OR",
+    "rationale": "destructive wedge: retreat and flip rule"
+  },
+  {
+    "epsilon": 0.2,
+    "T": 1.0,
+    "comp": "OR",
+    "rationale": "destructive wedge: retreat and flip rule"
+  },
+  {
+    "epsilon": 0.2,
+    "T": 3.0,
+    "comp": "OR",
+    "rationale": "destructive wedge: retreat and flip rule"
+  },
+  {
+    "epsilon": 0.2,
+    "T": 4.0,
+    "comp": "OR",
+    "rationale": "destructive wedge: retreat and flip rule"
+  }
+]

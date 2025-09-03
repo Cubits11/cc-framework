@@ -1,0 +1,454 @@
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Two‑World Attack Game — Pro Edition
+===================================
+
+A desktop‑friendly, fully reproducible console game that *demonstrates* the
+two‑world adaptive attack protocol and computes the key leakage metric J = p0 − p1
+(with a 95% bootstrap CI), as scoped in your independent study docs.
+
+Highlights
+----------
+• Cross‑platform: pure Python 3, no external deps.
+• Reproducible: --seed, fixed RNG, audit log (CSV).
+• Utility‑matched benign behavior by default (similar benign block rates).
+• Difficulty presets (easy/normal/hard/custom).
+• Interactive mode (human attacker) or --bot (ε‑greedy adaptive attacker).
+• Side‑channel demo (--leaky-timing) to visualize timing leakage.
+• Summary prints empirical rates, Youden’s J, and a CI.
+
+Quick start
+-----------
+    python3 two_world_game_pro.py --rounds 12
+    # Windows: py -3 two_world_game_pro.py --rounds 12
+
+Examples
+--------
+    # Play interactively with higher difficulty and a fixed seed
+    python3 two_world_game_pro.py -n 15 --difficulty hard --seed 42
+
+    # Let the built‑in attacker play for you and save a log
+    python3 two_world_game_pro.py -n 50 --bot --log game.csv
+
+    # Demonstrate timing side‑channels
+    python3 two_world_game_pro.py -n 20 --leaky-timing
+
+Author: ChatGPT (GPT‑5 Thinking)
+Date: 2025‑08‑31
+License: MIT
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import os
+import random
+import statistics as stats
+import sys
+import time
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Optional, Tuple
+
+
+# ------------------------------ Config & Models ------------------------------ #
+
+@dataclass
+class WorldConfig:
+    """Blocking and timing parameters for a world."""
+    # Block probabilities (per query type)
+    p_block_benign: float
+    p_block_attack: float
+    # Timing leak model (milliseconds)
+    mean_latency_ms: float = 80.0
+    std_latency_ms: float = 8.0
+    # Optional extra delay for secret world in leaky‑timing mode
+    extra_delay_ms: float = 0.0
+
+    def block_prob(self, qtype: str) -> float:
+        if qtype == "benign":
+            return self.p_block_benign
+        elif qtype == "attack":
+            return self.p_block_attack
+        else:
+            raise ValueError(f"unknown query type: {qtype}")
+
+
+@dataclass
+class RoundResult:
+    idx: int
+    qtype: str
+    resp_a: str
+    resp_b: str
+    latency_a_ms: int
+    latency_b_ms: int
+
+
+@dataclass
+class Summary:
+    benign_total: int
+    attack_total: int
+    block_benign_a: int
+    block_benign_b: int
+    block_attack_a: int
+    block_attack_b: int
+    p0_allowed: float  # Allowed rate on W0 for ATTACK queries
+    p1_allowed: float  # Allowed rate on W1 for ATTACK queries
+    j_hat: float
+    j_ci_low: float
+    j_ci_high: float
+    suggested_guess: Optional[str]  # A or B
+
+
+# ------------------------------- Game Engine -------------------------------- #
+
+class TwoWorldGamePro:
+    def __init__(
+        self,
+        rounds: int = 10,
+        seed: Optional[int] = None,
+        difficulty: str = "normal",
+        leaky_timing: bool = False,
+        bot: bool = False,
+        epsilon: float = 0.15,  # ε for ε‑greedy bot
+        log_path: Optional[str] = None,
+    ) -> None:
+        self.rounds = rounds
+        self.bot = bot
+        self.epsilon = epsilon
+        self.leaky_timing = leaky_timing
+        self.log_path = log_path
+
+        if seed is not None:
+            random.seed(seed)
+
+        # Calibrated defaults (utility‑matched benign ~similar across worlds)
+        # Safe (W0): less aggressive on attack; Secret (W1): more aggressive on attack.
+        self.world0 = WorldConfig(p_block_benign=0.08, p_block_attack=0.30)
+        self.world1 = WorldConfig(p_block_benign=0.08, p_block_attack=0.70)
+
+        if difficulty == "easy":
+            # Wider separation makes game easier.
+            self.world0.p_block_attack = 0.25
+            self.world1.p_block_attack = 0.80
+        elif difficulty == "normal":
+            pass
+        elif difficulty == "hard":
+            # Closer rates make game harder.
+            self.world0.p_block_attack = 0.35
+            self.world1.p_block_attack = 0.55
+        elif difficulty == "custom":
+            # Allow environment overrides for advanced users
+            def _envf(name: str, default: float) -> float:
+                try:
+                    return float(os.environ.get(name, default))
+                except Exception:
+                    return default
+            self.world0 = WorldConfig(
+                p_block_benign=_envf("W0_PB_BENIGN", 0.08),
+                p_block_attack=_envf("W0_PB_ATTACK", 0.30),
+            )
+            self.world1 = WorldConfig(
+                p_block_benign=_envf("W1_PB_BENIGN", 0.08),
+                p_block_attack=_envf("W1_PB_ATTACK", 0.70),
+            )
+        else:
+            raise ValueError(f"unknown difficulty: {difficulty}")
+
+        if self.leaky_timing:
+            # Add a subtle timing leak to the secret world.
+            self.world1.extra_delay_ms = 12.0  # secret adds ~12ms on average
+
+        # Hidden mapping: which label is which world index (0 or 1)
+        # Label -> world index
+        self.world_map: Dict[str, int] = {}
+        if random.choice([True, False]):
+            self.world_map["A"] = 0
+            self.world_map["B"] = 1
+        else:
+            self.world_map["A"] = 1
+            self.world_map["B"] = 0
+
+        # Secret world index (1)
+        self.secret_world = 1
+
+        self.history: List[RoundResult] = []
+
+        # Running tallies by label (A/B) for quick summaries
+        self.counts = {
+            "A": {"benign_total": 0, "attack_total": 0, "blocked_benign": 0, "blocked_attack": 0},
+            "B": {"benign_total": 0, "attack_total": 0, "blocked_benign": 0, "blocked_attack": 0},
+        }
+
+        if self.log_path:
+            # Initialize CSV audit log
+            with open(self.log_path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["round", "qtype", "respA", "latencyA_ms", "respB", "latencyB_ms"])
+
+    # --------------------------- Core mechanics --------------------------- #
+
+    def _draw_latency_ms(self, cfg: WorldConfig) -> int:
+        # Gaussian jitter with optional extra delay for secret world
+        mu = cfg.mean_latency_ms + cfg.extra_delay_ms
+        sigma = max(0.1, cfg.std_latency_ms)
+        # Truncate to positive values
+        val = max(1.0, random.gauss(mu, sigma))
+        return int(round(val))
+
+    def _query(self, world_idx: int, qtype: str, cfg0: WorldConfig, cfg1: WorldConfig) -> Tuple[str, int]:
+        cfg = cfg0 if world_idx == 0 else cfg1
+        p_block = cfg.block_prob(qtype)
+        blocked = (random.random() < p_block)
+        latency_ms = self._draw_latency_ms(cfg)
+        return ("Blocked" if blocked else "Allowed", latency_ms)
+
+    # --------------------------- Bot strategy ----------------------------- #
+    def _bot_choose(self) -> str:
+        """
+        ε‑greedy over two arms (benign vs attack) to maximize distinguishability:
+        choose the query type that has shown the largest *difference* between A and B.
+        """
+        # With epsilon, explore randomly
+        if random.random() < self.epsilon:
+            return random.choice(["benign", "attack"])
+
+        # Exploit: pick the type with larger absolute block‑rate difference
+        def diff(qtype: str) -> float:
+            # Estimate per‑label block rates so far
+            a = self.counts["A"]
+            b = self.counts["B"]
+            if qtype == "benign":
+                ra = (a["blocked_benign"] / a["benign_total"]) if a["benign_total"] else 0.0
+                rb = (b["blocked_benign"] / b["benign_total"]) if b["benign_total"] else 0.0
+            else:
+                ra = (a["blocked_attack"] / a["attack_total"]) if a["attack_total"] else 0.0
+                rb = (b["blocked_attack"] / b["attack_total"]) if b["attack_total"] else 0.0
+            return abs(ra - rb)
+        d_attack = diff("attack")
+        d_benign = diff("benign")
+        return "attack" if d_attack >= d_benign else "benign"
+
+    # --------------------------- Gameplay loop ---------------------------- #
+    def play(self) -> None:
+        print("\n=== Two‑World Attack Game — Pro Edition ===")
+        print("You will interact with two hidden worlds: A and B.")
+        print("One hides a secret (World 1) and the other is safe (World 0).")
+        if self.leaky_timing:
+            print("Note: timing leak enabled — observe subtle latency differences.\n")
+        else:
+            print("")
+
+        for i in range(1, self.rounds + 1):
+            if self.bot:
+                qtype = self._bot_choose()
+                print(f"Round {i}: BOT chooses query type -> {qtype}")
+            else:
+                qtype = self._ask_qtype(i)
+
+            resp_a, lat_a = self._query(self.world_map["A"], qtype, self.world0, self.world1)
+            resp_b, lat_b = self._query(self.world_map["B"], qtype, self.world0, self.world1)
+
+            self._tally("A", qtype, resp_a)
+            self._tally("B", qtype, resp_b)
+
+            self.history.append(RoundResult(i, qtype, resp_a, resp_b, lat_a, lat_b))
+
+            # Show responses for the round
+            lat_str = f"  (latency ms — A:{lat_a}, B:{lat_b})" if self.leaky_timing else ""
+            print(f"  World A: {resp_a}\n  World B: {resp_b}{lat_str}\n")
+
+            # Append to log if requested
+            if self.log_path:
+                with open(self.log_path, "a", newline="", encoding="utf-8") as f:
+                    w = csv.writer(f)
+                    w.writerow([i, qtype, resp_a, lat_a, resp_b, lat_b])
+
+        # Ask user to guess
+        guess = self._ask_guess()
+        guessed_world_index = self.world_map[guess]
+
+        if guessed_world_index == self.secret_world:
+            print("\n✅ Correct! You identified the secret world.")
+        else:
+            print("\n❌ Incorrect. The other world contained the secret.")
+
+        # Print summary with J and CI
+        summary = self._summarize()
+        self._print_summary(summary)
+
+    # ------------------------------ Helpers ------------------------------- #
+    def _ask_qtype(self, round_idx: int) -> str:
+        while True:
+            try:
+                s = input(f"Round {round_idx} — enter query type ('benign' or 'attack'): ").strip().lower()
+            except EOFError:
+                print("\nInput interrupted — exiting.")
+                sys.exit(1)
+            if s in {"benign", "attack"}:
+                return s
+            print("Please type 'benign' or 'attack'.")
+
+    def _ask_guess(self) -> str:
+        while True:
+            try:
+                s = input("Which world hides the secret? Type 'A' or 'B': ").strip().upper()
+            except EOFError:
+                print("\nInput interrupted — exiting.")
+                sys.exit(1)
+            if s in {"A", "B"}:
+                return s
+            print("Please type 'A' or 'B'.")
+
+    def _tally(self, label: str, qtype: str, resp: str) -> None:
+        c = self.counts[label]
+        if qtype == "benign":
+            c["benign_total"] += 1
+            if resp == "Blocked":
+                c["blocked_benign"] += 1
+        else:
+            c["attack_total"] += 1
+            if resp == "Blocked":
+                c["blocked_attack"] += 1
+
+    # Compute J = p0 - p1 from ATTACK outcomes (Allowed = attack success)
+    def _estimate_j_and_ci(self) -> Tuple[float, float, float, float, float]:
+        # Reconstruct per‑world attack "allowed" outcomes using the known mapping.
+        # For each round with qtype='attack', we know whether A/B correspond to W0/W1.
+        attack_pairs: List[Tuple[int, int]] = []  # (allowed_on_W0, allowed_on_W1)
+        for r in self.history:
+            if r.qtype != "attack":
+                continue
+            # Derive (allowed on W0, allowed on W1) from (A,B) based on mapping
+            # Boolean: 1 if Allowed, 0 if Blocked
+            allowed_a = 1 if r.resp_a == "Allowed" else 0
+            allowed_b = 1 if r.resp_b == "Allowed" else 0
+            if self.world_map["A"] == 0:
+                attack_pairs.append((allowed_a, allowed_b))
+            else:
+                attack_pairs.append((allowed_b, allowed_a))
+
+        if not attack_pairs:
+            return (0.0, 0.0, 0.0, 0.0, 0.0)
+
+        # Empirical means
+        p0 = sum(a for a, _ in attack_pairs) / len(attack_pairs)
+        p1 = sum(b for _, b in attack_pairs) / len(attack_pairs)
+        j_hat = p0 - p1
+
+        # 95% bootstrap CI (percentile)
+        B = 2000 if len(attack_pairs) >= 20 else 1000
+        js = []
+        for _ in range(B):
+            a, b = 0, 0
+            for _ in range(len(attack_pairs)):
+                x, y = random.choice(attack_pairs)
+                a += x
+                b += y
+            p0_b = a / len(attack_pairs)
+            p1_b = b / len(attack_pairs)
+            js.append(p0_b - p1_b)
+        js.sort()
+        lo = js[int(0.025 * (B - 1))]
+        hi = js[int(0.975 * (B - 1))]
+        return p0, p1, j_hat, lo, hi
+
+    def _summarize(self) -> Summary:
+        # Basic tallies by label
+        a = self.counts["A"]
+        b = self.counts["B"]
+
+        p0, p1, j_hat, lo, hi = self._estimate_j_and_ci()
+
+        # Heuristic suggestion: secret world blocks more ATTACK queries
+        # Compare block rates on attack between A and B
+        rate_attack_a = (a["blocked_attack"] / a["attack_total"]) if a["attack_total"] else 0.0
+        rate_attack_b = (b["blocked_attack"] / b["attack_total"]) if b["attack_total"] else 0.0
+        suggested = None
+        if a["attack_total"] and b["attack_total"]:
+            suggested = "A" if rate_attack_a > rate_attack_b else "B"
+
+        return Summary(
+            benign_total=a["benign_total"] + b["benign_total"],
+            attack_total=a["attack_total"] + b["attack_total"],
+            block_benign_a=a["blocked_benign"],
+            block_benign_b=b["blocked_benign"],
+            block_attack_a=a["blocked_attack"],
+            block_attack_b=b["blocked_attack"],
+            p0_allowed=p0,
+            p1_allowed=p1,
+            j_hat=j_hat,
+            j_ci_low=lo,
+            j_ci_high=hi,
+            suggested_guess=suggested,
+        )
+
+    def _print_summary(self, s: Summary) -> None:
+        print("\n--- Summary ---")
+        print(f"Benign queries total: {s.benign_total}")
+        if s.benign_total:
+            # Per‑label benign block rates (utility matching)
+            # We print rates per label to help users see benign parity.
+            # NOTE: totals are per label (half the benign_total each in expectation).
+            a_b_total = self.counts['A']['benign_total']
+            b_b_total = self.counts['B']['benign_total']
+            a_rate = (self.counts['A']['blocked_benign']/a_b_total) if a_b_total else 0.0
+            b_rate = (self.counts['B']['blocked_benign']/b_b_total) if b_b_total else 0.0
+            print(f"  World A benign block rate: {a_rate:.2f}")
+            print(f"  World B benign block rate: {b_rate:.2f}")
+
+        print(f"Attack queries total: {s.attack_total}")
+        if s.attack_total:
+            a_a_total = self.counts['A']['attack_total']
+            b_a_total = self.counts['B']['attack_total']
+            ra = (self.counts['A']['blocked_attack']/a_a_total) if a_a_total else 0.0
+            rb = (self.counts['B']['blocked_attack']/b_a_total) if b_a_total else 0.0
+            print(f"  World A attack block rate: {ra:.2f}")
+            print(f"  World B attack block rate: {rb:.2f}")
+
+        if s.attack_total:
+            print("\nLeakage (Youden’s J on ATTACK success):")
+            print(f"  p0 (Allowed | W0, ATTACK): {s.p0_allowed:.2f}")
+            print(f"  p1 (Allowed | W1, ATTACK): {s.p1_allowed:.2f}")
+            print(f"  Ĵ = p0 − p1: {s.j_hat:.3f} (95% CI: [{s.j_ci_low:.3f}, {s.j_ci_high:.3f}])")
+
+        if s.suggested_guess:
+            print(f"\nHeuristic: the world with *higher attack block rate* is likely SECRET → suggest: {s.suggested_guess}")
+
+        print("\nThank you for playing! You can rerun with --bot, --rounds, --seed, or --difficulty.")
+
+
+# --------------------------------- CLI -------------------------------------- #
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Two‑World Attack Game — Pro Edition (desktop friendly)"
+    )
+    p.add_argument("-n", "--rounds", type=int, default=10, help="Number of query rounds (default: 10)")
+    p.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    p.add_argument("--difficulty", choices=["easy", "normal", "hard", "custom"], default="normal",
+                   help="Game difficulty; 'custom' reads env vars W0_PB_BENIGN, W0_PB_ATTACK, W1_PB_BENIGN, W1_PB_ATTACK")
+    p.add_argument("--leaky-timing", action="store_true", help="Enable timing side‑channel demo (adds avg delay to secret world)")
+    p.add_argument("--bot", action="store_true", help="Let built‑in attacker play (ε‑greedy over query types)")
+    p.add_argument("--epsilon", type=float, default=0.15, help="Exploration rate for bot (default: 0.15)")
+    p.add_argument("--log", type=str, default=None, help="CSV audit log path (e.g., game.csv)")
+    return p.parse_args(argv)
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    args = parse_args(argv)
+    game = TwoWorldGamePro(
+        rounds=max(1, args.rounds),
+        seed=args.seed,
+        difficulty=args.difficulty,
+        leaky_timing=args.leaky_timing,
+        bot=args.bot,
+        epsilon=max(0.0, min(1.0, args.epsilon)),
+        log_path=args.log,
+    )
+    game.play()
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

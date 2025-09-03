@@ -1,9 +1,17 @@
 LICENSE
 README.md
 pyproject.toml
+src/cc/_legacy/models.py
 src/cc/analysis/cc_estimation.py
 src/cc/analysis/reporting.py
+src/cc/cartographer/atlas.py
+src/cc/cartographer/audit.py
+src/cc/cartographer/bounds.py
+src/cc/cartographer/cli.py
+src/cc/cartographer/io.py
+src/cc/cartographer/stats.py
 src/cc/core/attackers.py
+src/cc/core/composition_theory.py
 src/cc/core/guardrail_api.py
 src/cc/core/logging.py
 src/cc/core/metrics.py
@@ -19,6 +27,7 @@ src/cc/guardrails/regex_filters.py
 src/cc/guardrails/semantic_filter.py
 src/cc/io/seeds.py
 src/cc/io/storage.py
+src/cc/utils/dashboard.py
 src/cc/utils/plotting.py
 src/cc/utils/timing.py
 src/cc/utils/validation.py
@@ -27,3 +36,4 @@ src/cc_framework.egg-info/SOURCES.txt
 src/cc_framework.egg-info/dependency_links.txt
 src/cc_framework.egg-info/requires.txt
 src/cc_framework.egg-info/top_level.txt
+tests/test_week2_deliverables.py
