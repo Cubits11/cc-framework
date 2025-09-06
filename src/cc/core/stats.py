@@ -24,6 +24,56 @@ ConfidenceInterval = Tuple[float, float]
 MetricsDict = Dict[str, float]
 
 
+# ======================= NEW: lightweight J bootstrap ======================== #
+@dataclass
+class JBootstrapCI:
+    """Minimal return type for the runner's import (used in analysis + logging)."""
+    ci_lower: float
+    ci_upper: float
+    method: str = "percentile"
+
+
+def bootstrap_ci_j_statistic(
+    w0: np.ndarray,
+    w1: np.ndarray,
+    B: int = 2000,
+    alpha: float = 0.05,
+    random_state: int = 1337,
+) -> JBootstrapCI:
+    """
+    Percentile bootstrap CI for J = mean(w0) - mean(w1),
+    where w0, w1 are 0/1 arrays of outcomes (world 0 / world 1).
+    
+    Args:
+        w0: Binary outcomes from world 0 (no protection)
+        w1: Binary outcomes from world 1 (with protection)
+        B: Number of bootstrap samples
+        alpha: Significance level for CI
+        random_state: Random seed for reproducibility
+        
+    Returns:
+        JBootstrapCI with confidence interval bounds
+    """
+    w0 = np.asarray(w0, dtype=float).ravel()
+    w1 = np.asarray(w1, dtype=float).ravel()
+    if w0.size == 0 or w1.size == 0:
+        raise ValueError("bootstrap_ci_j_statistic: both worlds must be non-empty")
+
+    n0, n1 = w0.size, w1.size
+    rng = np.random.default_rng(random_state)
+
+    boot = np.empty(B, dtype=float)
+    for b in range(B):
+        s0 = w0[rng.integers(0, n0, size=n0)]
+        s1 = w1[rng.integers(0, n1, size=n1)]
+        boot[b] = float(s0.mean() - s1.mean())
+
+    lo = float(np.quantile(boot, alpha / 2.0))
+    hi = float(np.quantile(boot, 1.0 - alpha / 2.0))
+    return JBootstrapCI(ci_lower=lo, ci_upper=hi)
+# ===================== END NEW: lightweight J bootstrap ===================== #
+
+
 @dataclass
 class BootstrapResult:
     """Comprehensive results of bootstrap analysis with CC metrics"""
@@ -146,8 +196,11 @@ def compute_composability_coefficients(
             "cc_max": 1.0,
             "delta_add": 0.0,
             "cc_multiplicative": 1.0,
+            "j_composed": j_composed,
+            "j_max_individual": j_composed,
             "j_theoretical_max": j_composed,
             "j_theoretical_add": j_composed,
+            "efficiency_ratio": 1.0,
         }
 
     j_max_individual = max(j_individual.values())
@@ -269,7 +322,7 @@ def bootstrap_ci_with_cc(
                 delta_boot = j_boot - j_max_individual
                 bootstrap_cc.append(cc_boot)
                 bootstrap_delta.append(delta_boot)
-        except:
+        except Exception:
             # Handle edge cases in bootstrap samples
             continue
 
@@ -595,9 +648,11 @@ def _run_hypothesis_tests(
 __all__ = [
     "BootstrapResult",
     "CCInterpretation",
+    "JBootstrapCI",
     "compute_j_statistic",
     "compute_composability_coefficients",
     "bootstrap_ci_with_cc",
+    "bootstrap_ci_j_statistic",
     "dkw_confidence_bound",
     "analytical_j_ci",
     "sanity_check_j_statistic",

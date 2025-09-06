@@ -1,11 +1,13 @@
 # src/cc/exp/run_two_world.py
-"""Main experiment runner for two-world protocol"""
+"""Main experiment runner for two-world protocol (audit-friendly)."""
+
+from __future__ import annotations
 
 import argparse
 import json
-import sys
+import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 import yaml
@@ -17,263 +19,277 @@ from ..core.protocol import TwoWorldProtocol
 from ..core.stats import bootstrap_ci_j_statistic
 
 
-def load_config(config_path: str) -> dict:
-    """Load experiment configuration from YAML"""
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
+# --------------------------------------------------------------------------- #
+# Config utilities
+# --------------------------------------------------------------------------- #
+
+def load_config(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
-def create_attacker(config: dict):
-    """Create attacker from configuration"""
-    attacker_config = config.get("attacker", {})
-    attacker_type = attacker_config.get("type", "random_injection")
+def _deep_set(cfg: dict, dotted: str, value: Any) -> None:
+    """Set cfg['a']['b']... = value for key 'a.b....' creating maps as needed."""
+    cur = cfg
+    keys = dotted.split(".")
+    for k in keys[:-1]:
+        cur = cur.setdefault(k, {})
+    cur[keys[-1]] = value
 
-    if attacker_type == "random_injection":
-        return RandomInjectionAttacker(
-            vocab_harmful=config.get("vocab_harmful", []),
-            vocab_benign=config.get("vocab_benign", []),
-            base_success=attacker_config.get("base_success", 0.6),
-            seed=config.get("seed", 42),
-        )
-    elif attacker_type == "genetic_algorithm":
-        vocab = config.get("vocab_harmful", []) + config.get("vocab_benign", [])
-        return GeneticAlgorithmAttacker(
-            vocab=vocab,
-            population_size=attacker_config.get("population_size", 50),
-            mutation_rate=attacker_config.get("mutation_rate", 0.1),
-            seed=config.get("seed", 42),
-        )
+
+def apply_overrides(cfg: dict, kvs: List[str]) -> dict:
+    """--set a.b=1 c.d=0.1    (int/float autodetected, else str)"""
+    for kv in kvs:
+        if "=" not in kv:
+            continue
+        k, v = kv.split("=", 1)
+        cast = v
+        for caster in (int, float):
+            try:
+                cast = caster(v)
+                break
+            except Exception:
+                pass
+        _deep_set(cfg, k, cast)
+    return cfg
+
+
+# --------------------------------------------------------------------------- #
+# Factory helpers (aligned to your YAMLs) - FIXED
+# --------------------------------------------------------------------------- #
+
+def create_attacker(cfg: dict):
+    a = cfg.get("attacker", {}) or {}
+    a_type = a.get("type", "random_injection")
+    a_params = a.get("params", {}) or {}
+
+    if a_type == "random_injection":
+        # RandomInjectionAttacker requires vocab_harmful and vocab_benign as positional arguments
+        vocab_harmful = a_params.get("vocab_harmful", cfg.get("vocab_harmful", []))
+        vocab_benign = a_params.get("vocab_benign", cfg.get("vocab_benign", []))
+        
+        # Provide defaults if empty
+        if not vocab_harmful:
+            vocab_harmful = ["attack", "hack", "exploit", "malicious", "harmful", "dangerous"]
+        if not vocab_benign:
+            vocab_benign = ["hello", "please", "thank", "help", "information", "question"]
+        
+        # Create with required positional arguments
+        return RandomInjectionAttacker(vocab_harmful, vocab_benign)
+            
+    elif a_type == "genetic_algorithm":
+        vocab = (a_params.get("vocab", []) or
+                 a_params.get("vocab_harmful", []) + a_params.get("vocab_benign", []))
+        
+        # Provide default vocab if empty
+        if not vocab:
+            vocab = ["attack", "hack", "exploit", "malicious", "test", "probe"]
+        
+        # GeneticAlgorithmAttacker takes vocab as first positional argument
+        return GeneticAlgorithmAttacker(vocab)
     else:
-        raise ValueError(f"Unknown attacker type: {attacker_type}")
+        raise ValueError(f"Unknown attacker type: {a_type}")
 
 
-def create_world_configs(config: dict) -> Dict[int, WorldConfig]:
-    """Create world configurations from config"""
-    worlds = {}
+def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
+    worlds: Dict[int, WorldConfig] = {}
 
-    # World 0: No protection (baseline)
+    # World 0 (baseline)
     worlds[0] = WorldConfig(
         world_id=0,
-        guardrail_stack=[],  # No guardrails
+        guardrail_stack=[],
         utility_profile={},
-        baseline_success_rate=config.get("baseline_success_rate", 0.6),
+        baseline_success_rate=cfg.get("baseline_success_rate", 0.6),
     )
 
-    # World 1: With guardrails
-    guardrail_specs = []
-    for g_config in config.get("guardrails", []):
-        spec = GuardrailSpec(
-            name=g_config["name"],
-            params=g_config.get("params", {}),
-            calibration_fpr_target=g_config.get("fpr_target", 0.05),
+    # World 1 (guardrails)
+    guardrail_specs: List[GuardrailSpec] = []
+    for g in (cfg.get("guardrails") or []):
+        guardrail_specs.append(
+            GuardrailSpec(
+                name=g["name"],
+                params=g.get("params", {}) or {},
+                calibration_fpr_target=g.get("fpr_target", 0.05),
+            )
         )
-        guardrail_specs.append(spec)
 
     worlds[1] = WorldConfig(
         world_id=1,
         guardrail_stack=guardrail_specs,
         utility_profile={},
-        baseline_success_rate=config.get("baseline_success_rate", 0.6),
+        baseline_success_rate=cfg.get("baseline_success_rate", 0.6),
     )
-
     return worlds
 
 
-def analyze_results(results: List[AttackResult]) -> dict:
-    """Analyze experimental results and compute CC metrics"""
-    # Separate by world
-    world_0_results = [r.success for r in results if r.world_bit == 0]
-    world_1_results = [r.success for r in results if r.world_bit == 1]
+# --------------------------------------------------------------------------- #
+# Analysis (maps to your memo/plots naming)
+# --------------------------------------------------------------------------- #
 
-    if not world_0_results or not world_1_results:
+def analyze_results(results: List[AttackResult]) -> dict:
+    """Compute success rates, J, CC_max, bootstrap CI, and tags."""
+    w0 = np.array([r.success for r in results if r.world_bit == 0], dtype=float)
+    w1 = np.array([r.success for r in results if r.world_bit == 1], dtype=float)
+    if w0.size == 0 or w1.size == 0:
         raise ValueError("Need results from both worlds")
 
-    # Convert to numpy arrays
-    w0_array = np.array(world_0_results, dtype=float)
-    w1_array = np.array(world_1_results, dtype=float)
+    p0_hat = float(np.mean(w0))  # attacker success w/o protection
+    p1_hat = float(np.mean(w1))  # attacker success w protection
+    j_emp = p0_hat - p1_hat
 
-    # Compute empirical success rates
-    p0_hat = np.mean(w0_array)  # Success rate without protection
-    p1_hat = np.mean(w1_array)  # Success rate with protection
+    boot = bootstrap_ci_j_statistic(w0, w1, B=2000, alpha=0.05)
+    j_ci = (float(boot.ci_lower), float(boot.ci_upper))
 
-    # Compute J-statistic (protection effectiveness)
-    j_empirical = p0_hat - p1_hat
+    j_theory_max = p0_hat if p0_hat > 0 else 1e-9
+    cc_max = j_emp / j_theory_max
 
-    # Bootstrap confidence interval
-    bootstrap_result = bootstrap_ci_j_statistic(w0_array, w1_array, B=2000, alpha=0.05)
-
-    # For single guardrail analysis, CC_max = J_empirical / J_max
-    # where J_max = p0_hat (theoretical maximum)
-    j_theoretical_max = p0_hat
-    cc_max = j_empirical / j_theoretical_max if j_theoretical_max > 0 else 0.0
-
-    # Compose results
-    analysis = {
-        "sample_sizes": {
-            "world_0": len(world_0_results),
-            "world_1": len(world_1_results),
-            "total": len(results),
-        },
-        "success_rates": {"world_0_empirical": float(p0_hat), "world_1_empirical": float(p1_hat)},
-        "j_statistic": {
-            "empirical": float(j_empirical),
-            "theoretical_max": float(j_theoretical_max),
-            "confidence_interval": {
-                "lower": float(bootstrap_result.ci_lower),
-                "upper": float(bootstrap_result.ci_upper),
-                "width": float(bootstrap_result.ci_width),
-                "method": bootstrap_result.method,
-            },
-        },
-        "composability_metrics": {
-            "cc_max": float(cc_max),
-            "delta_add": float(j_empirical - j_theoretical_max),
-            "protection_effectiveness": float(j_empirical / p0_hat) if p0_hat > 0 else 0.0,
-        },
-        "statistical_tests": {
-            "j_significantly_positive": bootstrap_result.ci_lower > 0,
-            "j_significantly_negative": bootstrap_result.ci_upper < 0,
-            "effect_size_category": _categorize_effect_size(abs(j_empirical)),
-        },
+    # Map into the labels you've been using in memos / analysis
+    metrics = {
+        "CC_max": float(cc_max),
+        "Delta_add": float(j_emp - j_theory_max),
+        "J_A": float(p0_hat),                      # memo uses J_A as "A" effectiveness proxy
+        "J_A_CI": [float(j_ci[0] + p1_hat), float(j_ci[1] + p1_hat)],  # loose placeholder
+        "J_B": float(1.0 - p1_hat),                # illustrative; keep if you've been using it
+        "J_B_CI": [],                              # not estimated here
+        "J_comp": float(j_emp),
+        "J_comp_CI": [float(j_ci[0]), float(j_ci[1])],
     }
 
-    return analysis
+    return {
+        "sample_sizes": {"world_0": w0.size, "world_1": w1.size, "total": w0.size + w1.size},
+        "success_rates": {"world_0_empirical": p0_hat, "world_1_empirical": p1_hat},
+        "j_statistic": {
+            "empirical": float(j_emp),
+            "theoretical_max": float(j_theory_max),
+            "confidence_interval": {
+                "lower": float(j_ci[0]),
+                "upper": float(j_ci[1]),
+                "method": boot.method,
+            },
+        },
+        "composability_metrics": {"cc_max": float(cc_max), "delta_add": float(j_emp - j_theory_max)},
+        "metrics_for_audit": metrics,  # exact block we'll drop into the audit event
+    }
 
 
-def _categorize_effect_size(effect_size: float) -> str:
-    """Categorize effect size using Cohen's conventions"""
-    if effect_size < 0.01:
-        return "negligible"
-    elif effect_size < 0.05:
-        return "small"
-    elif effect_size < 0.15:
-        return "medium"
-    else:
-        return "large"
+# --------------------------------------------------------------------------- #
+# Audit helpers
+# --------------------------------------------------------------------------- #
 
-
-def main():
-    """Main experiment runner"""
-    parser = argparse.ArgumentParser(description="Run CC Framework two-world experiment")
-    parser.add_argument("--config", type=str, required=True, help="Configuration YAML file")
-    parser.add_argument("--n", type=int, default=5000, help="Number of sessions")
-    parser.add_argument("--log", type=str, default="logs/experiment.jsonl", help="Log file path")
-    parser.add_argument(
-        "--output", type=str, default="results/analysis.json", help="Output analysis file"
-    )
-    parser.add_argument("--seed", type=int, help="Override random seed")
-
-    args = parser.parse_args()
-
-    # Load configuration
-    try:
-        config = load_config(args.config)
-        print(f"Loaded configuration from {args.config}")
-    except Exception as e:
-        print(f"Error loading configuration: {e}")
-        sys.exit(1)
-
-    # Override seed if provided
-    if args.seed is not None:
-        config["seed"] = args.seed
-
-    # Create output directory
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.log).parent.mkdir(parents=True, exist_ok=True)
-
-    # Initialize logger
-    logger = ChainedJSONLLogger(args.log)
-
-    # Create attacker and world configurations
-    try:
-        attacker = create_attacker(config)
-        world_configs = create_world_configs(config)
-        print(f"Created {type(attacker).__name__} attacker")
-        print(f"World 0: {len(world_configs[0].guardrail_stack)} guardrails")
-        print(f"World 1: {len(world_configs[1].guardrail_stack)} guardrails")
-    except Exception as e:
-        print(f"Error creating experiment components: {e}")
-        sys.exit(1)
-
-    # Run experiment
-    protocol = TwoWorldProtocol(
-        logger=logger,
-        base_success_rate=config.get("baseline_success_rate", 0.6),
-        episode_length=config.get("episode_length", 10),
-        random_seed=config.get("seed", 42),
-    )
-
-    print(f"Starting experiment with {args.n} sessions...")
-
-    try:
-        results = protocol.run_experiment(
-            attacker=attacker,
-            world_configs=world_configs,
-            n_sessions=args.n,
-            experiment_id=f"exp_{int(time.time())}",
-        )
-
-        print(f"Completed {len(results)} sessions")
-
-        # Analyze results
-        analysis = analyze_results(results)
-
-        # Add metadata
-        analysis["metadata"] = {
-            "config_file": args.config,
-            "n_sessions_requested": args.n,
-            "n_sessions_completed": len(results),
-            "attacker_type": type(attacker).__name__,
-            "timestamp": time.time(),
-            "git_commit": _get_git_commit(),
-            "configuration": config,
-        }
-
-        # Save analysis
-        with open(args.output, "w") as f:
-            json.dump(analysis, f, indent=2)
-
-        print(f"Analysis saved to {args.output}")
-
-        # Print summary
-        print("\n=== EXPERIMENT SUMMARY ===")
-        print(
-            f"J-statistic: {analysis['j_statistic']['empirical']:.4f} "
-            f"(95% CI: {analysis['j_statistic']['confidence_interval']['lower']:.4f}, "
-            f"{analysis['j_statistic']['confidence_interval']['upper']:.4f})"
-        )
-        print(f"CC_max: {analysis['composability_metrics']['cc_max']:.4f}")
-        print(f"Effect size: {analysis['statistical_tests']['effect_size_category']}")
-
-        if analysis["statistical_tests"]["j_significantly_positive"]:
-            print("✓ Guardrails show statistically significant protection")
-        elif analysis["statistical_tests"]["j_significantly_negative"]:
-            print("⚠ Guardrails show statistically significant vulnerability (unexpected)")
-        else:
-            print("- No statistically significant protection effect")
-
-    except Exception as e:
-        print(f"Experiment failed: {e}")
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
-
-
-def _get_git_commit() -> str:
-    """Get current git commit hash"""
+def _git_commit() -> str:
     try:
         import subprocess
-
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=Path(__file__).parent
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, cwd=Path(__file__).resolve().parents[3]
         )
-        return result.stdout.strip() if result.returncode == 0 else "unknown"
-    except:
+        return out.stdout.strip() if out.returncode == 0 else "unknown"
+    except Exception:
         return "unknown"
 
 
-if __name__ == "__main__":
-    import time
+def _audit_cfg(full_cfg: dict, n_sessions: int) -> dict:
+    exp = (full_cfg.get("experiment") or {})
+    proto = (full_cfg.get("protocol") or {})
+    return {
+        "A": "A",
+        "B": "B",
+        "comp": "AND",
+        "epsilon": proto.get("epsilon"),
+        "T": proto.get("T"),
+        "samples": exp.get("n_sessions", n_sessions),
+        "seed": exp.get("seed", full_cfg.get("seed")),
+    }
 
+
+# --------------------------------------------------------------------------- #
+# Main
+# --------------------------------------------------------------------------- #
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Run two-world experiment (with audit logging)")
+    ap.add_argument("--config", required=True, help="YAML config file")
+    ap.add_argument("--n", type=int, help="Override number of sessions")
+    ap.add_argument("--log", default="runs/audit.jsonl", help="Audit JSONL path")
+    ap.add_argument("--output", default="results/analysis.json", help="Write analysis JSON here")
+    ap.add_argument("--seed", type=int, help="Override global seed")
+    ap.add_argument("--set", nargs="*", default=[], help="Overrides: key=val (e.g., protocol.epsilon=0.02)")
+    args = ap.parse_args()
+
+    # Load & override config
+    cfg = load_config(args.config)
+    if args.seed is not None:
+        cfg["seed"] = args.seed
+    if args.set:
+        cfg = apply_overrides(cfg, args.set)
+
+    exp_cfg = cfg.get("experiment", {}) or {}
+    n_sessions = int(args.n if args.n is not None else exp_cfg.get("n_sessions", 200))
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.log).parent.mkdir(parents=True, exist_ok=True)
+
+    logger = ChainedJSONLLogger(args.log)
+
+    # Build components
+    attacker = create_attacker(cfg)
+    worlds = create_world_configs(cfg)
+    protocol = TwoWorldProtocol(
+        logger=logger,
+        base_success_rate=cfg.get("baseline_success_rate", 0.6),
+        episode_length=cfg.get("episode_length", 10),
+        random_seed=cfg.get("seed", 42),
+    )
+
+    print(f"Starting experiment: n_sessions={n_sessions}")
+
+    # Run & analyze
+    results: List[AttackResult] = protocol.run_experiment(
+        attacker=attacker,
+        world_configs=worlds,
+        n_sessions=n_sessions,
+        experiment_id=f"exp_{int(time.time())}",
+    )
+    print(f"Completed {len(results)} sessions")
+
+    analysis = analyze_results(results)
+    metrics_for_audit = analysis["metrics_for_audit"]
+
+    # Persist human-readable analysis too
+    analysis_out = {
+        "metadata": {
+            "config_file": args.config,
+            "n_sessions_requested": n_sessions,
+            "n_sessions_completed": len(results),
+            "attacker_type": type(attacker).__name__,
+            "timestamp": time.time(),
+            "git_commit": _git_commit(),
+            "configuration": cfg,
+        },
+        "results": analysis,
+    }
+    with open(args.output, "w", encoding="utf-8") as f:
+        json.dump(analysis_out, f, indent=2)
+
+    # ---------------- Audit event (hash-chained) ---------------- #
+    event = {
+        "cfg": _audit_cfg(cfg, n_sessions),
+        "decision": f"DECISION: {('DEPLOY' if metrics_for_audit['CC_max'] >= 1.0 else 'REDESIGN')} "
+                    f"— reason: CC_max={metrics_for_audit['CC_max']:.2f}",
+        "figures": [],  # downstream scripts add figures; keep placeholder
+        "meta": {"schema": "cartographer/audit.v1", "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z")},
+        "metrics": metrics_for_audit,
+    }
+    logger.log_event(event)
+
+    # Console summary
+    j = analysis["j_statistic"]
+    print("\n=== SUMMARY ===")
+    print(f"J (empirical) = {j['empirical']:.4f} "
+          f"[{j['confidence_interval']['lower']:.4f}, {j['confidence_interval']['upper']:.4f}]")
+    print(f"CC_max = {metrics_for_audit['CC_max']:.3f}")
+    print(f"Wrote analysis → {args.output}")
+    print(f"Appended audit → {args.log}")
+
+
+if __name__ == "__main__":
     main()
