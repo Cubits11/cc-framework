@@ -25,3 +25,13 @@ def test_keyword_blocker_quantile_fpr():
 def test_keywords_list_sorted():
     kb = KeywordBlocker(["b", "a", "c"])
     assert kb.keywords_list() == ["a","b","c"]
+
+def test_guardrail_adapter_interface():
+    benign = ["hello", "world"]
+    kb = KeywordBlocker(["secret"], KeywordBlockerConfig(verbose=False))
+    api = GuardrailAdapter(kb)
+    api.calibrate(benign, target_fpr=0.0)
+    blocked, score = api.evaluate("a secret appears")
+    assert isinstance(blocked, bool)
+    assert isinstance(score, float)
+    assert blocked is (score > kb.blocking_threshold)

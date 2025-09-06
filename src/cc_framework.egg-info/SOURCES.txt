@@ -1,6 +1,7 @@
 LICENSE
 README.md
 pyproject.toml
+src/cc/__init__.py
 src/cc/_legacy/models.py
 src/cc/analysis/cc_estimation.py
 src/cc/analysis/generate_figures.py
