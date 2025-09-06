@@ -32,7 +32,10 @@ def test_three_figures_exist():
 
 def test_documentation_exists():
     """Core documentation present"""
+    assert Path("docs/index.md").exists()
     assert Path("docs/experiments-guide.md").exists()
+    assert Path("docs/reproducibility.md").exists()
+    assert Path("docs/architecture/protocol_sequence.md").exists()
     assert Path("paper/draft.md").exists()
 
 
