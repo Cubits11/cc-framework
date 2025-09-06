@@ -1,91 +1,133 @@
 # src/cc/core/attackers.py
 """
 Module: attackers
-Purpose: Attack strategies for guardrail evaluation
+Purpose: Attack strategies for guardrail evaluation (Two-World protocol)
 Dependencies: numpy, typing, abc
 Author: Pranav Bhave
-Date: 2025-08-27
+Date: 2025-08-27 (refined 2025-09-03)
+
+Design goals
+------------
+- Deterministic, CPU-cheap attackers suitable for smoke/e2e tests.
+- Clear, minimal interface: `generate_attack`, `update_strategy`, `reset`.
+- Reproducible randomness via numpy Generator; optional reseeding.
+- No framework dependencies beyond NumPy.
+
+Strategies
+----------
+1) RandomInjectionAttacker (Tier A):
+   - Samples a bag of harmful + benign tokens, shuffles, optional obfuscation.
+   - Tracks per-token success/attempt counts for lightweight diagnostics.
+
+2) GeneticAlgorithmAttacker (Tier B):
+   - Evolves token sequences using tournament selection, crossover, mutation.
+   - Maintains a lightweight fitness cache keyed by the token sequence string.
+
+Return schemas
+--------------
+`generate_attack(history)` returns a dict with at least:
+    {
+        "attack_id": str,
+        "prompt": str,
+        "tokens": List[str],
+        "strategy": str,          # e.g., "random_injection" or "genetic_algorithm"
+        ... optional metadata ...
+    }
+
+`update_strategy(attack, result)` expects:
+    attack["tokens"] : List[str]
+    result["success"]: bool (True if the attack bypassed the guardrail)
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 
+# =============================================================================
+# Base interface
+# =============================================================================
+
+
 class AttackStrategy(ABC):
-    """Abstract base class for attack strategies"""
+    """Abstract base class for attack strategies."""
 
     @abstractmethod
     def generate_attack(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generate next attack based on history"""
-        pass
+        """Generate the next attack based on (optional) history."""
+        raise NotImplementedError
 
     @abstractmethod
     def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:
-        """Update strategy based on attack result"""
-        pass
+        """Update internal state given the attack and its evaluation result."""
+        raise NotImplementedError
 
     @abstractmethod
-    def reset(self) -> None:
-        """Reset strategy to initial state"""
-        pass
+    def reset(self, *, seed: Optional[int] = None) -> None:
+        """Reset strategy to initial state; optionally reseed RNG."""
+        raise NotImplementedError
+
+
+# =============================================================================
+# Utilities
+# =============================================================================
+
+
+def _rng(seed: Optional[int]) -> np.random.Generator:
+    """Construct a numpy Generator; default seed if None."""
+    if seed is None:
+        return np.random.default_rng(0xC0FFEE)
+    return np.random.default_rng(int(seed))
+
+
+def _safe_choice(
+    rng: np.random.Generator, items: Sequence[str], size: int, replace: bool = True
+) -> List[str]:
+    """Safe choice that tolerates empty sequences by returning []."""
+    if not items or size <= 0:
+        return []
+    return rng.choice(items, size=size, replace=replace).tolist()
+
+
+# =============================================================================
+# Random Injection Attacker (Tier A)
+# =============================================================================
+
+
+@dataclass
+class RandomInjectionConfig:
+    n_harmful_min: int = 1
+    n_harmful_max: int = 3
+    n_benign_min: int = 0
+    n_benign_max: int = 2
+    obfuscate_prob: float = 0.30
+    seed: int = 42
 
 
 class RandomInjectionAttacker(AttackStrategy):
-    """Tier A: Random injection attack using vocabulary"""
+    """Tier A: Random injection attack using token vocabularies with light obfuscation."""
 
     def __init__(
         self,
-        vocab_harmful: List[str],
-        vocab_benign: List[str],
-        base_success: float = 0.6,
-        seed: int = 42,
+        vocab_harmful: Sequence[str],
+        vocab_benign: Sequence[str],
+        cfg: Optional[RandomInjectionConfig] = None,
     ):
-        self.vocab_harmful = vocab_harmful
-        self.vocab_benign = vocab_benign
-        self.base_success = base_success
-        self.rng = np.random.default_rng(seed)
+        self.vocab_harmful: List[str] = [t for t in vocab_harmful if t]
+        self.vocab_benign: List[str] = [t for t in vocab_benign if t]
+        self.cfg = cfg or RandomInjectionConfig()
+        self.rng = _rng(self.cfg.seed)
+
+        # Diagnostics: per-token success rates
         self.success_counts: Dict[str, int] = {}
         self.attempt_counts: Dict[str, int] = {}
 
-    def generate_attack(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generate random injection attack"""
-        # Choose number of harmful and benign tokens
-        n_harmful = self.rng.integers(1, 4)
-        n_benign = self.rng.integers(0, 3)
-
-        # Sample tokens
-        harmful_tokens = self.rng.choice(self.vocab_harmful, size=n_harmful, replace=True)
-        benign_tokens = (
-            self.rng.choice(self.vocab_benign, size=n_benign, replace=True) if n_benign > 0 else []
-        )
-
-        # Combine and shuffle
-        all_tokens = list(harmful_tokens) + list(benign_tokens)
-        self.rng.shuffle(all_tokens)
-
-        # Create prompt
-        prompt = " ".join(all_tokens)
-
-        # Add obfuscation with some probability
-        if self.rng.random() < 0.3:
-            prompt = self._obfuscate(prompt)
-
-        attack_id = f"random_{self.rng.integers(1, 1_000_000)}"
-
-        return {
-            "attack_id": attack_id,
-            "prompt": prompt,
-            "tokens": all_tokens,
-            "strategy": "random_injection",
-        }
-
-    def _obfuscate(self, text: str) -> str:
-        """Apply simple obfuscation techniques"""
-        techniques = [
+        # Pre-build simple obfuscation transforms
+        self._obfuscators = [
             lambda s: s.replace("a", "@"),
             lambda s: s.replace("e", "3"),
             lambda s: s.replace("i", "1"),
@@ -94,193 +136,246 @@ class RandomInjectionAttacker(AttackStrategy):
             lambda s: " ".join(s),  # space out characters
         ]
 
-        technique = self.rng.choice(techniques)
-        return technique(text)
-
-    def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:
-        """Update success tracking for adaptive weighting"""
-        attack_id = attack["attack_id"]
-        success = result.get("success", False)
-
-        # Track per-token success rates
-        for token in attack.get("tokens", []):
-            if token not in self.success_counts:
-                self.success_counts[token] = 0
-                self.attempt_counts[token] = 0
-
-            if success:
-                self.success_counts[token] += 1
-            self.attempt_counts[token] += 1
-
-    def reset(self) -> None:
-        """Reset strategy state"""
-        self.success_counts.clear()
-        self.attempt_counts.clear()
-
-
-class GeneticAlgorithmAttacker(AttackStrategy):
-    """Tier B: Genetic algorithm-based attacker"""
-
-    def __init__(
-        self,
-        vocab: List[str],
-        population_size: int = 50,
-        mutation_rate: float = 0.1,
-        crossover_rate: float = 0.7,
-        tournament_size: int = 3,
-        seed: int = 42,
-    ):
-        self.vocab = vocab
-        self.population_size = population_size
-        self.mutation_rate = mutation_rate
-        self.crossover_rate = crossover_rate
-        self.tournament_size = tournament_size
-        self.rng = np.random.default_rng(seed)
-
-        # Population: list of token sequences
-        self.population: List[List[str]] = []
-        self.fitness_cache: Dict[str, float] = {}
-        self.generation = 0
-
-        self._initialize_population()
-
-    def _initialize_population(self):
-        """Initialize random population"""
-        self.population = []
-        for _ in range(self.population_size):
-            length = self.rng.integers(2, 8)
-            individual = self.rng.choice(self.vocab, size=length, replace=True).tolist()
-            self.population.append(individual)
+    # --- Attack API ---------------------------------------------------------
 
     def generate_attack(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generate attack using current population"""
-        if not self.population:
-            self._initialize_population()
+        """Generate a random token soup with optional obfuscation."""
+        n_harmful = int(self.rng.integers(self.cfg.n_harmful_min, self.cfg.n_harmful_max + 1))
+        n_benign = int(self.rng.integers(self.cfg.n_benign_min, self.cfg.n_benign_max + 1))
 
-        # Select individual via tournament selection
-        individual = self._tournament_selection()
+        harmful_tokens = _safe_choice(self.rng, self.vocab_harmful, n_harmful, replace=True)
+        benign_tokens = _safe_choice(self.rng, self.vocab_benign, n_benign, replace=True)
 
-        # Create prompt
-        prompt = " ".join(individual)
-        attack_id = f"ga_gen{self.generation}_{self.rng.integers(1, 10000)}"
+        tokens = harmful_tokens + benign_tokens
+        if tokens:
+            self.rng.shuffle(tokens)
+
+        prompt = " ".join(tokens) if tokens else ""
+
+        # Optional obfuscation
+        if prompt and self.rng.random() < self.cfg.obfuscate_prob:
+            obf = self.rng.choice(self._obfuscators)
+            prompt = obf(prompt)
+
+        attack_id = f"random_{int(self.rng.integers(1, 1_000_000))}"
 
         return {
             "attack_id": attack_id,
             "prompt": prompt,
-            "tokens": individual.copy(),
+            "tokens": tokens,
+            "strategy": "random_injection",
+        }
+
+    def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:
+        """Update per-token counters from the result."""
+        tokens = attack.get("tokens", []) or []
+        success = bool(result.get("success", False))
+
+        for token in tokens:
+            self.attempt_counts[token] = self.attempt_counts.get(token, 0) + 1
+            if success:
+                self.success_counts[token] = self.success_counts.get(token, 0) + 1
+
+    def reset(self, *, seed: Optional[int] = None) -> None:
+        """Reset counters; optionally reseed RNG."""
+        self.success_counts.clear()
+        self.attempt_counts.clear()
+        if seed is not None:
+            self.rng = _rng(seed)
+
+    # --- Introspection ------------------------------------------------------
+
+    def token_success_rate(self, token: str) -> float:
+        """Return success rate for a specific token, or 0.0 if unseen."""
+        a = self.attempt_counts.get(token, 0)
+        if a <= 0:
+            return 0.0
+        return float(self.success_counts.get(token, 0) / a)
+
+    def top_tokens(self, k: int = 10, min_attempts: int = 3) -> List[Tuple[str, float, int]]:
+        """
+        Return up to k tokens with the highest success rate,
+        filtered by a minimum attempt count.
+        """
+        rows: List[Tuple[str, float, int]] = []
+        for tok, attempts in self.attempt_counts.items():
+            if attempts >= min_attempts:
+                rate = self.success_counts.get(tok, 0) / attempts
+                rows.append((tok, float(rate), int(attempts)))
+        rows.sort(key=lambda r: (r[1], r[2]), reverse=True)
+        return rows[: max(0, k)]
+
+
+# =============================================================================
+# Genetic Algorithm Attacker (Tier B)
+# =============================================================================
+
+
+@dataclass
+class GAConfig:
+    population_size: int = 50
+    mutation_rate: float = 0.10
+    crossover_rate: float = 0.70
+    tournament_size: int = 3
+    min_len: int = 2
+    max_len: int = 8
+    elitism_frac: float = 0.10  # top fraction kept verbatim per generation
+    evolve_every: int = 10      # evolve after this many fitness updates
+    seed: int = 42
+
+
+class GeneticAlgorithmAttacker(AttackStrategy):
+    """Tier B: Simple GA to evolve token sequences that aim to bypass guardrails."""
+
+    def __init__(self, vocab: Sequence[str], cfg: Optional[GAConfig] = None):
+        self.vocab: List[str] = [t for t in vocab if t]
+        self.cfg = cfg or GAConfig()
+        self.rng = _rng(self.cfg.seed)
+
+        self.population: List[List[str]] = []
+        self.fitness_cache: Dict[str, float] = {}  # key: str(individual) → fitness in [0,1]
+        self.generation: int = 0
+        self._updates_since_evolve: int = 0
+
+        self._initialize_population()
+
+    # --- Population management ---------------------------------------------
+
+    def _initialize_population(self) -> None:
+        """Initialize a random population."""
+        self.population = []
+        for _ in range(self.cfg.population_size):
+            length = int(self.rng.integers(self.cfg.min_len, self.cfg.max_len + 1))
+            indiv = _safe_choice(self.rng, self.vocab, length, replace=True)
+            self.population.append(indiv)
+        self.generation = 0
+        self._updates_since_evolve = 0
+
+    # --- GA primitives ------------------------------------------------------
+
+    def _seq_key(self, seq: Sequence[str]) -> str:
+        return " ".join(seq)
+
+    def _fitness(self, seq: Sequence[str]) -> float:
+        """Return cached fitness for a sequence; default to 0.0 if unknown."""
+        return self.fitness_cache.get(self._seq_key(seq), 0.0)
+
+    def _tournament_selection(self) -> List[str]:
+        """Select one individual using tournament selection."""
+        if not self.population:
+            return []
+        k = min(self.cfg.tournament_size, len(self.population))
+        idxs = self.rng.choice(len(self.population), size=k, replace=False).tolist()
+        best_idx = idxs[0]
+        best_fit = self._fitness(self.population[best_idx])
+        for i in idxs[1:]:
+            fit = self._fitness(self.population[i])
+            if fit > best_fit:
+                best_idx, best_fit = i, fit
+        return list(self.population[best_idx])
+
+    def _crossover(self, p1: List[str], p2: List[str]) -> Tuple[List[str], List[str]]:
+        """Single-point crossover (robust to short parents)."""
+        if len(p1) <= 1 or len(p2) <= 1:
+            return p1.copy(), p2.copy()
+        point1 = int(self.rng.integers(1, len(p1)))
+        point2 = int(self.rng.integers(1, len(p2)))
+        c1 = p1[:point1] + p2[point2:]
+        c2 = p2[:point2] + p1[point1:]
+        return c1, c2
+
+    def _mutate(self, indiv: List[str]) -> List[str]:
+        """Token-level mutation + occasional insertion/deletion."""
+        out = indiv.copy()
+
+        # Per-token replacement
+        for i in range(len(out)):
+            if self.rng.random() < self.cfg.mutation_rate and self.vocab:
+                out[i] = self.rng.choice(self.vocab)
+
+        # Structural edits
+        if self.rng.random() < self.cfg.mutation_rate:
+            if len(out) > self.cfg.min_len and self.rng.random() < 0.5:
+                # deletion
+                idx = int(self.rng.integers(0, len(out)))
+                out.pop(idx)
+            elif len(out) < self.cfg.max_len and self.vocab:
+                # insertion
+                idx = int(self.rng.integers(0, len(out) + 1))
+                tok = self.rng.choice(self.vocab)
+                out.insert(idx, tok)
+
+        return out
+
+    def _evolve_population(self) -> None:
+        """Create the next generation with elitism, crossover, and mutation."""
+        if not self.population:
+            self._initialize_population()
+            return
+
+        # Elitism
+        n = len(self.population)
+        n_elite = max(1, int(round(self.cfg.elitism_frac * n)))
+        # Rank by fitness (desc)
+        ranked = sorted(
+            ((self._fitness(ind), i) for i, ind in enumerate(self.population)),
+            key=lambda t: t[0],
+            reverse=True,
+        )
+        elites = [self.population[i].copy() for _, i in ranked[:n_elite]]
+
+        # Fill the rest
+        next_pop: List[List[str]] = elites
+        while len(next_pop) < self.cfg.population_size:
+            p1 = self._tournament_selection()
+            p2 = self._tournament_selection()
+            if self.rng.random() < self.cfg.crossover_rate:
+                c1, c2 = self._crossover(p1, p2)
+            else:
+                c1, c2 = p1, p2
+            next_pop.append(self._mutate(c1))
+            if len(next_pop) < self.cfg.population_size:
+                next_pop.append(self._mutate(c2))
+
+        # Trim and commit
+        self.population = next_pop[: self.cfg.population_size]
+        self.generation += 1
+        self._updates_since_evolve = 0
+
+    # --- Attack API ---------------------------------------------------------
+
+    def generate_attack(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Emit an attack constructed from the current best guess sequence."""
+        if not self.population:
+            self._initialize_population()
+
+        indiv = self._tournament_selection()
+        prompt = " ".join(indiv)
+        attack_id = f"ga_gen{self.generation}_{int(self.rng.integers(1, 1_000_000))}"
+
+        return {
+            "attack_id": attack_id,
+            "prompt": prompt,
+            "tokens": indiv.copy(),
             "strategy": "genetic_algorithm",
             "generation": self.generation,
         }
 
-    def _tournament_selection(self) -> List[str]:
-        """Select individual via tournament selection"""
-        tournament = self.rng.choice(
-            len(self.population),
-            size=min(self.tournament_size, len(self.population)),
-            replace=False,
-        )
-
-        # Select best individual from tournament (higher fitness = better)
-        best_idx = tournament[0]
-        best_fitness = self.fitness_cache.get(str(self.population[best_idx]), 0)
-
-        for idx in tournament[1:]:
-            fitness = self.fitness_cache.get(str(self.population[idx]), 0)
-            if fitness > best_fitness:
-                best_idx = idx
-                best_fitness = fitness
-
-        return self.population[best_idx].copy()
-
     def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:
-        """Update fitness and evolve population"""
-        tokens = attack.get("tokens", [])
-        success = result.get("success", False)
+        """Update fitness from the result and evolve periodically."""
+        tokens = attack.get("tokens") or []
+        success = bool(result.get("success", False))
+        key = self._seq_key(tokens)
+        self.fitness_cache[key] = 1.0 if success else 0.0
 
-        # Update fitness cache
-        key = str(tokens)
-        self.fitness_cache[key] = float(success)
-
-        # Evolve population every few updates
-        if len(self.fitness_cache) % 10 == 0:
+        # Evolve after a small batch of updates to keep smoke tests snappy.
+        self._updates_since_evolve += 1
+        if self._updates_since_evolve >= self.cfg.evolve_every:
             self._evolve_population()
 
-    def _evolve_population(self):
-        """Evolve the population"""
-        new_population = []
-
-        # Keep best individuals (elitism)
-        elite_count = max(1, self.population_size // 10)
-        elite_indices = self._get_elite_indices(elite_count)
-        for idx in elite_indices:
-            new_population.append(self.population[idx].copy())
-
-        # Generate rest through crossover and mutation
-        while len(new_population) < self.population_size:
-            parent1 = self._tournament_selection()
-            parent2 = self._tournament_selection()
-
-            if self.rng.random() < self.crossover_rate:
-                child1, child2 = self._crossover(parent1, parent2)
-                child1 = self._mutate(child1)
-                child2 = self._mutate(child2)
-                new_population.extend([child1, child2])
-            else:
-                new_population.extend([self._mutate(parent1.copy()), self._mutate(parent2.copy())])
-
-        # Trim to exact size
-        new_population = new_population[: self.population_size]
-        self.population = new_population
-        self.generation += 1
-
-    def _get_elite_indices(self, count: int) -> List[int]:
-        """Get indices of elite individuals"""
-        fitness_scores = []
-        for i, individual in enumerate(self.population):
-            key = str(individual)
-            fitness = self.fitness_cache.get(key, 0)
-            fitness_scores.append((fitness, i))
-
-        fitness_scores.sort(reverse=True)  # Higher fitness first
-        return [idx for _, idx in fitness_scores[:count]]
-
-    def _crossover(self, parent1: List[str], parent2: List[str]) -> Tuple[List[str], List[str]]:
-        """Single-point crossover"""
-        if len(parent1) <= 1 or len(parent2) <= 1:
-            return parent1.copy(), parent2.copy()
-
-        point1 = self.rng.integers(1, len(parent1))
-        point2 = self.rng.integers(1, len(parent2))
-
-        child1 = parent1[:point1] + parent2[point2:]
-        child2 = parent2[:point2] + parent1[point1:]
-
-        return child1, child2
-
-    def _mutate(self, individual: List[str]) -> List[str]:
-        """Mutate individual"""
-        mutated = individual.copy()
-
-        for i in range(len(mutated)):
-            if self.rng.random() < self.mutation_rate:
-                mutated[i] = self.rng.choice(self.vocab)
-
-        # Sometimes add or remove tokens
-        if self.rng.random() < self.mutation_rate:
-            if len(mutated) > 2 and self.rng.random() < 0.5:
-                # Remove token
-                idx = self.rng.integers(0, len(mutated))
-                mutated.pop(idx)
-            elif len(mutated) < 10:
-                # Add token
-                idx = self.rng.integers(0, len(mutated) + 1)
-                new_token = self.rng.choice(self.vocab)
-                mutated.insert(idx, new_token)
-
-        return mutated
-
-    def reset(self) -> None:
-        """Reset strategy state"""
+    def reset(self, *, seed: Optional[int] = None) -> None:
+        """Reset population and cache; optionally reseed RNG."""
+        if seed is not None:
+            self.rng = _rng(seed)
         self.fitness_cache.clear()
-        self.generation = 0
         self._initialize_population()

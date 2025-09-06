@@ -1,20 +1,59 @@
+# src/cc/cartographer/suggest.py
 """
 Suggest next (epsilon, T, comp) trials from audit history.
 
 Usage:
   python -m cc.cartographer.suggest --history runs/audit.jsonl --out experiments/grids/next.json
+
+Policy:
+- Read the last valid record from the tamper-evident audit chain.
+- Classify the regime via CC_max:
+    < 0.95  → "constructive"  (A∧B beats best single rail; exploit locally)
+    ≤ 1.05  → "independent"   (A∧B ≈ best; probe lightly)
+    > 1.05  → "destructive"   (A∧B underperforms; retreat + flip rule)
+- Propose a small, deduplicated grid around (epsilon, T, comp) with bounded steps.
+
+Notes:
+- This is a pragmatic search suggester for experiments, not a theorem prover.
+- All outputs are JSON-serializable dictionaries with keys: epsilon, T, comp, rationale.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from .audit import _iter_jsonl  # reuse internal reader
+from .audit import _iter_jsonl  # reuse the stable JSONL reader
+
+
+# =============================================================================
+# Config / bounds
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class Bounds:
+    eps_min: float = 0.0
+    eps_max: float = 1.0
+    T_min: float = 0.0
+    T_max: float = 10.0  # soft cap; can be raised if your runs use larger horizons
+
+
+BOUNDS = Bounds()
+
+
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return float(min(max(x, lo), hi))
+
+
+def _round4(x: float) -> float:
+    return float(round(x, 4))
 
 
 def _region(cc_max: float) -> str:
+    """Classify composition regime by CC_max (conservative normalization)."""
     if cc_max < 0.95:
         return "constructive"
     if cc_max <= 1.05:
@@ -22,85 +61,171 @@ def _region(cc_max: float) -> str:
     return "destructive"
 
 
-def _neighbors(x: float, steps: Tuple[float, ...]) -> List[float]:
-    out = [max(0.0, x + s) for s in steps]
-    # dedupe while preserving order
+def _neighbors(x: float, steps: Sequence[float], lo: float, hi: float) -> List[float]:
+    """Generate deduped neighbor candidates x + step clamped to [lo, hi]."""
     seen = set()
-    keep: List[float] = []
-    for v in out:
+    out: List[float] = []
+    for s in steps:
+        v = _clamp(float(x) + float(s), lo, hi)
         if v not in seen:
-            keep.append(v); seen.add(v)
-    return keep
+            out.append(v)
+            seen.add(v)
+    return out
 
 
-def _last(path: str) -> Optional[Dict[str, Any]]:
-    last = None
+def _last_valid(path: str) -> Optional[Dict[str, Any]]:
+    """
+    Return the last record that has both 'cfg' and 'metrics' dicts.
+    If none found, return None.
+    """
+    last: Optional[Dict[str, Any]] = None
     for _, obj in _iter_jsonl(path):
-        last = obj
+        cfg = obj.get("cfg")
+        mets = obj.get("metrics")
+        if isinstance(cfg, dict) and isinstance(mets, dict):
+            last = obj
     return last
 
 
-def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
-    rec = _last(history)
+def _cold_start(k: int) -> List[Dict[str, Any]]:
+    """Canonical seeds when there is no history."""
+    eps_grid = (0.00, 0.10, 0.20, 0.40)
+    T_grid = (1.0, 2.0, 5.0)
+    comps = ("AND", "OR")
     out: List[Dict[str, Any]] = []
+    for e in eps_grid:
+        for t in T_grid:
+            for c in comps:
+                out.append(
+                    {
+                        "epsilon": _round4(_clamp(e, BOUNDS.eps_min, BOUNDS.eps_max)),
+                        "T": _round4(_clamp(t, BOUNDS.T_min, BOUNDS.T_max)),
+                        "comp": c,
+                        "rationale": "cold start seed",
+                    }
+                )
+    return out[:k]
+
+
+# =============================================================================
+# Suggestion logic
+# =============================================================================
+
+
+def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
+    """
+    Propose up to k next trials based on the last audited configuration and outcome.
+
+    Heuristics by zone:
+      - constructive: local exploitation around (epsilon, T), try both comp rules.
+      - independent: light epsilon probe, single comp; add one comp toggle probe.
+      - destructive: retreat with larger steps and flip comp.
+    """
+    rec = _last_valid(history)
     if not rec:
-        # cold start: canonical seeds
-        seeds = [
-            {"epsilon": e, "T": t, "comp": c, "rationale": "cold start seed"}
-            for e in (0.0, 0.1, 0.2)
-            for t in (1.0, 2.0, 5.0)
-            for c in ("AND", "OR")
-        ]
-        return seeds[:k]
+        return _cold_start(k)
 
     cfg = rec.get("cfg", {})
     mets = rec.get("metrics", {})
-    e0 = cfg.get("epsilon"); t0 = cfg.get("T"); comp0 = cfg.get("comp", "AND")
-    cc = float(mets.get("CC_max", 1.0))
+
+    # Pull last parameters with robust defaults
+    e0_raw = cfg.get("epsilon")
+    t0_raw = cfg.get("T")
+    comp0 = cfg.get("comp", "AND")
+    cc_raw = mets.get("CC_max", 1.0)
+
+    try:
+        e0 = float(e0_raw)
+    except Exception:
+        e0 = 0.10
+    try:
+        t0 = float(t0_raw)
+    except Exception:
+        t0 = 2.0
+    try:
+        cc = float(cc_raw)
+    except Exception:
+        cc = 1.0
+
+    # Clamp into supported bounds
+    e0 = _clamp(e0, BOUNDS.eps_min, BOUNDS.eps_max)
+    t0 = _clamp(t0, BOUNDS.T_min, BOUNDS.T_max)
+    comp0 = "AND" if str(comp0).upper() == "AND" else "OR"
+
     zone = _region(cc)
 
-    # reasonable defaults if missing
-    e0 = float(e0) if isinstance(e0, (int, float)) else 0.1
-    t0 = float(t0) if isinstance(t0, (int, float)) else 2.0
+    proposals: List[Dict[str, Any]] = []
 
     if zone == "constructive":
-        # exploit nearby; small moves; try both rules
-        for e in _neighbors(e0, (-0.05, 0.0, +0.05)):
-            for t in _neighbors(t0, (-0.5, 0.0, +0.5)):
-                for c in (comp0, "OR" if comp0 == "AND" else "AND"):
-                    out.append({"epsilon": round(e, 4), "T": round(t, 4), "comp": c,
-                                "rationale": "exploit constructive valley"})
-    elif zone == "independent":
-        # shrink search—probe epsilon only; toggle rule once
-        for e in _neighbors(e0, (-0.1, 0.0, +0.1, +0.2)):
-            out.append({"epsilon": round(e, 4), "T": round(t0, 4), "comp": comp0,
-                        "rationale": "independent plateau: favor single, light epsilon sweep"})
-        out.append({"epsilon": round(e0, 4), "T": round(t0, 4),
-                    "comp": "OR" if comp0 == "AND" else "AND",
-                    "rationale": "independent plateau: rule toggle probe"})
-    else:
-        # destructive: move away; bigger steps + flip rule
-        for e in _neighbors(e0, (-0.2, -0.1, +0.1, +0.2)):
-            for t in _neighbors(t0, (-1.0, +1.0, +2.0)):
-                out.append({"epsilon": round(e, 4), "T": round(max(0.0, t), 4),
-                            "comp": "OR" if comp0 == "AND" else "AND",
-                            "rationale": "destructive wedge: retreat and flip rule"})
+        # Exploit the valley; small isotropic moves; test both comp rules
+        for e in _neighbors(e0, (-0.05, 0.0, +0.05), BOUNDS.eps_min, BOUNDS.eps_max):
+            for t in _neighbors(t0, (-0.5, 0.0, +0.5), BOUNDS.T_min, BOUNDS.T_max):
+                for c in (comp0, ("OR" if comp0 == "AND" else "AND")):
+                    proposals.append(
+                        {
+                            "epsilon": _round4(e),
+                            "T": _round4(t),
+                            "comp": c,
+                            "rationale": "exploit constructive valley",
+                        }
+                    )
 
-    # light dedupe and trim
-    seen = set()
+    elif zone == "independent":
+        # Gentle probe primarily over epsilon; keep T fixed; one comp toggle
+        for e in _neighbors(e0, (-0.10, 0.0, +0.10, +0.20), BOUNDS.eps_min, BOUNDS.eps_max):
+            proposals.append(
+                {
+                    "epsilon": _round4(e),
+                    "T": _round4(t0),
+                    "comp": comp0,
+                    "rationale": "independent plateau: epsilon sweep",
+                }
+            )
+        proposals.append(
+            {
+                "epsilon": _round4(e0),
+                "T": _round4(t0),
+                "comp": "OR" if comp0 == "AND" else "AND",
+                "rationale": "independent plateau: comp toggle probe",
+            }
+        )
+
+    else:  # destructive
+        # Move away aggressively and flip composition rule
+        flip = "OR" if comp0 == "AND" else "AND"
+        for e in _neighbors(e0, (-0.20, -0.10, +0.10, +0.20), BOUNDS.eps_min, BOUNDS.eps_max):
+            for t in _neighbors(t0, (-1.0, +1.0, +2.0), BOUNDS.T_min, BOUNDS.T_max):
+                proposals.append(
+                    {
+                        "epsilon": _round4(e),
+                        "T": _round4(t),
+                        "comp": flip,
+                        "rationale": "destructive wedge: retreat + flip comp",
+                    }
+                )
+
+    # Deduplicate and keep ordering stable; cap to k
+    seen: set[Tuple[float, float, str]] = set()
     uniq: List[Dict[str, Any]] = []
-    for s in out:
-        key = (s["epsilon"], s["T"], s["comp"])
+    for s in proposals:
+        key = (float(s["epsilon"]), float(s["T"]), str(s["comp"]))
         if key not in seen:
-            uniq.append(s); seen.add(key)
-    return uniq[:k]
+            uniq.append(s)
+            seen.add(key)
+
+    return uniq[: max(0, int(k))]
+
+
+# =============================================================================
+# CLI
+# =============================================================================
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    p = argparse.ArgumentParser()
-    p.add_argument("--history", required=True)
-    p.add_argument("--out", required=True)
-    p.add_argument("--k", type=int, default=6)
+    p = argparse.ArgumentParser(description="Suggest next (epsilon, T, comp) trials from audit history.")
+    p.add_argument("--history", required=True, help="Path to runs/audit.jsonl")
+    p.add_argument("--out", required=True, help="Path to write JSON suggestions (e.g., experiments/grids/next.json)")
+    p.add_argument("--k", type=int, default=6, help="Number of suggestions to emit")
     args = p.parse_args(argv)
 
     recs = suggest(args.history, k=args.k)

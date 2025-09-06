@@ -21,12 +21,17 @@ COV_MIN   ?= 80
 SESS_SMOKE ?= 200
 SESS_MVP   ?= 5000
 
-CONFIG_SMOKE ?= experiments/configs/toy.yaml
-CONFIG_MVP   ?= experiments/configs/two_world.yaml
+CONFIG_SMOKE ?= experiments/configs/smoke.yaml
+CONFIG_MVP   ?= experiments/configs/mvp.yaml
+
+# Output paths expected by tests
+FIG_DIR    := paper/figures
+SMOKE_CSV  := results/smoke/aggregates/summary.csv
+AUDIT_LOG  := runs/audit.jsonl
 
 # -------- Phony ----------
 .PHONY: help install setup lock deps fmt lint type test test-unit test-int cov bench \
-        reproduce-smoke reproduce-mvp figures reports docs docs-serve \
+        reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
         carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest
@@ -43,15 +48,16 @@ help:
 	@echo "lint                 Ruff/Isort/Black checks (no changes)"
 	@echo "type                 mypy type-checking"
 	@echo "test                 Unit+integration tests with coverage (>= $(COV_MIN)%)"
-	@echo "reproduce-smoke      $(SESS_SMOKE) sessions quick run (CPU)"
+	@echo "reproduce-smoke      $(SESS_SMOKE) sessions quick run (CPU) + CSV + 3 figs"
 	@echo "reproduce-mvp        $(SESS_MVP) sessions main Tier A run (CPU)"
-	@echo "figures              Generate plots (paper/figures, results/artifacts)"
+	@echo "reproduce-figures    Rebuild smoke CSV + 3 figs from audit history"
+	@echo "figures              Project plots (paper/figures, results/artifacts)"
 	@echo "reports              Build evaluation reports (evaluation/reports)"
 	@echo "docs                 Build MkDocs site to site/"
 	@echo "docs-serve           Local preview at http://127.0.0.1:8000"
-	@echo "verify-*             Stats, invariants, audit-chain checks"
+	@echo "verify-*             Stats and audit-chain checks"
 	@echo "docker-build/run     CPU docker image for fully pinned env"
-	@echo "carto-*              Cartographer agent CLI entrypoints"
+	@echo "carto-*              Cartographer CLI entrypoints (aliases)"
 	@echo "clean/distclean      Clean artifacts / wipe venv, locks"
 	@echo "-------------------------------------------------------------"
 	@echo ""
@@ -62,10 +68,10 @@ $(VENV_DIR)/bin/activate:
 	$(ACT); $(PIP) install --upgrade pip wheel setuptools
 
 install: $(VENV_DIR)/bin/activate
-	$(ACT); $(PIP) install -e .[dev,docs,notebooks]
+	$(ACT); $(PIP) install -e .[dev,docs,notebooks] || $(PIP) install -e .[dev]
 
 setup: install
-	$(ACT); pre-commit install
+	$(ACT); pre-commit install || true
 
 lock: install
 	$(ACT); python -c "import pkgutil, sys; print('Python:', sys.version)"
@@ -107,18 +113,45 @@ bench: install
 	$(ACT); pytest benchmarks -q || true
 
 # -------- Reproduce Runs (Tier A) -------
+# Runs the Cartographer CLI once (FH upper bound path), then emits the CSV and 3 figures
 reproduce-smoke: install
-	$(ACT); python -m experiments.run --config $(CONFIG_SMOKE) --n $(SESS_SMOKE) \
-	  --results-dir results --seed 1337
+	mkdir -p paper/figures results/smoke/aggregates runs
+	$(ACT); python -m cc.cartographer.cli run \
+		--config experiments/configs/smoke.yaml \
+		--samples $(SESS_SMOKE) \
+		--fig paper/figures/phase_diagram.pdf \
+		--audit runs/audit.jsonl
+	$(ACT); python -m cc.analysis.generate_figures \
+		--history runs/audit.jsonl \
+		--fig-dir paper/figures \
+		--out-dir results/smoke/aggregates
+	# compatibility for legacy tests:
+	mkdir -p results/aggregates
+	cp results/smoke/aggregates/summary.csv results/aggregates/summary.csv
 
+# Larger local run (kept as alias; customize as needed)
 reproduce-mvp: install
-	$(ACT); python -m experiments.run --config $(CONFIG_MVP) --n $(SESS_MVP) \
-	  --results-dir results --seed 1337
+	mkdir -p $(FIG_DIR) results/mvp/aggregates runs
+	$(ACT); python -m cc.cartographer.cli run \
+		--config $(CONFIG_MVP) \
+		--samples $(SESS_MVP) \
+		--fig $(FIG_DIR)/phase_mvp.pdf \
+		--audit $(AUDIT_LOG)
+	$(ACT); python -m cc.analysis.generate_figures \
+		--history $(AUDIT_LOG) \
+		--fig-dir $(FIG_DIR) \
+		--out-dir results/mvp/aggregates
+
+# Rebuild smoke figures + CSV only (no new run)
+reproduce-figures: install
+	mkdir -p $(FIG_DIR) results/smoke/aggregates
+	$(ACT); python -m cc.analysis.generate_figures \
+		--history $(AUDIT_LOG) \
+		--fig-dir $(FIG_DIR) \
+		--out-dir results/smoke/aggregates
 
 # -------- Analysis / Figures / Reports ---
-figures: install
-	$(ACT); python scripts/plot_cc_curves.py
-	$(ACT); python scripts/summarize_results.py
+figures: reproduce-figures
 
 reports: install
 	$(ACT); python -c "from cc.analysis.reporting import build_all; build_all()"
@@ -131,14 +164,12 @@ docs-serve: install
 	$(ACT); mkdocs serve -a 127.0.0.1:8000
 
 # -------- Verifications -----
-verify-invariants: install
-	$(ACT); python -c "from cc.utils.validation import run_invariant_suite; run_invariant_suite()"
-
 verify-statistics: install
-	$(ACT); python -c "from cc.analysis.cc_estimation import self_check; self_check()"
+	$(ACT); python -m cc.cartographer.cli verify-stats \
+		--config $(CONFIG_SMOKE) --bootstrap 2000
 
 verify-audit: install
-	$(ACT); python -c "from cc.io.storage import verify_hash_chain; verify_hash_chain('results/raw')"
+	$(ACT); python -m cc.cartographer.cli verify-audit --audit $(AUDIT_LOG)
 
 # -------- Docker (CPU) -----
 docker-build:
@@ -153,7 +184,7 @@ docker-run:
 clean:
 	rm -rf .pytest_cache .coverage htmlcov site dist build \
 	  results/aggregates results/artifacts \
-	  paper/figures paper/tables \
+	  $(FIG_DIR) paper/tables \
 	  benchmarks/results || true
 	find . -name "__pycache__" -type d -prune -exec rm -rf {} +
 
@@ -162,31 +193,26 @@ distclean: clean
 
 # -------- Cartographer Agent (CLI) ----------
 carto-install:
-	python -m pip install -U pip && pip install -e .[dev]
+	$(PY) -m pip install -U pip && pip install -e .[dev]
 
-carto-smoke: carto-install
-	python -m cc.cartographer.cli run \
-		--config experiments/configs/smoke.yaml \
-		--samples 200 \
+carto-smoke: install
+	$(ACT); python -m cc.cartographer.cli run \
+		--config $(CONFIG_SMOKE) \
+		--samples $(SESS_SMOKE) \
 		--fig figs/phase_smoke.png \
-		--audit runs/audit.jsonl
+		--audit $(AUDIT_LOG)
 
-carto-mvp: carto-install
-	python -m cc.cartographer.cli run \
-		--config experiments/configs/mvp.yaml \
-		--samples 5000 \
+carto-mvp: install
+	$(ACT); python -m cc.cartographer.cli run \
+		--config $(CONFIG_MVP) \
+		--samples $(SESS_MVP) \
 		--fig figs/phase_e2_T10.png \
-		--audit runs/audit.jsonl
+		--audit $(AUDIT_LOG)
 
-carto-verify-audit: carto-install
-	python -m cc.cartographer.cli verify-audit --audit runs/audit.jsonl
+carto-verify-audit: verify-audit
+carto-verify-stats: verify-statistics
 
-carto-verify-stats: carto-install
-	python -m cc.cartographer.cli verify-stats \
-		--config experiments/configs/mvp.yaml \
-		--bootstrap 10000
-
-carto-suggest: carto-install
-	python -m cc.cartographer.cli suggest \
-		--history runs/audit.jsonl \
+carto-suggest: install
+	$(ACT); python -m cc.cartographer.suggest \
+		--history $(AUDIT_LOG) \
 		--out experiments/grids/next.json

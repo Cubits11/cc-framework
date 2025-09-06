@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# builds / caches
+*.egg-info/
+.dist-info/
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# results & runs (keep artifacts small)
+results/raw/
+results/aggregates/
+runs/*.jsonl
+runs/*.jsonl.bak
+
+# notebooks
+*.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# plots (source-of-truth is code)
+figures/*.pdf
+figures/*.png
+

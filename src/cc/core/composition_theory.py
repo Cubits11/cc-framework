@@ -1,47 +1,49 @@
-# src/cc/core/composition_theory.py (New module)
+# src/cc/core/composition_theory.py
 """
-Theoretical foundations for guardrail composition
-Bridges IST 496 to PhD Year 1
+Theoretical wrappers for guardrail composition.
+Bridges IST 496 to PhD Year 1 (FH-style ROC bounds).
 """
 
-from typing import Tuple
+from __future__ import annotations
+from typing import Iterable, Sequence, Tuple
+import numpy as np
+from cc.cartographer.bounds import frechet_upper
 
+ROC = Sequence[Tuple[float, float]]
 
-class CompositionAlgebra:
+def upper_bound_j_and(roc_a: ROC, roc_b: ROC) -> float:
+    """FH-style upper bound on composed J for AND-composition."""
+    return frechet_upper(roc_a, roc_b, comp="AND")
+
+def upper_bound_j_or(roc_a: ROC, roc_b: ROC) -> float:
+    """FH-style upper bound on composed J for OR-composition."""
+    return frechet_upper(roc_a, roc_b, comp="OR")
+
+def discretize_scores_to_roc(scores: Iterable[Tuple[float, int]]) -> ROC:
     """
-    Algebraic structure for guardrail composition
-    Foundation for PhD Year 1 theoretical work
+    Convert (score, label) pairs to a coarse ROC curve (FPR, TPR) by threshold sweep.
+    label: 1 for attack/positive, 0 for benign/negative.
     """
+    arr = np.asarray(list(scores), dtype=float)
+    if arr.size == 0:
+        return [(0.0, 0.0), (1.0, 1.0)]
+    s = arr[:, 0]
+    y = arr[:, 1].astype(int)
 
-    @staticmethod
-    def binary_composition_bound(
-        j1: float, j2: float, correlation: float = 0
-    ) -> Tuple[float, float]:
-        """
-        Analytical bounds for binary composition
-
-        Returns:
-            (lower_bound, upper_bound) for composed J-statistic
-        """
-        # Independent case
-        j_independent = j1 + j2 - j1 * j2
-
-        # Perfect correlation cases
-        j_redundant = max(j1, j2)
-        j_complementary = min(j1 + j2, 1.0)
-
-        # Correlation-adjusted bounds
-        lower = (1 - abs(correlation)) * j_independent + abs(correlation) * j_redundant
-        upper = (1 - abs(correlation)) * j_independent + abs(correlation) * j_complementary
-
-        return (lower, upper)
-
-    @staticmethod
-    def n_way_complexity_bound(n: int) -> float:
-        """
-        Computational complexity bound for n-way composition
-        Preview of PhD Year 3 work
-        """
-        # O(n^2) pairwise interactions
-        # O(2^n) for full interaction graph
-        return n * (n - 1) / 2  # Simplified for IST 496
+    # Unique thresholds (descending)
+    thr = np.unique(s)[::-1]
+    P = (y == 1).sum()
+    N = (y == 0).sum()
+    roc = []
+    for t in thr:
+        pred = s >= t
+        tp = float((pred & (y == 1)).sum())
+        fp = float((pred & (y == 0)).sum())
+        tpr = tp / P if P > 0 else 0.0
+        fpr = fp / N if N > 0 else 0.0
+        roc.append((fpr, tpr))
+    # ensure 0,0 and 1,1 anchors
+    roc = [(0.0, 0.0)] + roc + [(1.0, 1.0)]
+    # monotonic cleanup (optional): sort by FPR
+    roc.sort(key=lambda z: z[0])
+    return roc

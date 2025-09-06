@@ -576,8 +576,10 @@ class TwoWorldProtocol:
 
     def _hash_list(self, items: List[Any]) -> str:
         """Hash list contents"""
-        combined = "".join(str(item) for item in items)
-        return hashlib.sha256(combined.encode()).hexdigest()[:16]
+        # Use JSON serialization to avoid collisions from delimiter-free concatenation
+        # (e.g., [1, 23] vs [12, 3] both yielding "123").
+        canonical = json.dumps(items, sort_keys=True)
+        return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
     def _generate_id(self) -> str:
         """Generate unique identifier"""

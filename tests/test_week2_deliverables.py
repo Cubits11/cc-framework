@@ -1,18 +1,22 @@
-# tests/test_week2_deliverables.py
 """Test that Week 2 deliverables are complete"""
+
+import subprocess
+from pathlib import Path
+
+import pandas as pd
 
 
 def test_smoke_runs():
     """200 session smoke test completes"""
     result = subprocess.run(["make", "reproduce-smoke"], capture_output=True)
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr.decode()
     assert Path("results/smoke/aggregates/summary.csv").exists()
 
 
 def test_unit_tests_pass():
     """Unit tests are green"""
     result = subprocess.run(["pytest", "tests/unit", "-q"], capture_output=True)
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr.decode()
 
 
 def test_three_figures_exist():

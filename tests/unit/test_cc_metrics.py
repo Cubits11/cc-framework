@@ -35,11 +35,10 @@ class TestCCMetrics:
             )
             for i in range(100, 200)
         ]
-
         j_stat, p0, p1 = compute_j_statistic(results)
-        assert j_stat == 1.0
-        assert p0 == 1.0
-        assert p1 == 0.0
+        assert np.isclose(j_stat, 1.0)
+        assert np.isclose(p0, 1.0)
+        assert np.isclose(p1, 0.0)
 
     def test_no_effect(self):
         """Test J≈0 for no defense effect"""

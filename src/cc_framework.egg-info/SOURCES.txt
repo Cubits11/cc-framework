@@ -3,6 +3,7 @@ README.md
 pyproject.toml
 src/cc/_legacy/models.py
 src/cc/analysis/cc_estimation.py
+src/cc/analysis/generate_figures.py
 src/cc/analysis/reporting.py
 src/cc/cartographer/atlas.py
 src/cc/cartographer/audit.py
@@ -10,6 +11,7 @@ src/cc/cartographer/bounds.py
 src/cc/cartographer/cli.py
 src/cc/cartographer/io.py
 src/cc/cartographer/stats.py
+src/cc/cartographer/suggest.py
 src/cc/core/attackers.py
 src/cc/core/composition_theory.py
 src/cc/core/guardrail_api.py
