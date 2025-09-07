@@ -35,7 +35,7 @@ This guide provides an architectural overview, research directions, and implemen
 - **Utility Metrics**
   - Beyond success rate, what utility trade-offs (latency, false positives) arise from guardrail stacks?
 - **Calibration & Adaptation**
-  - Can guardrails auto-calibrate to maintain target false-positive rates over time?
+  - Can guardrails auto-calibrate to maintain target false-positive rates over time?   
 
 ## 3. Technical Improvements & Best Practices
 

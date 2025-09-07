@@ -1,44 +1,57 @@
-"""Abstractions for interacting with guardrails.
+"""Adapters and helper utilities for guardrails.
 
-This module provides a minimal API that the rest of the framework can use
-without depending on concrete guardrail implementations. Guardrails expose an
-`evaluate` method returning both the blocking decision and a raw score, as well
-as a `calibrate` method for threshold fitting.
+This module currently exposes :class:`GuardrailAdapter`, a thin wrapper
+that ensures any guardrail implementation provides the minimal interface
+expected by the core protocol (``score``/``blocks``/``calibrate``).
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Sequence, Tuple
+from typing import Any, Iterable
 
 from cc.guardrails.base import Guardrail
 
 
-class GuardrailAPI(ABC):
-    """Abstract interface for guardrail interaction."""
+class GuardrailAdapter(Guardrail):
+    """Wrap an arbitrary guardrail to provide a stable API.
 
-    @abstractmethod
-    def evaluate(self, text: str) -> Tuple[bool, float]:
-        """Return ``(blocked, score)`` for the supplied text."""
+    The adapter delegates ``score``, ``blocks`` and ``calibrate`` to the
+    wrapped guardrail if they are available. Missing methods raise
+    ``NotImplementedError`` where appropriate. Additional attributes are
+    proxied via ``__getattr__`` to maintain access to implementation-specific
+    details (e.g. thresholds).
+    """
 
-    @abstractmethod
-    def calibrate(self, benign_texts: Sequence[str], target_fpr: float = 0.05) -> None:
-        """Calibrate guardrail using benign examples."""
+    def __init__(self, guardrail: Any) -> None:  # pragma: no cover - trivial
+        self._guardrail = guardrail
+
+    # ------------------------------------------------------------------
+    # Guardrail interface
+    # ------------------------------------------------------------------
+    def score(self, text: str) -> float:
+        if not hasattr(self._guardrail, "score"):
+            raise NotImplementedError("wrapped guardrail lacks score()")
+        return float(self._guardrail.score(text))
+
+    def blocks(self, text: str) -> bool:
+        if hasattr(self._guardrail, "blocks"):
+            return bool(self._guardrail.blocks(text))
+        if hasattr(self._guardrail, "score"):
+            # Fallback: block when score > 0.0
+            return bool(self._guardrail.score(text) > 0.0)
+        raise NotImplementedError("wrapped guardrail lacks blocks()")
+
+    def calibrate(self, benign_texts: Iterable[str], target_fpr: float = 0.05) -> None:
+        if hasattr(self._guardrail, "calibrate"):
+            self._guardrail.calibrate(benign_texts, target_fpr)
+        else:
+            raise NotImplementedError("wrapped guardrail lacks calibrate()")
+
+    # ------------------------------------------------------------------
+    # Attribute delegation
+    # ------------------------------------------------------------------
+    def __getattr__(self, name: str) -> Any:  # pragma: no cover - simple proxy
+        return getattr(self._guardrail, name)
 
 
-class GuardrailAdapter(GuardrailAPI):
-    """Adapter wrapping any :class:`~cc.guardrails.base.Guardrail` instance."""
-
-    def __init__(self, guardrail: Guardrail):
-        self.guardrail = guardrail
-
-    def evaluate(self, text: str) -> Tuple[bool, float]:  # pragma: no cover - simple delegation
-        """Delegate evaluation to underlying guardrail."""
-        return self.guardrail.blocks(text), self.guardrail.score(text)
-
-    def calibrate(self, benign_texts: Sequence[str], target_fpr: float = 0.05) -> None:
-        """Delegate calibration to underlying guardrail."""
-        self.guardrail.calibrate(list(benign_texts), target_fpr=target_fpr)
-
-
-__all__ = ["GuardrailAPI", "GuardrailAdapter"]
+__all__ = ["GuardrailAdapter"]

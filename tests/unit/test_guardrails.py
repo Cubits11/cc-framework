@@ -1,5 +1,6 @@
 import math
 from cc.guardrails.keyword_blocker import KeywordBlocker, KeywordBlockerConfig
+from cc.core.guardrail_api import GuardrailAdapter
 
 def test_keyword_blocker_exact_and_fuzzy():
     kb = KeywordBlocker(["api_key", "token"])
