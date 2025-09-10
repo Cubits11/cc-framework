@@ -47,9 +47,32 @@ class GuardrailAdapter(Guardrail):
         else:
             raise NotImplementedError("wrapped guardrail lacks calibrate()")
     def evaluate(self, text: str) -> tuple[bool, float]:
-        """Return ``(blocked, score)`` pair for ``text``."""
-        s = self.score(text)
-        return s > float(getattr(self._guardrail, "threshold", 0.5)), se
+        """Return ``(blocked, score)`` pair for ``text``.
+
+        This method ensures the wrapped guardrail's expensive ``score``
+        calculation is executed at most once even if ``blocks`` internally
+        calls ``score`` again. We compute the score first, then temporarily
+        patch the underlying ``score`` method to return the cached value while
+        calling ``blocks``.
+        """
+        score = self.score(text)
+        # Call blocks with score memoised to avoid duplicate work
+        blocked = False
+        if hasattr(self._guardrail, "blocks"):
+            if hasattr(self._guardrail, "score"):
+                orig_score = self._guardrail.score
+                try:
+                    self._guardrail.score = lambda _t: score  # type: ignore[assignment]
+                    blocked = bool(self._guardrail.blocks(text))
+                finally:
+                    self._guardrail.score = orig_score  # type: ignore[assignment]
+            else:
+                blocked = bool(self._guardrail.blocks(text))
+        else:
+            # Fallback: block when score > 0.0
+            blocked = bool(score > 0.0)
+
+        return blocked, score
     # ------------------------------------------------------------------
     # Attribute delegation
     # ------------------------------------------------------------------
