@@ -48,7 +48,6 @@ class GuardrailAdapter(Guardrail):
             raise NotImplementedError("wrapped guardrail lacks calibrate()")
     def evaluate(self, text: str) -> tuple[bool, float]:
         """Return ``(blocked, score)`` pair for ``text``."""
-        elf.blocks(text), score
         s = self.score(text)
         return s > float(getattr(self._guardrail, "threshold", 0.5)), se
     # ------------------------------------------------------------------
