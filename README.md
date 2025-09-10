@@ -290,6 +290,14 @@ make verify-audit
 make test
 ```
 
+### Reports
+- CC only: `python -m cc.cartographer.cli build-reports --mode cc`
+- CCC only: `python -m cc.cartographer.cli build-reports --mode ccc` (requires addenda CSVs under `evaluation/ccc/addenda/`)
+- Full pane: `python -m cc.cartographer.cli build-reports --mode all`
+
+**Neutrality band:** `[0.95, 1.05]`. We classify only if CI(CC) clears the band.
+**Assumptions:** thresholds jointly realizable; FH applied per class; no independence assumed.
+
 ## 📚 Academic Context
 
 ### IST 496 Independent Study (Fall 2025)
