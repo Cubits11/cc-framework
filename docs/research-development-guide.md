@@ -1,64 +1,61 @@
- Research & Development Guide for CC Framework
+# CC Framework Research & Development Guide
 
-This guide provides an architectural overview, research directions, and implementation practices for the CC Framework. It is intended for engineers and researchers onboarding to the project.
+Comprehensive, step-by-step manual for engineers and researchers working on the Composability Coefficient (CC) Framework. This document explains the architecture, outlines open research problems, and codifies patterns for extending the codebase.
 
 ## 1. Architectural Overview
 
-- **Core Protocol (`src/cc/core/protocol.py`)**
-  - Implements the *Two-World* experiment protocol used to measure composability of guardrails.
-  - Handles session orchestration, guardrail stack construction, experiment logging, and result aggregation.
-- **Attackers (`src/cc/core/attackers.py`)**
-  - Strategy interfaces and concrete implementations (e.g., `RandomInjectionAttacker`, `GeneticAlgorithmAttacker`).
-  - Each attacker exposes `generate_attack`, `update_strategy`, and `reset` methods.
-- **Guardrails (`src/cc/guardrails/`)**
-  - `Guardrail` base class defines scoring and blocking APIs.
-  - Concrete guardrails: `KeywordBlocker`, `RegexFilter`, `SemanticFilter`, and compositional helpers.
-- **Experiment Runner (`src/cc/exp/run_two_world.py`)**
-  - CLI for loading YAML configs, building components, running experiments, and producing audit logs.
-  - Supports config overrides and automated analysis output.
-- **Logging (`src/cc/core/logging.py`)**
-  - Chainable JSONL audit logger used across the protocol and runner.
-- **Models & Stats (`src/cc/core/models.py`, `src/cc/core/stats.py`)**
-  - Dataclasses for experiment metadata and statistical utilities (bootstrap CI, J-statistic).
-- **Documentation & Scripts**
-  - `docs/` for architectural notes and design specs.
-  - `scripts/`, `tools/` provide support utilities.
+### 1.1 Repository Topology
+
+- `experiments/` – configuration files (`configs/`), experiment runner (`run.py`), grids, and two-world game utilities.
+- `src/cc/`
+  - `analysis/` – composability estimation, cartographer, reporting, figure generation.
+  - `core/` – attackers, guardrail API, composition theory, metrics, logging.
+  - `guardrails/` – base classes plus keyword, regex, semantic, and composite guardrails.
+  - `io/` – seed management and persistent storage helpers.
+  - `utils/` – plotting helpers, dashboard, validation utilities.
+- `tests/` – unit, integration, and end‑to‑end tests.
+- `docs/` – design specs, memos, and additional guides.
+- `scripts/` – support tooling (calibration, plotting, summarization).
+
+### 1.2 Data Flow
+
+1. **Experiment Run** – `python experiments/run.py --config <yaml> --seed <int> --out results/<ID>/raw.jsonl` generates raw detections and metadata.
+2. **Metric Computation** – `python -m src.cc.analysis.cc_estimation` derives J, ΔJ, CC, and confidence intervals; outputs `metrics_*.json` files.
+3. **Null Shuffle** – same module with `--shuffle.k` for label-shuffle baseline; outputs `null_shuffle.json`.
+4. **Figure Generation** – `python -m src.cc.analysis.generate_figures` creates FH region, ROC overlay, CC convergence, and CI bar charts under `results/<ID>/figs/`.
+5. **Audit Trail** – all runs append SHA-chained logs to `runs/audit.jsonl`.
+6. **Decision** – classification (constructive/neutral/destructive) written to `decision.json`.
 
 ## 2. Key Research Questions
 
-- **Guardrail Interaction**
-  - How do different guardrail classes interact under composition? Which combinations yield constructive vs. destructive interference?
-- **Attacker Modeling**
-  - What attacker capabilities most effectively exploit guardrail weaknesses? Explore RL-based attackers or side-channel attacks.
-- **Statistical Reliability**
-  - How many sessions are required for stable CC estimates? Investigate variance reduction and sequential analysis techniques.
-- **Utility Metrics**
-  - Beyond success rate, what utility trade-offs (latency, false positives) arise from guardrail stacks?
-- **Calibration & Adaptation**
-  - Can guardrails auto-calibrate to maintain target false-positive rates over time?   
+- **Guardrail Interaction** – When do guardrails compose constructively vs. destructively? Explore pairwise and higher-order stacks.
+- **Attacker Modeling** – Which attack strategies best expose weaknesses? Investigate RL-based, genetic, or side‑channel attackers.
+- **Statistical Reliability** – Required sample sizes for stable CC and ΔJ estimates; variance reduction techniques.
+- **Utility Trade-offs** – Impact of stacking on latency and false-positive rates beyond policy caps.
+- **Auto-Calibration** – Can guardrails adapt to maintain target FPR over time without manual tuning?
 
 ## 3. Technical Improvements & Best Practices
 
 - **Testing & CI**
-  - Maintain high test coverage with unit, integration, and e2e tests under `tests/`.
-  - Use `pre-commit` hooks for linting and formatting (`pre-commit run --files <file>`).
+  - Maintain high coverage via `pytest -q tests/unit tests/integration`.
+  - Consider enabling `pre-commit` for linting/formatting.
 - **Configuration Management**
-  - YAML configs under `src/cc/exp/configs/` should remain minimal; prefer defaults in code.
-  - Provide sample configs for common experiment setups.
+  - Keep YAML configs minimal; prefer code defaults and documented overrides.
+  - Store experiment plans (PLAN JSON) alongside results for reproducibility.
 - **Type Safety & Documentation**
-  - Use type hints and docstrings throughout core modules.
-  - Keep `docs/` updated with new features and APIs.
+  - Use type hints and detailed docstrings throughout `src/cc`.
+  - Update `docs/` whenever APIs change.
 - **Performance**
   - Profile attacker generation and guardrail evaluation loops.
-  - Consider caching strategies and vectorized operations for large experiments.
+  - Apply vectorization or caching for large runs.
 - **Reproducibility**
-  - Record random seeds and git commits for every experiment via the audit logger.
+  - All experiments record seeds and git SHAs; ensure deterministic execution.
 
-## 4. Implementing & Extending the Framework
+## 4. Implementation & Extension Recipes
 
-### Adding a New Guardrail
+### 4.1 Adding a New Guardrail
 
-1. Create a subclass of `Guardrail` in `src/cc/guardrails/`:
+1. Subclass `Guardrail` in `src/cc/guardrails/`:
    ```python
    from cc.guardrails.base import Guardrail
 
@@ -69,34 +66,45 @@ This guide provides an architectural overview, research directions, and implemen
        def blocks(self, text: str) -> bool:
            return len(text) > 500
    ```
-2. Expose the guardrail in `TwoWorldProtocol._create_guardrail` mapping.
-3. Add configuration example in `src/cc/exp/configs/`.
-4. Write unit tests under `tests/unit/` and run `pytest`.
+2. Register the guardrail in the creation mapping (e.g., `TwoWorldProtocol._create_guardrail`).
+3. Provide example configuration in `experiments/configs/`.
+4. Add unit tests under `tests/unit/` and run `pytest`.
 
-### Creating a Custom Attacker
+### 4.2 Creating a Custom Attacker
 
 1. Subclass `AttackStrategy` in `src/cc/core/attackers.py`.
-2. Implement `generate_attack`, `update_strategy`, and `reset` methods.
-3. Register the attacker in `src/cc/exp/run_two_world.py:create_attacker`.
-4. Provide documentation and example config.
+2. Implement `generate_attack`, `update_strategy`, and `reset`.
+3. Register in `experiments/run.py` (or `two_world_game_phd.py`) so configs can reference it.
+4. Document usage and add example config.
 
-### Running Experiments
+### 4.3 Extending Analysis
+
+- Implement new metrics or visualizations in `src/cc/analysis/`.
+- Ensure functions accept file paths and output JSON/figures under `results/<ID>/`.
+- Add corresponding tests under `tests/analysis/` and update documentation.
+
+### 4.4 Running Experiments
 
 ```bash
-python -m cc.exp.run_two_world \
-  --config experiments/configs/smoke.yaml \
-  --set protocol.epsilon=0.02 protocol.T=-0.03 \
-  --n 200
+python experiments/run.py \
+  --config experiments/configs/toy.yaml \
+  --seed 123 \
+  --out results/my_run/raw.jsonl
+
+python -m src.cc.analysis.cc_estimation \
+  --raw results/my_run/raw.jsonl \
+  --policy.fpr_cap 0.05 \
+  --bootstrap.fixed 1000 \
+  --out results/my_run/metrics_fixed.json
 ```
-- Results are written to `results/analysis.json` and audit logs to `runs/audit.jsonl` by default.
 
 ## 5. Action Items & Roadmap
 
-- [ ] Benchmark existing guardrails on larger datasets and record CC statistics.
-- [ ] Prototype RL-based attacker to compare against GA and random baselines.
-- [ ] Implement utility-aware scoring to capture trade-offs.
-- [ ] Automate generation of experiment dashboards using results files.
-- [ ] Draft publication-ready experiments based on gathered metrics.
+- [ ] Benchmark existing guardrails on larger datasets and log CC statistics.
+- [ ] Prototype RL-based attackers and compare with genetic/random baselines.
+- [ ] Implement utility-aware scoring to capture latency and false-positive trade-offs.
+- [ ] Automate experiment dashboard generation from results files.
+- [ ] Prepare publication-ready experiments using the full pipeline.
 
 ---
-This guide should evolve alongside the codebase. Contributions and updates are welcome.
+This guide should evolve with the codebase. Contributions and updates are welcome.

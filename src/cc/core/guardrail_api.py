@@ -41,6 +41,19 @@ class GuardrailAdapter(Guardrail):
             return bool(self._guardrail.score(text) > 0.0)
         raise NotImplementedError("wrapped guardrail lacks blocks()")
 
+    def evaluate(self, text: str) -> tuple[bool, float]:
+        """Return ``(blocked, score)`` for *text*.
+
+        The adapter composes :meth:`score` and :meth:`blocks` to emulate the
+        optional ``evaluate`` method some guardrails expose. This keeps the
+        interface stable for callers that expect a single evaluation entry
+        point.
+        """
+
+        score = self.score(text)
+        blocked = self.blocks(text)
+        return blocked, score
+
     def calibrate(self, benign_texts: Iterable[str], target_fpr: float = 0.05) -> None:
         if hasattr(self._guardrail, "calibrate"):
             self._guardrail.calibrate(benign_texts, target_fpr)
