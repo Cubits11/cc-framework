@@ -46,7 +46,10 @@ class GuardrailAdapter(Guardrail):
             self._guardrail.calibrate(benign_texts, target_fpr)
         else:
             raise NotImplementedError("wrapped guardrail lacks calibrate()")
-
+    def evaluate(self, text: str) -> tuple[bool, float]:
+        """Return ``(blocked, score)`` pair for ``text``."""
+        score = self.score(text)
+        return self.blocks(text), score
     # ------------------------------------------------------------------
     # Attribute delegation
     # ------------------------------------------------------------------
