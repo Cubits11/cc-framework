@@ -156,6 +156,8 @@ figures: reproduce-figures
 reports: install
 	$(ACT); python -c "from cc.analysis.reporting import build_all; build_all()"
 
+ccc: install
+	$(ACT); python scripts/generate_ccc.py
 # -------- Docs --------------
 docs: install
 	$(ACT); mkdocs build --strict
