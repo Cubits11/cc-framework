@@ -50,4 +50,9 @@ def metrics_to_csv(summary: Iterable[Tuple[str, float]]) -> str:
     lines = ["metric,value"]
     for metric, value in summary:
         lines.append(f"{metric},{value}")
-    return "\n".join(lines) + "\n"
+        return "\n".join(lines) + "\n"
+
+
+def build_all() -> None:
+    """Placeholder builder for evaluation reports."""
+    return
