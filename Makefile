@@ -1,4 +1,4 @@
-# ======================================================================
+q# ======================================================================
 # CC-Framework • Makefile (Tier A)
 # Goals: one-command reproducibility, quality gates, and clean ergonomics
 # ======================================================================
@@ -154,7 +154,7 @@ reproduce-figures: install
 figures: reproduce-figures
 
 reports: install
-	$(ACT); python -c "from cc.analysis.reporting import build_all; build_all()"
+	$(ACT); python -m cc.cartographer.cli build-reports --mode all
 
 ccc: install
 	$(ACT); python scripts/generate_ccc.py
