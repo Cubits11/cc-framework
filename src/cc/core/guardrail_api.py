@@ -37,8 +37,8 @@ class GuardrailAdapter(Guardrail):
         if hasattr(self._guardrail, "blocks"):
             return bool(self._guardrail.blocks(text))
         if hasattr(self._guardrail, "score"):
-            # Fallback: block when score > 0.0
-            return bool(self._guardrail.score(text) > 0.0)
+            threshold = float(getattr(self._guardrail, "threshold", 0.5))
+            return bool(self.score(text) > threshold)
         raise NotImplementedError("wrapped guardrail lacks blocks()")
 
     def calibrate(self, benign_texts: Iterable[str], target_fpr: float = 0.05) -> None:
