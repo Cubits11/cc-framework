@@ -32,7 +32,8 @@ def test_guardrail_adapter_interface():
     kb = KeywordBlocker(["secret"], KeywordBlockerConfig(verbose=False))
     api = GuardrailAdapter(kb)
     api.calibrate(benign, target_fpr=0.0)
+    kb.threshold = kb.blocking_threshold
     blocked, score = api.evaluate("a secret appears")
     assert isinstance(blocked, bool)
     assert isinstance(score, float)
-    assert blocked is (score > kb.blocking_threshold)
+    assert blocked is (score > kb.threshold)
