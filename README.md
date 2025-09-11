@@ -28,7 +28,7 @@ This framework bridges the gap between theoretical security composition (differe
 
 ```bash
 # Clone repository
-git clone https://github.com/pranavbhave/cc-framework
+git clone https://github.com/Cubits11/cc-framework
 cd cc-framework
 
 # Install dependencies  
