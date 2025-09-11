@@ -1,43 +1,56 @@
 # CC Framework — Research & Development Guide
 
-This manual introduces the cc-framework repository and provides step-by-step guidance for researchers and engineers.
+This manual acts as an internal developer handbook for the cc-framework project. It explains the architecture, provides a research agenda, and codifies how to extend the framework.
 
 ## 1. Architectural Overview
 
-- **Experiments (`experiments/`)**
-  - `run.py`: entry point for executing guardrail experiments.
-  - `configs/`: canonical YAML configurations; `grids/` for parameter sweeps.
-  - `two_world_game_phd.py`: reference environment used in docs and memos.
-- **Core Library (`src/cc/`)**
-  - `core/`: composition theory, attackers, metrics, and guardrail APIs.
-  - `guardrails/`: concrete guardrail implementations (keyword, regex, semantic, etc.).
-  - `analysis/`: CC estimation, reporting utilities, and figure generation.
+- **Core Library (`src/cc/`)
+  - `core/`: composition theory primitives, attacker interfaces, metrics, and experiment orchestration.
+  - `guardrails/`: implementations for keyword, regex, semantic, and other guardrails.
+  - `analysis/`: composability coefficient (CC) estimation, reporting utilities, and figure generation.
   - `cartographer/`: statistical bounds, auditing helpers, and command‑line interfaces.
   - `io/`: seed management and storage utilities; `utils/`: plotting and validation helpers.
-- **Auxiliary Areas**
-  - `scripts/`: calibration, plotting, and summarisation utilities.
+- **Experiments (`experiments/`)
+  - `run.py`: entry point for running guardrail experiments.
+  - `configs/`: canonical YAML configurations; `grids/` support parameter sweeps.
+  - `two_world_game_phd.py`: reference environment used in docs and memos.
+- **Support Assets**
+  - `scripts/`: calibration, plotting, summarisation, and migration scripts.
   - `runs/`: append-only audit logs; `results/`: experiment outputs and figures.
-  - `docs/`, `paper/`: documentation, memos, and manuscript sources.
+  - Documentation lives under `docs/`; `paper/` contains manuscript sources.
 
-## 2. Development Environment
+## 2. Development Environment & Workflow
 
-1. **Clone and install**
+1. **Setup**
    ```bash
    git clone https://github.com/<org>/cc-framework.git
    cd cc-framework
    pip install -e .
    ```
-2. **Optional tools**
-   - Activate `deployment/conda/env.yaml` or Dockerfile for reproducible setups.
+2. **Optional tooling**
+   - Use `deployment/conda/env.yaml` or the Dockerfile for reproducible builds.
 3. **Quality checks**
    ```bash
    pre-commit run --files <changed_files>
    pytest -q tests/unit tests/integration
    ```
+4. **Workflow tips**
+   - Keep commits small and descriptive.
+   - Record seeds and git SHAs via the audit logger.
+   - Update relevant docs when adding new features.
 
-## 3. Running Experiments
+## 3. Research Agenda & Key Questions
 
-1. **Plan an experiment** – choose guardrail pair, config, seed, and output directory.
+- How do guardrail combinations affect Youden's J and the CC across domains?
+- Which attacker strategies most effectively bypass current guardrail stacks?
+- What sample sizes are required for stable CC estimates with bootstrap CIs?
+- How do utility trade-offs (latency, false positives) change with additional rails?
+- Can guardrails self-calibrate to maintain target false-positive rates over time?
+- What formal guarantees can we provide about composition under adaptive attacks?
+
+## 4. Experiment Workflow
+
+1. **Plan** – choose guardrail pair, config, seed, and output directory.
 2. **Execute**
    ```bash
    python experiments/run.py \
@@ -71,23 +84,7 @@ This manual introduces the cc-framework repository and provides step-by-step gui
    ```
 6. **Audit** – append run metadata to `runs/audit.jsonl`.
 
-## 4. Key Research Questions
-
-- How do guardrail combinations shift Youden's J and the composability coefficient (CC)?
-- What attacker strategies most effectively bypass current guardrails?
-- How many samples are required for stable CC estimates under bootstrap CIs?
-- What utility trade-offs (latency, false positives) emerge when stacking rails?
-- Can guardrails self-calibrate to maintain target false-positive rates over time?
-
-## 5. Technical Improvements & Best Practices
-
-- Maintain unit, integration, and end-to-end tests under `tests/`.
-- Keep YAML configs minimal; prefer defaults in code and document overrides.
-- Use type hints and docstrings across modules; update `docs/` alongside new APIs.
-- Profile attacker generation and guardrail evaluation loops for performance.
-- Record random seeds and git SHAs for every run via the audit logger.
-
-## 6. Implementing & Extending the Framework
+## 5. Extension Guide
 
 ### Adding a Guardrail
 1. Subclass `Guardrail` in `src/cc/guardrails/`:
@@ -102,9 +99,9 @@ This manual introduces the cc-framework repository and provides step-by-step gui
            return len(text) > 500
    ```
 2. Register it in the guardrail factory (e.g., `TwoWorldProtocol._create_guardrail`).
-3. Provide a sample config and write unit tests.
+3. Provide a sample config and unit tests.
 
-### Creating an Attacker
+### Implementing an Attacker
 1. Subclass `AttackStrategy` in `src/cc/core/attackers.py`.
 2. Implement `generate_attack`, `update_strategy`, and `reset` methods.
 3. Register the attacker in the experiment runner.
@@ -115,12 +112,20 @@ This manual introduces the cc-framework repository and provides step-by-step gui
 2. Expose CLIs or scripts under `scripts/` if user-facing.
 3. Include examples in `docs/` and extend tests.
 
-## 7. Action Items & Roadmap
+## 6. Technical Improvements & Best Practices
+
+- Maintain unit, integration, and end-to-end tests under `tests/`.
+- Use type hints and docstrings across modules; prefer minimal YAML configs.
+- Profile attacker generation and guardrail evaluation loops for performance.
+- Automate dashboards from `results/` for rapid experiment review.
+- Ensure datasets and outputs are versioned and stored with metadata.
+
+## 7. Roadmap & Action Items
 
 - [ ] Benchmark guardrail stacks on larger datasets and record CC statistics.
 - [ ] Prototype RL-based attackers to compare with genetic and random baselines.
 - [ ] Implement utility-aware scoring to capture latency/precision trade-offs.
-- [ ] Automate dashboards from `results/` for rapid experiment review.
+- [ ] Add self-calibrating guardrails that adjust thresholds automatically.
 - [ ] Prepare publication-quality experiments and figures.
 
 ---
