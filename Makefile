@@ -1,4 +1,4 @@
-q# ======================================================================
+# ======================================================================
 # CC-Framework • Makefile (Tier A)
 # Goals: one-command reproducibility, quality gates, and clean ergonomics
 # ======================================================================
@@ -29,12 +29,29 @@ FIG_DIR    := paper/figures
 SMOKE_CSV  := results/smoke/aggregates/summary.csv
 AUDIT_LOG  := runs/audit.jsonl
 
+# -------- Week-3 fixed params (single θ) ----------
+W3_D        ?= 0.55
+W3_TPR_A    ?= 0.72
+W3_TPR_B    ?= 0.65
+W3_FPR_A    ?= 0.035
+W3_FPR_B    ?= 0.050
+W3_ALPHA    ?= 0.05        # hard cap (must hold); do not auto-relax
+W3_DELTA    ?= 0.05        # 95% CI
+W3_TARGET_T ?= 0.10        # optional planner half-width
+W3_N1       ?= 200
+W3_N0       ?= 200
+W3_K1       ?= 124
+W3_K0       ?= 18
+W3_JSON     ?= runs/week3_methods.json
+W3_FIG      ?= figs/fig_week3_roc_fh.png
+
 # -------- Phony ----------
 .PHONY: help install setup lock deps fmt lint type test test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
-        carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest
+        carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
+        week3 week3-95 week3-90 week3-fig test-week3
 
 # -------- Help -----------
 help:
@@ -48,9 +65,13 @@ help:
 	@echo "lint                 Ruff/Isort/Black checks (no changes)"
 	@echo "type                 mypy type-checking"
 	@echo "test                 Unit+integration tests with coverage (>= $(COV_MIN)%)"
+	@echo "test-week3           Run Week-3 unit tests only"
 	@echo "reproduce-smoke      $(SESS_SMOKE) sessions quick run (CPU) + CSV + 3 figs"
 	@echo "reproduce-mvp        $(SESS_MVP) sessions main Tier A run (CPU)"
 	@echo "reproduce-figures    Rebuild smoke CSV + 3 figs from audit history"
+	@echo "week3                FH–Bernstein+Wilson CIs at single θ (α=$(W3_ALPHA), δ=$(W3_DELTA))"
+	@echo "week3-95             Same as week3 (δ=0.05)"
+	@echo "week3-90             Same as week3 (δ=0.10)"
 	@echo "figures              Project plots (paper/figures, results/artifacts)"
 	@echo "reports              Build evaluation reports (evaluation/reports)"
 	@echo "docs                 Build MkDocs site to site/"
@@ -106,14 +127,55 @@ test-unit: install
 test-int: install
 	$(ACT); pytest tests/integration -q --disable-warnings
 
+# Week-3 focused tests (the files you just added)
+test-week3: install
+	$(ACT); pytest -q --disable-warnings \
+	  tests/unit/test_fh_intervals_alpha_cap.py \
+	  tests/unit/test_variance_envelope.py \
+	  tests/unit/test_bernstein_monotonicity.py \
+	  tests/unit/test_methods_cli_smoke.py
+
 cov: test ## alias
 	@true
 
 bench: install
 	$(ACT); pytest benchmarks -q || true
 
+# -------- Week-3 (single θ) -------
+# Primary: α=0.05 hard cap, δ=0.05 (95%), planner t=0.10, counts path (no bootstrap)
+week3: install
+	mkdir -p $(dir $(W3_JSON)) $(dir $(W3_FIG))
+	$(ACT); python -m cc.cartographer.cli methods \
+	  --D $(W3_D) \
+	  --tpr-a $(W3_TPR_A) --tpr-b $(W3_TPR_B) --fpr-a $(W3_FPR_A) --fpr-b $(W3_FPR_B) \
+	  --n1 $(W3_N1) --n0 $(W3_N0) \
+	  --k1 $(W3_K1) --k0 $(W3_K0) \
+	  --alpha-cap $(W3_ALPHA) --delta $(W3_DELTA) \
+	  --target-t $(W3_TARGET_T) \
+	  --figure-out $(W3_FIG) \
+	  --json-out $(W3_JSON)
+	@echo "✓ Week-3 JSON → $(W3_JSON)"
+	@echo "✓ Week-3 FIG  → $(W3_FIG)"
+
+# Handy variants for manuscript sensitivity
+week3-95: install
+	$(MAKE) week3 W3_DELTA=0.05
+
+week3-90: install
+	$(MAKE) week3 W3_DELTA=0.10
+
+week3-fig: install
+	mkdir -p $(dir $(W3_FIG))
+	$(ACT); python -m cc.cartographer.cli methods \
+	  --D $(W3_D) \
+	  --tpr-a $(W3_TPR_A) --tpr-b $(W3_TPR_B) --fpr-a $(W3_FPR_A) --fpr-b $(W3_FPR_B) \
+	  --n1 $(W3_N1) --n0 $(W3_N0) \
+	  --k1 $(W3_K1) --k0 $(W3_K0) \
+	  --alpha-cap $(W3_ALPHA) --delta $(W3_DELTA) \
+	  --target-t $(W3_TARGET_T) \
+	  --figure-out $(W3_FIG)
+
 # -------- Reproduce Runs (Tier A) -------
-# Runs the Cartographer CLI once (FH upper bound path), then emits the CSV and 3 figures
 reproduce-smoke: install
 	mkdir -p paper/figures results/smoke/aggregates runs
 	$(ACT); python -m cc.cartographer.cli run \
@@ -129,7 +191,6 @@ reproduce-smoke: install
 	mkdir -p results/aggregates
 	cp results/smoke/aggregates/summary.csv results/aggregates/summary.csv
 
-# Larger local run (kept as alias; customize as needed)
 reproduce-mvp: install
 	mkdir -p $(FIG_DIR) results/mvp/aggregates runs
 	$(ACT); python -m cc.cartographer.cli run \
@@ -142,7 +203,6 @@ reproduce-mvp: install
 		--fig-dir $(FIG_DIR) \
 		--out-dir results/mvp/aggregates
 
-# Rebuild smoke figures + CSV only (no new run)
 reproduce-figures: install
 	mkdir -p $(FIG_DIR) results/smoke/aggregates
 	$(ACT); python -m cc.analysis.generate_figures \
@@ -158,6 +218,7 @@ reports: install
 
 ccc: install
 	$(ACT); python scripts/generate_ccc.py
+
 # -------- Docs --------------
 docs: install
 	$(ACT); mkdocs build --strict

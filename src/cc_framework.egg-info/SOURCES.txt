@@ -10,9 +10,11 @@ src/cc/cartographer/atlas.py
 src/cc/cartographer/audit.py
 src/cc/cartographer/bounds.py
 src/cc/cartographer/cli.py
+src/cc/cartographer/intervals.py
 src/cc/cartographer/io.py
 src/cc/cartographer/stats.py
 src/cc/cartographer/suggest.py
+src/cc/cli/__init__.py
 src/cc/core/attackers.py
 src/cc/core/composition_theory.py
 src/cc/core/guardrail_api.py
