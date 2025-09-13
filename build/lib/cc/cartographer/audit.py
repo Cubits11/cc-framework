@@ -1,19 +1,30 @@
 # src/cc/cartographer/audit.py
 """
 Module: audit
-Purpose: Tamper-evident JSONL audit chain (stable JSON, SHA-256 links)
-Dependencies: hashlib, json, os, typing, datetime
-Author: Pranav Bhave
-Date: 2025-08-31
+Purpose:
+  (A) Tamper-evident JSONL audit chain (stable JSON, SHA-256 links)
+  (B) FH-ceiling auditor for composed J against Fréchet–Hoeffding envelopes
 
-Design notes
-------------
+Dependencies: hashlib, json, os, typing, datetime, numpy
+Author: Pranav Bhave
+Date: 2025-08-31 (updated 2025-09-12)
+
+Design notes (A)
+----------------
 - Each line is a complete JSON object with:
     • sha256: SHA-256 of the line’s content excluding the sha256 field itself
     • prev_sha256: pointer to the previous record’s sha256 (or null for the first)
 - Serialization uses a *stable* JSON form: sorted keys + compact separators.
 - Appends are flushed and fsync’d for durability (opt-out by setting fsync=False).
 - `verify_chain` replays the file and re-computes hashes to detect tampering.
+
+Design notes (B)
+----------------
+- The FH auditor uses `envelope_over_rocs` to compute the J ceiling grid
+  and checks observed composed J values at specified cross-threshold pairs.
+- Two entry points:
+    • `audit_fh_ceiling_by_index`: indices into ROC arrays + observed J.
+    • `audit_fh_ceiling_by_points`: explicit ROC points + observed J (maps to indices).
 """
 
 from __future__ import annotations
@@ -23,9 +34,14 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union, cast, Literal
+
+import numpy as np
+
+from .bounds import envelope_over_rocs, ensure_anchors
 
 __all__ = [
+    # JSONL chain
     "append_jsonl",
     "verify_chain",
     "tail_sha",
@@ -33,6 +49,9 @@ __all__ = [
     "rehash_file",
     "append_record",   # convenience: make_record + append_jsonl
     "AuditError",
+    # FH auditor
+    "audit_fh_ceiling_by_index",
+    "audit_fh_ceiling_by_points",
 ]
 
 
@@ -365,3 +384,110 @@ def append_record(
         figures=figures,
     )
     return append_jsonl(path, rec, fsync=fsync)
+
+
+# =============================================================================
+# Fréchet–Hoeffding (FH) ceiling auditor
+# =============================================================================
+
+Violation = Tuple[int, int, float, float]  # (i_a, i_b, J_obs, J_cap)
+
+
+def audit_fh_ceiling_by_index(
+    roc_a: np.ndarray,
+    roc_b: np.ndarray,
+    pairs: Iterable[Tuple[int, int, float]],
+    *,
+    comp: Literal["AND", "OR", "and", "or"] = "AND",
+    add_anchors: bool = False,
+    tol: float = 1e-12,
+) -> List[Violation]:
+    """
+    Given indices into roc_a/roc_b and observed J at those index pairs, flag any FH-cap violations.
+    Returns list of (i_a, i_b, J_obs, J_cap) for offending points (empty if none).
+
+    Args:
+        roc_a, roc_b: arrays of shape (Na,2) and (Nb,2) with columns [FPR, TPR].
+        pairs: iterable of (i_a, i_b, J_obs).
+        comp: "AND" or "OR" composition.
+        add_anchors: if True, ensure (0,0) and (1,1) present (indices will refer to the *augmented* arrays).
+        tol: allowed numerical slack (J_obs > J_cap + tol counts as violation).
+    """
+    if add_anchors:
+        A = ensure_anchors(roc_a)
+        B = ensure_anchors(roc_b)
+    else:
+        A = np.asarray(roc_a, dtype=float)
+        B = np.asarray(roc_b, dtype=float)
+
+    # Build FH envelope grid once
+    _, Jgrid = envelope_over_rocs(A, B, comp=comp, add_anchors=False)
+    H, W = Jgrid.shape
+
+    bad: List[Violation] = []
+    for ia, ib, j_obs in pairs:
+        if not (0 <= ia < H and 0 <= ib < W):
+            # ignore out-of-range indices quietly
+            continue
+        j_cap = float(Jgrid[ia, ib])
+        if j_obs > j_cap + tol:
+            bad.append((int(ia), int(ib), float(j_obs), j_cap))
+    return bad
+
+
+def audit_fh_ceiling_by_points(
+    roc_a: np.ndarray,
+    roc_b: np.ndarray,
+    triples: Iterable[Tuple[Tuple[float, float], Tuple[float, float], float]],
+    *,
+    comp: Literal["AND", "OR", "and", "or"] = "AND",
+    add_anchors: bool = False,
+    tol: float = 1e-12,
+    strict: bool = False,
+) -> List[Tuple[Tuple[float, float], Tuple[float, float], float, float]]:
+    """
+    Like `audit_fh_ceiling_by_index`, but accepts explicit ROC points for each rail.
+
+    Args:
+        triples: iterable of ((fpr_a, tpr_a), (fpr_b, tpr_b), J_obs).
+        strict: if True, raise if a point is not found exactly in roc_a/roc_b;
+                if False, skip points that do not match exactly.
+
+    Returns:
+        List of ((fpr_a, tpr_a), (fpr_b, tpr_b), J_obs, J_cap) for violations.
+    """
+    if add_anchors:
+        A = ensure_anchors(roc_a)
+        B = ensure_anchors(roc_b)
+    else:
+        A = np.asarray(roc_a, dtype=float)
+        B = np.asarray(roc_b, dtype=float)
+
+    # Map points to indices by exact match
+    def idx_of(M: np.ndarray, pt: Tuple[float, float]) -> Optional[int]:
+        mask = (np.isclose(M[:, 0], pt[0])) & (np.isclose(M[:, 1], pt[1]))
+        where = np.nonzero(mask)[0]
+        return int(where[0]) if where.size > 0 else None
+
+    # Envelope grid
+    _, Jgrid = envelope_over_rocs(A, B, comp=comp, add_anchors=False)
+
+    violations: List[Tuple[Tuple[float, float], Tuple[float, float], float, float]] = []
+    for pa, pb, j_obs in triples:
+        ia = idx_of(A, pa)
+        ib = idx_of(B, pb)
+        if ia is None or ib is None:
+            if strict:
+                missing = []
+                if ia is None:
+                    missing.append(f"A{pa}")
+                if ib is None:
+                    missing.append(f"B{pb}")
+                raise AuditError(f"Point(s) not found in ROC arrays: {', '.join(missing)}")
+            else:
+                # Skip silently when not strict
+                continue
+        j_cap = float(Jgrid[ia, ib])
+        if j_obs > j_cap + tol:
+            violations.append((pa, pb, float(j_obs), j_cap))
+    return violations

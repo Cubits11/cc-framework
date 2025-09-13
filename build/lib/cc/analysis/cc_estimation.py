@@ -20,7 +20,7 @@ This file keeps backward compatibility with:
   • `estimate_cc_metrics(results, individual_j=None)`
 
 Author: Pranav Bhave
-Refined: 2025-09-11
+Refined: 2025-09-12
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from cc.core.stats import (
     compute_j_statistic,
 )
 
-# Week-3 methods (FH–Bernstein) — single source of truth lives here:
+# Week-3 methods (FH–Bernstein)
 from cc.cartographer.bounds import (
     fh_intervals,
     fh_var_envelope,
@@ -43,20 +43,29 @@ from cc.cartographer.bounds import (
     cc_two_sided_bound,
 )
 from cc.cartographer.intervals import cc_ci_wilson, cc_ci_bootstrap
+
+__all__ = [
+    # Back-compat
+    "estimate_j_statistics",
+    "estimate_cc_metrics",
+    # Week-3 FH–Bernstein API
+    "estimate_cc_methods_from_rates",
+    "estimate_cc_methods",
+    # Convenience CI wrappers
+    "cc_ci_wilson_from_rates",
+    "cc_ci_bootstrap_from_samples",
+    # Wilson/Newcombe helpers (exported for direct import)
+    "wilson_interval",
+    "newcombe_diff_ci",
+    "cc_confint_newcombe",
+]
+
 # ---------------------------------------------------------------------------
 # Backward-compatible helpers (existing API)
 # ---------------------------------------------------------------------------
 
 def estimate_j_statistics(results: Iterable[AttackResult]) -> Dict[str, float]:
-    """Compute empirical J statistic and world success rates.
-
-    Args:
-        results: Iterable of attack results from the two-world protocol.
-
-    Returns:
-        Dictionary containing the J statistic (``j_statistic``) and the success
-        rates in each world (``p0`` and ``p1``).
-    """
+    """Compute empirical J statistic and world success rates."""
     result_list = list(results)
     j_stat, p0, p1 = compute_j_statistic(result_list)
     return {"j_statistic": j_stat, "p0": p0, "p1": p1}
@@ -66,23 +75,7 @@ def estimate_cc_metrics(
     results: Iterable[AttackResult],
     individual_j: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
-    """Compute empirical composability metrics from attack results.
-
-    This routine first estimates the J statistic and, if individual guardrail
-    J-statistics are provided, computes the composability coefficients using
-    :func:`cc.core.stats.compute_composability_coefficients`.
-
-    Args:
-        results: Iterable of :class:`AttackResult` objects.
-        individual_j: Optional mapping {guardrail_id: J_r}. When provided,
-            composability metrics are added via :func:`compute_composability_coefficients`.
-
-    Returns:
-        Dictionary with empirical metrics. Always includes ``j_statistic``,
-        ``p0`` and ``p1``. If ``individual_j`` is supplied, the dictionary also
-        contains ``cc_max``, ``delta_add`` and ``cc_multiplicative`` among other
-        fields returned by :func:`compute_composability_coefficients`.
-    """
+    """Compute empirical composability metrics from attack results."""
     metrics = estimate_j_statistics(results)
     if individual_j:
         cc_metrics = compute_composability_coefficients(
@@ -166,19 +159,7 @@ def estimate_cc_methods_from_rates(
     # Optional risk split across classes (δ1, δ0); if None, δ/2 each
     split: Optional[Tuple[float, float]] = None,
 ) -> Dict[str, Union[float, Tuple[float, float], dict]]:
-    """End-to-end FH–Bernstein CC workflow given scalar rates at θ.
-
-    Returns a dictionary containing:
-      • point:  CCPoint
-      • bounds: CCBounds (I1/I0 + vbar1/vbar0)
-      • ci:     CCCI     (two-sided CI for CC at risk δ; plus planner outputs if target_t)
-      • audit:  {'bernstein_bound_at_halfwidth': ..., 'delta': ...} convenience fields
-
-    Notes:
-      - p1_hat = P(A∧B=1 | Y=1), p0_hat = P(A∨B=1 | Y=0) empirically at θ
-      - D      = min_r(1 - J_r(θ_r^*)), supplied by caller (single-rail reference)
-      - FPR policy α-cap is bound into I0 (upper) automatically if provided
-    """
+    """End-to-end FH–Bernstein CC workflow given scalar rates at θ."""
     # Validate inputs
     for nm, val in [
         ("p1_hat", p1_hat), ("p0_hat", p0_hat),
@@ -265,22 +246,7 @@ def estimate_cc_methods(
     target_t: Optional[float] = None,
     split: Optional[Tuple[float, float]] = None,
 ) -> Dict[str, Union[float, Tuple[float, float], dict]]:
-    """Derive (p1_hat, p0_hat) from results, then run FH–Bernstein CC workflow.
-
-    Args:
-        results: Iterable of AttackResult from the two-world protocol at θ.
-        D: Denominator (>0) from single-rail reference, D = min_r (1 - J_r(θ_r*)).
-        tpr_a, tpr_b, fpr_a, fpr_b: Operating TPR/FPR for rails A,B at θ.
-        n1, n0: Class-conditional sample sizes.
-        alpha_cap: Optional FPR policy cap applied to I0.
-        delta: Total two-sided risk for the CI (default 0.05).
-        target_t: Optional desired half-width for planning.
-        split: Optional class-wise risk split (δ1, δ0) summing to δ.
-
-    Returns:
-        Dictionary with 'point', 'bounds', 'ci', and 'audit' entries
-        (see `estimate_cc_methods_from_rates` for fields).
-    """
+    """Derive (p1_hat, p0_hat) from results, then run FH–Bernstein CC workflow."""
     res = list(results)
     j_stat, p0_hat, p1_hat = compute_j_statistic(res)
     return estimate_cc_methods_from_rates(
@@ -290,8 +256,80 @@ def estimate_cc_methods(
         target_t=target_t, split=split,
     )
 
-def cc_ci_wilson_from_rates(p1_hat: float, n1: int, p0_hat: float, n0: int, D: float, delta: float=0.05):
+# ---------------------------------------------------------------------------
+# Convenience: Wilson and bootstrap CC CIs (delegating to cartographer.intervals)
+# ---------------------------------------------------------------------------
+
+def cc_ci_wilson_from_rates(
+    p1_hat: float, n1: int, p0_hat: float, n0: int, D: float, delta: float = 0.05
+) -> Tuple[float, float]:
+    """Two-sided CC CI using Wilson/Newcombe (difference of proportions) under denominator D."""
     return cc_ci_wilson(p1_hat, n1, p0_hat, n0, D, delta)
 
-def cc_ci_bootstrap_from_samples(y1_samples, y0_samples, D: float, delta: float=0.05, B: int=2000, seed=None):
+
+def cc_ci_bootstrap_from_samples(
+    y1_samples,
+    y0_samples,
+    D: float,
+    delta: float = 0.05,
+    B: int = 2000,
+    seed: Optional[int] = None,
+) -> Tuple[float, float]:
+    """Two-sided CC CI via bootstrap from class-labeled samples."""
     return cc_ci_bootstrap(y1_samples, y0_samples, D, delta, B=B, seed=seed)
+
+# ---------------------------------------------------------------------------
+# Wilson / Newcombe helpers (exported for direct import)
+# ---------------------------------------------------------------------------
+
+from statistics import NormalDist
+
+def _z_for(alpha: float = 0.05) -> float:
+    if not (0.0 < alpha < 1.0):
+        raise ValueError("alpha must be in (0,1)")
+    return NormalDist().inv_cdf(1.0 - alpha / 2.0)
+
+def wilson_interval(x: int, n: int, alpha: float = 0.05) -> Tuple[float, float]:
+    """Wilson score interval for a single proportion (two-sided)."""
+    if n <= 0:
+        return (0.0, 1.0)
+    if x < 0 or x > n:
+        raise ValueError("x must lie in [0, n].")
+    z = _z_for(alpha)
+    p = x / n
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (p + z2 / (2.0 * n)) / denom
+    margin = (z / denom) * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)) ** 0.5)
+    lo, hi = center - margin, center + margin
+    return (0.0 if lo < 0.0 else lo, 1.0 if hi > 1.0 else hi)
+
+def newcombe_diff_ci(x1: int, n1: int, x0: int, n0: int, alpha: float = 0.05) -> Tuple[float, float]:
+    """
+    Newcombe (1998) method 10: Wilson intervals on each proportion, then ΔCI = (L1 - U0, U1 - L0),
+    where Δ = p1 - p0. Better than Wald for small n or extreme p.
+    """
+    L1, U1 = wilson_interval(x1, n1, alpha)
+    L0, U0 = wilson_interval(x0, n0, alpha)
+    return (L1 - U0, U1 - L0)
+
+def cc_confint_newcombe(
+    x1: int, n1: int,
+    x0: int, n0: int,
+    D: float,
+    alpha: float = 0.05,
+    clamp01: bool = False,
+) -> Tuple[float, float]:
+    """
+    Convert Newcombe ΔCI to a CC CI via CC = (1 - Δ) / D.
+    Mapping is monotone decreasing in Δ:
+      Δ_lo, Δ_hi -> CC_lo = (1 - Δ_hi) / D, CC_hi = (1 - Δ_lo) / D
+    """
+    if D <= 0.0:
+        raise ValueError("D must be > 0.")
+    d_lo, d_hi = newcombe_diff_ci(x1, n1, x0, n0, alpha)
+    cc_lo = (1.0 - d_hi) / D
+    cc_hi = (1.0 - d_lo) / D
+    if clamp01:
+        cc_lo, cc_hi = max(0.0, cc_lo), min(1.0, cc_hi)
+    return cc_lo, cc_hi

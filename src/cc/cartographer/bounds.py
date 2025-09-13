@@ -5,12 +5,6 @@ Purpose:
   (A) Fréchet–Hoeffding-style ceilings for composed Youden's J over two ROC curves
   (B) Finite-sample FH–Bernstein utilities for CC at a fixed operating point θ
 
-Author: Pranav Bhave (upgraded with FH-variance + Bernstein/CC utilities)
-Dates:
-  - Original: 2025-08-31
-  - Refined:  2025-09-05
-  - Upgraded: 2025-09-11
-
 Overview
 --------
 Given two ROC curves A and B as (FPR, TPR) point sets, (A) computes an *upper bound*
@@ -23,32 +17,28 @@ marginals (TPR_a,TPR_b,FPR_a,FPR_b), (B) provides:
   • A tight variance envelope  v̄ = max_{p∈I} p(1-p);
   • Two-sided Bernstein tails for Bernoulli means and a CC deviation bound;
   • Finite-sample CI for CC and a closed-form per-class sample-size planner.
-
-Design notes
-------------
-- Robust to sparsity/ordering of ROC samples (no monotonicity assumed).
-- Optional “anchor” augmentation adds (0,0) and (1,1) when desired.
-- Type-annotated, pure NumPy + math; mypy-friendly.
-- Bernstein utilities are distribution-free via FH variance envelopes.
-- Clear exceptions on infeasible policy caps (I0 upper < lower).
-
 """
 
 from __future__ import annotations
 
+from math import ceil, exp, log
 from typing import Iterable, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import TypeAlias
-from math import exp, log
 
 __all__ = [
     # ROC/FH ceilings on J over curves
     "ROCArrayLike",
     "frechet_upper",
     "frechet_upper_with_argmax",
+    "frechet_upper_with_argmax_points",
+    "envelope_over_rocs",
     "ensure_anchors",
+    # n-rail FH helpers
+    "fh_and_bounds_n",
+    "fh_or_bounds_n",
     # FH/Bernstein utilities at a fixed θ
     "fh_intervals",
     "fh_var_envelope",
@@ -57,6 +47,7 @@ __all__ = [
     "cc_two_sided_bound",
     "cc_confint",
     "needed_n_bernstein",
+    "needed_n_bernstein_int",
 ]
 
 # ---- Types -----------------------------------------------------------------
@@ -68,15 +59,18 @@ ROCArrayLike: TypeAlias = Union[
     NDArray[np.float64],
 ]
 
-
 # ---- Utilities (ROC arrays) ------------------------------------------------
 
-def _to_array_roc(arr: ROCArrayLike) -> NDArray[np.float64]:
+def _to_array_roc(
+    arr: ROCArrayLike, *, clip: Literal["silent", "warn", "error"] = "silent"
+) -> NDArray[np.float64]:
     """
-    Coerce to float array of shape (n, 2) with columns [FPR, TPR], clipped into [0,1].
+    Coerce to float array of shape (n, 2) with columns [FPR, TPR].
 
-    Raises:
-        ValueError: on bad shape or non-finite values.
+    clip:
+        - "silent": silently clip out-of-range to [0,1] (back-compat; default).
+        - "warn":   clip and emit a RuntimeWarning.
+        - "error":  raise on any out-of-range entry.
     """
     if isinstance(arr, np.ndarray):
         roc = arr.astype(float, copy=False)
@@ -86,22 +80,47 @@ def _to_array_roc(arr: ROCArrayLike) -> NDArray[np.float64]:
     if roc.ndim != 2 or roc.shape[1] != 2:
         raise ValueError("ROC must be array-like of shape (n, 2) with columns [FPR, TPR].")
 
-    roc = np.clip(roc, 0.0, 1.0)
+    oob_mask = (roc < 0.0) | (roc > 1.0)
+    if oob_mask.any():
+        if clip == "error":
+            bad = roc[oob_mask.any(axis=1)]
+            raise ValueError(f"ROC contains out-of-range values; first few: {bad[:4]!r}")
+        elif clip == "warn":
+            import warnings
+            warnings.warn("Clipping ROC values to [0,1].", RuntimeWarning, stacklevel=2)
+        roc = np.clip(roc, 0.0, 1.0)
+
     if not np.isfinite(roc).all():
         raise ValueError("ROC contains non-finite values.")
     return roc
 
 
-def ensure_anchors(roc: ROCArrayLike) -> NDArray[np.float64]:
+def ensure_anchors(
+    roc: ROCArrayLike,
+    *,
+    preserve_order: bool = True,
+    clip: Literal["silent", "warn", "error"] = "silent",
+) -> NDArray[np.float64]:
     """
-    Ensure ROC contains (0,0) and (1,1) anchor points. Returns a new array with uniques kept.
-    Useful when curves are sampled sparsely and the envelope needs closure.
+    Ensure ROC contains (0,0) and (1,1).
+
+    If preserve_order=True, append any missing anchors without global sorting
+    (keeps caller indices stable). Otherwise, return unique, sorted rows
+    (lexicographic by FPR asc, then TPR asc).
     """
-    R = _to_array_roc(roc)
-    anchors = np.array([[0.0, 0.0], [1.0, 1.0]], dtype=float)
-    stacked = np.vstack([R, anchors])
-    uniq = np.unique(stacked, axis=0)
-    return uniq
+    R = _to_array_roc(roc, clip=clip)
+    has_00 = np.any((R[:, 0] == 0.0) & (R[:, 1] == 0.0))
+    has_11 = np.any((R[:, 0] == 1.0) & (R[:, 1] == 1.0))
+    if not has_00:
+        R = np.vstack([R, [0.0, 0.0]])
+    if not has_11:
+        R = np.vstack([R, [1.0, 1.0]])
+    if preserve_order:
+        return R
+    # unique + sorted (FPR asc, then TPR asc)
+    R = np.unique(R, axis=0)
+    order = np.lexsort((R[:, 1], R[:, 0]))
+    return R[order]
 
 
 def _frechet_grid_AND(
@@ -126,47 +145,70 @@ def _frechet_grid_OR(
     return tpr_or - fpr_or  # J grid
 
 
+# ---- n-rail FH helpers -----------------------------------------------------
+
+def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """
+    FH bounds for ∧_i A_i given per-rail trigger rates alphas = P(A_i) with shape (k, ...).
+    Returns (lower, upper) where:
+      lower = max(0, sum_i alpha_i - (k-1)),  upper = min_i alpha_i
+    """
+    if alphas.ndim < 1:
+        raise ValueError("alphas must have rail dimension on axis 0.")
+    k = alphas.shape[0]
+    lower = np.maximum(0.0, np.sum(alphas, axis=0) - (k - 1))
+    upper = np.min(alphas, axis=0)
+    return lower, upper
+
+
+def fh_or_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """
+    FH bounds for ∨_i A_i given per-rail trigger rates alphas = P(A_i) with shape (k, ...).
+    Returns (lower, upper) where:
+      lower = max_i alpha_i,  upper = min(1, sum_i alpha_i)
+    """
+    if alphas.ndim < 1:
+        raise ValueError("alphas must have rail dimension on axis 0.")
+    lower = np.max(alphas, axis=0)
+    upper = np.minimum(1.0, np.sum(alphas, axis=0))
+    return lower, upper
+
+
 # ---- Public API: FH ceilings over ROC curves -------------------------------
 
 def frechet_upper(
     roc_a: ROCArrayLike,
     roc_b: ROCArrayLike,
     *,
-    comp: Literal["AND", "OR"] = "AND",
+    comp: Literal["AND", "OR", "and", "or"] = "AND",
+    clip: Literal["silent", "warn", "error"] = "silent",
     add_anchors: bool = False,
 ) -> float:
-    """
-    Compute the Fréchet-style *upper bound* on composed Youden's J over two ROC curves.
+    """Fréchet-style *upper bound* on composed Youden's J over two ROC curves."""
+    if add_anchors:
+        A = ensure_anchors(roc_a, clip=clip)
+        B = ensure_anchors(roc_b, clip=clip)
+    else:
+        A = _to_array_roc(roc_a, clip=clip)
+        B = _to_array_roc(roc_b, clip=clip)
 
-    Args:
-        roc_a: Sequence/array of (FPR, TPR) for guardrail A.
-        roc_b: Sequence/array of (FPR, TPR) for guardrail B.
-        comp:  Composition rule: "AND" or "OR".
-        add_anchors: If True, add (0,0) and (1,1) anchors to each curve before bounding.
-
-    Returns:
-        Upper bound on composed J, clipped to [-1, 1].
-
-    Notes:
-        This is a ceiling under arbitrary dependence; it ignores any independence assumptions.
-    """
-    A = ensure_anchors(roc_a) if add_anchors else _to_array_roc(roc_a)
-    B = ensure_anchors(roc_b) if add_anchors else _to_array_roc(roc_b)
-
-    # Broadcast cross-pairs
     FPR_a = A[:, 0][:, None]  # (Na,1)
     TPR_a = A[:, 1][:, None]  # (Na,1)
     FPR_b = B[:, 0][None, :]  # (1,Nb)
     TPR_b = B[:, 1][None, :]  # (1,Nb)
 
-    if comp == "AND":
+    comp_u = comp.upper()
+    if comp_u == "AND":
         Jgrid = _frechet_grid_AND(FPR_a, TPR_a, FPR_b, TPR_b)
-    elif comp == "OR":
+    elif comp_u == "OR":
         Jgrid = _frechet_grid_OR(FPR_a, TPR_a, FPR_b, TPR_b)
     else:
         raise ValueError('comp must be "AND" or "OR".')
 
-    jmax = float(np.max(Jgrid)) if Jgrid.size else 0.0
+    if not Jgrid.size:
+        return 0.0
+    Jgrid = np.nan_to_num(Jgrid, nan=-1.0, posinf=1.0, neginf=-1.0)
+    jmax = float(np.max(Jgrid))
     return float(np.clip(jmax, -1.0, 1.0))
 
 
@@ -174,18 +216,17 @@ def frechet_upper_with_argmax(
     roc_a: ROCArrayLike,
     roc_b: ROCArrayLike,
     *,
-    comp: Literal["AND", "OR"] = "AND",
+    comp: Literal["AND", "OR", "and", "or"] = "AND",
+    clip: Literal["silent", "warn", "error"] = "silent",
     add_anchors: bool = False,
 ) -> Tuple[float, Optional[int], Optional[int]]:
-    """
-    As `frechet_upper`, but also return indices (ia, ib) of the maximizing cross-pair.
-
-    Returns:
-        (jmax, ia, ib) where ia indexes into A, ib into B. If either curve is empty,
-        returns (0.0, None, None).
-    """
-    A = ensure_anchors(roc_a) if add_anchors else _to_array_roc(roc_a)
-    B = ensure_anchors(roc_b) if add_anchors else _to_array_roc(roc_b)
+    """As `frechet_upper`, but also return (ia, ib) of the maximizing cross-pair."""
+    if add_anchors:
+        A = ensure_anchors(roc_a, clip=clip)
+        B = ensure_anchors(roc_b, clip=clip)
+    else:
+        A = _to_array_roc(roc_a, clip=clip)
+        B = _to_array_roc(roc_b, clip=clip)
 
     if A.size == 0 or B.size == 0:
         return 0.0, None, None
@@ -195,24 +236,81 @@ def frechet_upper_with_argmax(
     FPR_b = B[:, 0][None, :]
     TPR_b = B[:, 1][None, :]
 
-    if comp == "AND":
+    comp_u = comp.upper()
+    if comp_u == "AND":
         Jgrid = _frechet_grid_AND(FPR_a, TPR_a, FPR_b, TPR_b)
-    elif comp == "OR":
+    elif comp_u == "OR":
         Jgrid = _frechet_grid_OR(FPR_a, TPR_a, FPR_b, TPR_b)
     else:
         raise ValueError('comp must be "AND" or "OR".')
 
-    flat_idx = int(np.argmax(Jgrid))
+    Jgrid = np.nan_to_num(Jgrid, nan=-1.0, posinf=1.0, neginf=-1.0)
+    flat_idx = int(np.nanargmax(Jgrid))
     ia, ib = np.unravel_index(flat_idx, Jgrid.shape)
     jmax = float(Jgrid[ia, ib])
     return float(np.clip(jmax, -1.0, 1.0)), int(ia), int(ib)
 
 
+def frechet_upper_with_argmax_points(
+    roc_a: ROCArrayLike,
+    roc_b: ROCArrayLike,
+    *,
+    comp: Literal["AND", "OR", "and", "or"] = "AND",
+    clip: Literal["silent", "warn", "error"] = "silent",
+    add_anchors: bool = False,
+) -> Tuple[float, ROCPoint, ROCPoint]:
+    """
+    Like `frechet_upper_with_argmax` but returns the maximizing ROC points themselves:
+    (J_max, (fpr_a*, tpr_a*), (fpr_b*, tpr_b*))
+    """
+    if add_anchors:
+        A = ensure_anchors(roc_a, clip=clip)
+        B = ensure_anchors(roc_b, clip=clip)
+    else:
+        A = _to_array_roc(roc_a, clip=clip)
+        B = _to_array_roc(roc_b, clip=clip)
+
+    jmax, ia, ib = frechet_upper_with_argmax(A, B, comp=comp, clip=clip, add_anchors=False)
+    if ia is None or ib is None:
+        return 0.0, (0.0, 0.0), (0.0, 0.0)
+    return jmax, (float(A[ia, 0]), float(A[ia, 1])), (float(B[ib, 0]), float(B[ib, 1]))
+
+
+def envelope_over_rocs(
+    roc_a: ROCArrayLike,
+    roc_b: ROCArrayLike,
+    *,
+    comp: Literal["AND", "OR", "and", "or"] = "AND",
+    clip: Literal["silent", "warn", "error"] = "silent",
+    add_anchors: bool = False,
+) -> Tuple[float, NDArray[np.float64]]:
+    """
+    Return (J_max, J_grid) where J_grid has shape (Na, Nb).
+    Useful for plotting heatmaps and highlighting the argmax.
+    """
+    if add_anchors:
+        A = ensure_anchors(roc_a, clip=clip)
+        B = ensure_anchors(roc_b, clip=clip)
+    else:
+        A = _to_array_roc(roc_a, clip=clip)
+        B = _to_array_roc(roc_b, clip=clip)
+
+    FPR_a = A[:, 0][:, None]; TPR_a = A[:, 1][:, None]
+    FPR_b = B[:, 0][None, :]; TPR_b = B[:, 1][None, :]
+
+    comp_u = comp.upper()
+    if comp_u == "AND":
+        J = _frechet_grid_AND(FPR_a, TPR_a, FPR_b, TPR_b)
+    elif comp_u == "OR":
+        J = _frechet_grid_OR(FPR_a, TPR_a, FPR_b, TPR_b)
+    else:
+        raise ValueError('comp must be "AND" or "OR".')
+
+    J = np.nan_to_num(J, nan=-1.0, posinf=1.0, neginf=-1.0)
+    return float(np.clip(np.max(J), -1.0, 1.0)), J
+
+
 # ---- FH/Bernstein utilities at a fixed θ -----------------------------------
-
-def _clip01(x: float) -> float:
-    return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
-
 
 def _validate_prob(name: str, x: float) -> None:
     if not (0.0 <= x <= 1.0) or not np.isfinite(x):
@@ -226,22 +324,16 @@ def fh_intervals(
     fpr_b: float,
     *,
     alpha_cap: Optional[float] = None,
+    cap_mode: Literal["error", "clip"] = "error",
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
     """
     Fréchet–Hoeffding *sharp* intervals for:
       I1: p1 = P(A ∧ B = 1 | Y=1)   (AND on positives)
       I0: p0 = P(A ∨ B = 1 | Y=0)   (OR  on negatives)
 
-    Args:
-        tpr_a, tpr_b: class-conditional TPRs at θ for rails A,B (Y=1).
-        fpr_a, fpr_b: class-conditional FPRs at θ for rails A,B (Y=0).
-        alpha_cap: optional policy cap for FPR at deploy-time (binds U0 = min(U0, alpha)).
-
-    Returns:
-        (I1, I0) where each is (L, U) with 0 <= L <= U <= 1.
-
-    Raises:
-        ValueError if the policy cap makes I0 empty (U0 < L0), signalling infeasible θ under policy.
+    cap_mode:
+      - "error": raise if policy cap makes I0 empty (strict feasibility).
+      - "clip":  set U0=L0 (point interval) when the cap would make I0 empty.
     """
     for nm, x in [("tpr_a", tpr_a), ("tpr_b", tpr_b), ("fpr_a", fpr_a), ("fpr_b", fpr_b)]:
         _validate_prob(nm, x)
@@ -256,31 +348,25 @@ def fh_intervals(
         U0 = min(U0, alpha_cap)
 
     if U1 < L1:
-        # Numerical or input inconsistency; clip to a degenerate but valid interval
         U1 = L1
     if U0 < L0:
-        # Policy renders the target θ infeasible for OR-composite negatives.
-        raise ValueError(
-            f"Policy cap makes I0 empty: L0={L0:.6f}, U0={U0:.6f}. "
-            "Relax α or adjust θ/marginals."
-        )
+        if cap_mode == "error":
+            raise ValueError(
+                f"Policy cap makes I0 empty: L0={L0:.6f}, U0={U0:.6f}. "
+                "Relax α or adjust θ/marginals."
+            )
+        else:
+            U0 = L0  # point interval under strict cap
 
     return (L1, U1), (L0, U0)
 
 
 def fh_var_envelope(interval: Tuple[float, float]) -> float:
     """
-    Max_{p in [a,b]} p(1-p). Concave with unique maximizer at 0.5.
-
-    Returns:
-        v̄ = 0.25 if the interval contains 0.5,
-        else max{ a(1-a), b(1-b) }.
-
-    Raises:
-        ValueError on invalid interval.
+    Return max_{p in [a,b]} p(1-p); 0.25 if 0.5∈[a,b], else max of endpoints.
     """
     a, b = interval
-    if not (0.0 <= a <= 1.0 and 0.0 <= b <= 1.0 and a <= b and np.isfinite(a) and np.isfinite(b)):
+    if not (np.isfinite(a) and np.isfinite(b) and 0.0 <= a <= b <= 1.0):
         raise ValueError(f"Invalid interval {interval}; must satisfy 0<=a<=b<=1.")
     if a <= 0.5 <= b:
         return 0.25
@@ -297,34 +383,24 @@ def bernstein_tail(
     two_sided: bool = True,
 ) -> float:
     """
-    Bernstein tail bound for a Bernoulli mean with known variance envelope vbar.
+    Bernstein tail for a Bernoulli mean with variance envelope vbar.
+    Supports legacy positional (n, eps, vbar) and new keyword style (t with D or eps).
 
-    Supports BOTH:
-      - New style (keywords): bernstein_tail(t=..., n=..., vbar=..., D=..., two_sided=True)
-                              OR bernstein_tail(eps=..., n=..., vbar=..., two_sided=True)
-      - Legacy positional:   bernstein_tail(n, eps, vbar)  [two-sided implied; D=1.0]
-
-    Bound:
-      P(|p̂ - p| >= ε) ≤ 2 * exp( - n * ε^2 / (2 vbar + (2/3) ε) )
-
-    If you are in CC-space with half-width t on CC, use t and D (ε = t * D).
+    Bound (two-sided version):
+      P(|p̂ - p| >= ε) ≤ 2 * exp( - n * ε^2 / (2 vbar + (2/3) ε) ).
     """
-    # ---- Legacy positional parsing (n, eps, vbar) ----
     if args:
         if len(args) == 3 and all(a is not None for a in args):
             n_pos, eps_pos, vbar_pos = args  # type: ignore
-            n = int(n_pos)
-            eps = float(eps_pos)
-            vbar = float(vbar_pos)
+            n = int(n_pos); eps = float(eps_pos); vbar = float(vbar_pos)
         else:
             raise TypeError(
                 "Legacy positional call must be bernstein_tail(n, eps, vbar). "
                 "Prefer keyword style: bernstein_tail(t=..., n=..., vbar=..., D=...)."
             )
 
-    # ---- Validate / derive eps from t, D if needed ----
     if n is None or vbar is None:
-        raise ValueError("Provide n and vbar (either via keywords or legacy positional args).")
+        raise ValueError("Provide n and vbar (keywords or legacy positional).")
     if n <= 0:
         raise ValueError("n must be positive.")
     if not (0.0 <= vbar <= 0.25 + 1e-12):
@@ -343,7 +419,7 @@ def bernstein_tail(
             raise ValueError("eps must be nonnegative.")
 
     if eps == 0.0:
-        return 1.0  # degenerate safe bound
+        return 1.0
 
     denom = 2.0 * vbar + (2.0 / 3.0) * eps
     if denom <= 0.0:
@@ -352,27 +428,13 @@ def bernstein_tail(
     exponent = - (n * eps * eps) / denom
     base = exp(exponent)
     prob = (2.0 * base) if two_sided else base
-    # clip numeric
-    if prob < 0.0:
-        prob = 0.0
-    elif prob > 1.0:
-        prob = 1.0
-    return float(prob)
+    return float(0.0 if prob < 0.0 else (1.0 if prob > 1.0 else prob))
+
 
 def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
     """
     Invert  2 * exp( - n * eps^2 / (2 vbar + (2/3) eps) ) <= delta
-    to solve for the smallest eps >= 0 satisfying the inequality.
-
-    Uses a safe bracket + binary search (monotone).
-
-    Args:
-        n: sample size (positive).
-        vbar: variance envelope ∈ [0, 0.25].
-        delta: tail budget ∈ (0, 2).
-
-    Returns:
-        eps >= 0 such that the two-sided Bernstein tail ≤ delta.
+    to solve for the smallest eps ≥ 0. Uses bracket + binary search.
     """
     if n <= 0:
         raise ValueError("n must be positive.")
@@ -382,7 +444,6 @@ def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
         raise ValueError("delta must be in (0, 2).")
 
     target = log(2.0 / delta)  # > 0
-    # Expand upper bracket until f(hi) >= target
     lo, hi = 0.0, 1.0
     for _ in range(64):
         denom = 2.0 * vbar + (2.0 / 3.0) * hi
@@ -392,7 +453,6 @@ def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
         hi *= 2.0
         if hi > 1e6:
             break
-    # Binary search
     for _ in range(96):
         mid = 0.5 * (lo + hi)
         denom = 2.0 * vbar + (2.0 / 3.0) * mid
@@ -411,31 +471,19 @@ def cc_two_sided_bound(
     D: float,
     I1: Tuple[float, float],
     I0: Tuple[float, float],
+    *,
+    cap_at_one: bool = False,
 ) -> float:
-    """
-    P(|CC_hat - CC| >= t) bound with FH variance envelopes and a union bound.
-
-    Args:
-        n1, n0: class-conditional sample sizes for Y=1, Y=0.
-        t: CC deviation radius (> 0).
-        D: denominator (> 0).
-        I1, I0: FH intervals for p1, p0 respectively.
-
-    Returns:
-        Two-term Bernstein + union bound probability.
-
-    Notes:
-        This does not assume any dependence structure beyond the FH envelopes.
-    """
+    """Union bound of two Bernstein tails on classes Y=1 and Y=0 for CC half-width t."""
     if D <= 0.0:
-        return 1.0  # Fragile denominator; caller should flag elsewhere.
+        return 1.0
     if t < 0.0:
         raise ValueError("t must be >= 0.")
     v1 = fh_var_envelope(I1)
     v0 = fh_var_envelope(I0)
-    return bernstein_tail(t=t, n=n1, vbar=v1, D=D, two_sided=True) \
-     + bernstein_tail(t=t, n=n0, vbar=v0, D=D, two_sided=True)
-
+    s = bernstein_tail(t=t, n=n1, vbar=v1, D=D, two_sided=True) \
+      + bernstein_tail(t=t, n=n0, vbar=v0, D=D, two_sided=True)
+    return min(1.0, s) if cap_at_one else s
 
 
 def cc_confint(
@@ -449,25 +497,13 @@ def cc_confint(
     *,
     delta: float = 0.05,
     split: Optional[Tuple[float, float]] = None,
+    clamp01: bool = False,
 ) -> Tuple[float, float]:
     """
-    Finite-sample two-sided confidence interval for CC at fixed θ.
+    Finite-sample two-sided CI for CC: invert classwise Bernstein tails, propagate through D.
+    Returns (lo, hi) around CC_hat = (1 - (p1_hat - p0_hat)) / D.
 
-    We invert Bernstein per class to obtain eps1, eps0 such that
-    P(|p1_hat - p1| >= eps1) ≤ δ1 and P(|p0_hat - p0| ≥ eps0) ≤ δ0 with δ1+δ0=δ.
-    Then |(p1_hat - p0_hat) - (p1 - p0)| ≤ eps1 + eps0 and
-         |CC_hat - CC| ≤ (eps1 + eps0) / D.
-
-    Args:
-        n1, n0: class-conditional sample sizes.
-        p1_hat, p0_hat: empirical composite rates at θ.
-        D: denominator (> 0).
-        I1, I0: FH intervals for p1 and p0.
-        delta: total two-sided risk (default 0.05).
-        split: optional (δ1, δ0). If None, uses symmetric (δ/2, δ/2).
-
-    Returns:
-        (lo, hi) CC interval centered at CC_hat = (1 - (p1_hat - p0_hat)) / D.
+    clamp01: if True, clamp (lo, hi) to [0,1] for display convenience (raw math is returned otherwise).
     """
     if D <= 0.0:
         raise ValueError("D must be > 0.")
@@ -487,8 +523,11 @@ def cc_confint(
     eps1 = invert_bernstein_eps(n1, v1, d1)
     eps0 = invert_bernstein_eps(n0, v0, d0)
     cc_hat = (1.0 - (p1_hat - p0_hat)) / D
-    t = (eps1 + eps0) / D
-    return cc_hat - t, cc_hat + t
+    t_half = (eps1 + eps0) / D
+    lo, hi = cc_hat - t_half, cc_hat + t_half
+    if clamp01:
+        lo, hi = max(0.0, lo), min(1.0, hi)
+    return lo, hi
 
 
 def needed_n_bernstein(
@@ -501,21 +540,9 @@ def needed_n_bernstein(
     split: Optional[Tuple[float, float]] = None,
 ) -> Tuple[float, float]:
     """
-    Closed-form per-class sample sizes (n1*, n0*) to ensure each Bernstein term ≤ δ_y.
-
-    We enforce:
-      2 * exp( - n_y * (tD)^2 / ( 2 v̄_y + (2/3) tD ) ) ≤ δ_y
-    ⇒  n_y ≥ ( 2 v̄_y + (2/3) tD ) / (tD)^2 * log(2/δ_y)
-
-    Args:
-        t: CC deviation target (> 0).
-        D: denominator (> 0).
-        I1, I0: FH intervals for p1, p0.
-        delta: total two-sided risk (default 0.05).
-        split: optional (δ1, δ0) with δ1+δ0=δ. If None, uses symmetric split.
-
-    Returns:
-        (n1_star, n0_star) as floats (caller may ceil to integers).
+    Closed-form per-class sample sizes (floats) so each Bernstein term ≤ δ_y.
+    Enforce: 2 * exp( - n_y (tD)^2 / ( 2 v̄_y + (2/3) tD ) ) ≤ δ_y
+      ⇒ n_y ≥ (( 2 v̄_y + (2/3) tD ) / (tD)^2) * log(2/δ_y).
     """
     if t <= 0.0 or D <= 0.0:
         raise ValueError("t and D must be > 0.")
@@ -537,3 +564,20 @@ def needed_n_bernstein(
         return (num / den) * log(2.0 / dely)
 
     return n_star(v1, d1), n_star(v0, d0)
+
+
+def needed_n_bernstein_int(
+    t: float,
+    D: float,
+    I1: Tuple[float, float],
+    I0: Tuple[float, float],
+    *,
+    delta: float = 0.05,
+    split: Optional[Tuple[float, float]] = None,
+) -> Tuple[int, int]:
+    """
+    Integer (ceil) per-class sample sizes for planner; wraps `needed_n_bernstein`.
+    Returns (max(1, ceil(n1_float)), max(1, ceil(n0_float))).
+    """
+    n1f, n0f = needed_n_bernstein(t, D, I1, I0, delta=delta, split=split)
+    return max(1, int(ceil(n1f))), max(1, int(ceil(n0f)))
