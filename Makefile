@@ -7,11 +7,13 @@
 SHELL := /bin/bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
+.DEFAULT_GOAL := help
 
 PY        ?= python3
 PIP       ?= pip
 VENV_DIR  ?= .venv
 ACT       := source $(VENV_DIR)/bin/activate
+EXTRAS    := '.[dev,docs,notebooks]'
 
 PKG_NAME  := cc
 SRC_DIR   := src/cc
@@ -35,9 +37,9 @@ W3_TPR_A    ?= 0.72
 W3_TPR_B    ?= 0.65
 W3_FPR_A    ?= 0.035
 W3_FPR_B    ?= 0.050
-W3_ALPHA    ?= 0.05        # hard cap (must hold); do not auto-relax
+W3_ALPHA    ?= 0.05        # hard cap; do not auto-relax
 W3_DELTA    ?= 0.05        # 95% CI
-W3_TARGET_T ?= 0.10        # optional planner half-width
+W3_TARGET_T ?= 0.10        # planner half-width
 W3_N1       ?= 200
 W3_N0       ?= 200
 W3_K1       ?= 124
@@ -46,40 +48,34 @@ W3_JSON     ?= runs/week3_methods.json
 W3_FIG      ?= figs/fig_week3_roc_fh.png
 
 # -------- Phony ----------
-.PHONY: help install setup lock deps fmt lint type test test-unit test-int cov bench \
+.PHONY: help dev install setup lock deps fmt lint type test test-week3 test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
         carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
-        week3 week3-95 week3-90 week3-fig test-week3
+        week3 week3-95 week3-90 week3-fig
 
 # -------- Help -----------
 help:
 	@echo ""
 	@echo "CC-Framework • Make targets"
 	@echo "-------------------------------------------------------------"
-	@echo "setup                Create venv, install deps, install pre-commit"
-	@echo "install              Install package (editable) + [dev,docs,notebooks] extras"
-	@echo "lock                 Freeze runtime deps to requirements.lock.txt"
-	@echo "fmt                  Auto-format (ruff --fix, isort, black)"
-	@echo "lint                 Ruff/Isort/Black checks (no changes)"
-	@echo "type                 mypy type-checking"
-	@echo "test                 Unit+integration tests with coverage (>= $(COV_MIN)%)"
-	@echo "test-week3           Run Week-3 unit tests only"
-	@echo "reproduce-smoke      $(SESS_SMOKE) sessions quick run (CPU) + CSV + 3 figs"
-	@echo "reproduce-mvp        $(SESS_MVP) sessions main Tier A run (CPU)"
-	@echo "reproduce-figures    Rebuild smoke CSV + 3 figs from audit history"
-	@echo "week3                FH–Bernstein+Wilson CIs at single θ (α=$(W3_ALPHA), δ=$(W3_DELTA))"
-	@echo "week3-95             Same as week3 (δ=0.05)"
-	@echo "week3-90             Same as week3 (δ=0.10)"
-	@echo "figures              Project plots (paper/figures, results/artifacts)"
-	@echo "reports              Build evaluation reports (evaluation/reports)"
-	@echo "docs                 Build MkDocs site to site/"
-	@echo "docs-serve           Local preview at http://127.0.0.1:8000"
-	@echo "verify-*             Stats and audit-chain checks"
-	@echo "docker-build/run     CPU docker image for fully pinned env"
-	@echo "carto-*              Cartographer CLI entrypoints (aliases)"
-	@echo "clean/distclean      Clean artifacts / wipe venv, locks"
+	@echo "dev / install       Create venv, install package + extras (zsh-safe)"
+	@echo "setup               Install + pre-commit hook (optional)"
+	@echo "lock                Freeze deps -> requirements.lock.txt"
+	@echo "fmt                 Auto-format (ruff --fix, isort, black)"
+	@echo "lint                Ruff/Isort/Black checks (no changes)"
+	@echo "type                mypy type-checking"
+	@echo "test                Unit+integration + coverage >= $(COV_MIN)% (override: COV_MIN=20)"
+	@echo "test-week3          Run Week-3 unit tests only"
+	@echo "reproduce-smoke     $(SESS_SMOKE) sessions quick run + CSV + figs"
+	@echo "reproduce-mvp       $(SESS_MVP) sessions main run"
+	@echo "reproduce-figures   Rebuild smoke CSV + 3 figs from audit history"
+	@echo "week3               FH–Bernstein+Wilson CIs at single θ (α=$(W3_ALPHA), δ=$(W3_DELTA))"
+	@echo "week3-95 / week3-90 Variants for δ"
+	@echo "docs / docs-serve   Build or serve MkDocs docs"
+	@echo "docker-build/run    CPU docker image"
+	@echo "clean/distclean     Clean artifacts / wipe venv & locks"
 	@echo "-------------------------------------------------------------"
 	@echo ""
 
@@ -88,18 +84,20 @@ $(VENV_DIR)/bin/activate:
 	$(PY) -m venv $(VENV_DIR)
 	$(ACT); $(PIP) install --upgrade pip wheel setuptools
 
+dev: install
+
 install: $(VENV_DIR)/bin/activate
-	$(ACT); $(PIP) install -e .[dev,docs,notebooks] || $(PIP) install -e .[dev]
+	$(ACT); $(PIP) install -e $(EXTRAS) || $(PIP) install -e '.[dev]'
 
 setup: install
 	$(ACT); pre-commit install || true
 
 lock: install
-	$(ACT); python -c "import pkgutil, sys; print('Python:', sys.version)"
-	$(ACT); pip freeze --all | sed '/@ file:\/\//d' > requirements.lock.txt
+	$(ACT); python -c "import sys; print('Python:', sys.version)"
+	$(ACT); $(PIP) freeze --all | sed '/@ file:\/\//d' > requirements.lock.txt
 	@echo "Wrote requirements.lock.txt"
 
-deps: install ## alias
+deps: install
 	@true
 
 # -------- Code Quality ----
@@ -127,7 +125,7 @@ test-unit: install
 test-int: install
 	$(ACT); pytest tests/integration -q --disable-warnings
 
-# Week-3 focused tests (the files you just added)
+# Week-3 focused tests (subset)
 test-week3: install
 	$(ACT); pytest -q --disable-warnings \
 	  tests/unit/test_fh_intervals_alpha_cap.py \
@@ -135,14 +133,13 @@ test-week3: install
 	  tests/unit/test_bernstein_monotonicity.py \
 	  tests/unit/test_methods_cli_smoke.py
 
-cov: test ## alias
+cov: test
 	@true
 
 bench: install
 	$(ACT); pytest benchmarks -q || true
 
 # -------- Week-3 (single θ) -------
-# Primary: α=0.05 hard cap, δ=0.05 (95%), planner t=0.10, counts path (no bootstrap)
 week3: install
 	mkdir -p $(dir $(W3_JSON)) $(dir $(W3_FIG))
 	$(ACT); python -m cc.cartographer.cli methods \
@@ -157,7 +154,6 @@ week3: install
 	@echo "✓ Week-3 JSON → $(W3_JSON)"
 	@echo "✓ Week-3 FIG  → $(W3_FIG)"
 
-# Handy variants for manuscript sensitivity
 week3-95: install
 	$(MAKE) week3 W3_DELTA=0.05
 
@@ -174,12 +170,18 @@ week3-fig: install
 	  --alpha-cap $(W3_ALPHA) --delta $(W3_DELTA) \
 	  --target-t $(W3_TARGET_T) \
 	  --figure-out $(W3_FIG)
-
+	
+week3-power: install
+	$(ACT); python scripts/make_power_curve.py \
+	  --I1 0.37,0.65 --I0 0.05,0.05 --D 0.55 --delta 0.05 \
+	  --target-t 0.10 \
+	  --out paper/figures/fig_week3_power_curve.png
+	  
 # -------- Reproduce Runs (Tier A) -------
 reproduce-smoke: install
 	mkdir -p paper/figures results/smoke/aggregates runs
 	$(ACT); python -m cc.cartographer.cli run \
-		--config experiments/configs/smoke.yaml \
+		--config $(CONFIG_SMOKE) \
 		--samples $(SESS_SMOKE) \
 		--fig paper/figures/phase_diagram.pdf \
 		--audit runs/audit.jsonl
@@ -187,7 +189,6 @@ reproduce-smoke: install
 		--history runs/audit.jsonl \
 		--fig-dir paper/figures \
 		--out-dir results/smoke/aggregates
-	# compatibility for legacy tests:
 	mkdir -p results/aggregates
 	cp results/smoke/aggregates/summary.csv results/aggregates/summary.csv
 
@@ -256,7 +257,7 @@ distclean: clean
 
 # -------- Cartographer Agent (CLI) ----------
 carto-install:
-	$(PY) -m pip install -U pip && pip install -e .[dev]
+	$(PY) -m pip install -U pip && pip install -e '.[dev]'
 
 carto-smoke: install
 	$(ACT); python -m cc.cartographer.cli run \

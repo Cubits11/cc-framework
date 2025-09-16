@@ -331,9 +331,8 @@ def fh_intervals(
       I1: p1 = P(A ∧ B = 1 | Y=1)   (AND on positives)
       I0: p0 = P(A ∨ B = 1 | Y=0)   (OR  on negatives)
 
-    cap_mode:
-      - "error": raise if policy cap makes I0 empty (strict feasibility).
-      - "clip":  set U0=L0 (point interval) when the cap would make I0 empty.
+    With an optional policy cap α for negatives:
+      I0 = [max(fpr_a,fpr_b), min(α, fpr_a+fpr_b, 1)]  (raise or clip if empty).
     """
     for nm, x in [("tpr_a", tpr_a), ("tpr_b", tpr_b), ("fpr_a", fpr_a), ("fpr_b", fpr_b)]:
         _validate_prob(nm, x)
@@ -384,11 +383,19 @@ def bernstein_tail(
 ) -> float:
     """
     Bernstein tail for a Bernoulli mean with variance envelope vbar.
-    Supports legacy positional (n, eps, vbar) and new keyword style (t with D or eps).
 
-    Bound (two-sided version):
-      P(|p̂ - p| >= ε) ≤ 2 * exp( - n * ε^2 / (2 vbar + (2/3) ε) ).
+    Two call styles are supported:
+      • New (preferred): bernstein_tail(t=..., n=..., vbar=..., D=..., two_sided=True)
+          uses ε = t·D (CC half-width t mapped to class-space).
+      • Legacy       : bernstein_tail(n, eps, vbar) where eps=ε directly.
+
+    Bound (two-sided):
+      P(|p̂ - p| ≥ ε) ≤ 2 * exp( - n * ε^2 / (2 vbar + (2/3) ε) ).
+
+    Monotonicity:
+      increasing in n ↓ (prob decreases), increasing in ε (or t) ↓ (prob decreases).
     """
+    # legacy positional (n, eps, vbar)
     if args:
         if len(args) == 3 and all(a is not None for a in args):
             n_pos, eps_pos, vbar_pos = args  # type: ignore
@@ -426,6 +433,7 @@ def bernstein_tail(
         return 1.0
 
     exponent = - (n * eps * eps) / denom
+    # Avoid under/overflow; map to [0,1].
     base = exp(exponent)
     prob = (2.0 * base) if two_sided else base
     return float(0.0 if prob < 0.0 else (1.0 if prob > 1.0 else prob))
@@ -433,7 +441,7 @@ def bernstein_tail(
 
 def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
     """
-    Invert  2 * exp( - n * eps^2 / (2 vbar + (2/3) eps) ) <= delta
+    Invert  2 * exp( - n * eps^2 / (2 vbar + (2/3) eps) ) ≤ delta
     to solve for the smallest eps ≥ 0. Uses bracket + binary search.
     """
     if n <= 0:

@@ -66,10 +66,25 @@ from cc.analysis.cc_estimation import cc_confint_newcombe
 # Helpers
 # =============================================================================
 
+DEFAULT_DPI = 300
+
+
 def _ensure_dir(p: str | Path) -> Path:
     pth = Path(p)
     pth.mkdir(parents=True, exist_ok=True)
     return pth
+
+
+def _save_opaque(fig: plt.Figure, path: Path | str, *, dpi: int = DEFAULT_DPI) -> None:
+    """Always save with an opaque white canvas to avoid transparency artifacts."""
+    fig.savefig(
+        path,
+        dpi=dpi,
+        facecolor="white",
+        edgecolor="white",
+        bbox_inches="tight",
+        transparent=False,
+    )
 
 
 def _to_float(x: Any, default: float = 0.0) -> float:
@@ -155,19 +170,16 @@ def _plot_phase_surface(E: np.ndarray, T: np.ndarray, C: np.ndarray,
     _save_opaque(fig, fig_path); plt.close(fig)
 
 
-
 def _plot_phase_point(eps: float, T: float, cc: float, fig_path: Path, warned: bool) -> None:
-    fig, ax = plt.subplots(figsize=(4.6, 3.6), facecolor="white")
-    ax.scatter([eps], [T], s=90, color=CBLUE)
+    fig, ax = plt.subplots(figsize=(4.8, 3.8))
+    ax.scatter([eps], [T], s=100, color=CBLUE, edgecolor="white", lw=0.8)
     (x0, x1), (y0, y1) = _auto_lims(eps, T)
-    ax.set_xlim(x0, x1)
-    ax.set_ylim(y0, y1)
+    ax.set_xlim(x0, x1); ax.set_ylim(y0, y1)
     subtitle = "" if not warned else " (cfg missing; defaults used)"
     ax.set_title(f"CC phase point: CC_max={cc:.2f}{subtitle}", pad=6)
     ax.set_xlabel("epsilon"); ax.set_ylabel("T")
     ax.grid(True, alpha=0.25)
-    fig.savefig(fig_path, dpi=300)
-    plt.close(fig)
+    _save_opaque(fig, fig_path); plt.close(fig)
 
 
 def _plot_cc_convergence(cc_series: Sequence[float], fig_path: Path) -> None:
@@ -180,7 +192,7 @@ def _plot_cc_convergence(cc_series: Sequence[float], fig_path: Path) -> None:
     ax.set_xlabel("trial"); ax.set_ylabel(r"$CC_{\max}$")
     ax.set_title(r"$CC_{\max}$ convergence", pad=6)
     ax.grid(True, alpha=0.25)
-    fig.savefig(fig_path, dpi=300)
+    _save_opaque(fig, fig_path)
     plt.close(fig)
 
 
@@ -237,15 +249,18 @@ def plot_roc_fh_slice(
     fig = plt.figure(figsize=(7.0, 5.2), facecolor="white")
     ax = fig.add_axes([0.10, 0.12, 0.62, 0.80], facecolor="white")
 
+    # diagonal + points
     ax.plot([0, 1], [0, 1], ls="--", lw=1.0, color="0.6")
     ax.scatter([fpr_a, fpr_b], [tpr_a, tpr_b], s=60, marker="o", color=CBLUE)
     ax.text(fpr_a, tpr_a, "  A", va="center", ha="left")
     ax.text(fpr_b, tpr_b, "  B", va="center", ha="left")
 
+    # policy α-cap (vertical line at upper bound of I0 if provided)
     if alpha_cap is not None:
         ax.axvline(alpha_cap, ls=":", lw=1.2, color=CGREY)
         ax.text(alpha_cap, 0.02, " α-cap", rotation=90, va="bottom", ha="right")
 
+    # FH ceilings at θ
     tpr_and = min(tpr_a, tpr_b)
     fpr_and = max(0.0, fpr_a + fpr_b - 1.0)
     tpr_or  = min(1.0, tpr_a + tpr_b)
@@ -257,6 +272,7 @@ def plot_roc_fh_slice(
     ax.set_xlim(-0.02, 1.02); ax.set_ylim(-0.02, 1.02)
     ax.set_title("ROC slice with FH context at θ")
 
+    # --- inset: Bernstein vs Hoeffding tail (Y=0)
     ax2 = fig.add_axes([0.75, 0.58, 0.22, 0.32], facecolor="white")
     if I0[0] <= 0.5 <= I0[1]:
         vbar0 = 0.25
@@ -272,7 +288,7 @@ def plot_roc_fh_slice(
     ax2.set_title("Tail bound (Y=0)"); ax2.legend(fontsize=8, loc="upper right")
 
     ax.text(0.02, -0.10, f"I1={I1}, I0={I0}, CC=(1-(p1-p0))/D, D={D:.3f}", transform=ax.transAxes)
-    fig.savefig(outpath, dpi=300, bbox_inches="tight")
+    _save_opaque(fig, outpath)
     plt.close(fig)
 
 
@@ -296,7 +312,7 @@ def plot_fh_heatmap(
     ax.set_xlabel("Index in ROC_B"); ax.set_ylabel("Index in ROC_A")
     ax.set_title(f"FH Envelope on Composed J [{comp}]")
     cbar = plt.colorbar(im, ax=ax); cbar.set_label("FH ceiling on composed J")
-    fig.savefig(outpath, dpi=300); plt.close(fig)
+    _save_opaque(fig, outpath); plt.close(fig)
 
     return {"J_max": J_max, "argmax": (int(ia), int(ib)), "shape": J.shape, "outpath": outpath}
 
@@ -321,9 +337,10 @@ def _plot_cc_ci_figure(
         f"Newcombe  [{newc_lo:.3f}, {newc_hi:.3f}] (±{(newc_hi-newc_lo)/2:.3f})"
     )
     ax.text(0.02, 0.05, txt, transform=ax.transAxes)
-    ax.set_yticks([0, 1], ["Bernstein (FH)", "Newcombe (Wilson)"])
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(["Bernstein (FH)", "Newcombe (Wilson)"])
     ax.grid(True, axis="x", alpha=0.25); ax.legend(frameon=False, loc="lower right")
-    fig.savefig(outpath, dpi=300); plt.close(fig)
+    _save_opaque(fig, outpath); plt.close(fig)
 
 
 def plot_cc_ci_comparison(
@@ -427,6 +444,7 @@ def _write_summary_csv(
         w.writeheader()
         w.writerow(row)
 
+    # mirror to a conventional location
     mirror = Path("results/aggregates")
     mirror.mkdir(parents=True, exist_ok=True)
     mirror_file = mirror / "summary.csv"
@@ -497,6 +515,8 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     last_cc  = _to_float(rec.get("metrics", {}).get("CC_max"), 1.0)
 
     if E.size >= 10:
+        _save_opaque(fig := plt.figure(figsize=(1, 1)), fig_dir / "phase_diagram.pdf")  # placeholder if any side effects
+        plt.close(fig)
         _plot_phase_surface(E, T, C, last_eps, last_T, fig_dir / "phase_diagram.pdf")
     else:
         warned = (last_eps == 0.0 and last_T == 0.0)
