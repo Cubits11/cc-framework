@@ -245,6 +245,27 @@ docker-run:
 	  -v $$PWD:/workspace -w /workspace \
 	  cc-framework:cpu bash
 
+# -------- Week 5 pipeline ---------
+week5-pilot: install
+	mkdir -p results/week5_scan figures runs
+	$(ACT); python scripts/calibrate_guardrail.py \
+	        --config experiments/configs/week5_pilot.yaml \
+	        --dataset datasets/benign \
+	        --summary results/week5_scan/calibration_summary.json \
+	        --audit runs/audit_week5.jsonl
+	$(ACT); python -m cc.exp.run_two_world \
+	        --config experiments/configs/week5_pilot.yaml \
+	        --out-csv results/week5_scan/scan.csv \
+	        --output results/week5_scan/analysis.json \
+	        --audit runs/audit_week5.jsonl \
+	        --calibration-summary results/week5_scan/calibration_summary.json
+	$(ACT); python scripts/make_week5_figs.py \
+	        --scan results/week5_scan/scan.csv \
+	        --out-ci figures/week5_ci_comparison.png \
+	        --out-roc figures/week5_roc_slice.png
+
+memo-week5: install
+	$(ACT); pandoc docs/week5_memo.md -o docs/week5_memo.pdf
 # -------- Clean -------------
 clean:
 	rm -rf .pytest_cache .coverage htmlcov site dist build \
