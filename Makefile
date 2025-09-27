@@ -54,7 +54,7 @@ W3_FIG      ?= figs/fig_week3_roc_fh.png
         docker-build docker-run clean distclean \
         carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
         week3 week3-95 week3-90 week3-fig
-
+		week5-pilot memo-week5
 # -------- Help -----------
 help:
 	@echo ""
