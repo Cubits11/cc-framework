@@ -47,11 +47,11 @@ def test_scan_schema_and_rows(ensure_week5_scan: Path) -> None:
 
     last = None
     for row in reversed(rows):
-        if row.get("fpr_a"):
+        if row.get("fpr_b"):
             last = row
             break
     if last is None:
-        pytest.fail("No row contained fpr_a values")
+        pytest.fail("No row contained fpr_b values")
 
-    fpr = float(last["fpr_a"])
+    fpr = float(last["fpr_b"])
     assert 0.04 <= fpr <= 0.06, f"Calibrated FPR {fpr:.3f} out of bounds"
