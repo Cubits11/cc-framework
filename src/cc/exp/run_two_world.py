@@ -201,11 +201,92 @@ def analyze_results(results: List[AttackResult]) -> dict:
         "j_statistic": {
             "empirical": j_emp,
             "theoretical_max": j_theory_max,
-            "confidence_interval": {"lower": j_ci[0], "upper": j_ci[1], "method": boot.method},
+            "confidence_interval": {"lower": j_ci[0], "upper": j_ci[1], "method": "bootstrap"},
         },
         "composability_metrics": {"cc_max": cc_max, "delta_add": metrics["Delta_add"]},
         "metrics_for_audit": metrics,  # exact block to drop into the audit event
     }
+
+def _bootstrap_delta(arr0: np.ndarray, arr1: np.ndarray, alpha: float, seed: int = 2025) -> Tuple[float, float, float]:
+    """Bootstrap CI for difference in success rates."""
+    if arr0.size == 0 or arr1.size == 0:
+        return float("nan"), float("nan"), float("nan")
+    rng = np.random.default_rng(seed)
+    reps = []
+    for _ in range(200):
+        sample0 = rng.choice(arr0, size=arr0.size, replace=True)
+        sample1 = rng.choice(arr1, size=arr1.size, replace=True)
+        reps.append(float(np.mean(sample0) - np.mean(sample1)))
+    ci_lo, ci_hi = bootstrap_ci(reps, n_resamples=0, alpha=alpha)
+    return float(np.mean(reps)), float(ci_lo), float(ci_hi)
+
+
+def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Construct per-prefix metrics for scan.csv."""
+    rows: List[Dict[str, Any]] = []
+    fpr_default = None
+    if calibration:
+        guardrails = calibration.get("guardrails") or []
+        if guardrails:
+            fpr_default = guardrails[0].get("fpr")
+    arr_results = list(results)
+    for idx in range(1, len(arr_results) + 1):
+        subset = arr_results[:idx]
+        w0 = np.array([1.0 if r.success else 0.0 for r in subset if r.world_bit == 0], dtype=float)
+        w1 = np.array([1.0 if r.success else 0.0 for r in subset if r.world_bit == 1], dtype=float)
+        row: Dict[str, Any] = {}
+        row["tpr_a"] = ""
+        row["tpr_b"] = ""
+        row["fpr_a"] = fpr_default if fpr_default is not None else ""
+        row["fpr_b"] = fpr_default if fpr_default is not None else ""
+        row["I1_lo"] = ""
+        row["I1_hi"] = ""
+        row["I0_lo"] = ""
+        row["I0_hi"] = ""
+        row["vbar1"] = ""
+        row["vbar0"] = ""
+        row["cc_hat"] = ""
+        row["ci_lo"] = ""
+        row["ci_hi"] = ""
+        row["ci_width"] = ""
+        row["D"] = ""
+        row["D_lamp"] = ""
+        row["bonferroni_call"] = "hold"
+        row["bhy_call"] = "hold"
+
+        if w0.size > 0 and w1.size > 0:
+            vbar0 = float(np.mean(w0))
+            vbar1 = float(np.mean(w1))
+            row["vbar0"] = vbar0
+            row["vbar1"] = vbar1
+            row["tpr_a"] = 1.0 - vbar1
+            row["tpr_b"] = vbar0
+
+            w1_lo, w1_hi = wilson_ci(int(np.sum(w1)), int(w1.size), alpha=alpha_cap)
+            w0_lo, w0_hi = wilson_ci(int(np.sum(w0)), int(w0.size), alpha=alpha_cap)
+            row["I1_lo"] = w1_lo
+            row["I1_hi"] = w1_hi
+            row["I0_lo"] = w0_lo
+            row["I0_hi"] = w0_hi
+
+            cc_hat = vbar0 - vbar1
+            row["cc_hat"] = cc_hat
+            _, ci_lo, ci_hi = _bootstrap_delta(w0, w1, alpha=alpha_cap, seed=idx + 1000)
+            if not np.isnan(ci_lo) and not np.isnan(ci_hi):
+                row["ci_lo"] = ci_lo
+                row["ci_hi"] = ci_hi
+                row["ci_width"] = ci_hi - ci_lo
+                row["D"] = cc_hat
+                row["D_lamp"] = cc_hat
+                if ci_lo > 0:
+                    row["bonferroni_call"] = "reject"
+                    row["bhy_call"] = "reject"
+                else:
+                    row["bonferroni_call"] = "hold"
+                    row["bhy_call"] = "hold"
+
+        rows.append(row)
+    return rows
 
 
 # --------------------------------------------------------------------------- #
