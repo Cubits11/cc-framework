@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import os
@@ -22,6 +23,7 @@ from ..core.logging import ChainedJSONLLogger, audit_context
 from ..core.models import AttackResult, GuardrailSpec, WorldConfig
 from ..core.protocol import TwoWorldProtocol
 from ..core.stats import bootstrap_ci_j_statistic
+from ..analysis.ci import bootstrap_ci, wilson_ci
 
 # Cartographer audit (tamper-evident chain helpers)
 from ..cartographer import audit as cart_audit
