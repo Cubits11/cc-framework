@@ -1,0 +1,21 @@
+{
+  "timestamp": 1758939738.8213387,
+  "config": "experiments/configs/week5_pilot.yaml",
+  "dataset": "datasets/benign",
+  "alpha_cap": 0.05,
+  "target_window": [
+    0.04,
+    0.06
+  ],
+  "guardrails": [
+    {
+      "name": "toy_threshold",
+      "threshold": 0.13392857142857142,
+      "fpr": 0.04,
+      "n_texts": 200,
+      "target": 0.05,
+      "range_lo": 0.04,
+      "range_hi": 0.05
+    }
+  ]
+}
