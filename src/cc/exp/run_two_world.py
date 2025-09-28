@@ -24,6 +24,7 @@ from ..core.models import AttackResult, GuardrailSpec, WorldConfig
 from ..core.protocol import TwoWorldProtocol
 from ..core.stats import bootstrap_ci_j_statistic
 from ..analysis.ci import bootstrap_ci, wilson_ci
+from ..core.metrics import cc_max as cc_max_metric, delta_add as delta_add_metric, youden_j
 
 # Cartographer audit (tamper-evident chain helpers)
 from ..cartographer import audit as cart_audit
@@ -160,8 +161,33 @@ def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
 # Analysis (maps to your memo/plots naming)
 # --------------------------------------------------------------------------- #
 
-def analyze_results(results: List[AttackResult]) -> dict:
-    """Compute success rates, J, CC_max, bootstrap CI, and tags (two-world attacker success)."""
+def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int, float]:
+    """Return world-indexed FPRs using calibration metadata when available."""
+
+    if not calibration_summary:
+        return {0: 0.0, 1: 0.0}
+
+    guardrails = calibration_summary.get("guardrails") or []
+    if not guardrails:
+        return {0: 0.0, 1: 0.0}
+
+    # Base world (no guardrail stack in our two-world protocol).
+    world_fprs = {0: 0.0}
+
+    # Composition world uses the stack of guardrails; approximate stack FPR via
+    # complementary probability assuming independence between guardrails.
+    comp_survival = 1.0
+    for entry in guardrails:
+        fpr = float(entry.get("fpr", 0.0))
+        fpr = max(0.0, min(1.0, fpr))
+        comp_survival *= (1.0 - fpr)
+    world_fprs[1] = 1.0 - comp_survival
+
+    return world_fprs
+
+
+def analyze_results(results: List[AttackResult], calibration_summary: Dict[str, Any] | None = None) -> dict:
+    """Compute success rates, operating points, and CC metrics for the two worlds."""
     w0 = np.array([r.success for r in results if r.world_bit == 0], dtype=float)
     w1 = np.array([r.success for r in results if r.world_bit == 1], dtype=float)
     if w0.size == 0 or w1.size == 0:
@@ -169,6 +195,14 @@ def analyze_results(results: List[AttackResult]) -> dict:
 
     p0_hat = float(np.mean(w0))  # attacker success w/o protection
     p1_hat = float(np.mean(w1))  # attacker success w/ protection
+
+    tpr_world0 = max(0.0, min(1.0, 1.0 - p0_hat))
+    tpr_world1 = max(0.0, min(1.0, 1.0 - p1_hat))
+
+    world_fprs = _resolve_world_fprs(calibration_summary)
+    fpr_world0 = world_fprs.get(0, 0.0)
+    fpr_world1 = world_fprs.get(1, 0.0)
+
     j_emp = p0_hat - p1_hat      # reduction in attacker success (higher is better)
 
     rng = np.random.default_rng(123)
@@ -179,31 +213,41 @@ def analyze_results(results: List[AttackResult]) -> dict:
         delta_samples.append(float(np.mean(sample0) - np.mean(sample1)))
     j_ci = bootstrap_ci(delta_samples, n_resamples=0, alpha=0.05)
 
+    j_a = youden_j(tpr_world0, fpr_world0)
+    j_b = youden_j(tpr_world1, fpr_world1)
 
-    # Theoretical max reduction is preventing all baseline successes
-    j_theory_max = max(p0_hat, 1e-12)
-    cc_max = j_emp / j_theory_max  # ∈ [0,1] if j_emp ≤ j_theory_max
+    cc_max_value = cc_max_metric(j_emp, j_a, j_b)
+    delta_add_value = delta_add_metric(j_emp, j_a, j_b)
+    j_theory_max = max(j_a, j_b)
 
     metrics = {
-        "J_A": p0_hat,                 # baseline attacker success
-        "J_A_CI": None,                # not estimated here
-        "J_B": 1.0 - p1_hat,           # defensive “success” (informal)
+        "J_A": j_a,
+        "J_A_CI": None,
+        "J_B": j_b,
         "J_B_CI": None,
-        "J_comp": j_emp,               # our primary J
+        "J_comp": j_emp,
         "J_comp_CI": [j_ci[0], j_ci[1]],
-        "CC_max": cc_max,
-        "Delta_add": j_emp - j_theory_max,  # typically ≤ 0 by definition
+        "CC_max": cc_max_value,
+        "Delta_add": delta_add_value,
+        "TPR_A": tpr_world0,
+        "FPR_A": fpr_world0,
+        "TPR_B": tpr_world1,
+        "FPR_B": fpr_world1,
     }
 
     return {
         "sample_sizes": {"world_0": int(w0.size), "world_1": int(w1.size), "total": int(w0.size + w1.size)},
         "success_rates": {"world_0_empirical": p0_hat, "world_1_empirical": p1_hat},
+        "operating_points": {
+            "world_0": {"tpr": tpr_world0, "fpr": fpr_world0},
+            "world_1": {"tpr": tpr_world1, "fpr": fpr_world1},
+        },
         "j_statistic": {
             "empirical": j_emp,
             "theoretical_max": j_theory_max,
             "confidence_interval": {"lower": j_ci[0], "upper": j_ci[1], "method": "bootstrap"},
         },
-        "composability_metrics": {"cc_max": cc_max, "delta_add": metrics["Delta_add"]},
+        "composability_metrics": {"cc_max": cc_max_value, "delta_add": delta_add_value},
         "metrics_for_audit": metrics,  # exact block to drop into the audit event
     }
 
@@ -224,11 +268,9 @@ def _bootstrap_delta(arr0: np.ndarray, arr1: np.ndarray, alpha: float, seed: int
 def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Construct per-prefix metrics for scan.csv."""
     rows: List[Dict[str, Any]] = []
-    fpr_default = None
-    if calibration:
-        guardrails = calibration.get("guardrails") or []
-        if guardrails:
-            fpr_default = guardrails[0].get("fpr")
+    world_fprs = _resolve_world_fprs(calibration)
+    fpr_a_default = world_fprs.get(0)
+    fpr_b_default = world_fprs.get(1)
     arr_results = list(results)
     for idx in range(1, len(arr_results) + 1):
         subset = arr_results[:idx]
@@ -237,8 +279,8 @@ def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: 
         row: Dict[str, Any] = {}
         row["tpr_a"] = ""
         row["tpr_b"] = ""
-        row["fpr_a"] = fpr_default if fpr_default is not None else ""
-        row["fpr_b"] = fpr_default if fpr_default is not None else ""
+        row["fpr_a"] = fpr_a_default if fpr_a_default is not None else ""
+        row["fpr_b"] = fpr_b_default if fpr_b_default is not None else ""
         row["I1_lo"] = ""
         row["I1_hi"] = ""
         row["I0_lo"] = ""
@@ -259,8 +301,11 @@ def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: 
             vbar1 = float(np.mean(w1))
             row["vbar0"] = vbar0
             row["vbar1"] = vbar1
-            row["tpr_a"] = 1.0 - vbar1
-            row["tpr_b"] = vbar0
+
+            tpr_a = max(0.0, min(1.0, 1.0 - vbar0))
+            tpr_b = max(0.0, min(1.0, 1.0 - vbar1))
+            row["tpr_a"] = tpr_a
+            row["tpr_b"] = tpr_b
 
             w1_lo, w1_hi = wilson_ci(int(np.sum(w1)), int(w1.size), alpha=alpha_cap)
             w0_lo, w0_hi = wilson_ci(int(np.sum(w0)), int(w0.size), alpha=alpha_cap)
@@ -269,15 +314,20 @@ def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: 
             row["I0_lo"] = w0_lo
             row["I0_hi"] = w0_hi
 
-            cc_hat = vbar0 - vbar1
-            row["cc_hat"] = cc_hat
+            j_comp = vbar0 - vbar1
+            fpr_a = row["fpr_a"] if row["fpr_a"] != "" else 0.0
+            fpr_b = row["fpr_b"] if row["fpr_b"] != "" else 0.0
+            j_a = youden_j(tpr_a, fpr_a)
+            j_b = youden_j(tpr_b, fpr_b)
+            row["cc_hat"] = cc_max_metric(j_comp, j_a, j_b)
             _, ci_lo, ci_hi = _bootstrap_delta(w0, w1, alpha=alpha_cap, seed=idx + 1000)
             if not np.isnan(ci_lo) and not np.isnan(ci_hi):
                 row["ci_lo"] = ci_lo
                 row["ci_hi"] = ci_hi
                 row["ci_width"] = ci_hi - ci_lo
-                row["D"] = cc_hat
-                row["D_lamp"] = cc_hat
+                delta_value = delta_add_metric(j_comp, j_a, j_b)
+                row["D"] = delta_value
+                row["D_lamp"] = delta_value
                 if ci_lo > 0:
                     row["bonferroni_call"] = "reject"
                     row["bhy_call"] = "reject"
@@ -428,7 +478,7 @@ def main() -> None:
         print(f"Completed {len(results)} sessions")
 
         # Analyze
-        analysis = analyze_results(results)
+        analysis = analyze_results(results, calibration_summary)
         metrics_for_audit = analysis["metrics_for_audit"]
 
         # Persist human-readable analysis
