@@ -1,0 +1,32 @@
+seed: 123
+alpha_cap: 0.05
+baseline_success_rate: 0.65
+episode_length: 10
+
+attacker:
+  type: random_injection
+  params:
+    vocab_harmful: ["attack", "breach", "exploit", "bypass", "override", "poison"]
+    vocab_benign: ["hello", "thanks", "please", "info", "question", "assist"]
+
+guardrails:
+  # Composite OR: emulate with a single tunable threshold aggregating keyword ∨ semantic tokens.
+  - name: toy_threshold
+    params:
+      keywords:
+        ["attack", "breach", "exploit", "bypass", "override", "poison",
+         "adversarial", "jailbreak", "prompt injection"]
+      threshold: 0.20
+      alpha_cap: 0.05
+    fpr_target: 0.05
+
+protocol:
+  epsilon: 0.01
+  T: 0.50
+
+experiment:
+  n_sessions: 150
+  memo_tag: week6_or
+
+outputs:
+  dir: results/week6/or

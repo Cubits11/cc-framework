@@ -47,14 +47,21 @@ W3_K0       ?= 18
 W3_JSON     ?= runs/week3_methods.json
 W3_FIG      ?= figs/fig_week3_roc_fh.png
 
+# -------- Week-6 (α-cap ablation) ----------
+W6_DIR      := results/week6
+W6_AUDIT    := runs/audit_week6.jsonl
+W6_FIG_DIR  := figures/week6
+W6_RAILS    := keyword regex semantic and or
+
 # -------- Phony ----------
 .PHONY: help dev install setup lock deps fmt lint type test test-week3 test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
         carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
-        week3 week3-95 week3-90 week3-fig
-		week5-pilot memo-week5
+        week3 week3-95 week3-90 week3-fig week3-power \
+        week5-pilot memo-week5 \
+        $(addprefix week6-rail-,$(W6_RAILS)) week6-ablation memo-week6 week6-utility test-week6
 
 # -------- Help -----------
 help:
@@ -64,16 +71,17 @@ help:
 	@echo "dev / install       Create venv, install package + extras (zsh-safe)"
 	@echo "setup               Install + pre-commit hook (optional)"
 	@echo "lock                Freeze deps -> requirements.lock.txt"
-	@echo "fmt                 Auto-format (ruff --fix, isort, black)"
-	@echo "lint                Ruff/Isort/Black checks (no changes)"
-	@echo "type                mypy type-checking"
-	@echo "test                Unit+integration + coverage >= $(COV_MIN)% (override: COV_MIN=20)"
+	@echo "fmt / lint / type   Code quality: ruff/isort/black/mypy"
+	@echo "test                Unit+integration + coverage >= $(COV_MIN)%"
 	@echo "test-week3          Run Week-3 unit tests only"
 	@echo "reproduce-smoke     $(SESS_SMOKE) sessions quick run + CSV + figs"
 	@echo "reproduce-mvp       $(SESS_MVP) sessions main run"
 	@echo "reproduce-figures   Rebuild smoke CSV + 3 figs from audit history"
 	@echo "week3               FH–Bernstein+Wilson CIs at single θ (α=$(W3_ALPHA), δ=$(W3_DELTA))"
 	@echo "week3-95 / week3-90 Variants for δ"
+	@echo "week5-pilot         Calibrate + run Week-5 pilot and figures"
+	@echo "week6-ablation      Calibrate/write-back + run + figures for 5 rails (fail-fast)"
+	@echo "memo-week6          Build Week-6 memo (and PDF if pandoc available)"
 	@echo "docs / docs-serve   Build or serve MkDocs docs"
 	@echo "docker-build/run    CPU docker image"
 	@echo "clean/distclean     Clean artifacts / wipe venv & locks"
@@ -266,6 +274,82 @@ week5-pilot: install
 
 memo-week5: install
 	$(ACT); pandoc docs/week5_memo.md -o docs/week5_memo.pdf
+
+# -------- Week 6 pipeline (α-cap ablation, fail-fast) ---------
+
+# Helper: assert file exists
+define _assert_file
+	@if [ ! -f "$(1)" ]; then echo "FAIL: Missing artifact $(1)"; exit 1; fi
+endef
+
+# Helper: assert at least one PNG exists in dir
+define _assert_any_png
+	@if ! compgen -G "$(1)/*.png" > /dev/null; then echo "FAIL: No figures in $(1)"; exit 1; fi
+endef
+
+# Per-rail target:
+# - Calibrate with write-back to a derived config
+# - Run two-world with fail-fast checks (FPR window + threshold equality)
+# - Generate Week-6 figures
+# - Verify artifacts + audit tail
+$(addprefix week6-rail-,$(W6_RAILS)): install
+	@rail=$(@:week6-rail-%=%); \
+	cfg="experiments/configs/week6_$${rail}.yaml"; \
+	outdir="$(W6_DIR)/$${rail}"; \
+	figdir="$(W6_FIG_DIR)/$${rail}"; \
+	mkdir -p "$$outdir" "$$figdir" "$(dir $(W6_AUDIT))"; \
+	echo "==> [Calibrate] $${rail}"; \
+	$(ACT); python scripts/calibrate_guardrail.py \
+		--config $$cfg \
+		--dataset datasets/benign \
+		--summary $$outdir/calibration_summary.json \
+		--audit $(W6_AUDIT) \
+		--write-config-out $$outdir/calibrated.yaml ; \
+	echo "==> [Run+Checks] $${rail}"; \
+	$(ACT); python scripts/run_with_checks.py \
+		--config $$outdir/calibrated.yaml \
+		--out-json $$outdir/analysis.json \
+		--audit $(W6_AUDIT) \
+		--seed 123 \
+		--fpr-lo 0.04 --fpr-hi 0.06 \
+		--calibration $$outdir/calibration_summary.json ; \
+	echo "==> [Figures] $${rail}"; \
+	$(ACT); python scripts/make_week6_figs.py \
+		--inputs $$outdir/analysis.json \
+		--out-dir $$figdir ; \
+	$(call _assert_file,$$outdir/analysis.json); \
+	$(call _assert_file,$$outdir/calibration_summary.json); \
+	$(call _assert_any_png,$$figdir); \
+	tail -n 1 $(W6_AUDIT) >/dev/null || { echo "FAIL: audit file missing or empty"; exit 1; }; \
+	echo "OK: week6-rail-$${rail}"
+
+# Umbrella target: run all five rails
+week6-ablation: $(addprefix week6-rail-,$(W6_RAILS))
+	@echo "OK: week6-ablation complete."
+
+# Optional: utility summaries per rail
+# Usage: make week6-utility RAIL=keyword
+week6-utility: install
+	@if [ -z "$(RAIL)" ]; then echo "Usage: make week6-utility RAIL=keyword"; exit 2; fi
+	$(ACT); python scripts/summarize_results.py --utility \
+	  --final-results $(W6_DIR)/$(RAIL)/final_results.json \
+	  --out-csv $(W6_DIR)/$(RAIL)/utility_summary.csv \
+	  --out-fig $(W6_FIG_DIR)/$(RAIL)/utility_hist.png
+
+# Memo (MD always; PDF if pandoc is installed)
+memo-week6: install
+	@echo "Memo ready at docs/week6_memo.md"
+	@if command -v pandoc >/dev/null 2>&1; then \
+		$(ACT); pandoc docs/week6_memo.md -o docs/week6_memo.pdf; \
+		echo "Memo PDF → docs/week6_memo.pdf"; \
+	else \
+		echo "pandoc not found; skipping PDF build."; \
+	fi
+
+# Tests for Week-6 integration
+test-week6: install
+	$(ACT); pytest tests/integration/test_week6_writeback_and_alpha.py -q
+
 # -------- Clean -------------
 clean:
 	rm -rf .pytest_cache .coverage htmlcov site dist build \

@@ -32,9 +32,10 @@ try:
     from cc.guardrails.keyword_blocker import KeywordBlocker
     from cc.guardrails.regex_filters import RegexFilter
     from cc.guardrails.semantic_filter import SemanticFilter
+    from cc.guardrails.toy_threshold import ToyThresholdGuardrail
 except ImportError as e:
     warnings.warn(f"Some guardrails not available: {e}")
-    RegexFilter = KeywordBlocker = SemanticFilter = None
+    RegexFilter = KeywordBlocker = SemanticFilter = ToyThresholdGuardrail = None
 
 
 @dataclass
@@ -161,6 +162,7 @@ class TwoWorldProtocol:
             "keyword_blocker": KeywordBlocker,
             "semantic": SemanticFilter,
             "semantic_filter": SemanticFilter,
+            "toy_threshold": ToyThresholdGuardrail,
         }
 
         guardrail_class = guardrail_map.get(spec.name.lower())

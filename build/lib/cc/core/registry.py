@@ -7,12 +7,14 @@ from cc.guardrails.base import BaseGuardrail
 from cc.guardrails.keyword_blocker import KeywordBlocker
 from cc.guardrails.regex_filters import RegexFilters
 from cc.guardrails.semantic_filter import SemanticFilter
+from cc.guardrails.toy_threshold import ToyThresholdGuardrail
 
 _ATTACKERS = {"random_injection": RandomInjectionAttacker}
 _GUARDRAILS = {
     "keyword_blocker": KeywordBlocker,
     "regex_filters": RegexFilters,
     "semantic_filter": SemanticFilter,
+    "toy_threshold": ToyThresholdGuardrail,
 }
 
 

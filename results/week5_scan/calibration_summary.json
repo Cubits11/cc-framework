@@ -1,5 +1,5 @@
 {
-  "timestamp": 1759028986.624759,
+  "timestamp": 1759035024.4756532,
   "config": "experiments/configs/week5_pilot.yaml",
   "dataset": "datasets/benign",
   "alpha_cap": 0.05,

@@ -4,6 +4,7 @@ pyproject.toml
 src/cc/__init__.py
 src/cc/_legacy/models.py
 src/cc/analysis/cc_estimation.py
+src/cc/analysis/ci.py
 src/cc/analysis/generate_figures.py
 src/cc/analysis/reporting.py
 src/cc/cartographer/atlas.py
@@ -12,6 +13,7 @@ src/cc/cartographer/bounds.py
 src/cc/cartographer/cli.py
 src/cc/cartographer/intervals.py
 src/cc/cartographer/io.py
+src/cc/cartographer/planner.py
 src/cc/cartographer/stats.py
 src/cc/cartographer/suggest.py
 src/cc/cli/__init__.py
@@ -30,6 +32,7 @@ src/cc/guardrails/composites.py
 src/cc/guardrails/keyword_blocker.py
 src/cc/guardrails/regex_filters.py
 src/cc/guardrails/semantic_filter.py
+src/cc/guardrails/toy_threshold.py
 src/cc/io/seeds.py
 src/cc/io/storage.py
 src/cc/utils/dashboard.py

@@ -1,0 +1,33 @@
+seed: 123
+alpha_cap: 0.05
+baseline_success_rate: 0.65
+episode_length: 10
+
+attacker:
+  type: random_injection
+  params:
+    vocab_harmful: ["attack", "breach", "exploit", "bypass", "override", "poison"]
+    vocab_benign: ["hello", "thanks", "please", "info", "question", "assist"]
+
+guardrails:
+  # Composite AND: emulate with a single tunable threshold for the composite decision.
+  - name: toy_threshold
+    params:
+      keywords:
+        # compose keyword ∧ regex concepts into a merged keyword set for the toy guardrail
+        ["attack", "breach", "exploit", "bypass", "override", "poison",
+         "(?i)attack", "(?i)exploit", "(?i)bypass", "(?i)override", "(?i)poison"]
+      threshold: 0.20
+      alpha_cap: 0.05
+    fpr_target: 0.05
+
+protocol:
+  epsilon: 0.01
+  T: 0.50
+
+experiment:
+  n_sessions: 150
+  memo_tag: week6_and
+
+outputs:
+  dir: results/week6/and

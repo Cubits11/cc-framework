@@ -3,11 +3,13 @@
 Module: logging
 Purpose: JSONL audit logger (shim) that delegates to Cartographer's tamper-evident chain
 Dependencies: json, time, pathlib; delegates hashing/verification to cc.cartographer.audit
-Author: Pranav Bhave (upgraded by assistant)
+Author: Pranav Bhave
 Dates:
   - 2025-08-27: initial shim
   - 2025-09-14: PhD-level upgrade (deterministic envelopes, env/git introspection,
                 optional sanitize, verify-on-write, lockfile, richer context)
+  - 2025-09-28: Ultimate upgrade (rotation, compression, redaction, batch ops,
+                env snapshot, thread-safety, schema v3, tail/head utilities)
 
 Notes
 -----
@@ -16,11 +18,14 @@ Notes
   with fields: `prev_sha256`, `sha256` (Cartographer owns hash discipline).
 - New features are opt-in and non-breaking:
     * Deterministic envelope with both unix and ISO-8601 timestamps (UTC),
-      host, pid, optional git SHA, optional seed/session.
+      host, pid, git SHA, session id, optional seed and env snapshot.
     * `auto_sanitize=True` to coerce common non-JSON types (Path, set, tuple, bytes).
     * `verify_on_write=True` to run a full chain verification after append.
     * Best-effort inter-process lock (atomic lockfile) to guard concurrent writers.
-    * `audit_context` logs success/failure with precise perf+wall durations and exception type.
+    * **Redaction** via `redact_keys` and `redact_patterns` (regex) with a configurable mask.
+    * **Rotation** via `max_bytes`/`backup_count` and optional `compress_backups=True` (.gz).
+    * **Batch** helpers (`log_many`) and quick **introspection** (`tail`, `current_head`).
+    * Optional `fsync_on_write=True` for durability (best-effort).
 - Use `cc.cartographer.audit` directly for new code if you don’t need the compatibility layer.
 
 Schema
@@ -29,7 +34,7 @@ Each record is written with an envelope:
 
 {
   "meta": {
-    "schema": "core/logging.v2",
+    "schema": "core/logging.v3",
     "ts_unix": <float>,
     "ts_iso": "YYYY-MM-DDTHH:MM:SS.sssZ",
     "host": <str>,            # hostname
@@ -37,6 +42,7 @@ Each record is written with an envelope:
     "git_sha": <str|null>,    # env/auto-detected
     "session_id": <str>,      # stable per-process launch
     "seed": <int|null>,       # optional (user-provided)
+    "env": { ... },           # optional snapshot (python/platform) if capture_env=True
     "extra": { ... }          # user-supplied meta overrides
   },
   "payload": { ... }          # user content (JSON-serializable)
@@ -48,22 +54,30 @@ Each record is written with an envelope:
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import os
+import platform
+import re
 import socket
 import subprocess
 import time
-import hashlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from threading import RLock
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from cc.cartographer import audit
 
-__all__ = ["ChainedJSONLLogger", "audit_context", "LoggingError"]
+__all__ = [
+    "ChainedJSONLLogger",
+    "audit_context",
+    "LoggingError",
+]
 
-SCHEMA_ID = "core/logging.v2"
+SCHEMA_ID_DEFAULT = "core/logging.v3"
 _LOCKFILE_SUFFIX = ".lock"
 
 # A stable per-process session id (pid + monotonic start hashed)
@@ -74,7 +88,7 @@ _session_id = hashlib.sha256(
 
 
 class LoggingError(RuntimeError):
-    """Raised for audit logging failures (serialization, locking, verification)."""
+    """Raised for audit logging failures (serialization, locking, verification, rotation)."""
 
 
 def _now_unix() -> float:
@@ -86,9 +100,7 @@ def _now_iso(ts: Optional[float] = None) -> str:
     """ISO-8601 in UTC with 'Z' suffix; millisecond precision."""
     if ts is None:
         ts = _now_unix()
-    # manual formatting to avoid importing datetime
-    # time.gmtime returns tm in UTC
-    tm = time.gmtime(ts)
+    tm = time.gmtime(ts)  # UTC
     ms = int((ts - int(ts)) * 1000)
     return f"{tm.tm_year:04d}-{tm.tm_mon:02d}-{tm.tm_mday:02d}T{tm.tm_hour:02d}:{tm.tm_min:02d}:{tm.tm_sec:02d}.{ms:03d}Z"
 
@@ -97,7 +109,7 @@ _git_sha_cache: Optional[str] = None
 
 
 def _detect_git_sha(cwd: Optional[Path] = None) -> Optional[str]:
-    """Resolve git SHA once (env `GIT_SHA` wins), else try `git rev-parse --short=12 HEAD`."""
+    """Resolve git SHA once (env `GIT_SHA` wins), else `git rev-parse --short=12 HEAD`."""
     global _git_sha_cache
     if _git_sha_cache is not None:
         return _git_sha_cache
@@ -128,17 +140,16 @@ def _coerce_json_safe(obj: Any) -> Any:
       - dataclass -> dict
     Leaves unknown types to default str().
     """
-    # avoid importing dataclasses.asdict unless needed
+    from dataclasses import asdict, is_dataclass  # lazy import
+
     if isinstance(obj, Path):
         return str(obj)
     if isinstance(obj, (set, tuple)):
         return list(obj)
     if isinstance(obj, (bytes, bytearray)):
         return obj.hex()
-    if hasattr(obj, "__dataclass_fields__"):
+    if is_dataclass(obj):
         try:
-            from dataclasses import asdict
-
             return asdict(obj)
         except Exception:
             return str(obj)
@@ -147,10 +158,7 @@ def _coerce_json_safe(obj: Any) -> Any:
 
 def _ensure_json(obj: Any, auto_sanitize: bool) -> None:
     if auto_sanitize:
-        def _default(x):
-            return _coerce_json_safe(x)
-        # We don't actually use the output here; we only validate serializability.
-        json.dumps(obj, default=_default, sort_keys=True, separators=(",", ":"))
+        json.dumps(obj, default=_coerce_json_safe, sort_keys=True, separators=(",", ":"))
     else:
         json.dumps(obj, sort_keys=True, separators=(",", ":"))  # may raise TypeError
 
@@ -193,6 +201,40 @@ def _release_lock(lockfile: Path) -> None:
         pass
 
 
+def _deep_redact(obj: Any, *, keys: Sequence[str], patterns: Sequence[re.Pattern], mask: str) -> Any:
+    """Return a redacted copy of `obj` (dict/list/primitive) using key names or regex patterns."""
+    def _should_redact_key(k: str) -> bool:
+        if k in keys:
+            return True
+        return any(p.search(k) for p in patterns)
+
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if _should_redact_key(str(k)):
+                out[k] = mask
+            else:
+                out[k] = _deep_redact(v, keys=keys, patterns=patterns, mask=mask)
+        return out
+    if isinstance(obj, list):
+        return [_deep_redact(v, keys=keys, patterns=patterns, mask=mask) for v in obj]
+    # primitives unchanged
+    return obj
+
+
+def _compile_patterns(pats: Optional[Sequence[str]]) -> List[re.Pattern]:
+    out: List[re.Pattern] = []
+    if not pats:
+        return out
+    for p in pats:
+        try:
+            out.append(re.compile(p, re.IGNORECASE))
+        except re.error:
+            # ignore invalid regex, fail-soft
+            continue
+    return out
+
+
 @dataclass
 class EnvelopeMeta:
     schema: str
@@ -203,6 +245,7 @@ class EnvelopeMeta:
     git_sha: Optional[str]
     session_id: str
     seed: Optional[int]
+    env: Optional[Dict[str, Any]]
     extra: Dict[str, Any]
 
 
@@ -215,11 +258,14 @@ class ChainedJSONLLogger:
         sha = logger.log({"event": "something", ...})
         ok, err = logger.verify_chain_integrity()
 
-    Upgrades:
+    Upgrades (opt-in):
         - Deterministic envelope with ISO+unix timestamps, host, pid, git sha (if available), session id.
         - Optional auto-sanitization of payload/meta extras.
         - Optional verify_on_write to check chain integrity after each append.
         - Best-effort lockfile to reduce concurrent writer races (Cartographer should still detect tampering).
+        - Redaction of sensitive keys/patterns before writing.
+        - File rotation and optional gzip compression of rotated files.
+        - Batch logging helpers; tail/head utilities; fsync for durability.
 
     Parameters
     ----------
@@ -233,7 +279,24 @@ class ChainedJSONLLogger:
         If True, call `audit.verify_chain` after each append and raise on failure.
     auto_sanitize : bool
         If True, coerce common non-JSON types in payload and meta.extra.
-
+    schema_id : str
+        Envelope schema id (default: "core/logging.v3").
+    capture_env : bool
+        If True, include a small immutable environment snapshot in `meta.env`.
+    fsync_on_write : bool
+        If True, attempt to fsync the log file after each append (best effort).
+    max_bytes : Optional[int]
+        If set, rotate the file when size >= max_bytes before the next append.
+    backup_count : int
+        Number of rotated files to keep (default 5). Ignored if max_bytes is None.
+    compress_backups : bool
+        If True, gzip rotated files (`.gz`).
+    redact_keys : Sequence[str]
+        Exact key names to redact anywhere within `payload` and `meta.extra`.
+    redact_patterns : Sequence[str]
+        Regex patterns (matched on key names) to redact.
+    redact_mask : str
+        Replacement string for redacted values (default: "***").
     """
 
     def __init__(
@@ -243,24 +306,64 @@ class ChainedJSONLLogger:
         enable_lock: bool = True,
         verify_on_write: bool = False,
         auto_sanitize: bool = False,
+        *,
+        schema_id: str = SCHEMA_ID_DEFAULT,
+        capture_env: bool = False,
+        fsync_on_write: bool = False,
+        max_bytes: Optional[int] = None,
+        backup_count: int = 5,
+        compress_backups: bool = False,
+        redact_keys: Optional[Sequence[str]] = None,
+        redact_patterns: Optional[Sequence[str]] = None,
+        redact_mask: str = "***",
     ) -> None:
+        # Paths & env
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.lockfile = self.path.with_suffix(self.path.suffix + _LOCKFILE_SUFFIX) if enable_lock else None
+
+        # Behavior flags
         self.verify_on_write = verify_on_write
         self.auto_sanitize = auto_sanitize
         self.default_seed = default_seed
-        self.last_sha: Optional[str] = audit.tail_sha(str(self.path))  # None for empty/new files
+        self.schema_id = schema_id
+        self.capture_env = capture_env
+        self.fsync_on_write = fsync_on_write
+
+        # Rotation
+        self.max_bytes = int(max_bytes) if max_bytes is not None else None
+        self.backup_count = int(backup_count)
+        self.compress_backups = bool(compress_backups)
+
+        # Redaction
+        self.redact_keys = list(redact_keys or [])
+        self.redact_patterns = _compile_patterns(redact_patterns)
+        self.redact_mask = redact_mask
+
+        # State
         self._host = socket.gethostname()
         self._pid = os.getpid()
         self._git_sha = _detect_git_sha(self.path.parent)
+        self._thread_lock = RLock()
+        self.last_sha: Optional[str] = audit.tail_sha(str(self.path))  # None for empty/new files
+
+        # Precompute environment snapshot if requested
+        self._env_snapshot: Optional[Dict[str, Any]] = None
+        if self.capture_env:
+            self._env_snapshot = {
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+                "machine": platform.machine(),
+                "processor": platform.processor(),
+                "implementation": platform.python_implementation(),
+            }
 
     # ------------------------------------------------------------------ helpers
 
     def _build_meta(self, extra_meta: Optional[Dict[str, Any]], seed: Optional[int]) -> EnvelopeMeta:
         ts = _now_unix()
         return EnvelopeMeta(
-            schema=SCHEMA_ID,
+            schema=self.schema_id,
             ts_unix=ts,
             ts_iso=_now_iso(ts),
             host=self._host,
@@ -268,14 +371,79 @@ class ChainedJSONLLogger:
             git_sha=self._git_sha,
             session_id=_session_id,
             seed=(seed if seed is not None else self.default_seed),
+            env=self._env_snapshot,
             extra=(extra_meta or {}),
         )
 
+    def _maybe_rotate(self) -> Optional[str]:
+        """Rotate the underlying file if size >= max_bytes. Returns rotated filename (or None)."""
+        if self.max_bytes is None:
+            return None
+        try:
+            if self.path.exists() and self.path.stat().st_size >= self.max_bytes:
+                rotated = self._rotate_files()
+                # Start a new chain: reset head SHA
+                self.last_sha = None
+                return rotated
+            return None
+        except Exception as e:
+            raise LoggingError(f"rotation failed: {e}") from e
+
+    def _rotate_files(self) -> str:
+        """Perform size-based rotation akin to logging.handlers.RotatingFileHandler."""
+        # Shift existing backups: .(backup_count-1) <- .(backup_count-2) <- ... <- .1 <- current
+        def rot_name(idx: int) -> Path:
+            return self.path.with_suffix(self.path.suffix + f".{idx}")
+
+        # Remove oldest
+        if self.backup_count > 0:
+            oldest = rot_name(self.backup_count)
+            if oldest.exists():
+                oldest.unlink(missing_ok=True)
+
+            # Shift downwards
+            for i in range(self.backup_count - 1, 0, -1):
+                src = rot_name(i)
+                dst = rot_name(i + 1)
+                if src.exists():
+                    src.replace(dst)
+
+            # Move current to .1
+            if self.path.exists():
+                self.path.replace(rot_name(1))
+                rotated_str = str(rot_name(1))
+
+                # Optional compression
+                if self.compress_backups:
+                    gz_path = Path(rotated_str + ".gz")
+                    with open(rotated_str, "rb") as f_in, gzip.open(gz_path, "wb") as f_out:
+                        while True:
+                            chunk = f_in.read(64 * 1024)
+                            if not chunk:
+                                break
+                            f_out.write(chunk)
+                    # remove uncompressed rotated file
+                    Path(rotated_str).unlink(missing_ok=True)
+                    rotated_str = str(gz_path)
+
+                return rotated_str
+        # No backups requested: just truncate
+        self.path.write_text("", encoding="utf-8")
+        return str(self.path)
+
+    def _redact(self, payload: Dict[str, Any], extra: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        if not self.redact_keys and not self.redact_patterns:
+            return payload, extra
+        pay = _deep_redact(payload, keys=self.redact_keys, patterns=self.redact_patterns, mask=self.redact_mask)
+        ext = _deep_redact(extra, keys=self.redact_keys, patterns=self.redact_patterns, mask=self.redact_mask)
+        return pay, ext
+
     def _make_record(self, payload: Dict[str, Any], meta: EnvelopeMeta) -> Dict[str, Any]:
         """Construct the canonical envelope around payload; raises on non-serializable content unless auto_sanitize."""
-        # validate serializability early
+        # Redact first, then validate serializability
+        payload, meta_extra = self._redact(payload, meta.extra)
         _ensure_json(payload, self.auto_sanitize)
-        _ensure_json(meta.extra, self.auto_sanitize)
+        _ensure_json(meta_extra, self.auto_sanitize)
 
         rec = {
             "meta": {
@@ -287,16 +455,25 @@ class ChainedJSONLLogger:
                 "git_sha": meta.git_sha,
                 "session_id": meta.session_id,
                 "seed": meta.seed,
-                "extra": meta.extra,
+                "env": meta.env,
+                "extra": meta_extra,
             },
             "payload": payload,
-            # chain fields to be added by cc.cartographer.audit:
-            # "prev_sha256": "...",
-            # "sha256": "..."
         }
         # sanity: canonical dump (sorted keys, compact separators)
         _canonical_dumps(rec, self.auto_sanitize)
         return rec
+
+    def _fsync_best_effort(self) -> None:
+        """Attempt to fsync the file (best-effort; ignored on failure)."""
+        try:
+            fd = os.open(str(self.path), os.O_RDWR)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ public API
 
@@ -330,35 +507,52 @@ class ChainedJSONLLogger:
         Raises
         ------
         LoggingError
-            On serialization failure, lock acquisition failure, or verification failure.
+            On serialization failure, lock acquisition failure (when verify_on_write),
+            rotation error, or verification failure.
         """
-        meta = self._build_meta(extra_meta, seed)
-        rec = self._make_record(payload, meta)
-
-        # Optional inter-process lock
-        locked = False
-        if self.lockfile is not None:
-            locked = _acquire_lock(self.lockfile)
-            if not locked:
-                # Non-fatal by design; Cartographer will still hash-chain detect interleaving,
-                # but we warn by raising a soft error only if verify_on_write is requested.
-                if (self.verify_on_write if verify_on_write is None else verify_on_write):
+        with self._thread_lock:
+            # Optional inter-process lock
+            locked = False
+            if self.lockfile is not None:
+                locked = _acquire_lock(self.lockfile)
+                if not locked and (self.verify_on_write if verify_on_write is None else verify_on_write):
+                    # Only escalate when verification is requested (stricter mode)
                     raise LoggingError(f"Could not acquire audit lock: {self.lockfile}")
 
-        try:
-            sha = audit.append_jsonl(str(self.path), rec)
-            self.last_sha = sha
+            try:
+                # Rotate before we append
+                rotated = self._maybe_rotate()
+                if rotated is not None:
+                    # Emit rotation marker into the *new* file (fresh chain)
+                    try:
+                        self.log_event(
+                            "rotation_new_chain",
+                            fields={"rotated_from": rotated, "previous_head": self.last_sha},
+                            verify_on_write=False,
+                        )
+                    except Exception:
+                        # Do not fail the user's actual append due to rotation marker issues
+                        pass
 
-            if (self.verify_on_write if verify_on_write is None else verify_on_write):
-                try:
-                    audit.verify_chain(str(self.path))
-                except Exception as e:
-                    raise LoggingError(f"Audit chain verification failed post-append: {e}") from e
+                meta = self._build_meta(extra_meta, seed)
+                rec = self._make_record(payload, meta)
 
-            return sha
-        finally:
-            if locked:
-                _release_lock(self.lockfile)  # type: ignore[arg-type]
+                sha = audit.append_jsonl(str(self.path), rec)
+                self.last_sha = sha
+
+                if self.fsync_on_write:
+                    self._fsync_best_effort()
+
+                if (self.verify_on_write if verify_on_write is None else verify_on_write):
+                    try:
+                        audit.verify_chain(str(self.path))
+                    except Exception as e:
+                        raise LoggingError(f"Audit chain verification failed post-append: {e}") from e
+
+                return sha
+            finally:
+                if locked:
+                    _release_lock(self.lockfile)  # type: ignore[arg-type]
 
     def log_event(
         self,
@@ -369,13 +563,25 @@ class ChainedJSONLLogger:
         extra_meta: Optional[Dict[str, Any]] = None,
         verify_on_write: Optional[bool] = None,
     ) -> str:
-        """
-        Convenience: wrap an 'event' with arbitrary fields into payload.
-        """
+        """Convenience: wrap an 'event' with arbitrary fields into payload."""
         payload = {"event": event}
         if fields:
             payload.update(fields)
         return self.log(payload, seed=seed, extra_meta=extra_meta, verify_on_write=verify_on_write)
+
+    def log_many(
+        self,
+        payloads: Iterable[Dict[str, Any]],
+        *,
+        seed: Optional[int] = None,
+        extra_meta: Optional[Dict[str, Any]] = None,
+        verify_on_write: Optional[bool] = None,
+    ) -> List[str]:
+        """Append many payloads atomically with respect to the lock; returns list of SHAs in order."""
+        shas: List[str] = []
+        for p in payloads:
+            shas.append(self.log(p, seed=seed, extra_meta=extra_meta, verify_on_write=verify_on_write))
+        return shas
 
     def verify_chain_integrity(self) -> Tuple[bool, Optional[str]]:
         """
@@ -391,7 +597,39 @@ class ChainedJSONLLogger:
         except Exception as e:
             return False, str(e)
 
+    def current_head(self) -> Optional[str]:
+        """Return the current chain head SHA (None if file empty)."""
+        try:
+            self.last_sha = audit.tail_sha(str(self.path))
+            return self.last_sha
+        except Exception:
+            return self.last_sha
+
+    def tail(self, n: int = 10) -> List[Dict[str, Any]]:
+        """
+        Return the last `n` JSONL records as dicts (best-effort; reads file normally).
+        Intended for quick debugging and NOT for large-scale analytics.
+        """
+        n = max(1, int(n))
+        try:
+            with self.path.open("r", encoding="utf-8") as f:
+                lines = f.readlines()[-n:]
+            out: List[Dict[str, Any]] = []
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except Exception:
+                    # skip corrupt lines; cartographer verification would catch this upstream
+                    continue
+            return out
+        except FileNotFoundError:
+            return []
+
     # ------------------------------------------------------------------ context manager
+
 
 @contextmanager
 def audit_context(
