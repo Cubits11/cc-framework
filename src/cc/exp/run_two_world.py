@@ -171,8 +171,14 @@ def analyze_results(results: List[AttackResult]) -> dict:
     p1_hat = float(np.mean(w1))  # attacker success w/ protection
     j_emp = p0_hat - p1_hat      # reduction in attacker success (higher is better)
 
-    boot = bootstrap_ci_j_statistic(w0, w1, B=2000, alpha=0.05)
-    j_ci: Tuple[float, float] = (float(boot.ci_lower), float(boot.ci_upper))
+    rng = np.random.default_rng(123)
+    delta_samples = []
+    for _ in range(200):
+        sample0 = rng.choice(w0, size=w0.size, replace=True)
+        sample1 = rng.choice(w1, size=w1.size, replace=True)
+        delta_samples.append(float(np.mean(sample0) - np.mean(sample1)))
+    j_ci = bootstrap_ci(delta_samples, n_resamples=0, alpha=0.05)
+
 
     # Theoretical max reduction is preventing all baseline successes
     j_theory_max = max(p0_hat, 1e-12)
