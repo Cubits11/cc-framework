@@ -331,12 +331,22 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Run two-world experiment (deterministic, audit-logged)")
     ap.add_argument("--config", required=True, help="YAML config file")
     ap.add_argument("--n", type=int, help="Override number of sessions")
-    ap.add_argument("--log", default="runs/audit.jsonl", help="Audit JSONL path")
+    ap.add_argument("--audit", help="Audit JSONL path (default: runs/audit.jsonl)")
+    ap.add_argument("--log", help="Deprecated alias for --audit")
     ap.add_argument("--output", default="results/analysis.json", help="Write analysis JSON here")
+    ap.add_argument("--out-csv", help="Write per-session metrics CSV here")
+    ap.add_argument("--calibration-summary", help="Optional JSON file from calibration script")
     ap.add_argument("--seed", type=int, help="Override global seed")
     ap.add_argument("--set", nargs="*", default=[], help="Overrides: key=val (e.g., protocol.epsilon=0.02)")
     ap.add_argument("--experiment-id", default=None, help="Optional tag for this run")
     args = ap.parse_args()
+
+    calibration_summary: Dict[str, Any] = {}
+    if args.calibration_summary:
+        calib_path = Path(args.calibration_summary)
+        if calib_path.exists():
+            with open(calib_path, "r", encoding="utf-8") as f:
+                calibration_summary = json.load(f)
 
     # Load & override config
     cfg = load_config(args.config)
@@ -349,13 +359,32 @@ def main() -> None:
     seed = int(cfg.get("seed", 42))
     _set_determinism(seed)
 
+    if calibration_summary:
+        summary_map = {}
+        for entry in calibration_summary.get("guardrails", []):
+            name = entry.get("name")
+            if name:
+                summary_map[name] = entry
+        for guardrail_cfg in cfg.get("guardrails", []) or []:
+            name = guardrail_cfg.get("name")
+            if name in summary_map:
+                params = guardrail_cfg.setdefault("params", {})
+                if "threshold" in summary_map[name]:
+                    params["threshold"] = summary_map[name]["threshold"]
+
     exp_cfg = cfg.get("experiment", {}) or {}
     n_sessions = int(args.n if args.n is not None else exp_cfg.get("n_sessions", 200))
 
     out_path = Path(args.output)
-    log_path = Path(args.log)
+    audit_arg = args.audit or args.log
+    if audit_arg is None:
+        audit_arg = "runs/audit.jsonl"
+    log_path = Path(audit_arg)
+    out_csv = Path(args.out_csv) if args.out_csv else None
     out_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_csv:
+        out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     # Provenance
     repo_root = _repo_root()
@@ -384,7 +413,8 @@ def main() -> None:
                        config_sha256=cfg_sha,
                        git_commit=git_sha,
                        n_sessions=n_sessions,
-                       seed=seed) as op_id:
+                       seed=seed,
+                       calibration_summary=calibration_summary) as op_id:
 
         print(f"Starting experiment: n_sessions={n_sessions} (exp_id={exp_id})")
 
@@ -413,12 +443,42 @@ def main() -> None:
                 "timestamp_unix": time.time(),
                 "git_commit": git_sha,
                 "configuration": cfg,  # full (as run)
+                "calibration_summary": calibration_summary,
             },
             "results": analysis,
         }
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(analysis_out, f, indent=2)
 
+        # CSV metrics for Week 5 pilot
+        if out_csv:
+            rows = _build_csv_rows(results, cfg.get("alpha_cap", 0.05), calibration_summary)
+            header = [
+                "tpr_a",
+                "tpr_b",
+                "fpr_a",
+                "fpr_b",
+                "I1_lo",
+                "I1_hi",
+                "I0_lo",
+                "I0_hi",
+                "vbar1",
+                "vbar0",
+                "cc_hat",
+                "ci_lo",
+                "ci_hi",
+                "ci_width",
+                "D",
+                "D_lamp",
+                "bonferroni_call",
+                "bhy_call",
+            ]
+            with open(out_csv, "w", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=header)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({k: row.get(k, "") for k in header})
+                           
         # Cartographer audit record (tamper-evident)
         decision = (
             f"DECISION: {'DEPLOY' if metrics_for_audit['CC_max'] >= 1.0 else 'REDESIGN'} "
@@ -449,11 +509,15 @@ def main() -> None:
     print("\n=== SUMMARY ===")
     print(f"Git SHA       : {git_sha}")
     print(f"Config SHA256 : {cfg_sha[:12]}…")
-    print(f"J (empirical) : {j['empirical']:.4f}  "
-          f"[{j['confidence_interval']['lower']:.4f}, {j['confidence_interval']['upper']:.4f}]  ({j['confidence_interval']['method']})")
+    print(
+        f"J (empirical) : {j['empirical']:.4f}  "
+        f"[{j['confidence_interval']['lower']:.4f}, {j['confidence_interval']['upper']:.4f}]  ({j['confidence_interval']['method']})"
+    )
     print(f"CC_max        : {metrics_for_audit['CC_max']:.3f}")
     print(f"Wrote analysis → {out_path}")
     print(f"Appended audit → {log_path}")
+    if out_csv:
+        print(f"Wrote scan CSV → {out_csv}")
 
 
 if __name__ == "__main__":
