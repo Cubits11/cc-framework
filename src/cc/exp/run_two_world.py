@@ -12,7 +12,7 @@ import random
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 import numpy as np
 import yaml
@@ -161,24 +161,44 @@ def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
 # Analysis (maps to your memo/plots naming)
 # --------------------------------------------------------------------------- #
 
+def _extract_guardrail_entries(calibration_summary: Dict[str, Any] | None) -> Iterable[Dict[str, Any]]:
+    """Yield guardrail calibration entries from either flat or nested summaries."""
+
+    if not calibration_summary:
+        return []
+
+    entries: List[Dict[str, Any]] = []
+
+    guardrails = calibration_summary.get("guardrails")
+    if isinstance(guardrails, list):
+        entries.extend([entry for entry in guardrails if isinstance(entry, dict)])
+
+    # Week-5 calibration writes a flat summary; treat it as a single-entry list.
+    if not entries and {"name", "threshold"}.issubset(calibration_summary.keys()):
+        entries.append({
+            "name": calibration_summary.get("name"),
+            "threshold": calibration_summary.get("threshold"),
+            "fpr": calibration_summary.get("fpr"),
+        })
+
+    return entries
+
+
 def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int, float]:
     """Return world-indexed FPRs using calibration metadata when available."""
 
-    if not calibration_summary:
+    entries = list(_extract_guardrail_entries(calibration_summary))
+    if not entries:
         return {0: 0.0, 1: 0.0}
 
-    guardrails = calibration_summary.get("guardrails") or []
-    if not guardrails:
-        return {0: 0.0, 1: 0.0}
-
-    # Base world (no guardrail stack in our two-world protocol).
     world_fprs = {0: 0.0}
 
-    # Composition world uses the stack of guardrails; approximate stack FPR via
-    # complementary probability assuming independence between guardrails.
     comp_survival = 1.0
-    for entry in guardrails:
-        fpr = float(entry.get("fpr", 0.0))
+    for entry in entries:
+        try:
+            fpr = float(entry.get("fpr", 0.0))
+        except (TypeError, ValueError):
+            fpr = 0.0
         fpr = max(0.0, min(1.0, fpr))
         comp_survival *= (1.0 - fpr)
     world_fprs[1] = 1.0 - comp_survival
@@ -411,7 +431,7 @@ def main() -> None:
 
     if calibration_summary:
         summary_map = {}
-        for entry in calibration_summary.get("guardrails", []):
+        for entry in _extract_guardrail_entries(calibration_summary):
             name = entry.get("name")
             if name:
                 summary_map[name] = entry
