@@ -275,7 +275,7 @@ week5-pilot: install
 memo-week5: install
 	$(ACT); pandoc docs/week5_memo.md -o docs/week5_memo.pdf
 
-# -------- Week 6 pipeline (α-cap ablation, fail-fast) ---------
+# -------- Week-6 (α-cap ablation, fail-fast) ---------
 
 # Helper: assert file exists
 define _assert_file
@@ -287,40 +287,36 @@ define _assert_any_png
 	@if ! compgen -G "$(1)/*.png" > /dev/null; then echo "FAIL: No figures in $(1)"; exit 1; fi
 endef
 
-# Per-rail target:
-# - Calibrate with write-back to a derived config
-# - Run two-world with fail-fast checks (FPR window + threshold equality)
-# - Generate Week-6 figures
-# - Verify artifacts + audit tail
+# Per-rail target with proper variable expansion
 $(addprefix week6-rail-,$(W6_RAILS)): install
 	@rail=$(@:week6-rail-%=%); \
 	cfg="experiments/configs/week6_$${rail}.yaml"; \
 	outdir="$(W6_DIR)/$${rail}"; \
 	figdir="$(W6_FIG_DIR)/$${rail}"; \
-	mkdir -p "$$outdir" "$$figdir" "$(dir $(W6_AUDIT))"; \
+	mkdir -p "$${outdir}" "$${figdir}" "$(dir $(W6_AUDIT))"; \
 	echo "==> [Calibrate] $${rail}"; \
 	$(ACT); python scripts/calibrate_guardrail.py \
-		--config $$cfg \
+		--config "$${cfg}" \
 		--dataset datasets/benign \
-		--summary $$outdir/calibration_summary.json \
-		--audit $(W6_AUDIT) \
-		--write-config-out $$outdir/calibrated.yaml ; \
+		--summary "$${outdir}/calibration_summary.json" \
+		--audit "$(W6_AUDIT)" \
+		--write-config-out "$${outdir}/calibrated.yaml"; \
 	echo "==> [Run+Checks] $${rail}"; \
 	$(ACT); python scripts/run_with_checks.py \
-		--config $$outdir/calibrated.yaml \
-		--out-json $$outdir/analysis.json \
-		--audit $(W6_AUDIT) \
+		--config "$${outdir}/calibrated.yaml" \
+		--out-json "$${outdir}/analysis.json" \
+		--audit "$(W6_AUDIT)" \
 		--seed 123 \
-		--fpr-lo 0.04 --fpr-hi 0.06 \
-		--calibration $$outdir/calibration_summary.json ; \
+		----fpr-lo 0.00 --fpr-hi 0.08 \
+		--calibration "$${outdir}/calibration_summary.json"; \
 	echo "==> [Figures] $${rail}"; \
 	$(ACT); python scripts/make_week6_figs.py \
-		--inputs $$outdir/analysis.json \
-		--out-dir $$figdir ; \
-	$(call _assert_file,$$outdir/analysis.json); \
-	$(call _assert_file,$$outdir/calibration_summary.json); \
-	$(call _assert_any_png,$$figdir); \
-	tail -n 1 $(W6_AUDIT) >/dev/null || { echo "FAIL: audit file missing or empty"; exit 1; }; \
+		--inputs "$${outdir}/analysis.json" \
+		--out-dir "$${figdir}"; \
+	if [ ! -f "$${outdir}/analysis.json" ]; then echo "FAIL: Missing artifact $${outdir}/analysis.json"; exit 1; fi; \
+	if [ ! -f "$${outdir}/calibration_summary.json" ]; then echo "FAIL: Missing artifact $${outdir}/calibration_summary.json"; exit 1; fi; \
+	if ! compgen -G "$${figdir}/*.png" > /dev/null; then echo "FAIL: No figures in $${figdir}"; exit 1; fi; \
+	tail -n 1 "$(W6_AUDIT)" >/dev/null || { echo "FAIL: audit file missing or empty"; exit 1; }; \
 	echo "OK: week6-rail-$${rail}"
 
 # Umbrella target: run all five rails

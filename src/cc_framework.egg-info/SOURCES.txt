@@ -10,6 +10,7 @@ src/cc/analysis/reporting.py
 src/cc/cartographer/atlas.py
 src/cc/cartographer/audit.py
 src/cc/cartographer/bounds.py
+src/cc/cartographer/bounds_enterprise.py
 src/cc/cartographer/cli.py
 src/cc/cartographer/intervals.py
 src/cc/cartographer/io.py

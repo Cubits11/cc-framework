@@ -1,3 +1,4 @@
+# experiments/configs/week6_keyword.yaml
 seed: 123
 alpha_cap: 0.05
 baseline_success_rate: 0.65

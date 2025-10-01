@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Compositional Safety Research OS — FH–Bernstein @ α-cap (v1.3, robust)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="description" content="Research OS for compositional guardrail analysis with FH intervals, Bernstein CIs, λ-coordinates and adversarial stress, with robust UI fallbacks."/>
+  <style>
+    :root {
+      --bg:#0b1220; --panel:#141c2b; --panel2:#19233a; --grid:#2a3752; --text:#d7e2ff; --muted:#8fa3c7;
+      --blue:#4da3ff; --amber:#ffb547; --green:#58df93; --red:#ff6f6f; --purple:#b388ff; --pink:#ff8ac2;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background: linear-gradient(135deg,#09111e 0%,#0e1a2f 60%,#0b1220 100%); color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; }
+    .wrap { max-width:1200px; margin:28px auto; padding:0 16px; }
+    .row { display:grid; grid-gap:16px; }
+    .row.cols-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .row.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .row.cols-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .panel { background: linear-gradient(180deg,var(--panel) 0%,var(--panel2) 100%); border:1px solid #1e2a44; border-radius:12px; padding:16px; }
+    .hdr { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    h1 { margin:0; font-size:22px; color:var(--blue); }
+    h2 { margin:0 0 8px; font-size:16px; color:var(--blue); }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:10px; font-weight:600; }
+    .pill.pass { background: rgba(88,223,147,.15); color: var(--green); border:1px solid rgba(88,223,147,.35);}
+    .pill.block { background: rgba(255,111,111,.15); color: var(--red); border:1px solid rgba(255,111,111,.35);}
+    label { font-size:12px; color:var(--muted); display:block; }
+    input[type="number"] { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #26334f; background:#0f1728; color:var(--text); margin-top:4px;}
+    .kpi { background: linear-gradient(180deg,rgba(77,163,255,.12),rgba(77,163,255,.06)); border:1px solid rgba(77,163,255,.35); border-radius:12px; padding:12px;}
+    .kpi .t { color:#acd4ff; font-size:12px; }
+    .kpi .v { font-size:22px; font-weight:700; }
+    .kpi .s { font-size:11px; color:var(--muted); margin-top:4px; }
+    .assump { font-size:12px; color:var(--muted); display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:8px; }
+    .gridline { border-top:1px dashed #2a3752; margin:12px 0; }
+    button { background:#16325a; color:#cfe3ff; border:1px solid #274a7a; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    button:hover { background:#1a3a69; }
+    .note { font-size:12px; color:var(--muted); }
+    .ok { color: var(--green); }
+    .warn { color: var(--amber); }
+    .err { color: var(--red); }
+    .foot { text-align:center; color:#7f94bb; font-size:12px; margin-top:8px; }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; }
+    .center { max-width:920px; margin:40px auto; text-align:center; }
+    .error { background:#2a1120; border:1px solid #5b1a33; color:#ffd3e1; padding:14px 16px; border-radius:12px; }
+    .banner { background:#2a1a11; border:1px solid #7a4b27; color:#ffd9b0; padding:10px 12px; border-radius:10px; margin-bottom:12px; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+    @media (max-width: 980px){ .row.cols-3, .row.cols-2, .row.cols-4 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div id="root" aria-live="polite"></div>
+
+<script>
+/* -----------------------------------------------------------------------------
+   ROBUST LOADER (No CORS attributes; dual-track Recharts)
+   Strategy:
+   1) Load React 18 + ReactDOM 18 (multi-CDN).
+   2) Try Recharts v2 (no extra deps). If window.Recharts undefined:
+   3) Load react-is, then try Recharts v3. If still missing → chartless mode.
+----------------------------------------------------------------------------- */
+(function(){
+  const cdn = (pkg, path) => ([
+    `https://unpkg.com/${pkg}/${path}`,
+    `https://cdn.jsdelivr.net/npm/${pkg}/${path}`
+  ]);
+
+  const libsPrimary = [
+    { global:'React',    urls: cdn('react@18',     'umd/react.production.min.js') },
+    { global:'ReactDOM', urls: cdn('react-dom@18','umd/react-dom.production.min.js') },
+    // First attempt: Recharts v2 (simplest UMD, no react-is needed)
+    { global:'Recharts', urls: cdn('recharts@2.10.4','umd/Recharts.min.js'), optional:true }
+  ];
+
+  const libsSecondary = [
+    { global:'reactIs',  urls: cdn('react-is@18','umd/react-is.production.min.js') },
+    { global:'Recharts', urls: cdn('recharts@3.2.1','umd/Recharts.min.js') }
+  ];
+
+  function loadScript(url){
+    return new Promise((resolve,reject)=>{
+      const s=document.createElement('script');
+      s.async = true; s.src = url;
+      s.onload = ()=> resolve(url);
+      s.onerror= ()=> reject(new Error('Failed '+url));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensure(globalName, urls){
+    if (window[globalName]) return true;
+    let lastErr;
+    for (const u of urls){
+      try { await loadScript(u); if (window[globalName]) return true; }
+      catch(e){ lastErr = e; }
+    }
+    if (lastErr) throw lastErr;
+    return !!window[globalName];
+  }
+
+  async function loadAll(specs){
+    for (const spec of specs){
+      try {
+        await ensure(spec.global, spec.urls);
+      } catch (e){
+        if (spec.optional) {
+          // swallow; we will try secondary path
+          continue;
+        } else {
+          throw e;
+        }
+      }
+    }
+  }
+
+  (async function boot(){
+    const rootNode = document.getElementById('root');
+    try{
+      // Primary path (React, ReactDOM, Recharts v2 optional)
+      await loadAll(libsPrimary);
+
+      // If Recharts still missing, try the secondary path (react-is + Recharts v3)
+      if (!window.Recharts){
+        await loadAll(libsSecondary);
+      }
+
+      // If Recharts still missing, mark chartless mode
+      if (!window.Recharts) {
+        window.__NO_CHARTS__ = true;
+        console.warn('Chart libs unavailable: entering chartless mode.');
+      }
+      startApp();
+    }catch(err){
+      rootNode.innerHTML = `
+        <div class="center">
+          <h1 style="color:var(--blue);margin-bottom:10px;">Compositional Safety Research OS</h1>
+          <div class="error">
+            <strong>Failed to load a required library.</strong><br/>
+            ${String(err.message || err)}<br/>
+            Tip: Some networks block CDNs; try a different network or offline build.
+          </div>
+        </div>`;
+      console.error(err);
+    }
+  })();
+})();
+</script>
+
+<script>
+/* -----------------------------------------------------------------------------
+   APP (initialized after libs); math is JS-only and works even in chartless mode
+   Core math blocks (all documented inline):
+   • FH intervals under α-cap
+   • Variance envelope on [L,U]
+   • Exact Bernstein inversion (bisection)
+   • λ-half-widths with κ inflation
+   • Adversarial L∞ stress in λ-space (dual rails)
+----------------------------------------------------------------------------- */
+function startApp(){
+  const R = window.React, RD = window.ReactDOM;
+  const {useState, useMemo, useEffect} = R;
+  const Re = window.Recharts; // may be undefined in chartless mode
+
+  // ---------- Helpers ----------
+  const clamp = (x,min,max)=> Math.min(max,Math.max(min,x));
+  const round = (x,k=3)=> (isFinite(x)? Number(x.toFixed(k)) : x);
+
+  // URL state encode/decode (compact share links)
+  function encodeState(obj){
+    try { return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); } catch(e){ return ""; }
+  }
+  function decodeState(str){
+    try { return JSON.parse(decodeURIComponent(escape(atob(str)))); } catch(e){ return null; }
+  }
+
+  // Fréchet–Hoeffding intervals with α-cap:
+  // For Y=1 (unsafe) AND composition: p1 ∈ [max(0, ta+tb-1), min(ta,tb)]
+  // For Y=0 (benign) OR composition:  p0 ∈ [max(fa,fb), min(1, fa+fb, α)]
+  function computeFH(ta,tb,fa,fb,alpha){
+    const L1 = Math.max(0, ta + tb - 1);
+    const U1 = Math.min(ta, tb);
+    const L0 = Math.max(fa, fb);
+    const U0 = Math.min(1, fa + fb, alpha);
+    return {L1,U1,L0,U0};
+  }
+
+  // Tight Bernoulli variance envelope over an interval:
+  // If [L,U] spans 0.5 → envelope is 1/4; else max at an endpoint
+  function vbarFromInterval(L,U){
+    if (L<=0.5 && U>=0.5) return 0.25;
+    const vL = L*(1-L), vU = U*(1-U);
+    return Math.max(vL,vU);
+  }
+
+  // Two-sided Bernstein tail inversion by bisection:
+  // solve ε ≥ 0 s.t. 2*exp( - n*ε² / (2*v + (2/3)ε) ) = δ_y  (per-class share)
+  function invertBernstein(n, vbar, delta_y){
+    if (!isFinite(n) || n<=0) return 0;
+    const target = Math.log(2/delta_y);
+    let lo=0, hi=Math.min(1,3);
+    for(let i=0;i<64;i++){
+      const mid=(lo+hi)/2;
+      const denom = 2*vbar + (2/3)*mid;
+      const lhs = (n*mid*mid)/denom;
+      if (lhs >= target) hi=mid; else lo=mid;
+    }
+    return (lo+hi)/2;
+  }
+
+  // λ half-width (adds κ to reflect marginal-CI inflation of rails)
+  function lambdaHalfwidth(eps, W, kappa){
+    if (!(W>0)) return Infinity;
+    return (eps + (kappa||0)) / W;
+  }
+
+  // Outer adversary: worst CC on an L∞ ball in (λ1,λ0)
+  function adversarialStress(lambda1, lambda0, L1,U1,L0,U0, D, budget){
+    if (!isFinite(lambda1) || !isFinite(lambda0)) return NaN;
+    const corners = [
+      [clamp(lambda1-budget,0,1), clamp(lambda0-budget,0,1)],
+      [clamp(lambda1-budget,0,1), clamp(lambda0+budget,0,1)],
+      [clamp(lambda1+budget,0,1), clamp(lambda0-budget,0,1)],
+      [clamp(lambda1+budget,0,1), clamp(lambda0+budget,0,1)],
+    ];
+    let worst = Infinity;
+    for (const [l1,l0] of corners){
+      const p1 = (1-l1)*U1 + l1*L1;
+      const p0 = (1-l0)*L0 + l0*U0;
+      const CC = (1 - (p1 - p0))/D;
+      if (CC < worst) worst = CC;
+    }
+    return worst;
+  }
+
+  // Download helper
+  function downloadJSON(obj, fname="cc_certificate.json"){
+    const blob = new Blob([JSON.stringify(obj,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download=fname; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+
+  function App(){
+    // Defaults chosen to keep α-cap active and intervals non-degenerate
+    const DEFAULTS = {
+      // Unsafe (Y=1): rail TPRs, observed AND, sample size, κ inflation
+      ta: 0.72, tb: 0.64, phat1: 0.58, n1: 500, marginalHW_t: 0.01,
+      // Benign (Y=0): rail FPRs, observed OR, sample size, κ inflation
+      fa: 0.041, fb: 0.032, phat0: 0.047, n0: 500, marginalHW_f: 0.005,
+      // Protocol knobs
+      alpha: 0.05, delta: 0.05, D: 0.15,
+      stressBudget: 0.2, tStar: 0.10, lambdaHWGate: 0.30
+    };
+
+    const [cfg, setCfg] = useState(()=>{
+      const u = new URLSearchParams(location.search).get("s");
+      const dec = u? decodeState(u) : null;
+      return dec? {...DEFAULTS, ...dec} : DEFAULTS;
+    });
+
+    // Persist state to URL for shareability
+    useEffect(()=>{
+      const q = new URLSearchParams(location.search);
+      q.set("s", encodeState(cfg));
+      const url = location.pathname + "?" + q.toString();
+      history.replaceState(null,"",url);
+    }, [cfg]);
+
+    // Numeric setter with type/interval guards
+    function setNum(key, val){
+      let x = parseFloat(val);
+      if (!isFinite(x)) x = 0;
+      if (["ta","tb","fa","fb","alpha","phat1","phat0","delta","marginalHW_t","marginalHW_f","stressBudget","tStar","lambdaHWGate"].includes(key)){
+        x = clamp(x, 0, 1);
+      }
+      if (key === "D") x = clamp(x, 1e-9, 11); // allow >1 for D but keep sane upper bound
+      if (["n1","n0"].includes(key)) x = Math.max(0, Math.floor(x));
+      setCfg(prev=>({...prev,[key]:x}));
+    }
+    const resetDefaults = ()=> setCfg(DEFAULTS);
+
+    // Core computations (memoized)
+    const out = useMemo(()=>{
+      const {ta,tb,fa,fb,alpha,n1,n0,phat1,phat0,D,delta,marginalHW_t,marginalHW_f,stressBudget,tStar,lambdaHWGate} = cfg;
+
+      const sane =
+        ta>=0&&ta<=1 && tb>=0&&tb<=1 && fa>=0&&fa<=1 && fb>=0&&fb<=1 &&
+        alpha>0&&alpha<=0.5 && D>0 && delta>0&&delta<1 &&
+        n1>=0 && n0>=0 && phat1>=0&&phat1<=1 && phat0>=0&&phat0<=1;
+
+      // FH intervals and widths
+      const {L1,U1,L0,U0} = computeFH(ta,tb,fa,fb,alpha);
+      const W1 = U1 - L1, W0 = U0 - L0;
+
+      // Variance envelopes and Bernstein epsilons (two-sided δ split across classes)
+      const vbar1 = vbarFromInterval(L1,U1);
+      const vbar0 = vbarFromInterval(L0,U0);
+      const eps1 = invertBernstein(n1, vbar1, delta/2);
+      const eps0 = invertBernstein(n0, vbar0, delta/2);
+
+      // Difference-in-joints proxy for compositional consistency (scaled by D)
+      const CChat = (1 - (phat1 - phat0))/D;
+      const halfWidth = (eps1 + eps0)/D;
+
+      // Degeneracy heuristic: intervals too narrow relative to CI resolution
+      const deg1 = W1 < 3*eps1;
+      const deg0 = W0 < 3*eps0;
+
+      // λ coordinates (where the observed lies inside FH interval): p = (1-λ)U + λL
+      const lambda1 = (!deg1 && W1>0) ? (U1 - phat1)/W1 : NaN;
+      const lambda0 = (!deg0 && W0>0) ? (phat0 - L0)/W0 : NaN;
+
+      // g-coordinates (distance-from-lower normalized), a sanity double-check
+      const g1 = (!deg1 && W1>0) ? (phat1 - L1)/W1 : NaN;
+      const g0 = (!deg0 && W0>0) ? (phat0 - L0)/W0 : NaN;
+
+      // Which class dominates uncertainty (for targeting further sampling)
+      const epsShare1 = (eps1 + eps0)>0 ? eps1/(eps1+eps0) : 0.5;
+      const dominant = epsShare1>0.7 ? "Y=1 (Unsafe)" : (epsShare1<0.3 ? "Y=0 (Benign)" : "Mixed");
+
+      // λ-CI half-widths (with κ inflation for marginal rail estimation)
+      const lambda1_hw = lambdaHalfwidth(eps1, W1, marginalHW_t);
+      const lambda0_hw = lambdaHalfwidth(eps0, W0, marginalHW_f);
+      const maxLambdaHW = Math.max(lambda1_hw, lambda0_hw);
+
+      // Inner stress (local linearization): dCC/dλ ≈ W/D
+      const innerStress_l1 = (W1/D)*cfg.stressBudget;
+      const innerStress_l0 = (W0/D)*cfg.stressBudget;
+      const innerStress_max = Math.max(innerStress_l1, innerStress_l0);
+
+      // Outer stress (adversarial) by L∞ budget in λ-space
+      const worstCC = (isFinite(lambda1) && isFinite(lambda0))
+        ? adversarialStress(lambda1,lambda0,L1,U1,L0,U0,D,cfg.stressBudget)
+        : NaN;
+      const outerStress = isFinite(worstCC) ? Math.max(0, CChat - worstCC) : NaN;
+
+      // Gate checks
+      const alphaHeld = phat0 <= alpha;
+      const lambdaGateOK = maxLambdaHW <= cfg.lambdaHWGate;
+      const innerOK = innerStress_max <= cfg.tStar;
+      const outerOK = isFinite(outerStress) ? (outerStress <= cfg.tStar) : false;
+      const degenerateFlag = (deg1 || deg0);
+      const passGate = sane && alphaHeld && lambdaGateOK && innerOK && outerOK && !degenerateFlag;
+
+      return {
+        sane, L1,U1,L0,U0, W1,W0, vbar1,vbar0, eps1,eps0, CChat, halfWidth,
+        lambda1,lambda0, g1,g0, epsShare1, dominant,
+        lambda1_hw, lambda0_hw, maxLambdaHW,
+        innerStress_l1, innerStress_l0, innerStress_max,
+        outerStress, worstCC,
+        alphaHeld, lambdaGateOK, innerOK, outerOK, degenerateFlag, passGate
+      };
+    }, [cfg]);
+
+    // Export bundle (audit-ready)
+    function exportCert(){
+      const cert = {
+        version: "CC-ResearchOS-1.3",
+        chartMode: (window.__NO_CHARTS__? "chartless" : (Re && Re.default ? "recharts-umd" : "recharts-umd")),
+        inputs: {...cfg},
+        outputs: {
+          intervals: { L1:out.L1, U1:out.U1, L0:out.L0, U0:out.U0 },
+          widths: { W1:out.W1, W0:out.W0 },
+          variance_envelopes: { vbar1:out.vbar1, vbar0:out.vbar0 },
+          epsilons: { eps1:out.eps1, eps0:out.eps0 },
+          CC: { estimate: out.CChat, halfWidth: out.halfWidth },
+          lambdas: { lambda1:out.lambda1, lambda0:out.lambda0, g1:out.g1, g0:out.g0 },
+          lambda_halfwidths: { lambda1_hw: out.lambda1_hw, lambda0_hw: out.lambda0_hw, maxLambdaHW: out.maxLambdaHW },
+          inner_stress: { dCC_dlambda1: out.W1/cfg.D, dCC_dlambda0: out.W0/cfg.D, budget: cfg.stressBudget, maxDelta: out.innerStress_max },
+          outer_stress: { budget: cfg.stressBudget, worstCC: out.worstCC, delta: out.outerStress },
+          gates: {
+            alphaHeld: out.alphaHeld, lambdaGateOK: out.lambdaGateOK,
+            innerOK: out.innerOK, outerOK: out.outerOK, degenerate: out.degenerateFlag,
+            pass: out.passGate
+          },
+          assumption_box: {
+            alpha_cap: true, phat0_le_alpha: out.alphaHeld,
+            iid_mode: true, track: "P", oos_detector: "N/A"
+          }
+        },
+        timestamp: new Date().toISOString()
+      };
+      downloadJSON(cert);
+    }
+
+    function Num({label, k, step="0.001"}){
+      return R.createElement("div",null,
+        R.createElement("label",{htmlFor:k}, label),
+        R.createElement("input",{id:k, type:"number", step, value:cfg[k],
+          onChange:e=>setNum(k,e.target.value), "aria-label":label})
+      );
+    }
+
+    // ----------------------------- UI -----------------------------
+    const header = R.createElement("div",{className:"panel"},
+      R.createElement("div",{className:"hdr"},
+        R.createElement("div",null,
+          R.createElement("h1",null,"Compositional Safety Research OS (Track P)"),
+          R.createElement("div",{className:"note"},"FH intervals + exact Bernstein CIs @ α-cap; λ coordinates with κ-inflated CIs; adversarial L∞ stress.")
+        ),
+        R.createElement("div",{className:["pill", out.passGate?"pass":"block"].join(" "), role:"status","aria-live":"polite"},
+          out.passGate ? "GATE: PASS" : "GATE: SEQUENTIAL REQUIRED"
+        )
+      ),
+      !window.Recharts && !window.__NO_CHARTS__ ? null :
+      (window.__NO_CHARTS__
+        ? R.createElement("div",{className:"banner"},"Chartless mode: network blocked UMD chart libs. All math and export work; charts are hidden.")
+        : null),
+      R.createElement("div",{className:"gridline"}),
+      R.createElement("div",{className:"assump", role:"region","aria-label":"Assumptions"},
+        R.createElement("div",null, R.createElement("strong",null,"Assumptions:")),
+        R.createElement("div",null," "),
+        R.createElement("div",null, "α-cap enforced: ", out.alphaHeld? "yes":"no"),
+        R.createElement("div",null, "IID mode: yes"),
+        R.createElement("div",null, "Track: P (pristine, 2-rail rigor)"),
+        R.createElement("div",null, "OOS detector: not configured")
+      ),
+      R.createElement("div",{className:"toolbar", style:{marginTop:12}},
+        R.createElement("button",{onClick:exportCert, title:"Download JSON certificate"},"Export Certificate"),
+        R.createElement("button",{onClick:resetDefaults, title:"Reset to defaults"},"Reset"),
+        R.createElement("span",{className:"note"},"Sharable link kept in the URL (?s=...).")
+      )
+    );
+
+    const inputs = R.createElement("div",{className:"row cols-3", style:{marginTop:16}},
+      R.createElement("div",{className:"panel", role:"group","aria-label":"Unsafe inputs"},
+        R.createElement("h2",null,"Unsafe (Y=1)"),
+        Num({label:"t_a (Rail A TPR)", k:"ta"}), Num({label:"t_b (Rail B TPR)", k:"tb"}),
+        Num({label:"p̂₁ (Observed AND)", k:"phat1"}), Num({label:"n₁ (samples)", k:"n1", step:"1"}),
+        Num({label:"κ₁ (marginal half-width for t’s)", k:"marginalHW_t"})
+      ),
+      R.createElement("div",{className:"panel", role:"group","aria-label":"Benign inputs"},
+        R.createElement("h2",null,"Benign (Y=0)"),
+        Num({label:"f_a (Rail A FPR)", k:"fa"}), Num({label:"f_b (Rail B FPR)", k:"fb"}),
+        Num({label:"p̂₀ (Observed OR)", k:"phat0", step:"0.0005"}), Num({label:"n₀ (samples)", k:"n0", step:"1"}),
+        Num({label:"κ₀ (marginal half-width for f’s)", k:"marginalHW_f", step:"0.0005"})
+      ),
+      R.createElement("div",{className:"panel", role:"group","aria-label":"Protocol parameters"},
+        R.createElement("h2",null,"Protocol"),
+        Num({label:"α (FPR cap)", k:"alpha"}), Num({label:"δ (two-sided total)", k:"delta", step:"0.01"}),
+        Num({label:"D (denominator)", k:"D", step:"0.01"}),
+        Num({label:"Stress budget (L∞ radius in λ-space)", k:"stressBudget", step:"0.01"}),
+        Num({label:"t* (stress threshold)", k:"tStar", step:"0.01"}),
+        Num({label:"λ half-width gate", k:"lambdaHWGate", step:"0.01"})
+      )
+    );
+
+    const kpis = R.createElement("div",{className:"row cols-4", style:{marginTop:16}},
+      R.createElement("div",{className:"kpi"},
+        R.createElement("div",{className:"t"},"CC estimate"),
+        R.createElement("div",{className:"v"}, round(out.CChat,3)),
+        R.createElement("div",{className:"s"},"±" + round(out.halfWidth,3))
+      ),
+      R.createElement("div",{className:"kpi"},
+        R.createElement("div",{className:"t"},"λ₁ (Unsafe)"),
+        R.createElement("div",{className:"v"}, isFinite(out.lambda1)? round(out.lambda1,3): "N/A"),
+        R.createElement("div",{className:"s"}, (out.W1<=0? "degenerate interval" : "width W₁="+round(out.W1,3)) )
+      ),
+      R.createElement("div",{className:"kpi"},
+        R.createElement("div",{className:"t"},"λ₀ (Benign)"),
+        R.createElement("div",{className:"v"}, isFinite(out.lambda0)? round(out.lambda0,3): "N/A"),
+        R.createElement("div",{className:"s"},"max λ half-width="+round(out.maxLambdaHW,3))
+      ),
+      R.createElement("div",{className:"kpi"},
+        R.createElement("div",{className:"t"},"Variance dominance"),
+        R.createElement("div",{className:"v"}, out.dominant),
+        R.createElement("div",{className:"s"},"ε₁ share="+ round(100*out.epsShare1,1) + "%")
+      )
+    );
+
+    // -------- Charts (wrapped to tolerate chartless mode) --------
+    function ChartsBlock(){
+      if (window.__NO_CHARTS__) {
+        return R.createElement("div",null,
+          R.createElement("div",{className:"panel"},
+            R.createElement("h2",null,"Charts unavailable"),
+            R.createElement("div",{className:"note"},"The environment blocked UMD chart libraries. Numeric outputs and export remain valid.")
+          )
+        );
+      }
+      const {
+        ResponsiveContainer, LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
+        XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine
+      } = Re;
+
+      // Data builders
+      const fhBars = [
+        { name:'I₁ (Unsafe, AND)', L: out.L1, U: out.U1, obs: cfg.phat1 },
+        { name:'I₀ (Benign, OR)',  L: out.L0, U: out.U0, obs: cfg.phat0 },
+      ];
+      const envBars = [
+        { name:'Unsafe (Y=1)', vbar: out.vbar1, eps: out.eps1, share: out.epsShare1 },
+        { name:'Benign (Y=0)', vbar: out.vbar0, eps: out.eps0, share: 1-out.epsShare1 },
+      ];
+      const stressL1 = (()=>{ const arr=[];
+        for (let l1=0; l1<=1.00001; l1+=0.05){
+          const p1 = (1-l1)*out.U1 + l1*out.L1;
+          const p0 = (isFinite(out.lambda0)? (1-out.lambda0)*out.L0 + out.lambda0*out.U0 : cfg.phat0);
+          const CC = (1-(p1-p0))/cfg.D;
+          arr.push({x:l1, CC});
+        } return arr; })();
+      const stressL0 = (()=>{ const arr=[];
+        for (let l0=0; l0<=1.00001; l0+=0.05){
+          const p1 = (isFinite(out.lambda1)? (1-out.lambda1)*out.U1 + out.lambda1*out.L1 : cfg.phat1);
+          const p0 = (1-l0)*out.L0 + l0*out.U0;
+          const CC = (1-(p1-p0))/cfg.D;
+          arr.push({x:l0, CC});
+        } return arr; })();
+      const depPoints = (()=>{ const pts=[];
+        for(let l1=0; l1<=1.00001; l1+=0.1){
+          for(let l0=0; l0<=1.00001; l0+=0.1){
+            const p1 = (1-l1)*out.U1 + l1*out.L1;
+            const p0 = (1-l0)*out.L0 + l0*out.U0;
+            const CC = (1-(p1-p0))/cfg.D;
+            const isObs = (isFinite(out.lambda1)&&isFinite(out.lambda0) &&
+              Math.abs(l1-out.lambda1)<0.075 && Math.abs(l0-out.lambda0)<0.075);
+            pts.push({l1, l0, CC, isObs});
+          }
+        } return pts; })();
+
+      return R.createElement(R.Fragment,null,
+        R.createElement("div",{className:"row cols-2", style:{marginTop:16}},
+          R.createElement("div",{className:"panel"},
+            R.createElement("h2",null,"Fréchet–Hoeffding Intervals"),
+            R.createElement("div",{style:{width:"100%", height:260}},
+              R.createElement(ResponsiveContainer,{width:"100%", height:"100%"},
+                R.createElement(BarChart,{data:fhBars},
+                  R.createElement(CartesianGrid,{stroke:"#2a3752", strokeDasharray:"3 3"}),
+                  R.createElement(XAxis,{dataKey:"name", stroke:"#8fa3c7"}),
+                  R.createElement(YAxis,{stroke:"#8fa3c7", domain:[0,1]}),
+                  R.createElement(Tooltip,{contentStyle:{background:"#0f1728", border:"1px solid #274a7a", color:"#cfe3ff"}}),
+                  R.createElement(Legend,null),
+                  R.createElement(Bar,{dataKey:"L", name:"Lower (L)"}),
+                  R.createElement(Bar,{dataKey:"U", name:"Upper (U)"})
+                )
+              )
+            ),
+            R.createElement("div",{className:"note"},"W₁=",round(out.W1,3)," | W₀=",round(out.W0,3))
+          ),
+          R.createElement("div",{className:"panel"},
+            R.createElement("h2",null,"Variance Envelopes & Classwise Widths"),
+            R.createElement("div",{style:{width:"100%", height:260}},
+              R.createElement(ResponsiveContainer,{width:"100%", height:"100%"},
+                R.createElement(BarChart,{data:envBars},
+                  R.createElement(CartesianGrid,{stroke:"#2a3752", strokeDasharray:"3 3"}),
+                  R.createElement(XAxis,{dataKey:"name", stroke:"#8fa3c7"}),
+                  R.createElement(YAxis,{stroke:"#8fa3c7"}),
+                  R.createElement(Tooltip,{contentStyle:{background:"#0f1728", border:"1px solid #274a7a", color:"#cfe3ff"}}),
+                  R.createElement(Legend,null),
+                  R.createElement(Bar,{dataKey:"vbar", name:"v̄ (envelope)"}),
+                  R.createElement(Bar,{dataKey:"eps", name:"ε (Bernstein)"})
+                )
+              )
+            ),
+            R.createElement("div",{className:"note"},"v̄₁=",round(out.vbar1,4)," | v̄₀=",round(out.vbar0,4))
+          )
+        ),
+        R.createElement("div",{className:"row cols-2", style:{marginTop:16}},
+          R.createElement("div",{className:"panel"},
+            R.createElement("h2",null,"Dependence Stress (Dual Lines)"),
+            R.createElement("div",{style:{width:"100%", height:260}},
+              R.createElement(ResponsiveContainer,{width:"100%", height:"100%"},
+                R.createElement(LineChart,{data:stressL1},
+                  R.createElement(CartesianGrid,{stroke:"#2a3752", strokeDasharray:"3 3"}),
+                  R.createElement(XAxis,{dataKey:"x", stroke:"#8fa3c7", label:{value:"λ", position:"bottom", fill:"#8fa3c7"}}),
+                  R.createElement(YAxis,{stroke:"#8fa3c7", label:{value:"CC", angle:-90, position:"left", fill:"#8fa3c7"}}),
+                  R.createElement(Tooltip,{contentStyle:{background:"#0f1728", border:"1px solid #274a7a", color:"#cfe3ff"}}),
+                  R.createElement(Line,{type:"monotone", dataKey:"CC", strokeWidth:2, dot:{r:1.5}, name:"vary λ₁ (λ₀ fixed)"}),
+                  R.createElement(Line,{type:"monotone", data:stressL0, dataKey:"CC", strokeWidth:2, dot:{r:1.5}, name:"vary λ₀ (λ₁ fixed)"}),
+                  R.createElement(ReferenceLine,{y: out.CChat, strokeDasharray:"5 4", label:{value:"Observed CC"}})
+                )
+              )
+            ),
+            R.createElement("div",{className:"note"},
+              "Inner stress Δ (budget=",cfg.stressBudget,"): ",
+              "max(", round(out.innerStress_l1,3), ", ", round(out.innerStress_l0,3), ") = ",
+              round(out.innerStress_max,3),
+              " | Outer (adversarial) Δ = ",
+              isFinite(out.outerStress)? round(out.outerStress,3): "N/A"
+            )
+          ),
+          R.createElement("div",{className:"panel"},
+            R.createElement("h2",null,"Dependence Coordinate Space (λ₁, λ₀)"),
+            R.createElement("div",{style:{width:"100%", height:260}},
+              R.createElement(ResponsiveContainer,{width:"100%", height:"100%"},
+                R.createElement(ScatterChart,null,
+                  R.createElement(CartesianGrid,{stroke:"#2a3752", strokeDasharray:"3 3"}),
+                  R.createElement(XAxis,{type:"number", dataKey:"l1", domain:[0,1], stroke:"#8fa3c7", label:{value:"λ₁ (unsafe)", position:"bottom", fill:"#8fa3c7"}}),
+                  R.createElement(YAxis,{type:"number", dataKey:"l0", domain:[0,1], stroke:"#8fa3c7", label:{value:"λ₀ (benign)", angle:-90, position:"left", fill:"#8fa3c7"}}),
+                  R.createElement(Tooltip,{contentStyle:{background:"#0f1728", border:"1px solid #274a7a", color:"#cfe3ff"}}),
+                  R.createElement(Scatter,{data:(()=>{ // custom circle highlighting observed
+                    return depPoints.map(p=>({ ...p,
+                      markerProps: { r: p.isObs? 5:3, fill: p.isObs? "#ffb547":"#4da3ff", fillOpacity: p.isObs? 1:.35 }
+                    }))
+                  })(), shape:(props)=>{
+                    const {cx, cy, payload} = props;
+                    const m = payload.markerProps || {};
+                    return R.createElement("circle",{cx, cy, r:m.r||3, fill:m.fill||"#4da3ff", fillOpacity:m.fillOpacity||.35, stroke:"none"});
+                  }})
+                )
+              )
+            ),
+            R.createElement("div",{className:"note"},"Orange ≈ observed; Blue = FH-feasible region")
+          )
+        )
+      );
+    }
+
+    const gates = R.createElement("div",{className:"panel", style:{marginTop:16}},
+      R.createElement("h2",null,"Gate Decision & Next Actions"),
+      R.createElement("div",{className:"row cols-2"},
+        R.createElement("div",null,
+          R.createElement("div",{className:"note"},
+            (out.lambdaGateOK? "✓":"✗"), " λ joint half-width ≤ ", cfg.lambdaHWGate, " → ",
+            round(out.maxLambdaHW,3), " ", (out.lambdaGateOK? "(ok)":"(too wide)")
+          ),
+          R.createElement("div",{className:"note"},
+            (out.innerOK? "✓":"✗"), " Inner stress ≤ t* (",cfg.tStar,") → ", round(out.innerStress_max,3)
+          ),
+          R.createElement("div",{className:"note"},
+            (out.outerOK? "✓":"✗"), " Outer stress ≤ t* (",cfg.tStar,") → ",
+            isFinite(out.outerStress)? round(out.outerStress,3) : "N/A"
+          ),
+          R.createElement("div",{className:"note"},
+            (out.alphaHeld? "✓":"✗"), " α-cap held: p̂₀=", round(cfg.phat0,3), " ≤ α=", cfg.alpha
+          ),
+          R.createElement("div",{className:"note"},
+            (out.degenerateFlag? "✗":"✓"), " Degenerate FH interval(s): ",
+            out.degenerateFlag? "yes — one-sided reporting; sequential required":"no"
+          )
+        ),
+        R.createElement("div",null,
+          out.passGate
+            ? R.createElement("div",{className:"ok"},"✓ PASS: qualifies for next-stage transfer tests. Keep stress budget = ",cfg.stressBudget,"; sample where ε-share dominates: ", out.dominant,".")
+            : R.createElement("div",{className:"warn"},
+                "⚠ SEQUENTIAL REQUIRED: tighten λ-CIs and re-check drift. ",
+                "Increase n until max λ half-width ≤ ",cfg.lambdaHWGate,". ",
+                "Suggested n₁ ≳ ", Math.max(cfg.n1, Math.ceil(cfg.n1*(1 + (out.maxLambdaHW||0)))),
+                ", n₀ ≳ ", Math.max(cfg.n0, Math.ceil(cfg.n0*(1 + (out.maxLambdaHW||0)))),
+                "."
+              )
+        )
+      )
+    );
+
+    // Mount
+    const app = R.createElement("div",{className:"wrap"},
+      header, inputs, kpis, R.createElement(ChartsBlock,null), gates,
+      R.createElement("div",{className:"foot"},
+        "Research OS v1.3 | FH→Bernstein @ α-cap | Adversarial dependence ball | κ-inflated λ-CIs | Robust chart fallbacks"
+      )
+    );
+
+    try{
+      const root = RD.createRoot(document.getElementById('root'));
+      root.render(app);
+    }catch(err){
+      const root = document.getElementById('root');
+      root.innerHTML = '<div class="center"><div class="error"><strong>Render error:</strong> '+String(err)+'</div></div>';
+      console.error(err);
+    }
+  }
+
+  // End App
+}
+</script>
+</body>
+</html>

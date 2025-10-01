@@ -1,0 +1,12 @@
+{
+  "name": "toy_threshold",
+  "threshold": 0.13392857142857142,
+  "fpr": 0.04,
+  "n_texts": 200,
+  "alpha_cap": 0.05,
+  "target_window": [
+    0.04,
+    0.06
+  ],
+  "timestamp": "2025-09-29T09:54:21.771220Z"
+}
