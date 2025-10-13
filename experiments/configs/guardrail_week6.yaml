@@ -1,0 +1,17 @@
+alpha_cap: 0.05
+fpr_window:
+- 0.04
+- 0.06
+seed: 2025
+rails:
+- keyword
+policy_label: week6_keyword
+thresholds:
+  keyword: 0.32879498763175924
+paths:
+  world0: data/world0.csv
+  world1: data/world1.csv
+outputs:
+  dir: figs_week6
+  memo_path: memos/week6_memo.md
+  audit_log: runs/audit_week6.jsonl
