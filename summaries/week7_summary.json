@@ -1,0 +1,2241 @@
+{
+  "ci_table": [
+    {
+      "bca_delta_width": 0.07507363028542884,
+      "bca_j_width": 0.07328317579989219,
+      "delta_j": -0.22666666666666666,
+      "fpr": 0.0,
+      "j": 0.6950000000000001,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.50,semantic=0.70",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.5,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "tpr": 0.6950000000000001,
+      "wilson_world0_width": 0.006361701013700707,
+      "wilson_world1_width": 0.07330545041992109
+    },
+    {
+      "bca_delta_width": 0.07599032199953575,
+      "bca_j_width": 0.07691931053283516,
+      "delta_j": -0.2373333333333333,
+      "fpr": 0.0,
+      "j": 0.6023333333333334,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.50,semantic=0.80",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.5,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "tpr": 0.6023333333333334,
+      "wilson_world0_width": 0.006361701013700707,
+      "wilson_world1_width": 0.07801890316275432
+    },
+    {
+      "bca_delta_width": 0.07686296206163967,
+      "bca_j_width": 0.0782833543165079,
+      "delta_j": -0.29133333333333333,
+      "fpr": 0.0,
+      "j": 0.6206666666666667,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.60,semantic=0.70",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "tpr": 0.6206666666666667,
+      "wilson_world0_width": 0.006361701013700707,
+      "wilson_world1_width": 0.07736726436018251
+    },
+    {
+      "bca_delta_width": 0.07756214841814156,
+      "bca_j_width": 0.0790305705278091,
+      "delta_j": -0.30933333333333335,
+      "fpr": 0.0003333333333333334,
+      "j": 0.5253333333333333,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.60,semantic=0.80",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "tpr": 0.5256666666666666,
+      "wilson_world0_width": 0.006906419266018414,
+      "wilson_world1_width": 0.07963428985852962
+    },
+    {
+      "bca_delta_width": 0.07717268686033033,
+      "bca_j_width": 0.07693948320926022,
+      "delta_j": -0.30266666666666664,
+      "fpr": 0.0,
+      "j": 0.6093333333333333,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.50,semantic=0.70",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.5,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "tpr": 0.6093333333333333,
+      "wilson_world0_width": 0.006361701013700707,
+      "wilson_world1_width": 0.07775725872435135
+    },
+    {
+      "bca_delta_width": 0.07705626131161405,
+      "bca_j_width": 0.0794737589864753,
+      "delta_j": -0.28600000000000003,
+      "fpr": 0.0003333333333333334,
+      "j": 0.5163333333333332,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.50,semantic=0.80",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.5,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "tpr": 0.5166666666666666,
+      "wilson_world0_width": 0.006906419266018414,
+      "wilson_world1_width": 0.07966452970260994
+    },
+    {
+      "bca_delta_width": 0.07889608519431435,
+      "bca_j_width": 0.08008341945985133,
+      "delta_j": -0.384,
+      "fpr": 0.0,
+      "j": 0.5303333333333333,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.60,semantic=0.70",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "tpr": 0.5303333333333333,
+      "wilson_world0_width": 0.006361701013700707,
+      "wilson_world1_width": 0.0796066081918126
+    },
+    {
+      "bca_delta_width": 0.08033333333333333,
+      "bca_j_width": 0.07766666666666669,
+      "delta_j": -0.30633333333333324,
+      "fpr": 0.0,
+      "j": 0.4793333333333334,
+      "label": "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.60,semantic=0.80",
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "tpr": 0.4793333333333334,
+      "wilson_world0_width": 0.006361701013700707,
+      "wilson_world1_width": 0.07966732060514706
+    },
+    {
+      "bca_delta_width": 0.04500081224326684,
+      "bca_j_width": 0.045727246658566735,
+      "delta_j": 0.08099999999999999,
+      "fpr": 0.06266666666666668,
+      "j": 0.9143333333333334,
+      "label": "serial_or:keyword+regex@keyword=0.60,regex=0.50",
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.5
+      },
+      "topology": "serial_or",
+      "tpr": 0.977,
+      "wilson_world0_width": 0.03902488422980486,
+      "wilson_world1_width": 0.02465137433321929
+    },
+    {
+      "bca_delta_width": 0.04757624647605909,
+      "bca_j_width": 0.04765028958423665,
+      "delta_j": 0.07099999999999995,
+      "fpr": 0.05566666666666666,
+      "j": 0.9076666666666666,
+      "label": "serial_or:keyword+regex@keyword=0.60,regex=0.60",
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.6
+      },
+      "topology": "serial_or",
+      "tpr": 0.9633333333333333,
+      "wilson_world0_width": 0.0369121076450779,
+      "wilson_world1_width": 0.030494915610330686
+    },
+    {
+      "bca_delta_width": 0.04814594328000876,
+      "bca_j_width": 0.04740623849256655,
+      "delta_j": 0.11833333333333337,
+      "fpr": 0.053666666666666675,
+      "j": 0.9016666666666667,
+      "label": "serial_or:keyword+regex@keyword=0.70,regex=0.50",
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.5
+      },
+      "topology": "serial_or",
+      "tpr": 0.9553333333333333,
+      "wilson_world0_width": 0.03625340939042074,
+      "wilson_world1_width": 0.03342924638193181
+    },
+    {
+      "bca_delta_width": 0.051119159236876356,
+      "bca_j_width": 0.04915086490726624,
+      "delta_j": 0.13133333333333336,
+      "fpr": 0.053000000000000005,
+      "j": 0.898,
+      "label": "serial_or:keyword+regex@keyword=0.70,regex=0.60",
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.6
+      },
+      "topology": "serial_or",
+      "tpr": 0.951,
+      "wilson_world0_width": 0.03599542638648726,
+      "wilson_world1_width": 0.03487519952204874
+    },
+    {
+      "bca_delta_width": 0.040435076783755,
+      "bca_j_width": 0.03993636119823998,
+      "delta_j": 0.024999999999999932,
+      "fpr": 0.05366666666666666,
+      "j": 0.9389999999999998,
+      "label": "serial_or:keyword+semantic@keyword=0.60,semantic=0.70",
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "tpr": 0.9926666666666666,
+      "wilson_world0_width": 0.03635900242240175,
+      "wilson_world1_width": 0.014915700225357353
+    },
+    {
+      "bca_delta_width": 0.04399999999999997,
+      "bca_j_width": 0.04402129601360556,
+      "delta_j": 0.07666666666666669,
+      "fpr": 0.057666666666666665,
+      "j": 0.9200000000000002,
+      "label": "serial_or:keyword+semantic@keyword=0.60,semantic=0.80",
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "tpr": 0.9776666666666667,
+      "wilson_world0_width": 0.03748882039455113,
+      "wilson_world1_width": 0.024175131695901308
+    },
+    {
+      "bca_delta_width": 0.04306219768705901,
+      "bca_j_width": 0.04089291141232236,
+      "delta_j": 0.03233333333333328,
+      "fpr": 0.05433333333333333,
+      "j": 0.9279999999999999,
+      "label": "serial_or:keyword+semantic@keyword=0.70,semantic=0.70",
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "tpr": 0.9823333333333333,
+      "wilson_world0_width": 0.03638671740507805,
+      "wilson_world1_width": 0.02177250172441907
+    },
+    {
+      "bca_delta_width": 0.04646689989084411,
+      "bca_j_width": 0.04700035632727895,
+      "delta_j": 0.119,
+      "fpr": 0.04433333333333333,
+      "j": 0.9099999999999999,
+      "label": "serial_or:keyword+semantic@keyword=0.70,semantic=0.80",
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "tpr": 0.9543333333333333,
+      "wilson_world0_width": 0.03310332215172769,
+      "wilson_world1_width": 0.03369142644660576
+    },
+    {
+      "bca_delta_width": 0.04233333333333331,
+      "bca_j_width": 0.04323491597186815,
+      "delta_j": 0.019999999999999973,
+      "fpr": 0.063,
+      "j": 0.923,
+      "label": "serial_or:regex+semantic@regex=0.50,semantic=0.70",
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.5,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "tpr": 0.986,
+      "wilson_world0_width": 0.03910760745726324,
+      "wilson_world1_width": 0.019705867174118596
+    },
+    {
+      "bca_delta_width": 0.043676236722704466,
+      "bca_j_width": 0.04389947673413199,
+      "delta_j": 0.097,
+      "fpr": 0.05166666666666666,
+      "j": 0.9213333333333333,
+      "label": "serial_or:regex+semantic@regex=0.50,semantic=0.80",
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.5,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "tpr": 0.9730000000000001,
+      "wilson_world0_width": 0.03575608243617999,
+      "wilson_world1_width": 0.026279404910478022
+    },
+    {
+      "bca_delta_width": 0.03973821317238011,
+      "bca_j_width": 0.040064935625059125,
+      "delta_j": 0.01966666666666663,
+      "fpr": 0.054000000000000006,
+      "j": 0.9336666666666666,
+      "label": "serial_or:regex+semantic@regex=0.60,semantic=0.70",
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "tpr": 0.9876666666666667,
+      "wilson_world0_width": 0.036475167379049225,
+      "wilson_world1_width": 0.01826061221494917
+    },
+    {
+      "bca_delta_width": 0.04776238201092302,
+      "bca_j_width": 0.047742121338834265,
+      "delta_j": 0.10633333333333335,
+      "fpr": 0.057999999999999996,
+      "j": 0.9006666666666667,
+      "label": "serial_or:regex+semantic@regex=0.60,semantic=0.80",
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "tpr": 0.9586666666666666,
+      "wilson_world0_width": 0.03747082304563144,
+      "wilson_world1_width": 0.03216040314800175
+    }
+  ],
+  "episodes_per_config": 600,
+  "fh_containment_rate": 1.0,
+  "fpr_window": [
+    0.04,
+    0.06
+  ],
+  "fpr_window_rate": 0.76,
+  "groups": {
+    "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.50,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.07507363028542884,
+        "std": 0.0037367098337411295
+      },
+      "bca_j_width": {
+        "mean": 0.07328317579989219,
+        "std": 0.001183836044261805
+      },
+      "cc_l": {
+        "mean": 0.005577429459603312,
+        "std": 0.00951009339969981
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.22666666666666666,
+        "std": 0.02211083193570265
+      },
+      "empirical_fpr": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "empirical_j": {
+        "mean": 0.6950000000000001,
+        "std": 0.03320809807528547
+      },
+      "empirical_tpr": {
+        "mean": 0.6950000000000001,
+        "std": 0.03320809807528547
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.022333333333333334,
+        "std": 0.003027650354097492
+      },
+      "fh_j_lower": {
+        "mean": 0.6323333333333333,
+        "std": 0.048024877812326436
+      },
+      "fh_j_upper": {
+        "mean": 0.8293333333333333,
+        "std": 0.02299154433941119
+      },
+      "fh_tpr_lower": {
+        "mean": 0.6546666666666667,
+        "std": 0.04644889664997436
+      },
+      "fh_tpr_upper": {
+        "mean": 0.8293333333333333,
+        "std": 0.02299154433941119
+      },
+      "independence_fpr": {
+        "mean": 2.278425925925926e-05,
+        "std": 6.971444118206677e-06
+      },
+      "independence_j": {
+        "mean": 0.6899010787037037,
+        "std": 0.03714596911360229
+      },
+      "independence_tpr": {
+        "mean": 0.6899238629629629,
+        "std": 0.03713938412448924
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.5,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006361701013700707,
+        "std": 0.0
+      },
+      "wilson_world1_width": {
+        "mean": 0.07330545041992109,
+        "std": 0.0023037974921218908
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.50,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.07599032199953575,
+        "std": 0.0014989614877800664
+      },
+      "bca_j_width": {
+        "mean": 0.07691931053283516,
+        "std": 0.0017094243873722402
+      },
+      "cc_l": {
+        "mean": 0.0022108711461871025,
+        "std": 0.006136827178675011
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.2373333333333333,
+        "std": 0.010710846008706388
+      },
+      "empirical_fpr": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "empirical_j": {
+        "mean": 0.6023333333333334,
+        "std": 0.021685888909098894
+      },
+      "empirical_tpr": {
+        "mean": 0.6023333333333334,
+        "std": 0.021685888909098894
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.024,
+        "std": 0.002527625148017184
+      },
+      "fh_j_lower": {
+        "mean": 0.5073333333333334,
+        "std": 0.031459850956770584
+      },
+      "fh_j_upper": {
+        "mean": 0.825,
+        "std": 0.006346477588219902
+      },
+      "fh_tpr_lower": {
+        "mean": 0.5313333333333333,
+        "std": 0.029448637018072998
+      },
+      "fh_tpr_upper": {
+        "mean": 0.825,
+        "std": 0.006346477588219902
+      },
+      "independence_fpr": {
+        "mean": 2.405277777777778e-05,
+        "std": 4.668964381429967e-06
+      },
+      "independence_j": {
+        "mean": 0.6004819601851852,
+        "std": 0.02081100819096827
+      },
+      "independence_tpr": {
+        "mean": 0.600506012962963,
+        "std": 0.020811136064958016
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.5,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006361701013700707,
+        "std": 0.0
+      },
+      "wilson_world1_width": {
+        "mean": 0.07801890316275432,
+        "std": 0.0007521073107136379
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.60,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.07686296206163967,
+        "std": 0.003564429511438964
+      },
+      "bca_j_width": {
+        "mean": 0.0782833543165079,
+        "std": 0.004254325163284754
+      },
+      "cc_l": {
+        "mean": 7.92740618513893e-08,
+        "std": 0.005825339140947303
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.29133333333333333,
+        "std": 0.02292499848539917
+      },
+      "empirical_fpr": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "empirical_j": {
+        "mean": 0.6206666666666667,
+        "std": 0.019134030184754902
+      },
+      "empirical_tpr": {
+        "mean": 0.6206666666666667,
+        "std": 0.019134030184754902
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.024,
+        "std": 0.002527625148017184
+      },
+      "fh_j_lower": {
+        "mean": 0.5439999999999999,
+        "std": 0.03058685265854522
+      },
+      "fh_j_upper": {
+        "mean": 0.7649999999999999,
+        "std": 0.012247448713915856
+      },
+      "fh_tpr_lower": {
+        "mean": 0.568,
+        "std": 0.0289251908665555
+      },
+      "fh_tpr_upper": {
+        "mean": 0.7649999999999999,
+        "std": 0.012247448713915856
+      },
+      "independence_fpr": {
+        "mean": 2.4319444444444445e-05,
+        "std": 4.5101907928217745e-06
+      },
+      "independence_j": {
+        "mean": 0.6206424527777779,
+        "std": 0.021889957473986168
+      },
+      "independence_tpr": {
+        "mean": 0.6206667722222222,
+        "std": 0.021891428029550557
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006361701013700707,
+        "std": 0.0
+      },
+      "wilson_world1_width": {
+        "mean": 0.07736726436018251,
+        "std": 0.000743376997444875
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.60,regex=0.60,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.07756214841814156,
+        "std": 0.004405731780866457
+      },
+      "bca_j_width": {
+        "mean": 0.0790305705278091,
+        "std": 0.0030514061024354633
+      },
+      "cc_l": {
+        "mean": -0.0010442672958203719,
+        "std": 0.012968441003206885
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.30933333333333335,
+        "std": 0.015027752105133138
+      },
+      "empirical_fpr": {
+        "mean": 0.0003333333333333334,
+        "std": 0.00074535599249993
+      },
+      "empirical_j": {
+        "mean": 0.5253333333333333,
+        "std": 0.012605113600792653
+      },
+      "empirical_tpr": {
+        "mean": 0.5256666666666666,
+        "std": 0.01299572579307859
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.025333333333333336,
+        "std": 0.0036132472314464657
+      },
+      "fh_j_lower": {
+        "mean": 0.40266666666666673,
+        "std": 0.014935044544813283
+      },
+      "fh_j_upper": {
+        "mean": 0.7333333333333333,
+        "std": 0.010206207261596557
+      },
+      "fh_tpr_lower": {
+        "mean": 0.42799999999999994,
+        "std": 0.015828946760778395
+      },
+      "fh_tpr_upper": {
+        "mean": 0.7333333333333333,
+        "std": 0.010206207261596557
+      },
+      "independence_fpr": {
+        "mean": 2.5546296296296298e-05,
+        "std": 9.537522461576457e-06
+      },
+      "independence_j": {
+        "mean": 0.5261856537037037,
+        "std": 0.009721283274010357
+      },
+      "independence_tpr": {
+        "mean": 0.5262111999999999,
+        "std": 0.009720501308383362
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006906419266018414,
+        "std": 0.0012180270407672756
+      },
+      "wilson_world1_width": {
+        "mean": 0.07963428985852962,
+        "std": 9.667019901255433e-05
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.50,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.07717268686033033,
+        "std": 0.002917010786575843
+      },
+      "bca_j_width": {
+        "mean": 0.07693948320926022,
+        "std": 0.006248843907648166
+      },
+      "cc_l": {
+        "mean": 0.0030901440009083268,
+        "std": 0.005085693337219841
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.30266666666666664,
+        "std": 0.02795333412830905
+      },
+      "empirical_fpr": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "empirical_j": {
+        "mean": 0.6093333333333333,
+        "std": 0.02507211820152242
+      },
+      "empirical_tpr": {
+        "mean": 0.6093333333333333,
+        "std": 0.02507211820152242
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.023,
+        "std": 0.0024720661623652217
+      },
+      "fh_j_lower": {
+        "mean": 0.5246666666666666,
+        "std": 0.03646535646640829
+      },
+      "fh_j_upper": {
+        "mean": 0.7703333333333333,
+        "std": 0.02514955267991859
+      },
+      "fh_tpr_lower": {
+        "mean": 0.5476666666666666,
+        "std": 0.03633562683892738
+      },
+      "fh_tpr_upper": {
+        "mean": 0.7703333333333333,
+        "std": 0.02514955267991859
+      },
+      "independence_fpr": {
+        "mean": 2.1550925925925927e-05,
+        "std": 5.691522888000755e-06
+      },
+      "independence_j": {
+        "mean": 0.606499225925926,
+        "std": 0.027682424422900743
+      },
+      "independence_tpr": {
+        "mean": 0.6065207768518519,
+        "std": 0.027686652535178435
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.5,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006361701013700707,
+        "std": 0.0
+      },
+      "wilson_world1_width": {
+        "mean": 0.07775725872435135,
+        "std": 0.0008245608731488826
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.50,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.07705626131161405,
+        "std": 0.0034867763694530385
+      },
+      "bca_j_width": {
+        "mean": 0.0794737589864753,
+        "std": 0.001911724589455011
+      },
+      "cc_l": {
+        "mean": -0.005012359257555977,
+        "std": 0.00994297449722211
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.28600000000000003,
+        "std": 0.021557416872673384
+      },
+      "empirical_fpr": {
+        "mean": 0.0003333333333333334,
+        "std": 0.00074535599249993
+      },
+      "empirical_j": {
+        "mean": 0.5163333333333332,
+        "std": 0.019699125756123172
+      },
+      "empirical_tpr": {
+        "mean": 0.5166666666666666,
+        "std": 0.020172864061517012
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.023666666666666666,
+        "std": 0.0038005847503304593
+      },
+      "fh_j_lower": {
+        "mean": 0.39033333333333325,
+        "std": 0.029706901555025884
+      },
+      "fh_j_upper": {
+        "mean": 0.7753333333333334,
+        "std": 0.022342038104583604
+      },
+      "fh_tpr_lower": {
+        "mean": 0.414,
+        "std": 0.03213686011074786
+      },
+      "fh_tpr_upper": {
+        "mean": 0.7753333333333334,
+        "std": 0.022342038104583604
+      },
+      "independence_fpr": {
+        "mean": 2.2707407407407413e-05,
+        "std": 9.011408711652688e-06
+      },
+      "independence_j": {
+        "mean": 0.5203406898148148,
+        "std": 0.02129887394821306
+      },
+      "independence_tpr": {
+        "mean": 0.5203633972222221,
+        "std": 0.02130184984147652
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.5,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006906419266018414,
+        "std": 0.0012180270407672756
+      },
+      "wilson_world1_width": {
+        "mean": 0.07966452970260994,
+        "std": 0.00010299539823441053
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.60,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.07889608519431435,
+        "std": 0.0016747336434944145
+      },
+      "bca_j_width": {
+        "mean": 0.08008341945985133,
+        "std": 0.0021455439027376058
+      },
+      "cc_l": {
+        "mean": -0.0020746181453636,
+        "std": 0.013066311686480224
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.384,
+        "std": 0.011030261405182875
+      },
+      "empirical_fpr": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "empirical_j": {
+        "mean": 0.5303333333333333,
+        "std": 0.007763876465901425
+      },
+      "empirical_tpr": {
+        "mean": 0.5303333333333333,
+        "std": 0.007763876465901425
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.02266666666666667,
+        "std": 0.004503085362035432
+      },
+      "fh_j_lower": {
+        "mean": 0.42433333333333334,
+        "std": 0.019170289512680815
+      },
+      "fh_j_upper": {
+        "mean": 0.732,
+        "std": 0.010096754153907284
+      },
+      "fh_tpr_lower": {
+        "mean": 0.44699999999999995,
+        "std": 0.019979155804654678
+      },
+      "fh_tpr_upper": {
+        "mean": 0.732,
+        "std": 0.010096754153907284
+      },
+      "independence_fpr": {
+        "mean": 2.305185185185185e-05,
+        "std": 8.79921394107426e-06
+      },
+      "independence_j": {
+        "mean": 0.5321625620370369,
+        "std": 0.014844642980257464
+      },
+      "independence_tpr": {
+        "mean": 0.5321856138888889,
+        "std": 0.014844889763367107
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006361701013700707,
+        "std": 0.0
+      },
+      "wilson_world1_width": {
+        "mean": 0.0796066081918126,
+        "std": 7.677812990471999e-05
+      }
+    },
+    "parallel_and:keyword+regex+semantic@keyword=0.70,regex=0.60,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.08033333333333333,
+        "std": 0.004314059701848241
+      },
+      "bca_j_width": {
+        "mean": 0.07766666666666669,
+        "std": 0.001900292375165213
+      },
+      "cc_l": {
+        "mean": 0.009456693016951189,
+        "std": 0.00971296954869385
+      },
+      "classification": {
+        "constructive": 0,
+        "destructive": 5,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": -0.30633333333333324,
+        "std": 0.015518805795979697
+      },
+      "empirical_fpr": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "empirical_j": {
+        "mean": 0.4793333333333334,
+        "std": 0.014073221221723027
+      },
+      "empirical_tpr": {
+        "mean": 0.4793333333333334,
+        "std": 0.014073221221723027
+      },
+      "fh_fpr_lower": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "fh_fpr_upper": {
+        "mean": 0.020666666666666667,
+        "std": 0.004654746681256315
+      },
+      "fh_j_lower": {
+        "mean": 0.3163333333333334,
+        "std": 0.015018507101425122
+      },
+      "fh_j_upper": {
+        "mean": 0.7493333333333333,
+        "std": 0.008787617550976047
+      },
+      "fh_tpr_lower": {
+        "mean": 0.337,
+        "std": 0.012326574724733762
+      },
+      "fh_tpr_upper": {
+        "mean": 0.7493333333333333,
+        "std": 0.008787617550976047
+      },
+      "independence_fpr": {
+        "mean": 2.0231481481481485e-05,
+        "std": 8.811001961905487e-06
+      },
+      "independence_j": {
+        "mean": 0.47180475185185183,
+        "std": 0.007385443327696898
+      },
+      "independence_tpr": {
+        "mean": 0.47182498333333334,
+        "std": 0.0073858271844286436
+      },
+      "rails": [
+        "keyword",
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "parallel_and",
+      "wilson_world0_width": {
+        "mean": 0.006361701013700707,
+        "std": 0.0
+      },
+      "wilson_world1_width": {
+        "mean": 0.07966732060514706,
+        "std": 0.00012901767896515386
+      }
+    },
+    "serial_or:keyword+regex@keyword=0.60,regex=0.50": {
+      "bca_delta_width": {
+        "mean": 0.04500081224326684,
+        "std": 0.0020412422603312435
+      },
+      "bca_j_width": {
+        "mean": 0.045727246658566735,
+        "std": 0.0017587192047696164
+      },
+      "cc_l": {
+        "mean": 0.0013139773418039155,
+        "std": 0.004416990170189753
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.08099999999999999,
+        "std": 0.010710846008706419
+      },
+      "empirical_fpr": {
+        "mean": 0.06266666666666668,
+        "std": 0.005602578771323869
+      },
+      "empirical_j": {
+        "mean": 0.9143333333333334,
+        "std": 0.003836954811073796
+      },
+      "empirical_tpr": {
+        "mean": 0.977,
+        "std": 0.002173067468400886
+      },
+      "fh_fpr_lower": {
+        "mean": 0.036333333333333336,
+        "std": 0.0067082039324993705
+      },
+      "fh_fpr_upper": {
+        "mean": 0.06366666666666666,
+        "std": 0.006055300708194984
+      },
+      "fh_j_lower": {
+        "mean": 0.806,
+        "std": 0.004801620096962638
+      },
+      "fh_j_upper": {
+        "mean": 0.9636666666666667,
+        "std": 0.00670820393249936
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8696666666666667,
+        "std": 0.010301024760241617
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.06268833333333335,
+        "std": 0.005894481882800763
+      },
+      "independence_j": {
+        "mean": 0.9132516666666668,
+        "std": 0.004475639481172721
+      },
+      "independence_tpr": {
+        "mean": 0.9759400000000001,
+        "std": 0.003185934074321955
+      },
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.5
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03902488422980486,
+        "std": 0.0016277392919236383
+      },
+      "wilson_world1_width": {
+        "mean": 0.02465137433321929,
+        "std": 0.001038556368318187
+      }
+    },
+    "serial_or:keyword+regex@keyword=0.60,regex=0.60": {
+      "bca_delta_width": {
+        "mean": 0.04757624647605909,
+        "std": 0.0031734160302011676
+      },
+      "bca_j_width": {
+        "mean": 0.04765028958423665,
+        "std": 0.0032255602724366064
+      },
+      "cc_l": {
+        "mean": -0.0013873491656918601,
+        "std": 0.00806535488687693
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.07099999999999995,
+        "std": 0.013102162671355685
+      },
+      "empirical_fpr": {
+        "mean": 0.05566666666666666,
+        "std": 0.008787617550976045
+      },
+      "empirical_j": {
+        "mean": 0.9076666666666666,
+        "std": 0.01216780816562932
+      },
+      "empirical_tpr": {
+        "mean": 0.9633333333333333,
+        "std": 0.0051370116691408065
+      },
+      "fh_fpr_lower": {
+        "mean": 0.03233333333333334,
+        "std": 0.004503085362035431
+      },
+      "fh_fpr_upper": {
+        "mean": 0.056666666666666664,
+        "std": 0.00790569415042095
+      },
+      "fh_j_lower": {
+        "mean": 0.8046666666666666,
+        "std": 0.010233387622005815
+      },
+      "fh_j_upper": {
+        "mean": 0.9676666666666668,
+        "std": 0.00450308536203545
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8613333333333333,
+        "std": 0.006168918507773915
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.055870555555555534,
+        "std": 0.007675850628456124
+      },
+      "independence_j": {
+        "mean": 0.9088405555555555,
+        "std": 0.0076173637637883965
+      },
+      "independence_tpr": {
+        "mean": 0.9647111111111112,
+        "std": 0.0031701905344460727
+      },
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "regex": 0.6
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.0369121076450779,
+        "std": 0.002641098364709719
+      },
+      "wilson_world1_width": {
+        "mean": 0.030494915610330686,
+        "std": 0.0019739238009588785
+      }
+    },
+    "serial_or:keyword+regex@keyword=0.70,regex=0.50": {
+      "bca_delta_width": {
+        "mean": 0.04814594328000876,
+        "std": 0.0023576335226587527
+      },
+      "bca_j_width": {
+        "mean": 0.04740623849256655,
+        "std": 0.0037846423791303326
+      },
+      "cc_l": {
+        "mean": -0.0022187715509028347,
+        "std": 0.009529307308252763
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.11833333333333337,
+        "std": 0.024238399287081613
+      },
+      "empirical_fpr": {
+        "mean": 0.053666666666666675,
+        "std": 0.01043498389499902
+      },
+      "empirical_j": {
+        "mean": 0.9016666666666667,
+        "std": 0.012416387021459441
+      },
+      "empirical_tpr": {
+        "mean": 0.9553333333333333,
+        "std": 0.004149966532662913
+      },
+      "fh_fpr_lower": {
+        "mean": 0.032,
+        "std": 0.005055250296034366
+      },
+      "fh_fpr_upper": {
+        "mean": 0.05466666666666666,
+        "std": 0.009530652303663865
+      },
+      "fh_j_lower": {
+        "mean": 0.7606666666666666,
+        "std": 0.015211472278806183
+      },
+      "fh_j_upper": {
+        "mean": 0.968,
+        "std": 0.005055250296034361
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8153333333333332,
+        "std": 0.018043158136965824
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.053929444444444405,
+        "std": 0.009251314679680355
+      },
+      "independence_j": {
+        "mean": 0.9035016666666668,
+        "std": 0.008564596503724237
+      },
+      "independence_tpr": {
+        "mean": 0.9574311111111113,
+        "std": 0.004162248305518322
+      },
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.5
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03625340939042074,
+        "std": 0.0031805853098431673
+      },
+      "wilson_world1_width": {
+        "mean": 0.03342924638193181,
+        "std": 0.0013942677447448502
+      }
+    },
+    "serial_or:keyword+regex@keyword=0.70,regex=0.60": {
+      "bca_delta_width": {
+        "mean": 0.051119159236876356,
+        "std": 0.0042273153323186645
+      },
+      "bca_j_width": {
+        "mean": 0.04915086490726624,
+        "std": 0.003818976539772631
+      },
+      "cc_l": {
+        "mean": 0.0007753607901791962,
+        "std": 0.004519706954019241
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.13133333333333336,
+        "std": 0.018196458751941532
+      },
+      "empirical_fpr": {
+        "mean": 0.053000000000000005,
+        "std": 0.011983785341498366
+      },
+      "empirical_j": {
+        "mean": 0.898,
+        "std": 0.007673909622147567
+      },
+      "empirical_tpr": {
+        "mean": 0.951,
+        "std": 0.004801620096962649
+      },
+      "fh_fpr_lower": {
+        "mean": 0.028000000000000004,
+        "std": 0.006280481227138924
+      },
+      "fh_fpr_upper": {
+        "mean": 0.053666666666666675,
+        "std": 0.012326574724733728
+      },
+      "fh_j_lower": {
+        "mean": 0.739,
+        "std": 0.017464249196572957
+      },
+      "fh_j_upper": {
+        "mean": 0.9720000000000001,
+        "std": 0.006280481227138902
+      },
+      "fh_tpr_lower": {
+        "mean": 0.7926666666666666,
+        "std": 0.0191702895126808
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.05291888888888892,
+        "std": 0.011986427734970882
+      },
+      "independence_j": {
+        "mean": 0.8974344444444444,
+        "std": 0.01071430435918425
+      },
+      "independence_tpr": {
+        "mean": 0.9503533333333334,
+        "std": 0.0038778331936505186
+      },
+      "rails": [
+        "keyword",
+        "regex"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "regex": 0.6
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03599542638648726,
+        "std": 0.003703197454906298
+      },
+      "wilson_world1_width": {
+        "mean": 0.03487519952204874,
+        "std": 0.0015721310130496985
+      }
+    },
+    "serial_or:keyword+semantic@keyword=0.60,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.040435076783755,
+        "std": 0.0016470291760861452
+      },
+      "bca_j_width": {
+        "mean": 0.03993636119823998,
+        "std": 0.004558554531963186
+      },
+      "cc_l": {
+        "mean": -0.0005066658631707697,
+        "std": 0.0022374623375039236
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.024999999999999932,
+        "std": 0.013591255358583396
+      },
+      "empirical_fpr": {
+        "mean": 0.05366666666666666,
+        "std": 0.005190803834132478
+      },
+      "empirical_j": {
+        "mean": 0.9389999999999998,
+        "std": 0.006411794687223808
+      },
+      "empirical_tpr": {
+        "mean": 0.9926666666666666,
+        "std": 0.0019002923751652203
+      },
+      "fh_fpr_lower": {
+        "mean": 0.03233333333333334,
+        "std": 0.005725188012439222
+      },
+      "fh_fpr_upper": {
+        "mean": 0.054333333333333345,
+        "std": 0.005962847939999437
+      },
+      "fh_j_lower": {
+        "mean": 0.8873333333333333,
+        "std": 0.005845225972250055
+      },
+      "fh_j_upper": {
+        "mean": 0.9676666666666666,
+        "std": 0.005725188012439263
+      },
+      "fh_tpr_lower": {
+        "mean": 0.9416666666666668,
+        "std": 0.010069204977995447
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.0536211111111111,
+        "std": 0.005829933400716514
+      },
+      "independence_j": {
+        "mean": 0.939468888888889,
+        "std": 0.005011889182634846
+      },
+      "independence_tpr": {
+        "mean": 0.9930899999999999,
+        "std": 0.0008973224058274696
+      },
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03635900242240175,
+        "std": 0.001613652892614851
+      },
+      "wilson_world1_width": {
+        "mean": 0.014915700225357353,
+        "std": 0.001574426295389445
+      }
+    },
+    "serial_or:keyword+semantic@keyword=0.60,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.04399999999999997,
+        "std": 0.003248931448269641
+      },
+      "bca_j_width": {
+        "mean": 0.04402129601360556,
+        "std": 0.003797735680260181
+      },
+      "cc_l": {
+        "mean": 0.00020753867717096704,
+        "std": 0.004680952833782512
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.07666666666666669,
+        "std": 0.0174801474695025
+      },
+      "empirical_fpr": {
+        "mean": 0.057666666666666665,
+        "std": 0.010314498964510534
+      },
+      "empirical_j": {
+        "mean": 0.9200000000000002,
+        "std": 0.009718253158075505
+      },
+      "empirical_tpr": {
+        "mean": 0.9776666666666667,
+        "std": 0.006078194176270157
+      },
+      "fh_fpr_lower": {
+        "mean": 0.03266666666666666,
+        "std": 0.006078194176270158
+      },
+      "fh_fpr_upper": {
+        "mean": 0.05866666666666668,
+        "std": 0.009888264649460887
+      },
+      "fh_j_lower": {
+        "mean": 0.8160000000000001,
+        "std": 0.011583033569262734
+      },
+      "fh_j_upper": {
+        "mean": 0.9673333333333334,
+        "std": 0.006078194176270155
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8746666666666666,
+        "std": 0.013713334953816162
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.0578011111111111,
+        "std": 0.009584363390697268
+      },
+      "independence_j": {
+        "mean": 0.9198561111111111,
+        "std": 0.00970255041563304
+      },
+      "independence_tpr": {
+        "mean": 0.9776572222222223,
+        "std": 0.0030941212677839556
+      },
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03748882039455113,
+        "std": 0.0029412933171385947
+      },
+      "wilson_world1_width": {
+        "mean": 0.024175131695901308,
+        "std": 0.003035602937276395
+      }
+    },
+    "serial_or:keyword+semantic@keyword=0.70,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.04306219768705901,
+        "std": 0.006001969680358489
+      },
+      "bca_j_width": {
+        "mean": 0.04089291141232236,
+        "std": 0.0024799954489127013
+      },
+      "cc_l": {
+        "mean": -0.0005146224205704738,
+        "std": 0.003619357589412224
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.03233333333333328,
+        "std": 0.008045012257431497
+      },
+      "empirical_fpr": {
+        "mean": 0.05433333333333333,
+        "std": 0.012834415538785638
+      },
+      "empirical_j": {
+        "mean": 0.9279999999999999,
+        "std": 0.010954451150103324
+      },
+      "empirical_tpr": {
+        "mean": 0.9823333333333333,
+        "std": 0.00434613493680174
+      },
+      "fh_fpr_lower": {
+        "mean": 0.031,
+        "std": 0.006302556800396345
+      },
+      "fh_fpr_upper": {
+        "mean": 0.05566666666666666,
+        "std": 0.012224747213928164
+      },
+      "fh_j_lower": {
+        "mean": 0.869,
+        "std": 0.01511989124005562
+      },
+      "fh_j_upper": {
+        "mean": 0.969,
+        "std": 0.006302556800396324
+      },
+      "fh_tpr_lower": {
+        "mean": 0.9246666666666666,
+        "std": 0.006603870918719661
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.054875555555555566,
+        "std": 0.011875945284013785
+      },
+      "independence_j": {
+        "mean": 0.9284566666666667,
+        "std": 0.012123301172830798
+      },
+      "independence_tpr": {
+        "mean": 0.9833322222222222,
+        "std": 0.0015678600655623593
+      },
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03638671740507805,
+        "std": 0.003923661036837552
+      },
+      "wilson_world1_width": {
+        "mean": 0.02177250172441907,
+        "std": 0.002463701074912232
+      }
+    },
+    "serial_or:keyword+semantic@keyword=0.70,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.04646689989084411,
+        "std": 0.0017712742323695066
+      },
+      "bca_j_width": {
+        "mean": 0.04700035632727895,
+        "std": 0.003148066130230661
+      },
+      "cc_l": {
+        "mean": -0.004264353562306224,
+        "std": 0.007218854876091894
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.119,
+        "std": 0.015302505241517363
+      },
+      "empirical_fpr": {
+        "mean": 0.04433333333333333,
+        "std": 0.011702326454361306
+      },
+      "empirical_j": {
+        "mean": 0.9099999999999999,
+        "std": 0.008079466429027207
+      },
+      "empirical_tpr": {
+        "mean": 0.9543333333333333,
+        "std": 0.007781745019952513
+      },
+      "fh_fpr_lower": {
+        "mean": 0.025333333333333336,
+        "std": 0.007763876465901411
+      },
+      "fh_fpr_upper": {
+        "mean": 0.04433333333333333,
+        "std": 0.011702326454361305
+      },
+      "fh_j_lower": {
+        "mean": 0.7713333333333333,
+        "std": 0.009817784316682097
+      },
+      "fh_j_upper": {
+        "mean": 0.9746666666666666,
+        "std": 0.007763876465901394
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8156666666666667,
+        "std": 0.016939434596362546
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.043829444444444456,
+        "std": 0.011451337864585482
+      },
+      "independence_j": {
+        "mean": 0.9133655555555557,
+        "std": 0.007531681695787957
+      },
+      "independence_tpr": {
+        "mean": 0.9571949999999999,
+        "std": 0.004578397342108032
+      },
+      "rails": [
+        "keyword",
+        "semantic"
+      ],
+      "thresholds": {
+        "keyword": 0.7,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03310332215172769,
+        "std": 0.004052752422286716
+      },
+      "wilson_world1_width": {
+        "mean": 0.03369142644660576,
+        "std": 0.0027572150579842315
+      }
+    },
+    "serial_or:regex+semantic@regex=0.50,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.04233333333333331,
+        "std": 0.001900292375165225
+      },
+      "bca_j_width": {
+        "mean": 0.04323491597186815,
+        "std": 0.002020363133984204
+      },
+      "cc_l": {
+        "mean": -0.0022427015906272894,
+        "std": 0.0015963481562570627
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.019999999999999973,
+        "std": 0.003333333333333341
+      },
+      "empirical_fpr": {
+        "mean": 0.063,
+        "std": 0.00660387091871965
+      },
+      "empirical_j": {
+        "mean": 0.923,
+        "std": 0.005451809077931988
+      },
+      "empirical_tpr": {
+        "mean": 0.986,
+        "std": 0.0019002923751652398
+      },
+      "fh_fpr_lower": {
+        "mean": 0.035666666666666666,
+        "std": 0.0034560735588879525
+      },
+      "fh_fpr_upper": {
+        "mean": 0.06400000000000002,
+        "std": 0.006078194176270156
+      },
+      "fh_j_lower": {
+        "mean": 0.8709999999999999,
+        "std": 0.009472181492255236
+      },
+      "fh_j_upper": {
+        "mean": 0.9643333333333333,
+        "std": 0.003456073558887977
+      },
+      "fh_tpr_lower": {
+        "mean": 0.9349999999999999,
+        "std": 0.00656167322834318
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.06298333333333335,
+        "std": 0.005883973643154215
+      },
+      "independence_j": {
+        "mean": 0.9250311111111111,
+        "std": 0.006548680010242017
+      },
+      "independence_tpr": {
+        "mean": 0.9880144444444445,
+        "std": 0.00144481485635212
+      },
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.5,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03910760745726324,
+        "std": 0.001863523262152421
+      },
+      "wilson_world1_width": {
+        "mean": 0.019705867174118596,
+        "std": 0.0011779306952573532
+      }
+    },
+    "serial_or:regex+semantic@regex=0.50,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.043676236722704466,
+        "std": 0.003141429856834382
+      },
+      "bca_j_width": {
+        "mean": 0.04389947673413199,
+        "std": 0.0017108300712589796
+      },
+      "cc_l": {
+        "mean": -0.0001510750681560851,
+        "std": 0.008078629294002361
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.097,
+        "std": 0.0113895663755133
+      },
+      "empirical_fpr": {
+        "mean": 0.05166666666666666,
+        "std": 0.0028867513459481294
+      },
+      "empirical_j": {
+        "mean": 0.9213333333333333,
+        "std": 0.00960324019392532
+      },
+      "empirical_tpr": {
+        "mean": 0.9730000000000001,
+        "std": 0.008850612031567845
+      },
+      "fh_fpr_lower": {
+        "mean": 0.030333333333333334,
+        "std": 0.0032058973436118908
+      },
+      "fh_fpr_upper": {
+        "mean": 0.053000000000000005,
+        "std": 0.00380058475033046
+      },
+      "fh_j_lower": {
+        "mean": 0.7946666666666666,
+        "std": 0.009383792173506158
+      },
+      "fh_j_upper": {
+        "mean": 0.9696666666666667,
+        "std": 0.0032058973436118695
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8476666666666667,
+        "std": 0.009098229375970785
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.05231277777777774,
+        "std": 0.0037082223245973197
+      },
+      "independence_j": {
+        "mean": 0.9214322222222224,
+        "std": 0.0036670320735432906
+      },
+      "independence_tpr": {
+        "mean": 0.9737450000000001,
+        "std": 0.0022706973285809575
+      },
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.5,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03575608243617999,
+        "std": 0.0009327662341694707
+      },
+      "wilson_world1_width": {
+        "mean": 0.026279404910478022,
+        "std": 0.003959120057550161
+      }
+    },
+    "serial_or:regex+semantic@regex=0.60,semantic=0.70": {
+      "bca_delta_width": {
+        "mean": 0.03973821317238011,
+        "std": 0.0017951072344810808
+      },
+      "bca_j_width": {
+        "mean": 0.040064935625059125,
+        "std": 0.0010674300733467213
+      },
+      "cc_l": {
+        "mean": 0.0018827236246657826,
+        "std": 0.003581435450598417
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.01966666666666663,
+        "std": 0.008027729719194875
+      },
+      "empirical_fpr": {
+        "mean": 0.054000000000000006,
+        "std": 0.004183300132670377
+      },
+      "empirical_j": {
+        "mean": 0.9336666666666666,
+        "std": 0.0036132472314464757
+      },
+      "empirical_tpr": {
+        "mean": 0.9876666666666667,
+        "std": 0.005602578771323878
+      },
+      "fh_fpr_lower": {
+        "mean": 0.032,
+        "std": 0.005190803834132479
+      },
+      "fh_fpr_upper": {
+        "mean": 0.05500000000000001,
+        "std": 0.004859126579037749
+      },
+      "fh_j_lower": {
+        "mean": 0.8866666666666667,
+        "std": 0.008079466429027219
+      },
+      "fh_j_upper": {
+        "mean": 0.968,
+        "std": 0.005190803834132508
+      },
+      "fh_tpr_lower": {
+        "mean": 0.9416666666666668,
+        "std": 0.010069204977995447
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.0542672222222222,
+        "std": 0.004752202380910953
+      },
+      "independence_j": {
+        "mean": 0.9319444444444445,
+        "std": 0.0035564891352478194
+      },
+      "independence_tpr": {
+        "mean": 0.9862116666666665,
+        "std": 0.0032115438481965307
+      },
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.6,
+        "semantic": 0.7
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.036475167379049225,
+        "std": 0.0012914249266841812
+      },
+      "wilson_world1_width": {
+        "mean": 0.01826061221494917,
+        "std": 0.0042408087797567735
+      }
+    },
+    "serial_or:regex+semantic@regex=0.60,semantic=0.80": {
+      "bca_delta_width": {
+        "mean": 0.04776238201092302,
+        "std": 0.00354239905829894
+      },
+      "bca_j_width": {
+        "mean": 0.047742121338834265,
+        "std": 0.0036725411036554806
+      },
+      "cc_l": {
+        "mean": 0.0012409938348897315,
+        "std": 0.003921696081870029
+      },
+      "classification": {
+        "constructive": 5,
+        "destructive": 0,
+        "independent": 0
+      },
+      "d_lamp_rate": 0.0,
+      "delta_j": {
+        "mean": 0.10633333333333335,
+        "std": 0.00885061203156782
+      },
+      "empirical_fpr": {
+        "mean": 0.057999999999999996,
+        "std": 0.013302046626156609
+      },
+      "empirical_j": {
+        "mean": 0.9006666666666667,
+        "std": 0.016524392743927245
+      },
+      "empirical_tpr": {
+        "mean": 0.9586666666666666,
+        "std": 0.008027729719194883
+      },
+      "fh_fpr_lower": {
+        "mean": 0.03233333333333333,
+        "std": 0.008547254269972056
+      },
+      "fh_fpr_upper": {
+        "mean": 0.057999999999999996,
+        "std": 0.013302046626156609
+      },
+      "fh_j_lower": {
+        "mean": 0.7633333333333333,
+        "std": 0.030184617127124783
+      },
+      "fh_j_upper": {
+        "mean": 0.9676666666666666,
+        "std": 0.008547254269972042
+      },
+      "fh_tpr_lower": {
+        "mean": 0.8213333333333335,
+        "std": 0.018760182420340315
+      },
+      "fh_tpr_upper": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "independence_fpr": {
+        "mean": 0.05714111111111111,
+        "std": 0.012966275909326851
+      },
+      "independence_j": {
+        "mean": 0.8996594444444446,
+        "std": 0.015476566764859747
+      },
+      "independence_tpr": {
+        "mean": 0.9568005555555554,
+        "std": 0.005153830530372795
+      },
+      "rails": [
+        "regex",
+        "semantic"
+      ],
+      "thresholds": {
+        "regex": 0.6,
+        "semantic": 0.8
+      },
+      "topology": "serial_or",
+      "wilson_world0_width": {
+        "mean": 0.03747082304563144,
+        "std": 0.004227333528800089
+      },
+      "wilson_world1_width": {
+        "mean": 0.03216040314800175,
+        "std": 0.0029129540041681035
+      }
+    }
+  },
+  "independence_containment_rate": 1.0,
+  "regime_counts": {
+    "constructive": 60,
+    "destructive": 40,
+    "independent": 0
+  },
+  "seed_count": 5,
+  "seeds": [
+    202501,
+    202502,
+    202503,
+    202504,
+    202505
+  ],
+  "total_runs": 100,
+  "zero_fp_runs": 38
+}
