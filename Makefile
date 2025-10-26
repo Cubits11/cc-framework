@@ -62,6 +62,12 @@ W6_RAILS    := keyword regex semantic and or
         week3 week3-95 week3-90 week3-fig week3-power \
         week5-pilot memo-week5 \
         $(addprefix week6-rail-,$(W6_RAILS)) week6-ablation memo-week6 week6-utility test-week6
+.PHONY: demo-rails
+demo-rails: init
+	$(ACT); python scripts/rails_compare.py \
+		--csv data/examples/rails_tiny.csv \
+		--out results/baselines/rails_summary.csv \
+		--fpr_min 0.04 --fpr_max 0.06 --epsilon 0.0
 
 # -------- Help -----------
 help:
@@ -382,3 +388,4 @@ carto-suggest: install
 	$(ACT); python -m cc.cartographer.suggest \
 		--history $(AUDIT_LOG) \
 		--out experiments/grids/next.json
+
