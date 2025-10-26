@@ -62,6 +62,27 @@ results = run_cc_experiment(
 print(f"CC_max: {results['cc_max']:.3f}")
 print(f"Interaction: {results['interaction_type']}")
 ```
+### Lightweight baseline demo
+
+| Step | Command | Outcome |
+| --- | --- | --- |
+| 1 | `make init` | Creates `.venv/` and installs the lightweight requirements listed in `requirements.txt`. |
+| 2 | `make demo` | Trains demo baselines, plots ROC curves, and writes comparison tables using `data/examples/synthetic.csv`. |
+
+Outputs land under `results/baselines/` and `figures/baselines/`:
+
+| Artifact | Description |
+| --- | --- |
+| `results/baselines/baseline_metrics.csv` | Held-out metrics for each baseline model. |
+| `results/baselines/baseline_predictions.csv` | Per-example predictions enabling further analysis. |
+| `results/baselines/baseline_comparison.csv` | Sorted metrics table for quick reporting. |
+| `figures/baselines/baseline_roc.png` | ROC overlay showing relative performance. |
+
+Re-run checklist:
+
+1. `make init`
+2. `make demo`
+3. Inspect the artifacts above before sharing results.
 
 ## 📊 Methodology
 
