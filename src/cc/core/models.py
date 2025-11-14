@@ -1,4 +1,3 @@
-# src/cc/core/models.py
 """
 Module: core.models (data layer for CC framework)
 Purpose: Strongly-typed, versioned, and serializable data models used across the
@@ -62,6 +61,8 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    get_args,
+    get_origin,
 )
 
 import blake3
@@ -79,6 +80,7 @@ from pydantic import (
 # ---------------------------------------------------------------------------
 try:  # numpy (optional)
     import numpy as np  # type: ignore[import]
+
     NUMPY_AVAILABLE = True
 except ImportError:  # pragma: no cover
     NUMPY_AVAILABLE = False
@@ -88,6 +90,7 @@ try:  # SQLAlchemy (optional)
     from datetime import datetime
     from sqlalchemy import Column, DateTime, Integer, String  # type: ignore[import]
     from sqlalchemy.orm import DeclarativeBase, declared_attr  # type: ignore[import]
+
     SQLALCHEMY_AVAILABLE = True
 except ImportError:  # pragma: no cover
     SQLALCHEMY_AVAILABLE = False
@@ -95,6 +98,7 @@ except ImportError:  # pragma: no cover
 
 try:  # Avro (optional)
     import fastavro  # type: ignore[import]
+
     AVRO_AVAILABLE = True
 except ImportError:  # pragma: no cover
     AVRO_AVAILABLE = False
@@ -102,6 +106,7 @@ except ImportError:  # pragma: no cover
 try:  # Protobuf (optional)
     from google.protobuf.json_format import ParseDict  # type: ignore[import]
     from google.protobuf.message import Message  # type: ignore[import]
+
     PROTO_AVAILABLE = True
 except ImportError:  # pragma: no cover
     PROTO_AVAILABLE = False
@@ -134,19 +139,45 @@ def _iso_from_unix(ts: float) -> str:
     )
 
 
-def _hash_json(obj: Any) -> str:
-    """Canonical JSON -> BLAKE3 hex digest."""
+def _hash_json(obj: Any, *, salt: Optional[bytes] = None) -> str:
+    """
+    Canonical JSON -> BLAKE3 hex digest.
+
+    Parameters
+    ----------
+    obj:
+        Any JSON-serializable object.
+    salt:
+        Optional bytes to prepend into the hash state (for adversarial resistance).
+    """
     data = json.dumps(obj, sort_keys=True, separators=(",", ":"))
-    return blake3.blake3(data.encode("utf-8")).hexdigest()
+    hasher = blake3.blake3()
+    if salt is not None:
+        hasher.update(salt)
+    hasher.update(data.encode("utf-8"))
+    return hasher.hexdigest()
 
 
-def _hash_text(text: Union[str, bytes]) -> str:
-    """Hash raw transcript text/bytes with BLAKE3."""
+def _hash_text(text: Union[str, bytes], *, salt: Optional[bytes] = None) -> str:
+    """
+    Hash raw transcript text/bytes with BLAKE3.
+
+    Parameters
+    ----------
+    text:
+        Input text or bytes.
+    salt:
+        Optional bytes to prepend into the hash state.
+    """
     if isinstance(text, bytes):
         data = text
     else:
         data = str(text).encode("utf-8", errors="replace")
-    return blake3.blake3(data).hexdigest()
+    hasher = blake3.blake3()
+    if salt is not None:
+        hasher.update(salt)
+    hasher.update(data)
+    return hasher.hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -191,18 +222,23 @@ if SQLALCHEMY_AVAILABLE:
                 ...
         """
 
+        # Allow SQLAlchemy 2 annotated declarative to ignore our lack of Mapped[]
+        __allow_unmapped__ = True
+
         @declared_attr
-        def creator_id(cls) -> Column:  # type: ignore[type-arg]
+        def creator_id(cls):  # type: ignore[no-untyped-def]
+            # Column is fine here; type hint was the problem, not the Column itself.
             return Column(String(64), nullable=True)
 
         @declared_attr
-        def updated_at(cls) -> Column:  # type: ignore[type-arg]
+        def updated_at(cls):  # type: ignore[no-untyped-def]
             return Column(
                 DateTime(timezone=True),
                 default=datetime.utcnow,
                 onupdate=datetime.utcnow,
                 nullable=False,
             )
+
 else:  # pragma: no cover
 
     class OrmBase:
@@ -227,6 +263,7 @@ class ModelBase(BaseModel):
     - optional creator_id for audit metadata
     - updated_at as a snapshot timestamp for this representation
     """
+
     schema_version: str = Field(default=_SCHEMA_VERSION, frozen=True)
     creator_id: Optional[str] = Field(
         default=None,
@@ -248,6 +285,9 @@ class ModelBase(BaseModel):
         ser_json_bytes="utf8",
     )
 
+    # Cache for dynamically constructed protobuf message classes, keyed by model class.
+    _PROTO_MESSAGE_CACHE: ClassVar[Dict[Type["ModelBase"], Type[Message]]] = {}
+
     @field_validator("updated_at", mode="before")
     @classmethod
     def _normalize_updated_at(cls, v: Any) -> float:
@@ -257,13 +297,13 @@ class ModelBase(BaseModel):
             f = float(v)
         except (TypeError, ValueError):
             raise ValueError("updated_at must be numeric unix seconds")
-        if f <= 0 or math.isinf(f):
+        if f <= 0 or math.isinf(f) or math.isnan(f):
             return _now_unix()
         return f
 
     @cached_property
     def _default_hash(self) -> str:
-        """Cached BLAKE3 hash of the full JSON representation (no excludes)."""
+        """Cached BLAKE3 hash of the full JSON representation (no excludes, unsalted)."""
         data = self.model_dump(mode="json")
         return _hash_json(data)
 
@@ -272,6 +312,7 @@ class ModelBase(BaseModel):
         *,
         exclude: Optional[Sequence[str]] = None,
         use_cache: bool = True,
+        salt: Optional[bytes] = None,
     ) -> str:
         """
         Stable BLAKE3 hash of the JSON representation of the model.
@@ -282,13 +323,19 @@ class ModelBase(BaseModel):
             Optional iterable of field names to drop before hashing
             (useful to ignore ids, timestamps, etc.).
         use_cache:
-            If True and `exclude` is None, reuse cached hash of the full object.
+            If True and `exclude` is None and `salt` is None, reuse cached
+            hash of the full object.
+        salt:
+            Optional bytes to prepend into the hash state (for adversarial
+            resistance or per-run/domain separation).
         """
-        if exclude is None and use_cache:
+        # Use cached full-object hash only when unsalted and unfiltered.
+        if exclude is None and use_cache and salt is None:
             return self._default_hash
+
         exclude_set = set(exclude or [])
         data = self.model_dump(mode="json", exclude=exclude_set)
-        return _hash_json(data)
+        return _hash_json(data, salt=salt)
 
     # ---------- Big-data / interoperability helpers ----------
 
@@ -323,14 +370,32 @@ class ModelBase(BaseModel):
         fastavro.schemaless_writer(buf, schema, self.to_avro_record())  # type: ignore[arg-type]
         return buf.getvalue()
 
-    def to_protobuf(self, proto_cls: Type[Message]) -> Message:
+    def to_protobuf(self, proto_cls: Optional[Type[Message]] = None) -> Message:
         """
         Export to a protobuf message instance.
 
         Parameters
         ----------
         proto_cls:
-            A protobuf Message subclass whose field names match this model.
+            Optional protobuf Message subclass whose field names match this model.
+            If provided, we simply hydrate that message type via ParseDict.
+            If not provided, a dynamic message type is created from the model
+            schema using google.protobuf's dynamic descriptors.
+
+        Dynamic type behavior
+        ---------------------
+        - Only basic scalar fields are mapped:
+            * int / IntEnum  -> int32
+            * float          -> double
+            * bool           -> bool
+            * str / Enum     -> string
+        - Optionals (Union[..., None]) are unwrapped to their inner type.
+        - Sequence[T] (e.g. List[int]) becomes a repeated scalar field when T is
+          one of the supported scalar types.
+        - More complex/nested fields (mappings, nested models, arbitrary objects)
+          are intentionally skipped and will not appear in the dynamic message
+          descriptor. Their values will simply be ignored when parsing using
+          ParseDict(ignore_unknown_fields=True).
 
         Raises
         ------
@@ -338,16 +403,118 @@ class ModelBase(BaseModel):
             If `google.protobuf` is not installed.
         """
         if not PROTO_AVAILABLE:  # pragma: no cover
-            raise ImportError("google.protobuf is required for protobuf export")
+            raise ImportError("google.protobuf required for protobuf export")
+
+        from google.protobuf import descriptor_pb2, descriptor_pool, message_factory  # type: ignore[import]
+
         data = self.model_dump(mode="json")
-        msg = proto_cls()  # type: ignore[call-arg]
+
+        # If an explicit proto class is passed, just hydrate it.
+        if proto_cls is not None:
+            msg = proto_cls()  # type: ignore[call-arg]
+            ParseDict(data, msg, ignore_unknown_fields=True)  # type: ignore[arg-type]
+            return msg
+
+        cls: Type[ModelBase] = self.__class__  # concrete subclass
+
+        # Fast path: reuse cached dynamic message class if we've already built it.
+        cached_msg_cls = ModelBase._PROTO_MESSAGE_CACHE.get(cls)
+        if cached_msg_cls is None:
+            # Build a dynamic message type that mirrors (a scalar subset of) this model.
+            fd_proto = descriptor_pb2.FileDescriptorProto()
+            fd_proto.name = f"{cls.__module__}.{cls.__name__}.dynamic.proto"
+            fd_proto.package = cls.__module__
+
+            msg_proto = descriptor_pb2.DescriptorProto()
+            msg_proto.name = cls.__name__
+
+            def _unwrap_optional(t: Any) -> Any:
+                """Unwrap Optional[T] / Union[T, None] down to T when possible."""
+                origin = get_origin(t)
+                if origin is Union:
+                    args = get_args(t)
+                    non_none = [a for a in args if a is not type(None)]  # noqa: E721
+                    if len(non_none) == 1:
+                        return _unwrap_optional(non_none[0])
+                return t
+
+            def _scalar_pb_type(t: Any) -> Optional[int]:
+                """
+                Map a core Python type to a protobuf scalar field type enum value.
+
+                Returns None for unsupported types (which are then skipped).
+                """
+                if isinstance(t, type) and issubclass(t, IntEnum):
+                    return descriptor_pb2.FieldDescriptorProto.TYPE_INT32  # type: ignore[attr-defined]
+                if isinstance(t, type) and issubclass(t, Enum):
+                    # String-ish enums
+                    return descriptor_pb2.FieldDescriptorProto.TYPE_STRING  # type: ignore[attr-defined]
+
+                if t is int:
+                    return descriptor_pb2.FieldDescriptorProto.TYPE_INT32  # type: ignore[attr-defined]
+                if t is float:
+                    return descriptor_pb2.FieldDescriptorProto.TYPE_DOUBLE  # type: ignore[attr-defined]
+                if t is bool:
+                    return descriptor_pb2.FieldDescriptorProto.TYPE_BOOL  # type: ignore[attr-defined]
+                if t is str:
+                    return descriptor_pb2.FieldDescriptorProto.TYPE_STRING  # type: ignore[attr-defined]
+                return None
+
+            field_number = 1
+            for field_name, field_info in cls.model_fields.items():
+                py_type = field_info.annotation
+
+                # Skip completely untyped / Any fields to avoid unpredictable schemas.
+                if py_type is Any or py_type is None:
+                    continue
+
+                core_type = _unwrap_optional(py_type)
+                origin = get_origin(core_type)
+
+                label = descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL  # type: ignore[attr-defined]
+                pb_type: Optional[int] = None
+
+                # Repeated scalar fields: Sequence[T] where T is scalar.
+                if origin in (list, List, Sequence, tuple, Tuple):
+                    args = get_args(core_type)
+                    if not args:
+                        continue
+                    elem_core = _unwrap_optional(args[0])
+                    scalar_type = _scalar_pb_type(elem_core)
+                    if scalar_type is None:
+                        # unsupported element type -> skip
+                        continue
+                    pb_type = scalar_type
+                    label = descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED  # type: ignore[attr-defined]
+                else:
+                    scalar_type = _scalar_pb_type(core_type)
+                    if scalar_type is None:
+                        # Complex / nested field -> skip for dynamic protobuf.
+                        continue
+                    pb_type = scalar_type
+
+                field_proto = msg_proto.field.add()
+                field_proto.name = field_name
+                field_proto.number = field_number
+                field_proto.type = pb_type
+                field_proto.label = label
+                field_number += 1
+
+            fd_proto.message_type.add().CopyFrom(msg_proto)
+            pool = descriptor_pool.DescriptorPool()
+            fd = pool.AddSerializedFile(fd_proto.SerializeToString())
+            factory = message_factory.MessageFactory(pool=pool)
+            cached_msg_cls = factory.GetPrototype(fd.message_types_by_name[cls.__name__])
+            ModelBase._PROTO_MESSAGE_CACHE[cls] = cached_msg_cls
+
+        msg = cached_msg_cls()  # type: ignore[call-arg]
         ParseDict(data, msg, ignore_unknown_fields=True)  # type: ignore[arg-type]
         return msg
 
-    def openapi_schema(self) -> JsonDict:
+    @classmethod
+    def openapi_schema(cls) -> JsonDict:
         """Return the OpenAPI-compatible JSON schema for this model type."""
-        # This is instance-independent; we delegate to Pydantic's JSON schema.
-        return self.model_json_schema()
+        return cls.model_json_schema()
 
     # ---------- Migration helper ----------
 
@@ -378,6 +545,7 @@ class AttackResult(ModelBase):
     - transcript_hash: BLAKE3 hash of the full transcript (not stored inline)
     - utility_score: optional scalar for multi-objective evaluation
     """
+
     world_bit: WorldBit = Field(
         description="0 (baseline) or 1 (guardrail-enabled).",
     )
@@ -387,6 +555,7 @@ class AttackResult(ModelBase):
     guardrails_applied: str
     rng_seed: int
     timestamp: float = Field(
+        default_factory=_now_unix,
         description="Unix timestamp in seconds (UTC) for when the attack was evaluated.",
     )
     # --- optional / metadata
@@ -394,6 +563,20 @@ class AttackResult(ModelBase):
     attack_strategy: str = ""
     utility_score: Optional[float] = None
     request_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+
+    @field_validator("transcript_hash", mode="before")
+    @classmethod
+    def _validate_transcript_hash(cls, v: Any) -> str:
+        if v is None:
+            raise ValueError("transcript_hash is required")
+        s = str(v)
+        if len(s) != 64:
+            raise ValueError("transcript_hash must be a 64-character hex string")
+        try:
+            int(s, 16)
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise ValueError("transcript_hash must be a 64-character hex string") from exc
+        return s
 
     @field_validator("utility_score", mode="before")
     @classmethod
@@ -411,15 +594,35 @@ class AttackResult(ModelBase):
     @field_validator("timestamp", mode="before")
     @classmethod
     def _normalize_timestamp(cls, v: Any) -> float:
+        """
+        Normalize timestamps for AttackResult.
+
+        - If missing / zero / non-numeric -> now.
+        - If non-finite or non-positive -> now.
+        - If absurdly far in the future (beyond safe time.gmtime range)
+          -> now.
+
+        We treat extremely large timestamps as invalid inputs rather than
+        risk platform-dependent OverflowError in time.gmtime().
+        """
         if v in (None, "", 0):
             return _now_unix()
         try:
             f = float(v)
         except (TypeError, ValueError):
             raise ValueError("timestamp must be numeric")
-        if f <= 0 or math.isinf(f):
+
+        # 1e12 seconds ~ 31,700+ years; anything beyond this is "nonsense" for our use.
+        MAX_REASONABLE_TS = 1e12
+
+        if (
+            not math.isfinite(f)
+            or f <= 0.0
+            or f > MAX_REASONABLE_TS
+        ):
             return _now_unix()
         return f
+
 
     @field_validator("rng_seed", mode="before")
     @classmethod
@@ -461,6 +664,7 @@ class AttackResult(ModelBase):
         attack_strategy: str = "",
         utility_score: Optional[float] = None,
         creator_id: Optional[str] = None,
+        salt: Optional[bytes] = None,
     ) -> "AttackResult":
         """
         Convenience constructor that takes the raw transcript and hashes it.
@@ -468,7 +672,7 @@ class AttackResult(ModelBase):
         This avoids accidentally persisting the full transcript in the data layer.
         """
         ts = _now_unix() if timestamp is None else float(timestamp)
-        thash = _hash_text(transcript)
+        thash = _hash_text(transcript, salt=salt)
         return cls(
             world_bit=world_bit,
             success=success,
@@ -489,6 +693,7 @@ class AttackResult(ModelBase):
 # ---------------------------------------------------------------------------
 class GuardrailSpec(ModelBase):
     """Specification for a guardrail configuration."""
+
     name: str
     params: Dict[str, Any] = Field(default_factory=dict)
     calibration_fpr_target: float = Field(
@@ -535,6 +740,7 @@ class GuardrailSpec(ModelBase):
 # ---------------------------------------------------------------------------
 class WorldConfig(ModelBase):
     """Configuration for a world in the two-world protocol."""
+
     world_id: WorldBit
     guardrail_stack: List[GuardrailSpec] = Field(default_factory=list)
     utility_profile: Dict[str, Any] = Field(default_factory=dict)
@@ -584,6 +790,7 @@ class WorldConfig(ModelBase):
 # ---------------------------------------------------------------------------
 class ExperimentConfig(ModelBase):
     """Complete experiment configuration."""
+
     experiment_id: str
     n_sessions: int = Field(gt=0)
     attack_strategies: List[str] = Field(min_length=1)
@@ -670,6 +877,7 @@ class ExperimentConfig(ModelBase):
 # ---------------------------------------------------------------------------
 class CCResult(ModelBase):
     """Results of CC analysis."""
+
     j_empirical: float
     cc_max: float
     delta_add: float
@@ -729,6 +937,7 @@ class CCResult(ModelBase):
 # ---------------------------------------------------------------------------
 class AttackStrategy(ModelBase):
     """Configuration for an attack strategy (declarative)."""
+
     name: str
     params: Dict[str, Any] = Field(default_factory=dict)
     vocabulary: List[str] = Field(default_factory=list)
@@ -762,18 +971,32 @@ class AttackStrategy(ModelBase):
 
 
 __all__ = [
+    # Flags / helpers
+    "_now_unix",
+    "_iso_from_unix",
+    "_hash_json",
+    "_hash_text",
+    "AVRO_AVAILABLE",
+    "PROTO_AVAILABLE",
+    "SQLALCHEMY_AVAILABLE",
+    "NUMPY_AVAILABLE",
+    # Enums
     "WorldBit",
     "CiMethod",
     "RiskLevel",
+    # Core models
+    "ModelBase",
     "AttackResult",
     "GuardrailSpec",
     "WorldConfig",
     "ExperimentConfig",
     "CCResult",
     "AttackStrategy",
+    # ORM helpers
     "OrmBase",
     "AuditColumnsMixin",
 ]
+
 
 # ---------------------------------------------------------------------------
 # CLI / smoke utilities
