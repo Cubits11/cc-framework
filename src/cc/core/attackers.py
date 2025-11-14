@@ -4,7 +4,7 @@ Module: attackers
 Purpose: Attack strategies for guardrail evaluation (Two-World protocol)
 Dependencies: numpy (only stdlib beyond typing/abc/dataclasses/enum)
 Author: Pranav Bhave
-Date: 2025-09-28  <-- UPDATED
+Date: 2025-11-12  <-- UPGRADED
 
 Design goals
 ------------
@@ -22,7 +22,7 @@ Tier A
      - Samples a bag of harmful + benign tokens, shuffles, optional obfuscation.
      - Tracks per-token success/attempt counts for lightweight diagnostics.
 
-  2) TemplatePromptAttacker (new):
+  2) TemplatePromptAttacker:
      - Fills natural-language templates with sampled tokens.
      - Supports simple curriculum (difficulty ∈ {easy, medium, hard}) and obfuscation.
 
@@ -39,13 +39,23 @@ Return schemas (backward compatible)
         "prompt": str,
         "tokens": List[str],
         "strategy": str,      # e.g., "random_injection", "genetic_algorithm"
-        ... optional metadata ...
+        "meta": {...}        # optional, nested metadata
     }
 
 `update_strategy(attack, result)` expects:
     - attack["tokens"] : List[str]
     - result["success"]: bool (True if the attack bypassed the guardrail)
     - Optional: result["score"] in [0,1] for graded fitness
+
+IMPORTANT NAMING NOTE
+---------------------
+There are two different "AttackStrategy" concepts in CC-Framework:
+
+- cc.core.attackers.AttackStrategy (this file): runtime *interface* / behavior.
+- cc.core.models.AttackStrategy: a *data model* / spec (name, params, vocab).
+
+Do NOT confuse them. This file exposes a helper `make_attacker_from_spec`
+to bridge the data-model spec into a runtime AttackStrategy instance.
 """
 
 from __future__ import annotations
@@ -56,6 +66,12 @@ from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+
+# Data-model AttackStrategy spec (NOT the runtime ABC below)
+try:  # soft import to avoid circulars in exotic setups
+    from cc.core.models import AttackStrategy as AttackStrategySpec  # type: ignore
+except Exception:  # pragma: no cover - defensive
+    AttackStrategySpec = None  # type: ignore
 
 
 # =============================================================================
@@ -79,19 +95,29 @@ class AttackEvent:
     meta: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        d = {
+        """
+        Standardized dict representation.
+
+        Keys:
+          - attack_id: str
+          - prompt: str
+          - tokens: List[str]
+          - strategy: str (stable, lowercase label)
+          - meta: dict (optional nested metadata)
+        """
+        data: Dict[str, Any] = {
             "attack_id": self.attack_id,
             "prompt": self.prompt,
             "tokens": list(self.tokens),
             "strategy": self.strategy,
         }
         if self.meta:
-            d.update(self.meta)
-        return d
+            data["meta"] = dict(self.meta)
+        return data
 
 
 class AttackStrategy(ABC):
-    """Abstract base class for attack strategies."""
+    """Abstract base class for runtime attack strategies."""
 
     # ----- core API -----
     @abstractmethod
@@ -127,7 +153,34 @@ class AttackStrategy(ABC):
     # ----- convenience -----
     @property
     def name(self) -> str:
+        """Human-readable name; by default the concrete class name."""
         return self.__class__.__name__
+
+    @property
+    def strategy_label(self) -> str:
+        """
+        Stable, lowercase label for analytics and logs.
+
+        Default: class name in snake_case with a trailing 'Attacker' trimmed.
+        Examples:
+          RandomInjectionAttacker -> "random_injection"
+          TemplatePromptAttacker  -> "template_prompt"
+          GeneticAlgorithmAttacker -> "genetic_algorithm"
+        """
+        name = self.__class__.__name__
+        if name.lower().endswith("attacker"):
+            name = name[:-8]  # strip 'Attacker'
+        # CamelCase -> snake_case
+        out: List[str] = []
+        for i, c in enumerate(name):
+            if c.isupper() and i > 0:
+                out.append("_")
+            out.append(c.lower())
+        return "".join(out)
+
+
+# Convenience alias for clarity elsewhere
+RuntimeAttackStrategy = AttackStrategy
 
 
 # =============================================================================
@@ -171,6 +224,26 @@ def _nonempty_unique(items: Sequence[str]) -> List[str]:
     return out
 
 
+def _canonical_token(tok: str) -> str:
+    """
+    Coarse canonicalization for token diagnostics.
+
+    Normalizes simple obfuscations:
+      - lowercase
+      - @ -> a, 3 -> e, 1 -> i, 0 -> o, $ -> s, + -> t
+    """
+    t = tok.lower()
+    t = (
+        t.replace("@", "a")
+        .replace("3", "e")
+        .replace("1", "i")
+        .replace("0", "o")
+        .replace("$", "s")
+        .replace("+", "t")
+    )
+    return t
+
+
 # =============================================================================
 # Random Injection Attacker (Tier A)
 # =============================================================================
@@ -209,7 +282,7 @@ class RandomInjectionAttacker(AttackStrategy):
         self.cfg = cfg or RandomInjectionConfig()
         self.rng = _rng(self.cfg.seed)
 
-        # Diagnostics: per-token success rates
+        # Diagnostics: per-token success rates (canonical tokens)
         self.success_counts: Dict[str, int] = {}
         self.attempt_counts: Dict[str, int] = {}
 
@@ -283,19 +356,20 @@ class RandomInjectionAttacker(AttackStrategy):
             attack_id=attack_id,
             prompt=prompt,
             tokens=tokens,
-            strategy="random_injection",
+            strategy=self.strategy_label,
         )
         return ev.to_dict()
 
     def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:
-        """Update per-token counters from the result."""
+        """Update per-token counters from the result (canonicalized tokens)."""
         tokens = attack.get("tokens", []) or []
         success = bool(result.get("success", False))
 
         for token in tokens:
-            self.attempt_counts[token] = self.attempt_counts.get(token, 0) + 1
+            c = _canonical_token(str(token))
+            self.attempt_counts[c] = self.attempt_counts.get(c, 0) + 1
             if success:
-                self.success_counts[token] = self.success_counts.get(token, 0) + 1
+                self.success_counts[c] = self.success_counts.get(c, 0) + 1
 
     def reset(self, *, seed: Optional[int] = None) -> None:
         """Reset counters; optionally reseed RNG."""
@@ -308,11 +382,12 @@ class RandomInjectionAttacker(AttackStrategy):
     # --- Introspection ------------------------------------------------------
 
     def token_success_rate(self, token: str) -> float:
-        """Return success rate for a specific token, or 0.0 if unseen."""
-        a = self.attempt_counts.get(token, 0)
+        """Return success rate for a specific (canonicalized) token, or 0.0 if unseen."""
+        c = _canonical_token(token)
+        a = self.attempt_counts.get(c, 0)
         if a <= 0:
             return 0.0
-        return float(self.success_counts.get(token, 0) / a)
+        return float(self.success_counts.get(c, 0) / a)
 
     def top_tokens(self, k: int = 10, min_attempts: int = 3) -> List[Tuple[str, float, int]]:
         """
@@ -330,22 +405,32 @@ class RandomInjectionAttacker(AttackStrategy):
     # --- serialization ------------------------------------------------------
 
     def state_dict(self) -> Dict[str, Any]:
+        """
+        Serialize config + dynamic state.
+
+        Note: RNG internal bit state is not serialized; we rely on cfg.seed or
+        external seeding via reset(seed=...).
+        """
         return {
             "cfg": asdict(self.cfg),
             "success_counts": dict(self.success_counts),
             "attempt_counts": dict(self.attempt_counts),
             "counter": int(self._counter),
-            # cannot serialize RNG internal state succinctly without pickle; reseed instead
         }
 
     def load_state_dict(self, state: Dict[str, Any]) -> None:
+        """Restore config + dynamic state."""
+        cfg_dict = state.get("cfg")
+        if cfg_dict is not None:
+            self.cfg = RandomInjectionConfig(**cfg_dict)
+            self.rng = _rng(self.cfg.seed)
         self.success_counts = dict(state.get("success_counts", {}))
         self.attempt_counts = dict(state.get("attempt_counts", {}))
         self._counter = int(state.get("counter", 0))
 
 
 # =============================================================================
-# Template Prompt Attacker (Tier A+)  --- new in 2025-09-28
+# Template Prompt Attacker (Tier A+)
 # =============================================================================
 
 
@@ -418,7 +503,7 @@ class TemplatePromptAttacker(AttackStrategy):
             attack_id=self._next_id(),
             prompt=prompt,
             tokens=tokens,
-            strategy="template_prompt",
+            strategy=self.strategy_label,
             meta={"difficulty": self.cfg.difficulty.value},
         ).to_dict()
 
@@ -432,9 +517,16 @@ class TemplatePromptAttacker(AttackStrategy):
             self.rng = _rng(seed)
 
     def state_dict(self) -> Dict[str, Any]:
-        return {"cfg": asdict(self.cfg), "counter": int(self._counter)}
+        return {
+            "cfg": asdict(self.cfg),
+            "counter": int(self._counter),
+        }
 
     def load_state_dict(self, state: Dict[str, Any]) -> None:
+        cfg_dict = state.get("cfg")
+        if cfg_dict is not None:
+            self.cfg = TemplateAttackerConfig(**cfg_dict)
+            self.rng = _rng(self.cfg.seed)
         self._counter = int(state.get("counter", 0))
 
 
@@ -463,10 +555,11 @@ class GAConfig:
 class GeneticAlgorithmAttacker(AttackStrategy):
     """Tier B: GA to evolve token sequences that aim to bypass guardrails.
 
-    Upgrades (2025-09-28):
+    Upgrades:
       - Fitness smoothing via EMA (stable across noisy evaluations).
       - Optional diversity pressure to avoid premature convergence.
       - Deterministic attack_id sequencing.
+      - Symmetric state_dict/load_state_dict for experiment checkpoints.
     """
 
     def __init__(self, vocab: Sequence[str], cfg: Optional[GAConfig] = None):
@@ -624,7 +717,7 @@ class GeneticAlgorithmAttacker(AttackStrategy):
             attack_id=self._next_id(),
             prompt=prompt,
             tokens=indiv.copy(),
-            strategy="genetic_algorithm",
+            strategy=self.strategy_label,
             meta={"generation": self.generation},
         ).to_dict()
 
@@ -668,6 +761,10 @@ class GeneticAlgorithmAttacker(AttackStrategy):
         }
 
     def load_state_dict(self, state: Dict[str, Any]) -> None:
+        cfg_dict = state.get("cfg")
+        if cfg_dict is not None:
+            self.cfg = GAConfig(**cfg_dict)
+            self.rng = _rng(self.cfg.seed)
         self.population = [list(ind) for ind in state.get("population", [])]
         self.fitness_cache = dict(state.get("fitness_cache", {}))
         self.generation = int(state.get("generation", 0))
@@ -676,7 +773,7 @@ class GeneticAlgorithmAttacker(AttackStrategy):
 
 
 # =============================================================================
-# Factory (YAML-friendly)
+# Factory (YAML/data-model friendly)
 # =============================================================================
 
 
@@ -716,16 +813,50 @@ def make_attacker_from_config(
 
     if t == "genetic_algorithm":
         vocab = params.get("vocab", params.get("vocab_harmful", []))  # be forgiving
-        cfg_kwargs = {k: v for k, v in params.items() if k != "vocab" and k != "vocab_harmful"}
+        cfg_kwargs = {k: v for k, v in params.items() if k not in ("vocab", "vocab_harmful")}
         cfg = GAConfig(**cfg_kwargs) if cfg_kwargs else GAConfig()
         return GeneticAlgorithmAttacker(vocab=vocab, cfg=cfg)
 
     raise ValueError(f"Unknown attacker type: {type_name!r}")
 
 
+def make_attacker_from_spec(spec: AttackStrategySpec) -> AttackStrategy:
+    """
+    Bridge data-model AttackStrategy (cc.core.models.AttackStrategy) into a
+    runtime attacker instance.
+
+    This allows experiment configs to use the *spec* as the canonical
+    representation, and construct runtime attackers lazily.
+    """
+    if AttackStrategySpec is None:  # pragma: no cover - defensive
+        raise RuntimeError("AttackStrategySpec is not available (models import failed).")
+
+    t = (spec.name or "").strip().lower()
+    params = dict(spec.params or {})
+
+    # Default vocabulary for some strategies can come from spec.vocabulary
+    if t == "random_injection":
+        vocab_harmful = params.pop("vocab_harmful", spec.vocabulary)
+        vocab_benign = params.pop("vocab_benign", [])
+        cfg = RandomInjectionConfig(**params) if params else RandomInjectionConfig()
+        return RandomInjectionAttacker(vocab_harmful=vocab_harmful, vocab_benign=vocab_benign, cfg=cfg)
+
+    if t == "template_prompt":
+        cfg = TemplateAttackerConfig(**params) if params else TemplateAttackerConfig()
+        return TemplatePromptAttacker(cfg=cfg)
+
+    if t == "genetic_algorithm":
+        vocab = params.pop("vocab", spec.vocabulary or params.pop("vocab_harmful", []))
+        cfg = GAConfig(**params) if params else GAConfig()
+        return GeneticAlgorithmAttacker(vocab=vocab, cfg=cfg)
+
+    raise ValueError(f"Unknown attacker spec name: {spec.name!r}")
+
+
 __all__ = [
     # base
     "AttackStrategy",
+    "RuntimeAttackStrategy",
     "AttackDifficulty",
     "AttackEvent",
     # random injection
@@ -737,6 +868,7 @@ __all__ = [
     # GA
     "GeneticAlgorithmAttacker",
     "GAConfig",
-    # factory
+    # factories
     "make_attacker_from_config",
+    "make_attacker_from_spec",
 ]
