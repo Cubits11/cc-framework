@@ -1,0 +1,92 @@
+\subsection{Primary safety hypotheses: H1 and H2}
+\label{subsec:primary-hypotheses}
+
+Let $p_y = \Pr(Z=1 \mid Y=y)$, $y\in\{0,1\}$, denote the classwise
+block rates of a fixed composed rail pair, with Fr\'echet--Hoeffding
+bounds $L_y \le p_y \le U_y$.
+We define dependence coordinates $\lambda_y$ and tightness scores
+$s_y = 1-\lambda_y$ as in Section~\ref{sec:foundations}.
+
+For each class $y$ we choose a critical dependence level
+$\tau_y \in (0,1)$ reflecting an operational safety requirement on
+$p_y$.
+We treat $H_{y,0}:\lambda_y > \tau_y$ as the \emph{unsafe or
+undetermined} null, and only reject $H_{y,0}$ when the data support
+$\lambda_y \le \tau_y$ with high confidence.
+
+\paragraph{Finite-sample envelopes.}
+Given $n_y$ i.i.d.\ samples per class, we form empirical rates
+$\hat p_y$ and compute one-sided empirical-Bernstein radii
+$\varepsilon_y(n_y,\alpha_y)$ such that
+\begin{equation}
+  \Pr\bigl( p_y \le \hat p_y + \varepsilon_y \bigr)
+  \;\ge\; 1-\alpha_y,
+  \qquad y\in\{0,1\}.
+  \label{eq:bernstein-H}
+\end{equation}
+Affine rescaling yields dependence-coordinate envelopes
+\[
+  \hat\lambda_y =
+  \frac{b_y - \hat p_y}{b_y - w_y},\qquad
+  U^{(\lambda)}_y =
+  \hat\lambda_y + \frac{\varepsilon_y}{b_y - w_y},
+\]
+which satisfy
+$\Pr(\lambda_y \le U^{(\lambda)}_y) \ge 1-\alpha_y$.
+
+\begin{hypothesis}[H1: Complementarity certification (harmful / AND)]
+\label{hyp:H1-final}
+For the harmful class $y=1$ under an AND composition, fix a
+critical dependence level $\tau_1 \in (0,1)$.
+
+\emph{Null (unsafe or undetermined complementarity):}
+\[
+  H_{1,0}:\quad \lambda_1 > \tau_1.
+\]
+
+\emph{Alternative (acceptable complementarity):}
+\[
+  H_{1,1}:\quad \lambda_1 \le \tau_1.
+\]
+
+\emph{Decision rule.}
+At per-test level $\alpha_1$ we compute $U^{(\lambda)}_1$ as above
+and reject $H_{1,0}$---thereby \emph{certifying complementarity} for
+this pair---if and only if
+\begin{equation}
+  U^{(\lambda)}_1 \le \tau_1.
+  \label{eq:H1-rule-final}
+\end{equation}
+Equivalently, in terms of the tightness score
+$s_1 = 1-\lambda_1$, with threshold $s_1^\star = 1-\tau_1$, we
+certify whenever the lower confidence limit for $s_1$ exceeds
+$s_1^\star$.
+\end{hypothesis}
+
+\begin{hypothesis}[H2: Benign-inflation certification (benign / OR)]
+\label{hyp:H2-final}
+For the benign class $y=0$ under an OR composition, fix a critical
+dependence level $\tau_0 \in (0,1)$.
+
+\emph{Null (excess or undetermined benign inflation):}
+\[
+  H_{2,0}:\quad \lambda_0 > \tau_0.
+\]
+
+\emph{Alternative (acceptable benign inflation):}
+\[
+  H_{2,1}:\quad \lambda_0 \le \tau_0.
+\]
+
+\emph{Decision rule.}
+At per-test level $\alpha_0$ we compute $U^{(\lambda)}_0$ and reject
+$H_{2,0}$---\emph{certifying acceptable benign inflation}---if and
+only if
+\begin{equation}
+  U^{(\lambda)}_0 \le \tau_0.
+  \label{eq:H2-rule-final}
+\end{equation}
+Equivalently, with benign-preservation score $s_0=1-\lambda_0$ and
+threshold $s_0^\star = 1-\tau_0$, we certify whenever the lower
+confidence limit for $s_0$ lies above $s_0^\star$.
+\end{hypothesis}
