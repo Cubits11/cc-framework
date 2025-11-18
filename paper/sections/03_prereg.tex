@@ -1,0 +1,207 @@
+\section{Pre-Registered Hypotheses and Testing Framework}
+\label{sec:prereg}
+
+In this section we convert the informal guardrail desiderata---unsafe
+complementarity on harmful inputs, bounded benign inflation, and
+stability across strata---into precise, finite-sample hypothesis tests
+expressed in the dependence coordinates of
+Section~\ref{sec:foundations}.
+Throughout we use $\lambda_y$ as the canonical ``badness'' coordinate
+and $s_y = 1-\lambda_y$ as the corresponding tightness score.
+
+We fix a per-class significance level $\alpha_y$ and use
+Theorem~\ref{thm:finite-sample} to obtain confidence radii
+$r_y = \varepsilon_y / W_y$ and confidence intervals
+\[
+  I_y^{(\lambda)} =
+  [L_y^{(\lambda)}, U_y^{(\lambda)}]
+  := \bigl[\hat\lambda_y - r_y,\; \hat\lambda_y + r_y\bigr] \cap [0,1]
+\]
+satisfying
+$\Pr(\lambda_y \in I_y^{(\lambda)}) \ge 1-\alpha_y$.
+
+\subsection{H1: Unsafe complementarity for AND (harmful class)}
+
+We consider the composed system under an AND rule on harmful inputs
+($Y=1$) and write $\lambda_1$ for its dependence coordinate and
+$s_1 = 1-\lambda_1$ for its unsafe complementarity score.
+
+We fix a pre-specified threshold $\tau_1 \in (0,1)$ encoding the
+maximum acceptable fraction of FH distance from the best-case AND
+corner.
+Equivalently, the minimum acceptable complementarity score is
+$s_1^{\min} = 1-\tau_1$.
+
+\begin{hypothesis}[H1: Unsafe complementarity]
+\label{hyp:H1}
+\mbox{}
+\begin{description}
+  \item[Null ($H_{0,1}$):]
+    $\lambda_1 > \tau_1$ \quad
+    (the harmful-class dependence lies too close to the FH worst case).
+  \item[Alternative ($H_{1,1}$):]
+    $\lambda_1 \le \tau_1$ \quad
+    (the system achieves sufficient unsafe complementarity).
+\end{description}
+\end{hypothesis}
+
+\paragraph{Test statistic and decision rule.}
+Compute $\hat\lambda_1$ and its confidence interval
+$I_1^{(\lambda)} = [L_1^{(\lambda)}, U_1^{(\lambda)}]$ as above.
+We \emph{reject} $H_{0,1}$ at level $\alpha_1$ whenever
+\begin{equation}
+  U_1^{(\lambda)} \le \tau_1.
+  \label{eq:H1-decision}
+\end{equation}
+Equivalently, in terms of the complementarity score
+$s_1 = 1-\lambda_1$ we reject $H_{0,1}$ whenever the one-sided
+$(1-\alpha_1)$ lower confidence bound for $s_1$ lies above
+$s_1^{\min} = 1-\tau_1$.
+
+\begin{remark}[Type I control]
+Under $H_{0,1}$ we have $\lambda_1 > \tau_1$.
+On the event $U_1^{(\lambda)} \le \tau_1$ we must have
+$\lambda_1 \notin I_1^{(\lambda)}$, hence
+\[
+  \Pr_{H_{0,1}}(U_1^{(\lambda)} \le \tau_1)
+  \;\le\;
+  \Pr_{H_{0,1}}(\lambda_1 \notin I_1^{(\lambda)})
+  \;\le\; \alpha_1.
+\]
+Thus the test~\eqref{eq:H1-decision} has size at most $\alpha_1$.
+\end{remark}
+
+\subsection{H2: Benign inflation for OR (benign class)}
+
+For the benign class ($Y=0$) under an OR composition, the dependence
+coordinate $\lambda_0$ quantifies benign inflation (distance from the
+best FH corner), while $s_0 = 1-\lambda_0$ quantifies benign
+preservation.
+
+We fix a pre-specified tolerated inflation level $\tau_0 \in (0,1)$,
+or equivalently a preservation score threshold
+$s_0^{\min} = 1-\tau_0$.
+
+\begin{hypothesis}[H2: Benign inflation control]
+\label{hyp:H2}
+\mbox{}
+\begin{description}
+  \item[Null ($H_{0,0}$):]
+    $\lambda_0 > \tau_0$ \quad
+    (benign inflation exceeds the allowed FH fraction).
+  \item[Alternative ($H_{1,0}$):]
+    $\lambda_0 \le \tau_0$ \quad
+    (benign inflation is controlled).
+\end{description}
+\end{hypothesis}
+
+\paragraph{Decision rule.}
+Compute $I_0^{(\lambda)} = [L_0^{(\lambda)}, U_0^{(\lambda)}]$ as
+before, and reject $H_{0,0}$ at level $\alpha_0$ if
+\begin{equation}
+  U_0^{(\lambda)} \le \tau_0,
+  \label{eq:H2-decision}
+\end{equation}
+equivalently, if the one-sided $(1-\alpha_0)$ lower confidence bound
+for $s_0$ lies above $s_0^{\min}$.
+By the same argument as for H1, this test has size at most $\alpha_0$.
+
+\subsection{H3: Strata stability (Simpson guard)}
+
+In many deployments, evaluation data are stratified into groups
+(e.g.\ stacks, language families, jurisdictions).
+We write $s \in \mathcal{S}$ for a stratum index and
+$\lambda_y^{(s)}$ for the dependence coordinate of the composed
+system restricted to that stratum.
+We also write $\lambda_y^{\mathrm{glob}}$ for the dependence
+coordinate computed on the pooled data.
+
+We wish to guard against large latent shifts of dependence across
+strata (Simpson effects).
+We fix a tolerance $\epsilon_{\mathrm{strata}} > 0$ and require each
+stratum to lie within this tolerance of the global system.
+
+\begin{hypothesis}[H3: Strata stability]
+\label{hyp:H3}
+\mbox{}
+\begin{description}
+  \item[Null ($H_{0,\mathrm{strata}}$):]
+    There exists a stratum $s \in \mathcal{S}$ and a class
+    $y \in \{0,1\}$ such that
+    \(
+      |\lambda_y^{(s)} - \lambda_y^{\mathrm{glob}}|
+      > \epsilon_{\mathrm{strata}}.
+    \)
+  \item[Alternative ($H_{1,\mathrm{strata}}$):]
+    For all $s \in \mathcal{S}$ and both classes,
+    \(
+      |\lambda_y^{(s)} - \lambda_y^{\mathrm{glob}}|
+      \le \epsilon_{\mathrm{strata}}.
+    \)
+\end{description}
+\end{hypothesis}
+
+\paragraph{Confidence radii.}
+For each class $y$ and stratum $s$, we compute:
+
+\begin{itemize}
+  \item an empirical coordinate $\hat\lambda_y^{(s)}$ and radius
+    $r_y^{(s)}$ from Theorem~\ref{thm:finite-sample},
+  \item the global coordinate $\hat\lambda_y^{\mathrm{glob}}$ and
+    radius $r_y^{\mathrm{glob}}$ from the pooled data.
+\end{itemize}
+
+We choose per-(class,stratum,global) significance levels
+$\alpha_y^{(s)}$ and $\alpha_y^{\mathrm{glob}}$ such that the total
+family-wise error across all strata and both classes is bounded by
+$\alpha_{\mathrm{strata}}$; for example, a simple Bonferroni choice is
+\[
+  \alpha_y^{(s)} = \frac{\alpha_{\mathrm{strata}}}{2(|\mathcal{S}|+1)},
+  \qquad
+  \alpha_y^{\mathrm{glob}} = \frac{\alpha_{\mathrm{strata}}}{2}.
+\]
+
+\paragraph{Decision rule (certificate of stability).}
+For each class $y$ and each stratum $s \in \mathcal{S}$, consider the
+quantity
+\begin{equation}
+  B_y^{(s)}
+  \;:=\;
+  |\hat\lambda_y^{(s)} - \hat\lambda_y^{\mathrm{glob}}|
+  \;+\; r_y^{(s)} \;+\; r_y^{\mathrm{glob}}.
+  \label{eq:simpson-bound}
+\end{equation}
+By the triangle inequality,
+\[
+  |\lambda_y^{(s)} - \lambda_y^{\mathrm{glob}}|
+  \le
+  |\hat\lambda_y^{(s)} - \hat\lambda_y^{\mathrm{glob}}|
+  + |\hat\lambda_y^{(s)} - \lambda_y^{(s)}|
+  + |\hat\lambda_y^{\mathrm{glob}} - \lambda_y^{\mathrm{glob}}|
+  \le B_y^{(s)}
+\]
+whenever all three coordinates lie in their respective confidence
+intervals.
+
+We \emph{reject} $H_{0,\mathrm{strata}}$ at level
+$\alpha_{\mathrm{strata}}$ (and thus certify strata stability) if
+\begin{equation}
+  B_y^{(s)} \le \epsilon_{\mathrm{strata}}
+  \quad\text{for all } y \in \{0,1\},\;
+  s \in \mathcal{S}.
+  \label{eq:H3-decision}
+\end{equation}
+If condition~\eqref{eq:H3-decision} fails for any $(y,s)$, we are
+unable to rule out Simpson-type deviations larger than
+$\epsilon_{\mathrm{strata}}$ in that stratum, and we report these
+strata explicitly.
+
+\begin{remark}[Conservatism and interpretation]
+The rule~\eqref{eq:H3-decision} is conservative: failure to certify
+stability does not prove the existence of a Simpson reversal, only
+that our finite sample does not suffice to rule one out at the chosen
+tolerance and error level.
+This is appropriate for safety auditing, where we prefer
+non-certification over overconfident claims of homogeneity across
+strata.
+\end{remark}
