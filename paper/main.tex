@@ -1,0 +1,48 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx,xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+\title{Compositional AI Safety under a Fixed False-Positive Cap:\\ 
+A Finite-Sample Auditable Approach}
+\author{Pranav Bhave}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+% [Briefly summarize vision, problem, approach, and results in 4-6 sentences]
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+\input{sections/01_introduction.tex}
+
+\section{Problem Setup and Preliminaries}\label{sec:setup}
+\input{sections/02_setup.tex}
+
+\section{Finite-Sample Composition Bounds}\label{sec:theory}
+\input{sections/03_theory.tex}
+
+\section{Experimental Evaluation}\label{sec:evaluation}
+\input{sections/04_evaluation.tex}
+
+\section{Discussion and Future Work}\label{sec:discussion}
+\input{sections/05_discussion.tex}
+
+\section*{Acknowledgments}
+% (if any)
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+\section{Impossibility of a Single Scalar Metric (Proof)}\label{app:impossibility}
+\input{sections/91_impossibility.tex}
+
+\section{Reproducibility Checklist and Details}\label{app:reproducibility}
+\input{sections/92_reproducibility.tex}
+
+\end{document}
