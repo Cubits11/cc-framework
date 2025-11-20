@@ -7,7 +7,9 @@ Author: Pranav Bhave
 Dates:
   - 2025-08-27: initial shim
   - 2025-09-14: (deterministic envelopes, env/git introspection,
+  - 2025-09-14: (deterministic envelopes, env/git introspection,
                 optional sanitize, verify-on-write, lockfile, richer context)
+  - 2025-09-28: (rotation, compression, redaction, batch ops,
   - 2025-09-28: (rotation, compression, redaction, batch ops,
                 env snapshot, thread-safety, schema v3, tail/head utilities)
   - 2025-11-13: (async support, Prometheus metrics, PII patterns,
@@ -27,6 +29,7 @@ Notes
   with fields: `prev_sha256`, `sha256` (Cartographer owns hash discipline).
 - New features are opt-in and non-breaking:
     * Deterministic envelope with both unix and ISO-8601 timestamps (UTC),
+      host, pid, git SHA, session id, optional seed and env snapshot (now with pip freeze fallback).
       host, pid, git SHA, session id, optional seed and env snapshot (now with pip freeze fallback).
     * `auto_sanitize=True` to coerce common non-JSON types (Path, set, tuple, bytes).
     * `verify_on_write=True` to run a full chain verification after append.
@@ -84,6 +87,7 @@ import secrets
 import socket
 import subprocess
 import sys
+import sys
 import time
 import threading
 from collections import deque
@@ -113,10 +117,12 @@ __all__ = [
     "ChainedJSONLLogger",
     "audit_context",
     "aaudit_context",
+    "aaudit_context",
     "LoggingError",
 ]
 
 SCHEMA_ID_DEFAULT = "core/logging.v5"  # Upgraded for changes
+SCHEMA_ID_DEFAULT = "core/logging.v4"  # Upgraded
 _LOCKFILE_SUFFIX = ".lock"
 
 # Built-in PII regexes applied to both keys and string values.
@@ -397,6 +403,11 @@ def _deep_redact(
             s = p.sub(mask, s)
         return s
 
+    def _redact_string(s: str) -> str:
+        for p in patterns:
+            s = p.sub(mask, s)
+        return s
+
     if isinstance(obj, dict):
         out: Dict[str, Any] = {}
         for k, v in obj.items():
@@ -432,6 +443,7 @@ def _deep_redact(
     return obj
 
 
+def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[re.Pattern]:
 def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[re.Pattern]:
     out: List[re.Pattern] = []
     if not pats:
@@ -541,6 +553,7 @@ class ChainedJSONLLogger:
     schema_id : str
         Envelope schema id (default: "core/logging.v5").
     capture_env : bool
+        If True, include a full environment snapshot in `meta.env` (python, platform, pip freeze with fallback).
         If True, include a full environment snapshot in `meta.env` (python, platform, pip freeze with fallback).
     fsync_on_write : bool
         If True, attempt to fsync the log file after each append (best effort).
@@ -956,6 +969,7 @@ class ChainedJSONLLogger:
 
     def _fsync_best_effort(self) -> None:
         """Attempt to fsync the file (best-effort; raise in strict if fails)."""
+        """Attempt to fsync the file (best-effort; raise in strict if fails)."""
         try:
             fd = os.open(str(self.path), os.O_RDWR)
             try:
@@ -1045,6 +1059,8 @@ class ChainedJSONLLogger:
             JSON-serializable content (auto-sanitized if enabled).
         level : str
             Log level: debug/info/warning/error (for metrics/filtering).
+        level : str
+            Log level: debug/info/warning/error (for metrics/filtering).
         seed : Optional[int]
             Overrides logger's default_seed for this record.
         extra_meta : Optional[Dict[str, Any]]
@@ -1098,6 +1114,7 @@ class ChainedJSONLLogger:
                                 "previous_head": self.last_sha,
                             },
                             verify_on_write=False,
+                            level="info",
                             level="info",
                         )
                     except Exception as e:
@@ -1175,6 +1192,12 @@ class ChainedJSONLLogger:
                 # ----------------------------------------------------------
                 # 7) Post-log hook (alerts, external sinks), with recursion guard
                 # ----------------------------------------------------------
+                self._post_log(sha)
+
+                if self.enable_prometheus:
+                    LOG_ENTRIES.inc()
+                    LOG_SIZE.set(self.path.stat().st_size)
+
                 self._post_log(sha)
 
                 return sha

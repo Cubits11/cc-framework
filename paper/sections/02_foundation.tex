@@ -1,0 +1,139 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[margin=1in]{geometry}
+
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+\begin{document}
+
+\section{Dependence Coordinates and Tightness Scores}
+
+We consider a binary class label $Y \in \{0,1\}$, with $Y=1$
+denoting harmful inputs and $Y=0$ benign inputs.
+Let $Z \in \{0,1\}$ be the output of a composed guardrail system
+(e.g.\ an AND/OR rule over individual rails), where $Z=1$ means
+``blocked''.
+For each class $y \in \{0,1\}$ we write
+\[
+  p_y = \Pr(Z = 1 \mid Y = y)
+\]
+for the classwise block rates.
+
+Given only per-rail marginal robustness at some operating point, the
+joint dependence structure is unknown and $p_y$ is constrained to lie
+in a Fr\'echet--Hoeffding (FH) interval
+\[
+  L_y \;\le\; p_y \;\le\; U_y, \qquad y \in \{0,1\}.
+\]
+
+\subsection{Best and worst FH extremes}
+
+For safety, we orient these bounds differently by class:
+
+\begin{definition}[Safety orientation]
+For the harmful class $y=1$, higher block rate is better, so we
+define
+\[
+  b_1 = U_1 \quad \text{(best case)}, \qquad
+  w_1 = L_1 \quad \text{(worst case)}.
+\]
+For the benign class $y=0$, lower block rate is better, so we define
+\[
+  b_0 = L_0 \quad \text{(best case)}, \qquad
+  w_0 = U_0 \quad \text{(worst case)}.
+\]
+We also define the FH width
+\[
+  W_y = b_y - w_y > 0, \qquad y \in \{0,1\}.
+\]
+\end{definition}
+
+Thus $b_y$ and $w_y$ are always ``best'' and ``worst'' in terms of
+safety, even though they correspond to different endpoints of the
+FH interval for $y=1$ and $y=0$.
+
+\subsection{Canonical dependence coordinates}
+
+We now define coordinates that locate the system inside the FH box.
+
+\begin{definition}[Dependence coordinates]
+On non-degenerate FH intervals, we define the
+\emph{dependence coordinates} $\lambda_y \in [0,1]$ by
+\begin{equation}
+  \lambda_y \;=\; \frac{b_y - p_y}{b_y - w_y},
+  \qquad y \in \{0,1\}.
+  \label{eq:lambda-def}
+\end{equation}
+Equivalently,
+\[
+  p_y \;=\; (1-\lambda_y)\,b_y + \lambda_y\,w_y.
+\]
+We interpret $\lambda_y = 0$ as ``best-case FH performance'' and
+$\lambda_y = 1$ as ``worst-case FH performance'' for class $y$.
+When $b_y = w_y$ the FH interval collapses and $\lambda_y$ is
+degenerate and not identifiable from $p_y$.
+\end{definition}
+
+Concretely, with the safety orientation above:
+\begin{align*}
+  \lambda_1 &= \frac{U_1 - p_1}{U_1 - L_1}, &
+  p_1 &= (1-\lambda_1)U_1 + \lambda_1 L_1, \\
+  \lambda_0 &= \frac{p_0 - L_0}{U_0 - L_0}, &
+  p_0 &= (1-\lambda_0)L_0 + \lambda_0 U_0.
+\end{align*}
+
+Thus $\lambda_y$ is always a ``badness'' coordinate: small values
+mean the system sits near the best FH extreme for class $y$, large
+values mean it sits near the worst extreme.
+
+\subsection{Tightness scores (goodness view)}
+
+For interpretability and dashboards it is often convenient to work
+with scores that run in the intuitive direction ``higher is better''.
+
+\begin{definition}[Tightness scores]
+The \emph{FH tightness scores} $s_y \in [0,1]$ are defined as
+\begin{equation}
+  s_y \;=\; 1 - \lambda_y
+          \;=\; \frac{p_y - w_y}{b_y - w_y},
+  \qquad y \in \{0,1\}.
+  \label{eq:s-def}
+\end{equation}
+Thus $s_y = 1$ means the system attains the best FH extreme $b_y$,
+and $s_y = 0$ means it attains the worst extreme $w_y$.
+\end{definition}
+
+Instantiating \eqref{eq:s-def} with the safety orientation gives
+\begin{align*}
+  s_1 &= \frac{p_1 - L_1}{U_1 - L_1}
+       &&\text{(unsafe complementarity / redundancy score)},\\[0.5ex]
+  s_0 &= \frac{U_0 - p_0}{U_0 - L_0}
+       &&\text{(benign preservation score)}.
+\end{align*}
+
+\begin{remark}[Relation to earlier $g$-notation]
+In previous drafts we used classwise scores
+\[
+  g_1 = \frac{p_1 - L_1}{U_1 - L_1}, \qquad
+  g_0 = \frac{p_0 - L_0}{U_0 - L_0}.
+\]
+These relate to the new coordinates as
+\[
+  g_1 = s_1 = 1 - \lambda_1, \qquad
+  g_0 = \lambda_0 = 1 - s_0.
+\]
+For the remainder of the paper we treat $\lambda_y$ as the canonical
+dependence coordinates (used in all theorems, derivatives, and
+stress bounds) and $s_y$ as the preferred human-facing scores.
+\end{remark}
+
+Empirical estimators $\hat p_y$ yield empirical coordinates
+$\hat\lambda_y$ and scores $\hat s_y$ via the same formulas, simply
+by substituting $\hat p_y$ for $p_y$.
+Finite-sample confidence intervals for $p_y$ induce intervals for
+$\lambda_y$ and $s_y$ via affine rescaling; see
+Section~\textsection2 for details.
+
+\end{document}

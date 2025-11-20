@@ -146,6 +146,7 @@ TModel = TypeVar("TModel", bound="ModelBase")
 # ---------------------------------------------------------------------------
 def _now_unix() -> float:
     """Unix timestamp in seconds (UTC)."""
+    """Unix timestamp in seconds (UTC)."""
     return float(time.time())
 
 
@@ -186,6 +187,10 @@ def _iso_from_unix(ts: float) -> str:
     """
     tm = time.gmtime(ts)
     ms = int((ts - int(ts)) * 1000)
+    return (
+        f"{tm.tm_year:04d}-{tm.tm_mon:02d}-{tm.tm_mday:02d}"
+        f"T{tm.tm_hour:02d}:{tm.tm_min:02d}:{tm.tm_sec:02d}.{ms:03d}Z"
+    )
     return (
         f"{tm.tm_year:04d}-{tm.tm_mon:02d}-{tm.tm_mday:02d}"
         f"T{tm.tm_hour:02d}:{tm.tm_min:02d}:{tm.tm_sec:02d}.{ms:03d}Z"
@@ -720,6 +725,7 @@ class AttackResult(ModelBase):
 
     @classmethod
     def from_transcript(
+    def from_transcript(
         cls,
         *,
         world_bit: WorldBit,
@@ -732,6 +738,8 @@ class AttackResult(ModelBase):
         session_id: str = "",
         attack_strategy: str = "",
         utility_score: Optional[float] = None,
+        creator_id: Optional[str] = None,
+        salt: Optional[bytes] = None,
         creator_id: Optional[str] = None,
         salt: Optional[bytes] = None,
     ) -> "AttackResult":
@@ -754,9 +762,15 @@ class AttackResult(ModelBase):
             attack_strategy=str(attack_strategy),
             utility_score=utility_score,
             creator_id=creator_id,
+            utility_score=utility_score,
+            creator_id=creator_id,
         )
 
 
+# ---------------------------------------------------------------------------
+# GuardrailSpec
+# ---------------------------------------------------------------------------
+class GuardrailSpec(ModelBase):
 # ---------------------------------------------------------------------------
 # GuardrailSpec
 # ---------------------------------------------------------------------------
@@ -771,8 +785,19 @@ class GuardrailSpec(ModelBase):
         le=1.0,
         description="Target false positive rate for calibration.",
     )
+    params: Dict[str, Any] = Field(default_factory=dict)
+    calibration_fpr_target: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Target false positive rate for calibration.",
+    )
     calibration_data_hash: str = ""
     version: str = "1.0"
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    risk_level: RiskLevel = RiskLevel.MEDIUM  # Safety tagging
+
+    @field_validator("params", mode="before")
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     risk_level: RiskLevel = RiskLevel.MEDIUM  # Safety tagging
 
@@ -870,6 +895,14 @@ class ExperimentConfig(ModelBase):
     HASH_EXCLUDE_FIELDS: ClassVar[set[str]] = {"iso_time"}
 
     experiment_id: str
+    n_sessions: int = Field(gt=0)
+    attack_strategies: List[str] = Field(min_length=1)
+    guardrail_configs: Dict[str, List[GuardrailSpec]] = Field(
+        min_length=1,
+        description="Mapping from label -> list[GuardrailSpec] composing that configuration.",
+    )
+    utility_target: float = Field(default=0.9, ge=0.0, le=1.0)
+    utility_tolerance: float = Field(default=0.02, ge=0.0, le=0.5)
     n_sessions: int = Field(gt=0)
     attack_strategies: List[str] = Field(min_length=1)
     guardrail_configs: Dict[str, List[GuardrailSpec]] = Field(
@@ -1001,6 +1034,7 @@ class CCResult(ModelBase):
     delta_add: float
     cc_multiplicative: Optional[float] = None
     confidence_interval: Optional[Tuple[float, float]] = None
+    bootstrap_samples: Optional[FloatSeq] = None
     bootstrap_samples: Optional[FloatSeq] = None
     n_sessions: int = 0
     ci_method: CiMethod = CiMethod.BOOTSTRAP

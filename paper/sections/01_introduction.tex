@@ -1,0 +1,429 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+\newcommand{\Prb}{\mathbb{P}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\RR}{\mathbb{R}}
+
+\begin{document}
+
+\title{Finite-Sample Compositional Safety\\
+under Unknown Dependence}
+\author{Pranav Bhave}
+\date{\today}
+\maketitle
+
+\begin{abstract}
+AI guardrails are increasingly deployed as \emph{ensembles} of
+binary ``rails'' (filters, classifiers, rules) whose outputs are
+composed by Boolean logic or small decision circuits.
+Operational safety guarantees are typically reported in terms of
+per-rail false negative and false positive rates measured on held-out
+data.
+However, the joint dependence between rails is rarely known or
+controlled.
+Consequently, the safety of a composed rule cannot be certified from
+marginals alone without making strong (and usually false)
+independence assumptions.
+
+This paper develops a finite-sample framework for
+\emph{compositional safety under unknown dependence}.
+We treat the joint law over rails as an unknown copula constrained by
+per-rail robustness at a fixed operating point, and we quantify how
+far a deployed system lies between best- and worst-case dependence
+extremes.
+Our main contributions are:
+(i) Fr\'echet--Hoeffding (FH) ``tightness'' scores and dependence
+coordinates that turn the FH box for two-class composition into an
+interpretable unit square;
+(ii) a finite-sample identification theorem with confidence envelopes
+for the dependence coordinates, and Lipschitz-sharp stress bounds for
+any compositional coefficient that is affine in the composed rates;
+and (iii) scalable FH prototypes for $n$ rails based on junction-tree
+linear programs over bounded treewidth chordal covers, yielding
+sound outer bounds that tighten monotonically with $k$ and converge
+to the exact FH polytope as $k \to n-1$.
+\end{abstract}
+
+\section{Introduction and Setting}
+
+\subsection{Rails, composition, and the unknown copula problem}
+
+We study a generic guardrail composition setting.
+Let $Y \in \{0,1\}$ denote the latent \emph{class},
+with $Y=1$ representing harmful inputs and $Y=0$ benign inputs.
+We observe $n$ binary \emph{rails}
+\[
+R_i \in \{0,1\}, \qquad i = 1,\dots,n,
+\]
+e.g.\ individual filters or classifiers.
+Here $R_i=1$ means ``rail $i$ fires'' (blocks or flags the input), and
+$R_i=0$ means it lets the input pass.
+
+A \emph{composition rule} is any Boolean map
+\[
+g : \{0,1\}^n \to \{0,1\},
+\]
+such as AND, OR, voting, or a small Boolean circuit.
+The composed system output is
+\[
+Z \;=\; g(R_{1:n}) \in \{0,1\},
+\]
+where $Z=1$ is interpreted as ``blocked''.
+
+For each class $y\in\{0,1\}$ we define the \emph{classwise block
+probabilities}
+\[
+p_y \;=\; \Prb\bigl(Z = 1 \mid Y = y\bigr)
+      \;=\; \Prb\bigl(g(R_{1:n}) = 1 \mid Y = y\bigr).
+\]
+In the usual convention, $p_1$ is the true positive rate of the
+composed rule, and $p_0$ is its false positive rate.
+
+In practice we rarely observe the full joint law of
+$(R_{1:n}, Y)$.
+Instead, guardrail evaluations report classwise
+\emph{per-rail marginals}
+\[
+m_{i,y} \;=\; \Prb(R_i = 1 \mid Y=y), \qquad i=1,\dots,n,\; y\in\{0,1\},
+\]
+possibly together with a small number of low-order interactions.
+All further dependence between rails is left unspecified.
+We refer to this situation as the \emph{unknown copula problem}:
+we know the marginals of $(R_{1:n} \mid Y=y)$ at some operating point,
+but not the copula that couples them.
+
+\paragraph{FH envelopes for the composed rule.}
+Given only the marginals, the set of joint laws over $R_{1:n}$
+compatible with them is a high-dimensional Fr\'echet--Hoeffding (FH)
+feasible set.
+For any fixed class $y$ and composition $g$, the induced block rate
+$p_y$ is linear in the joint law, and hence attains a minimum and
+maximum over the FH feasible region.
+We denote these classwise FH bounds by
+\[
+L_y \;\le\; p_y \;\le\; U_y, \qquad y\in\{0,1\}.
+\]
+Intuitively, $L_y$ and $U_y$ describe the best- and worst-case
+composed performance compatible with the per-rail evaluations, under
+\emph{any} possible dependence structure.
+
+For safety purposes we adopt the convention
+\begin{itemize}
+  \item For $y=1$ (harmful inputs), \emph{best case} is high block rate:
+        $p_1^{\mathrm{best}} = U_1$ and
+        $p_1^{\mathrm{worst}} = L_1$.
+  \item For $y=0$ (benign inputs), \emph{best case} is low block rate:
+        $p_0^{\mathrm{best}} = L_0$ and
+        $p_0^{\mathrm{worst}} = U_0$.
+\end{itemize}
+When $g$ is AND on $Y=1$, $U_1$ corresponds to maximally
+\emph{complementary} rails (high redundancy), and $L_1$ to maximally
+\emph{redundant failures}.
+When $g$ is OR on $Y=0$, $L_0$ corresponds to rails that hardly ever
+block benign content, while $U_0$ corresponds to severe benign
+inflation.
+
+In many regulatory and red-teaming contexts, such FH envelopes are
+computed at a fixed operating point or \emph{$\alpha$-cap}:
+per-rail false positive and negative rates are controlled to lie
+within some tolerance $\alpha$, and the FH bounds are evaluated under
+those marginals.
+We keep this dependence on the operating point implicit in the
+notation.
+
+\subsection{Dependence coordinates inside the FH box}
+
+The FH bounds provide an interval for each of the two classwise block
+rates $p_1$ and $p_0$.
+To turn these into interpretable \emph{dependence coordinates}, we
+normalize the realized rates between best and worst case.
+
+\begin{definition}[Dependence coordinates]
+Let $L_y \le p_y \le U_y$ be non-degenerate FH bounds for
+$y\in\{0,1\}$.
+We define the \emph{dependence coordinates}
+$\lambda_y \in [0,1]$ by
+\begin{align*}
+p_1 &= (1-\lambda_1)\,U_1 + \lambda_1\,L_1, \\
+p_0 &= (1-\lambda_0)\,L_0 + \lambda_0\,U_0,
+\end{align*}
+and write $\lambda = (\lambda_1,\lambda_0)$.
+When the FH interval for class $y$ collapses ($U_y=L_y$), we say
+$\lambda_y$ is \emph{degenerate} and is not identifiable from $p_y$.
+\end{definition}
+
+Thus $\lambda_y = 0$ means the system attains the best possible
+performance compatible with the per-rail marginals, and
+$\lambda_y = 1$ means it attains the worst.
+In particular:
+\begin{itemize}
+  \item $\lambda_1$ quantifies how much of the available
+        \emph{unsafe complementarity} the rails actually realize.
+        Small $\lambda_1$ means the composed AND rule is close to the
+        best-case FH corner $U_1$; large $\lambda_1$ means it is close
+        to the worst-case corner $L_1$.
+  \item $\lambda_0$ quantifies \emph{benign inflation}:
+        small $\lambda_0$ means benign block rate $p_0$ is close to
+        the best-case bound $L_0$, and large $\lambda_0$ means it is
+        close to the worst-case bound $U_0$.
+\end{itemize}
+
+In applications we observe empirical block rates
+$\hat p_y$ based on $n_y$ samples per class.
+Plugging $\hat p_y$ into the above definition yields the empirical
+dependence coordinates
+\[
+\hat \lambda_1 =
+\frac{U_1 - \hat p_1}{U_1 - L_1},\qquad
+\hat \lambda_0 =
+\frac{\hat p_0 - L_0}{U_0 - L_0},
+\]
+on non-degenerate intervals.
+These are simple affine reparameterizations of $\hat p_y$ and hence
+inherit standard concentration bounds.
+
+\subsection{FH tightness scores and pre-registered hypotheses}
+
+For some tasks it is useful to work with \emph{FH tightness scores}
+that run in the intuitive direction for each class.
+
+We define
+\begin{align*}
+g_1 &= 1 - \lambda_1
+     = \frac{p_1 - L_1}{U_1 - L_1},
+     &&\text{(unsafe complementarity score)},\\[0.5ex]
+g_0 &= \lambda_0
+     = \frac{p_0 - L_0}{U_0 - L_0},
+     &&\text{(benign inflation score)},
+\end{align*}
+with empirical versions obtained by replacing $p_y$ with $\hat p_y$.
+Thus $g_1 \approx 1$ means ``near best-case AND'', while
+$g_1 \approx 0$ signals that the composed rule sits near its
+FH worst case on harmful inputs.
+Conversely, $g_0 \approx 0$ means ``near best-case OR'' with low
+benign blocking, and $g_0 \approx 1$ indicates strong benign
+inflation.
+
+These normalized scores allow clean pre-registered hypotheses.
+For example, one might specify:
+\begin{itemize}
+  \item[(H1)] \textbf{Unsafe complementarity.}
+        For a designated pair of rails composed by AND,
+        the unsafe score satisfies
+        $g_1 \geq \tau_1$ with high confidence
+        (e.g.\ $\tau_1 = 0.65$ and a one-sided
+        $(1-\alpha)$ lower confidence bound above $\tau_1$).
+  \item[(H2)] \textbf{Benign inflation control.}
+        For the same pair composed by OR, the benign inflation score
+        obeys $g_0 \leq \tau_0$ (e.g.\ $\tau_0 = 0.5$ with an
+        upper confidence bound below $\tau_0$).
+  \item[(H3)] \textbf{Strata stability.}
+        When data are stratified by stack, language family, or other
+        covariates, the median $g_y$ across strata does not deviate
+        from the overall $g_y$ by more than $\epsilon_{\mathrm{Strata}}$.
+\end{itemize}
+Section~\ref{sec:hypotheses} (not written yet) will turn these
+informal sketches into precise statistical tests with multiple-
+comparison control.
+
+\subsection{Finite-sample identification and stress envelopes}
+
+From a statistical perspective, the key question is:
+
+\begin{quote}
+\emph{Given a finite sample and FH envelopes
+$[L_y,U_y]$, how precisely can we locate the system inside the FH
+box, and how sensitive are our compositional metrics to perturbations
+of the dependence coordinates?}
+\end{quote}
+
+We answer this in two steps.
+First we show that any finite-sample confidence interval for $p_y$
+induces a rescaled interval for $\lambda_y$, and hence for the
+tightness scores $g_y$.
+Then we propagate this uncertainty to \emph{any} compositional
+coefficient that is affine in $(p_1,p_0)$, obtaining
+Lipschitz-sharp stress bars as a function of the FH widths.
+
+\medskip
+
+Fix a per-class significance level $\alpha_y$ and suppose we have a
+finite-sample bound of Bernstein type
+\begin{equation}
+\Prb\bigl(|\hat p_y - p_y| \le \varepsilon_y\bigr)
+\;\ge\; 1 - \alpha_y, \qquad y\in\{0,1\},
+\label{eq:bernstein}
+\end{equation}
+where $\varepsilon_y$ is an explicit function of $(n_y,\alpha_y)$.
+(This can be the usual empirical-Bernstein radius; see later sections
+for the formula.)
+
+Define the FH widths $W_y = U_y - L_y$, and assume $W_y > 0$.
+By affine rescaling, the same event implies a bound on $\lambda_y$:
+\begin{equation}
+|\hat \lambda_y - \lambda_y|
+\;=\;
+\frac{|\hat p_y - p_y|}{W_y}
+\;\le\; \frac{\varepsilon_y}{W_y}.
+\label{eq:lambda-ci-idea}
+\end{equation}
+
+Many of the compositional metrics we care about are affine functions
+of $(p_1,p_0)$.
+A canonical example is the Youden-type compositional coefficient
+\[
+CC \;=\; \frac{J_{\mathrm{combo}}}{D},
+\quad
+J_{\mathrm{combo}} = p_1 - p_0,
+\]
+where $D>0$ is a fixed normalization (e.g.\ the sum of
+per-rail Youden scores).
+Such $CC$ can always be written as
+\[
+CC(\lambda_1,\lambda_0)
+= a_0 + a_1 p_1(\lambda_1) + a_2 p_0(\lambda_0),
+\]
+for constants $a_0,a_1,a_2$ determined by the choice of metric.
+
+\begin{theorem}[Finite-sample identification and stress envelopes]
+\label{thm:finite-sample}
+Fix the FH bounds $L_y < U_y$ and widths $W_y = U_y-L_y>0$ for
+$y\in\{0,1\}$.
+Assume classwise samples are i.i.d.\ conditional on $Y=y$, and let
+$\hat p_y$ be the empirical block rates from $n_y$ samples with
+confidence radii $\varepsilon_y$ satisfying
+\eqref{eq:bernstein}.
+
+\begin{enumerate}
+  \item[(A)] \textbf{Confidence intervals for dependence coordinates.}
+  On the event \eqref{eq:bernstein} we have
+  \begin{align*}
+    |\hat \lambda_1 - \lambda_1|
+      &\le \varepsilon_1/W_1,\\
+    |\hat \lambda_0 - \lambda_0|
+      &\le \varepsilon_0/W_0.
+  \end{align*}
+  Thus two-sided $(1-\alpha_y)$ confidence intervals for each
+  $\lambda_y$ are obtained by rescaling those for $p_y$:
+  \[
+    I_y^{(\lambda)} =
+    \left[
+      \hat \lambda_y - \frac{\varepsilon_y}{W_y},
+      \hat \lambda_y + \frac{\varepsilon_y}{W_y}
+    \right]
+    \cap [0,1].
+  \]
+
+  \item[(B)] \textbf{Lipschitz sensitivity of affine CC in $\lambda$.}
+  Let $CC$ be any compositional coefficient of the form
+  \[
+    CC
+    = \frac{c_0 + c_1 p_1 + c_2 p_0}{D}
+  \]
+  with constants $c_0,c_1,c_2 \in \RR$ and $D>0$.
+  Along any path $(\lambda_1,\lambda_0)$ inside the FH box,
+  \begin{align*}
+    \frac{\partial CC}{\partial \lambda_1}
+     &= \frac{c_1 (L_1-U_1)}{D},\\
+    \frac{\partial CC}{\partial \lambda_0}
+     &= \frac{c_2 (U_0-L_0)}{D}.
+  \end{align*}
+  In particular, $CC$ is globally Lipschitz in $\lambda$ with
+  constant
+  \[
+    L_{CC}
+    \;\le\;
+    \frac{|c_1| W_1 + |c_2| W_0}{D}.
+  \]
+  Any perturbations $(\Delta\lambda_1,\Delta\lambda_0)$ consistent
+  with the confidence intervals
+  $I_y^{(\lambda)}$ can change $CC$ by at most
+  \[
+    |CC(\lambda + \Delta\lambda) - CC(\lambda)|
+    \;\le\;
+    \frac{|c_1| W_1 |\Delta\lambda_1|
+          + |c_2| W_0 |\Delta\lambda_0|}{D}.
+  \]
+\end{enumerate}
+\end{theorem}
+
+Part~(A) formalizes the intuition that FH widths $W_y$ act as
+\emph{identifiability denominators}: if $W_y$ is narrow, then even a
+small absolute error $\varepsilon_y$ in $p_y$ leads to a large
+relative error in $\lambda_y$, and our claims about complementarity
+or benign inflation should be correspondingly cautious.
+Part~(B) shows that once we know $W_y$ and the structure of the
+metric $CC$, we can pre-compute \emph{stress bars} describing the
+worst-case drift of $CC$ under adversarial perturbations of the
+dependence coordinates, without re-fitting any models.
+
+\subsection{Scaling to many rails via local FH prototypes}
+
+For more than two rails, the FH feasible set of joint laws over
+$R_{1:n}$ given the marginals $(m_{i,y})$ is a polytope whose number
+of extreme points grows exponentially with $n$.
+Enumerating all FH corners to compute tight bounds on $p_y$ is
+therefore infeasible beyond very small ensembles.
+
+We address this ``curse of compositional dimensionality'' by
+introducing a family of \emph{local FH prototypes} indexed by a
+treewidth parameter $k$.
+The idea is to choose a chordal cover $G_k$ of the (unknown or
+assumed) rail dependency graph with treewidth $k$, introduce local
+clique marginals $\mu_C(x_C)$ for each maximal clique $C$ in $G_k$,
+impose linear junction-tree consistency constraints, and then enforce
+FH inequalities \emph{within} each clique.
+The resulting set of local marginals defines a polyhedral outer
+approximation $\mathcal{P}_k$ to the exact FH feasible set.
+
+For any class $y$ and composition $g$, the classwise block rate
+$p_y = \E[g(R_{1:n}) \mid Y=y]$ is linear in the joint law and hence
+linear in the clique marginals.
+Minimizing and maximizing $p_y$ over $\mathcal{P}_k$ therefore yields
+sound outer bounds
+\[
+L_y^{(k)} \;\le\; p_y \;\le\; U_y^{(k)}.
+\]
+We show that:
+(i) the bounds tighten monotonically as $k$ increases and the chordal
+cover is refined, i.e.\ $L_y^{(k+1)} \ge L_y^{(k)}$ and
+$U_y^{(k+1)} \le U_y^{(k)}$; and
+(ii) when $k = n-1$ (a single $n$-clique) the prototype coincides
+with the exact FH polytope and the bounds are tight.
+Moreover, for bounded treewidth $k$ the linear program scales as
+$O(n 2^{k+1})$ variables, which is polynomial in $n$ for fixed $k$
+and practical for pipelines, trees, and shallow factor graphs.
+
+These scalable prototypes provide the raw material from which both
+the FH tightness scores and the dependence coordinates are computed
+in large ensembles.
+
+\subsection*{Roadmap}
+
+Section~2 formalizes the two-rail FH envelopes and develops the
+finite-sample identification theorem in detail, including explicit
+Bernstein planners for required sample sizes.
+Section~3 introduces the Adversarial Dependence Probing (ADP)
+protocol as a practical stress-testing procedure that perturbs
+dependence while preserving per-rail marginals, using the Lipschitz
+bounds of Theorem~\ref{thm:finite-sample} to generate stress bars on
+any compositional coefficient of interest.
+Section~4 develops local FH prototypes for many rails via junction
+trees, proving soundness, monotone tightening, and complexity bounds
+as a function of treewidth.
+Section~5 presents empirical case studies on real guardrail
+ensembles, including pre-registered hypotheses about unsafe
+complementarity, benign inflation, and strata stability.
+
+\end{document}
