@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cc-framework"
-version = "0.1.0"
+version = "0.2.0"
 description = "Composability Coefficient (CC) framework for measuring guardrail interactions"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -35,22 +35,26 @@ dependencies = [
   "seaborn>=0.12",
   "plotly>=5.0",
   "jsonlines>=3.0",
-  "cryptography>=41.0"
+  "cryptography>=41.0",
+  # core data-layer requirements
+  "pydantic>=2.0",
+  "blake3>=0.3",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=7.4",
   "pytest-cov>=4.1",
+  "hypothesis>=6.90",
   "black>=24.3",
   "ruff>=0.6",
   "isort>=5.13",
   "mypy>=1.10",
-  "types-PyYAML>=6.0.12"
+  "types-PyYAML>=6.0.12",
 ]
 docs = [
   "mkdocs>=1.6",
-  "mkdocs-material>=9.5"
+  "mkdocs-material>=9.5",
 ]
 notebooks = [
   "ipykernel",
@@ -58,7 +62,17 @@ notebooks = [
   "pandas",
   "numpy",
   "scipy",
-  "pyyaml"
+  "pyyaml",
+]
+sql = [
+  "sqlalchemy>=2.0",
+]
+avro = [
+  "fastavro>=1.9",
+]
+protobuf = [
+  "protobuf>=5.0",
+  "googleapis-common-protos>=1.63",
 ]
 
 [project.urls]

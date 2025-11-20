@@ -8,10 +8,16 @@ seaborn>=0.12
 plotly>=5.0
 jsonlines>=3.0
 cryptography>=41.0
+pydantic>=2.0
+blake3>=0.3
+
+[avro]
+fastavro>=1.9
 
 [dev]
 pytest>=7.4
 pytest-cov>=4.1
+hypothesis>=6.90
 black>=24.3
 ruff>=0.6
 isort>=5.13
@@ -29,3 +35,10 @@ pandas
 numpy
 scipy
 pyyaml
+
+[protobuf]
+protobuf>=5.0
+googleapis-common-protos>=1.63
+
+[sql]
+sqlalchemy>=2.0

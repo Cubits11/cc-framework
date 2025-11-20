@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/core/models.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.02, 0.05, 0.1, 0.5, 0.6, 0.9, 0.95, 1.0, 1000, ',', '1.0', '4.0', ':', 'AVRO_AVAILABLE', 'AttackResult', 'AttackStrategy', 'AuditColumnsMixin', 'CCResult', 'CiMethod', 'ExperimentConfig', 'GuardrailSpec', 'ModelBase', 'NUMPY_AVAILABLE', 'OrmBase', 'PROTO_AVAILABLE', 'RiskLevel', 'SQLALCHEMY_AVAILABLE', 'TModel', 'WorldBit', 'WorldConfig', '__main__', '_hash_json', '_hash_text', '_iso_from_unix', '_now_unix', 'attack_id', 'attack_strategies', 'attack_strategy', 'bayes', 'before', 'bootstrap', 'bootstrap_samples', 'confidence_interval', 'guardrail_configs', 'guardrail_stack', 'guardrails_applied', 'high', 'ignore', 'iso8601', 'json', 'low', 'medium', 'name', 'params', 'random_seed', 'replace', 'rng_seed', 'session_id', 'stack', 'timestamp', 'transcript_hash', 'updated_at', 'utf-8', 'utf8', 'utility_score', 'version', 'vocabulary', 'wilson', 'world_id']

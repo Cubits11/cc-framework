@@ -3,10 +3,13 @@ README.md
 pyproject.toml
 src/cc/__init__.py
 src/cc/_legacy/models.py
+src/cc/analysis/alternative_metrics.py
 src/cc/analysis/cc_estimation.py
 src/cc/analysis/ci.py
+src/cc/analysis/comparison_runner.py
 src/cc/analysis/generate_figures.py
 src/cc/analysis/reporting.py
+src/cc/analysis/week7_utils.py
 src/cc/cartographer/atlas.py
 src/cc/cartographer/audit.py
 src/cc/cartographer/bounds.py
@@ -25,6 +28,7 @@ src/cc/core/logging.py
 src/cc/core/metrics.py
 src/cc/core/models.py
 src/cc/core/protocol.py
+src/cc/core/protocol_backup.py
 src/cc/core/registry.py
 src/cc/core/stats.py
 src/cc/exp/run_two_world.py
@@ -45,4 +49,6 @@ src/cc_framework.egg-info/SOURCES.txt
 src/cc_framework.egg-info/dependency_links.txt
 src/cc_framework.egg-info/requires.txt
 src/cc_framework.egg-info/top_level.txt
+tests/test_rails_compare.py
 tests/test_week2_deliverables.py
+tests/test_week7.py

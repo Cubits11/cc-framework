@@ -2,34 +2,63 @@
 """
 Module: bounds
 Purpose:
-  (A) Fréchet–Hoeffding-style ceilings for composed Youden's J over two ROC curves
+  (A) Fréchet–Hoeffding ceilings for composed Youden's J over two ROC curves
   (B) Finite-sample FH–Bernstein utilities for CC at a fixed operating point θ
+  (C) Seamless bridge to optional Enterprise add-ons if present
 
-Overview
---------
-Given two ROC curves A and B as (FPR, TPR) point sets, (A) computes an *upper bound*
-on the Youden's J statistic of their AND/OR composition under arbitrary dependence
-(no independence assumed). Pointwise ceilings come from Fréchet–Hoeffding (FH).
+Design notes
+------------
+- Backward compatibility: the original public API is preserved.
+- If `bounds_enterprise.py` is present, we:
+    • expose its advanced classes in this module's namespace; and
+    • allow select functions to delegate to the enterprise implementations
+      when enterprise-only options are provided (e.g. use_gpu, uncertainty).
+- If `bounds_enterprise.py` is absent, everything still works with the
+  lean, dependency-light numpy core here.
 
-Separately, for a *fixed* operating point θ = (τ_a, τ_b) with known class-conditional
-marginals (TPR_a,TPR_b,FPR_a,FPR_b), (B) provides:
-  • FH intervals I1 for p1 = P(A ∧ B = 1 | Y=1), and I0 for p0 = P(A ∨ B = 1 | Y=0);
-  • A tight variance envelope  v̄ = max_{p∈I} p(1-p);
-  • Two-sided Bernstein tails for Bernoulli means and a CC deviation bound;
-  • Finite-sample CI for CC and a closed-form per-class sample-size planner.
+Tip: For power users, you can import the advanced classes directly:
+    from cc.cartographer.bounds import GPBounds, BanditThresholdSelector, ...
 """
 
 from __future__ import annotations
 
 from math import ceil, exp, log
-from typing import Iterable, Literal, Optional, Sequence, Tuple, Union
+from typing import Iterable, Literal, Optional, Sequence, Tuple, Union, Dict, Any
 
 import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import TypeAlias
 
+# -----------------------------------------------------------------------------
+# Optional enterprise bridge (best-effort import)
+# -----------------------------------------------------------------------------
+_HAS_ENTERPRISE = False
+try:
+    # Local sibling file expected at: src/cc/cartographer/bounds_enterprise.py
+    from . import bounds_enterprise as _be  # type: ignore
+
+    # Re-export enterprise classes & enums if available
+    AdaptiveBounds = _be.AdaptiveBounds
+    BayesianBounds = _be.BayesianBounds
+    CausalBounds = _be.CausalBounds
+    StreamingBounds = _be.StreamingBounds
+    MultiObjectiveOptimizer = _be.MultiObjectiveOptimizer
+    BanditThresholdSelector = _be.BanditThresholdSelector
+    GPBounds = _be.GPBounds
+    DistributedROCAnalyzer = _be.DistributedROCAnalyzer
+    ConfidenceSequence = _be.ConfidenceSequence
+    PredictionInterval = _be.PredictionInterval
+    UncertaintyQuantifier = _be.UncertaintyQuantifier
+    AdaptiveStrategy = _be.AdaptiveStrategy
+    BoundType = _be.BoundType
+
+    _HAS_ENTERPRISE = True
+except Exception:  # noqa: BLE001
+    # Enterprise is optional; quietly continue with the core-only implementation.
+    pass
+
 __all__ = [
-    # ROC/FH ceilings on J over curves
+    # Core ceilings over ROC curves
     "ROCArrayLike",
     "frechet_upper",
     "frechet_upper_with_argmax",
@@ -50,6 +79,24 @@ __all__ = [
     "needed_n_bernstein_int",
 ]
 
+# If enterprise is present, surface its extras from this module.
+if _HAS_ENTERPRISE:
+    __all__ += [
+        "AdaptiveBounds",
+        "BayesianBounds",
+        "CausalBounds",
+        "StreamingBounds",
+        "MultiObjectiveOptimizer",
+        "BanditThresholdSelector",
+        "GPBounds",
+        "DistributedROCAnalyzer",
+        "ConfidenceSequence",
+        "PredictionInterval",
+        "UncertaintyQuantifier",
+        "AdaptiveStrategy",
+        "BoundType",
+    ]
+
 # ---- Types -----------------------------------------------------------------
 
 ROCPoint: TypeAlias = Tuple[float, float]
@@ -68,7 +115,7 @@ def _to_array_roc(
     Coerce to float array of shape (n, 2) with columns [FPR, TPR].
 
     clip:
-        - "silent": silently clip out-of-range to [0,1] (back-compat; default).
+        - "silent": silently clip out-of-range to [0,1] (default).
         - "warn":   clip and emit a RuntimeWarning.
         - "error":  raise on any out-of-range entry.
     """
@@ -176,6 +223,25 @@ def fh_or_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], ND
 
 # ---- Public API: FH ceilings over ROC curves -------------------------------
 
+def _maybe_delegate_to_enterprise(fname: str, **kw: Any):
+    """
+    Internal: If enterprise has a same-named function and non-core options were
+    provided, delegate to it. Otherwise return None to signal 'use core'.
+    """
+    if not _HAS_ENTERPRISE:
+        return None
+    f = getattr(_be, fname, None)
+    if f is None:
+        return None
+    # If caller passed any enterprise-only options, prefer enterprise path.
+    enterprise_flags = {"use_gpu", "uncertainty", "n_bootstrap"}
+    if enterprise_flags & set(kw):
+        return f
+    # Even without flags, delegating is safe & feature-equivalent; but we keep
+    # core-by-default for maximal determinism unless flags are present.
+    return None
+
+
 def frechet_upper(
     roc_a: ROCArrayLike,
     roc_b: ROCArrayLike,
@@ -183,8 +249,29 @@ def frechet_upper(
     comp: Literal["AND", "OR", "and", "or"] = "AND",
     clip: Literal["silent", "warn", "error"] = "silent",
     add_anchors: bool = False,
-) -> float:
-    """Fréchet-style *upper bound* on composed Youden's J over two ROC curves."""
+    # Enterprise passthrough (ignored by core; used if bounds_enterprise is present):
+    use_gpu: bool = False,
+    uncertainty: bool = False,
+    n_bootstrap: int = 1000,
+) -> Union[float, Tuple[float, Dict[str, float]]]:
+    """
+    Fréchet-style *upper bound* on composed Youden's J over two ROC curves.
+
+    Core path (always available): deterministic numpy implementation.
+    Enterprise path (optional): honors `use_gpu`, `uncertainty`, `n_bootstrap`.
+    """
+    maybe = _maybe_delegate_to_enterprise(
+        "frechet_upper",
+        use_gpu=use_gpu,
+        uncertainty=uncertainty,
+        n_bootstrap=n_bootstrap,
+    )
+    if maybe is not None:
+        # Delegate entirely; enterprise variant matches this signature.
+        return maybe(roc_a, roc_b, comp=comp, clip=clip, add_anchors=add_anchors,
+                     use_gpu=use_gpu, uncertainty=uncertainty, n_bootstrap=n_bootstrap)
+
+    # ---- Core implementation (numpy-only) ---------------------------------
     if add_anchors:
         A = ensure_anchors(roc_a, clip=clip)
         B = ensure_anchors(roc_b, clip=clip)
@@ -511,7 +598,7 @@ def cc_confint(
     Finite-sample two-sided CI for CC: invert classwise Bernstein tails, propagate through D.
     Returns (lo, hi) around CC_hat = (1 - (p1_hat - p0_hat)) / D.
 
-    clamp01: if True, clamp (lo, hi) to [0,1] for display convenience (raw math is returned otherwise).
+    clamp01: if True, clamp (lo, hi) to [0,1] for display convenience.
     """
     if D <= 0.0:
         raise ValueError("D must be > 0.")
