@@ -69,6 +69,7 @@ import math
 import threading
 import time
 import uuid
+import unicodedata
 import warnings
 from datetime import datetime
 from enum import Enum, IntEnum
@@ -97,13 +98,13 @@ from pydantic import (
     computed_field,
     field_serializer,
     field_validator,
+    StrictBool,
 )
 
 # ---------------------------------------------------------------------------
 # Global schema & type aliases
 # ---------------------------------------------------------------------------
-
-_SCHEMA_VERSION: str = "4.2"
+from cc.core.schema import SCHEMA_VERSION as _SCHEMA_VERSION
 
 JsonDict = Dict[str, Any]
 FloatSeq = Sequence[float]
@@ -221,10 +222,49 @@ def _iso_from_unix(ts: float) -> str:
         f"T{tm.tm_hour:02d}:{tm.tm_min:02d}:{tm.tm_sec:02d}.{ms:03d}Z"
     )
 
+def _normalize_unicode_for_hash(obj: Any) -> Any:
+    """
+    Recursively normalize all text to NFC for hashing stability.
+
+    Handles:
+    - dicts: normalize both keys and values if they are str
+    - lists/tuples: normalize elements
+    - str: normalized with unicodedata.normalize("NFC", s)
+    All other JSON-safe primitives are returned unchanged.
+    """
+    # Normalize plain strings
+    if isinstance(obj, str):
+        return unicodedata.normalize("NFC", obj)
+
+    # Normalize dict keys and values
+    if isinstance(obj, dict):
+        return {
+            _normalize_unicode_for_hash(k): _normalize_unicode_for_hash(v)
+            for k, v in obj.items()
+        }
+
+    # Normalize lists
+    if isinstance(obj, list):
+        return [_normalize_unicode_for_hash(v) for v in obj]
+
+    # Normalize tuples
+    if isinstance(obj, tuple):
+        return tuple(_normalize_unicode_for_hash(v) for v in obj)
+
+    # Everything else (numbers, bools, None) we leave as-is
+    return obj
+
 
 def _hash_json(obj: Any, *, salt: Optional[bytes] = None) -> str:
     """
-    Canonical JSON → BLAKE3 hex digest.
+    Canonical JSON -> BLAKE3 hex digest.
+
+    Invariants
+    ----------
+    - Keys are sorted and separators are compact ("," and ":").
+    - All Unicode text is normalized to NFC so that composed vs decomposed
+      forms hash identically (e.g. "café" NFC vs NFD).
+    - An optional salt can be used to separate hash namespaces.
 
     Parameters
     ----------
@@ -233,12 +273,18 @@ def _hash_json(obj: Any, *, salt: Optional[bytes] = None) -> str:
     salt:
         Optional bytes to prepend into the hash state (for adversarial resistance).
     """
-    data = json.dumps(obj, sort_keys=True, separators=(",", ":"))
+    # Normalize Unicode so NFC and NFD variants collapse to the same representation
+    normalized = _normalize_unicode_for_hash(obj)
+
+    # Canonical JSON: sorted keys, compact separators
+    data = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+
     hasher = blake3.blake3()
     if salt is not None:
         hasher.update(salt)
     hasher.update(data.encode("utf-8"))
     return hasher.hexdigest()
+
 
 
 def _hash_text(text: Union[str, bytes], *, salt: Optional[bytes] = None) -> str:
@@ -758,25 +804,48 @@ class AttackResult(ModelBase):
     - world_bit:
         * 0 = baseline (WorldBit.BASELINE)
         * 1 = guardrail-enabled (WorldBit.PROTECTED)
-    - success:
+
+    - success (STRICT BOOL):
         * Typically, "harmful output passed guardrail" (or analogous binary
           outcome). The exact semantics must be consistent with how J is
           computed in the stats layer.
+        * This field is a StrictBool:
+            - Accepts only True / False.
+            - Rejects strings like "true"/"false", integers, etc.
+          This is enforced so API misuse is caught early instead of silently
+          coerced.
+
     - transcript_hash:
         * BLAKE3 hash of the full transcript (not stored inline).
+
     - guardrails_applied:
         * Human-readable label of the guardrail config / stack applied.
           For reproducibility, prefer to correlate this with a stable config
           key elsewhere (e.g., ExperimentConfig.guardrail_configs).
+
+    Hashing / identity
+    ------------------
+    - `iso_time` is a computed field and is excluded from hashes:
+        * via HASH_EXCLUDE_FIELDS, and
+        * via ModelBase's automatic exclusion of @computed_field members.
+    - For deduplication / integrity checks, use `blake3_hash()` or
+      the compatibility alias `model_hash()`.
     """
 
     # iso_time is computed; we explicitly exclude it from hashes.
+    # (ModelBase also auto-excludes all @computed_field properties.)
     HASH_EXCLUDE_FIELDS: ClassVar[frozenset[str]] = frozenset({"iso_time"})
 
     world_bit: WorldBit = Field(
         description="0 (baseline) or 1 (guardrail-enabled).",
     )
-    success: bool
+    # STRICT BOOL semantics: only True/False allowed; no coercion from strings/ints.
+    success: StrictBool = Field(
+        description=(
+            "Did the attack succeed according to the experiment's semantics. "
+            "StrictBool: only True/False accepted; strings like 'true' are rejected."
+        ),
+    )
     attack_id: str
     transcript_hash: str
     guardrails_applied: str
@@ -785,18 +854,33 @@ class AttackResult(ModelBase):
         default_factory=_now_unix,
         description="Unix timestamp in seconds (UTC) for when the attack was evaluated.",
     )
-    # optional / metadata
+    # --- optional / metadata
     session_id: str = ""
     attack_strategy: str = ""
     utility_score: Optional[float] = None
     request_id: str = Field(
         default_factory=lambda: uuid.uuid4().hex[:REQUEST_ID_LENGTH],
-        description=f"Short request identifier (first {REQUEST_ID_LENGTH} hex chars of uuid4).",
+        description=(
+            f"Short request identifier (first {REQUEST_ID_LENGTH} "
+            "hex chars of uuid4)."
+        ),
     )
+
+    # -----------------------
+    # Field validators
+    # -----------------------
 
     @field_validator("transcript_hash", mode="before")
     @classmethod
     def _validate_transcript_hash(cls, v: Any) -> str:
+        """
+        transcript_hash must be a full BLAKE3 hex digest.
+
+        Invariants:
+        - Required (cannot be None).
+        - Exactly BLAKE3_HEX_LENGTH hex characters.
+        - Normalized to lowercase for stability.
+        """
         if v is None:
             raise ValueError("transcript_hash is required")
         s = str(v).strip()
@@ -807,13 +891,20 @@ class AttackResult(ModelBase):
             )
         try:
             int(s, 16)
-        except ValueError as exc:  # pragma: no cover
+        except ValueError as exc:  # pragma: no cover - defensive
             raise ValueError("transcript_hash must be hex-encoded") from exc
         return s.lower()
 
     @field_validator("utility_score", mode="before")
     @classmethod
     def _normalize_utility(cls, v: Any) -> Optional[float]:
+        """
+        Normalize optional utility_score.
+
+        Rules:
+        - None / "" → None
+        - Else: must be numeric and finite.
+        """
         if v is None or v == "":
             return None
         try:
@@ -830,15 +921,29 @@ class AttackResult(ModelBase):
     @field_validator("timestamp", mode="before")
     @classmethod
     def _normalize_timestamp(cls, v: Any) -> float:
+        """
+        Timestamp normalization.
+
+        - None → now (snapshot-style, via allow_none=True).
+        - Else: must be numeric, finite, and not absurdly large.
+        """
         return _normalize_unix_timestamp(v, allow_none=True)
 
     @field_validator("rng_seed", mode="before")
     @classmethod
     def _normalize_seed(cls, v: Any) -> int:
+        """
+        rng_seed must be an integer.
+
+        We accept things that cleanly cast to int, but reject type errors
+        so configs like "abc" fail fast.
+        """
         try:
             iv = int(v)
         except (TypeError, ValueError):
-            raise ValueError(f"rng_seed must be an integer (got {type(v).__name__}: {v!r})")
+            raise ValueError(
+                f"rng_seed must be an integer (got {type(v).__name__}: {v!r})"
+            )
         return iv
 
     @field_validator(
@@ -851,23 +956,51 @@ class AttackResult(ModelBase):
     @classmethod
     def _coerce_str(cls, v: Any) -> str:
         """
-        For AttackResult, these fields are *metadata*; None is normalized to "".
+        Normalize metadata-ish string fields.
+
+        For AttackResult, these are *metadata*:
+        - None is normalized to "" (empty string).
+        - Other types are stringified.
+
         Contrast with ExperimentConfig.attack_strategies, which are required
-        and thus reject None.
+        and thus reject None. That difference is intentional: session-level
+        metadata is optional; experiment-level config is not.
         """
         if v is None:
             return ""
         return str(v)
 
+    # -----------------------
+    # Computed properties
+    # -----------------------
+
     @computed_field
     @property
     def iso_time(self) -> str:
-        """ISO-8601 representation of `timestamp` in UTC."""
+        """
+        ISO-8601 representation of `timestamp` in UTC.
+
+        This is a *view* field:
+        - Included in `model_dump()` by default.
+        - Automatically excluded from hashes via ModelBase.
+        """
         return _iso_from_unix(self.timestamp)
 
+    # -----------------------
+    # Hashing / helpers
+    # -----------------------
+
     def model_hash(self) -> str:
-        """Backwards-compatible alias for blake3_hash()."""
+        """
+        Backwards-compatible alias for blake3_hash().
+
+        Use this in older call-sites that predate the unified hashing API.
+        """
         return self.blake3_hash()
+
+    # -----------------------
+    # High-level constructor
+    # -----------------------
 
     @classmethod
     def from_transcript(
@@ -894,12 +1027,19 @@ class AttackResult(ModelBase):
         - The transcript is *not* stored on the model, only a BLAKE3 hash.
         - If `salt` is provided, reproducibility of the hash requires that the
           caller store the same salt alongside experiment metadata.
+        - `success` must be a real boolean; StrictBool on the model ensures
+          that passing strings like "true" will raise a ValidationError.
+
+        Timestamp semantics
+        -------------------
+        - If `timestamp` is None: we capture "now" via `_now_unix()`.
+        - Else: we normalize via `_normalize_unix_timestamp()` for safety.
         """
         ts = _normalize_unix_timestamp(timestamp) if timestamp is not None else _now_unix()
         thash = _hash_text(transcript, salt=salt)
         return cls(
             world_bit=world_bit,
-            success=success,
+            success=success,  # StrictBool on the field enforces strictness
             attack_id=str(attack_id),
             transcript_hash=thash,
             guardrails_applied=str(guardrails_applied),
@@ -910,6 +1050,7 @@ class AttackResult(ModelBase):
             utility_score=utility_score,
             creator_id=creator_id,
         )
+
 
 
 # ---------------------------------------------------------------------------
@@ -1051,6 +1192,19 @@ class ExperimentConfig(ModelBase):
         cls,
         v: Any,
     ) -> Dict[str, List[GuardrailSpec]]:
+        """
+        Normalize guardrail_configs: mapping[str, list[GuardrailSpec]].
+
+        Rules:
+        - The mapping itself must be non-empty.
+        - For each key:
+            * None -> [] (no guardrails for that label)
+            * GuardrailSpec -> [spec]
+            * mapping -> [GuardrailSpec(**mapping)]
+            * iterable -> list of GuardrailSpec / coercible mappings
+        - An empty list for a key is allowed (e.g. 'baseline': []) to represent
+          a no-guardrail configuration.
+        """
         if v is None:
             raise ValueError("guardrail_configs must be provided and non-empty")
         if not isinstance(v, Mapping):
@@ -1062,13 +1216,19 @@ class ExperimentConfig(ModelBase):
         for k, raw_val in v.items():
             if not isinstance(k, str):
                 raise TypeError(f"guardrail_configs keys must be strings, got {type(k)}")
+
+            # Interpret None as "no guardrails for this config label"
+            if raw_val is None:
+                result[k] = []
+                continue
+
             if isinstance(raw_val, str):
                 raise TypeError(
                     f"guardrail_configs['{k}'] must not be a bare string. "
                     "Provide a GuardrailSpec, a mapping, or an iterable of those."
                 )
 
-            # Accept single spec, mapping, or iterable of specs
+            # Accept single spec / mapping or iterable of specs
             if isinstance(raw_val, GuardrailSpec):
                 raw_list = [raw_val]
             elif isinstance(raw_val, Mapping):
@@ -1085,8 +1245,9 @@ class ExperimentConfig(ModelBase):
                     specs.append(gr)
                 else:
                     specs.append(GuardrailSpec.model_validate(gr))
-            if not specs:
-                raise ValueError(f"guardrail_configs['{k}'] must contain at least one guardrail spec")
+
+            # IMPORTANT: empty list is allowed. This is how we represent
+            # a baseline / no-guardrail configuration for that label.
             result[k] = specs
 
         return result

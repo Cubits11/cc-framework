@@ -337,6 +337,7 @@ def test_modelbase_openapi_schema_includes_field_description():
 # migrate() behaviour
 # ---------------------------------------------------------------------
 
+from cc.core.schema import SCHEMA_VERSION
 
 @given(st.dictionaries(st.text(min_size=1, max_size=10), st.text()))
 def test_modelbase_migrate_best_effort(old_data: Dict[str, str]):

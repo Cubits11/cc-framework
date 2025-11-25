@@ -1,1133 +1,2792 @@
 # src/cc/theory/fh_bounds.py
 """
-PhD-Level Implementation: Fréchet-Hoeffding Bounds for Guardrail Composition
-MATHEMATICALLY CORRECTED VERSION
+Fréchet–Hoeffding Bounds for Guardrail Composition (Research-Grade Implementation)
 
-This module provides the mathematically rigorous, production-ready implementation of
-Fréchet-Hoeffding bounds for multi-guardrail safety composition. This version corrects
-ALL mathematical errors found in alternative implementations and provides complete
-PhD-level functionality.
+This module provides a mathematically rigorous implementation of
+Fréchet–Hoeffding (FH) and related bounds for multi-guardrail safety
+composition, together with independence baselines and diagnostic
+indices for composability.
 
-Key Mathematical Corrections:
-1. Correct FPR calculation for OR-gate independence (was using wrong multiplicative formula)
-2. Proper application of DKW theorem (not for binomial CIs)
-3. Robust statistical implementations with numerical stability
-4. Stratified bootstrap for two-world data
-5. Complete integration with existing CC framework
+Design goals
+------------
+1. **Mathematical correctness**
+   - Proper FH bounds for intersections and unions.
+   - Correct mapping from miss/false-alarm rates to TPR/FPR and J-statistics.
+   - Correct independence formulas for OR/AND gating.
 
-Author: Pranav Bhave
-Institution: Penn State University
-Advisor: Dr. Peng Liu
-Date: October 2025 (CORRECTED VERSION)
+2. **Explicit modeling of uncertainty**
+   - Bounds are represented as immutable `FHBounds` objects with
+     clear invariants: 0 ≤ lower ≤ upper ≤ 1.
+   - `ComposedJBounds` captures how TPR/FPR uncertainty propagates
+     into J-statistic uncertainty.
+
+3. **No hidden assumptions**
+   - We do NOT try to reconstruct TPR/FPR from J alone.
+   - Independence baselines for composability analysis require true
+     per-rail TPR/FPR, or gracefully fall back to a documented
+     heuristic if those are unavailable.
+
+4. **Robust numerics**
+   - Probability-vector validation handles NaNs, infinities, and
+     non-numeric types with informative errors.
+   - Wilson score intervals are used for binomial CIs (instead of
+     misusing DKW).
+   - Inverse normal CDF is implemented with multiple fallbacks and
+     defensive checks.
+
+This module is intended to be the theoretical backbone for the CC
+framework’s guardrail-composition analyses, including:
+- serial OR composition,
+- parallel AND composition,
+- independence baselines,
+- composability interference index (CII),
+- bootstrap-based J-statistic uncertainty,
+- sensitivity analysis to rate perturbations,
+- and internal mathematical self-tests.
 """
 
 from __future__ import annotations
-from typing import List, Tuple, Dict, Optional, Union, Sequence, NamedTuple, Protocol
-from dataclasses import dataclass, field
-import numpy as np
+
+from dataclasses import dataclass
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
+
 import math
-import warnings
-from abc import ABC, abstractmethod
 import random
-from collections import defaultdict
+import warnings
 
-# Import from existing CC framework
-try:
-    from ..core.models import AttackResult, GuardrailSpec
-    from ..core.stats import compute_j_statistic
-except ImportError:
-    # Fallback for testing
-    AttackResult = None
-    GuardrailSpec = None
-    def compute_j_statistic(results): 
-        return 0.5, 0.4, 0.1
+import numpy as np
 
-# Mathematical constants
-EPSILON = 1e-12
-MATHEMATICAL_TOLERANCE = 1e-10
-MAX_BOOTSTRAP_ITERATIONS = 10000
-MIN_SAMPLE_SIZE_WARNING = 30
+# Optional imports from the core framework.
+# The module is designed to *not* hard-depend on these at import time.
+try:  # pragma: no cover - exercised in integration, not unit core
+    from ..core.models import AttackResult, WorldBit  # type: ignore
+    from ..core.stats import compute_j_statistic  # type: ignore
+except Exception:  # pragma: no cover - standalone mode
+    AttackResult = Any  # type: ignore
+    WorldBit = Any  # type: ignore
 
+    def compute_j_statistic(results: Sequence[Any]) -> Tuple[float, float, float]:
+        """
+        Minimal stub for standalone usage.
+
+        Real implementation in cc.core.stats should be used in actual experiments.
+        """
+        # J, tpr, fpr (dummy values)
+        return 0.0, 0.5, 0.5
+
+
+# ---------------------------------------------------------------------
+# Constants & type aliases
+# ---------------------------------------------------------------------
+
+EPSILON: float = 1e-12
+MATHEMATICAL_TOLERANCE: float = 1e-10
+MAX_BOOTSTRAP_ITERATIONS: int = 10_000
+MIN_SAMPLE_SIZE_WARNING: int = 30
+
+Probability = float   # in [0, 1]
+JStatistic = float    # in [-1, 1]
+Bounds = Tuple[float, float]
+
+
+# ---------------------------------------------------------------------
 # Custom exceptions
+# ---------------------------------------------------------------------
+
+
 class FHBoundViolationError(Exception):
     """Raised when computed bounds violate mathematical constraints."""
-    pass
+
 
 class StatisticalValidationError(Exception):
     """Raised when statistical assumptions are violated."""
-    pass
+
 
 class NumericalInstabilityError(Exception):
     """Raised when numerical computations become unstable."""
-    pass
 
-# Type aliases
-Probability = float  # [0,1]
-JStatistic = float   # [-1,1]
-Bounds = Tuple[float, float]
-MarginalsVector = List[Probability]
-BootstrapSamples = List[float]
+
+# ---------------------------------------------------------------------
+# Core bound containers
+# ---------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class FHBounds:
     """
-    Immutable container for mathematically rigorous Fréchet-Hoeffding bounds.
-    
-    All bounds are SHARP (attainable) and satisfy:
-    - Lower bound: max{0, ∑pᵢ - (k-1)} for intersection
-    - Upper bound: min{pᵢ} for intersection
-    - Bounds are attainable by explicit constructions
+    Immutable container for Fréchet–Hoeffding type bounds on a probability.
+
+    Semantics
+    ---------
+    Represents an interval [lower, upper] ⊆ [0, 1] for the probability of some
+    composite event (e.g., intersection/union of rails, TPR/FPR band, etc.),
+    together with the per-rail marginals that were used to derive it.
+
+    Attributes
+    ----------
+    lower:
+        Lower bound on P(event). Must be finite and in [0, 1] up to tolerance.
+    upper:
+        Upper bound on P(event). Must be finite and in [0, 1] up to tolerance.
+    marginals:
+        Tuple of per-rail marginal probabilities used in the construction.
+        Each must be a finite value in [0, 1].
+    bound_type:
+        Human-readable tag describing what this interval represents, e.g.:
+        "intersection", "union", "tpr_serial_or", "fpr_parallel_and", etc.
+    k_rails:
+        Number of constituent rails/events. Must equal len(marginals).
+    is_sharp:
+        Whether this interval is mathematically sharp (attainable) under some
+        joint construction (typically True for pure FH bounds).
+    construction_proof:
+        Optional textual note or reference sketch showing how sharpness
+        or the inequality was derived.
+
+    Invariants (enforced in __post_init__)
+    --------------------------------------
+    - lower and upper are finite floats (not NaN, not ±inf).
+    - 0 ≤ lower ≤ upper ≤ 1 (within MATHEMATICAL_TOLERANCE).
+    - len(marginals) == k_rails and k_rails ≥ 1.
+    - Each marginal pᵢ is finite and lies in [0, 1].
+    - If |upper − lower| < MATHEMATICAL_TOLERANCE but upper != lower,
+      raise NumericalInstabilityError (suspicious “almost point” interval).
     """
+
     lower: float
     upper: float
-    marginals: Tuple[float, ...]
+    marginals: Tuple[Probability, ...]
     bound_type: str
     k_rails: int
-    is_sharp: bool = True  # All FH bounds are sharp
+    is_sharp: bool = True
     construction_proof: Optional[str] = None
-    
-    def __post_init__(self):
-        """Validate mathematical consistency with detailed error messages."""
-        if not (0 <= self.lower <= self.upper <= 1):
+
+    def __post_init__(self) -> None:
+        # Cast to float and check finiteness early (avoid weird numeric types).
+        lower = float(self.lower)
+        upper = float(self.upper)
+
+        if math.isnan(lower) or math.isinf(lower):
+            raise FHBoundViolationError(f"lower bound is not finite: {lower!r}")
+        if math.isnan(upper) or math.isinf(upper):
+            raise FHBoundViolationError(f"upper bound is not finite: {upper!r}")
+
+        # Structural consistency: marginals length vs k_rails.
+        if self.k_rails <= 0:
+            raise FHBoundViolationError(f"k_rails must be positive, got {self.k_rails}")
+        if len(self.marginals) != self.k_rails:
             raise FHBoundViolationError(
-                f"Invalid bounds: [{self.lower:.10f}, {self.upper:.10f}]. "
-                f"Must satisfy 0 ≤ lower ≤ upper ≤ 1."
+                f"k_rails={self.k_rails} does not match len(marginals)={len(self.marginals)}"
             )
-        
-        if abs(self.lower - self.upper) < 0 and self.lower != self.upper:
+
+        # Validate marginals as probabilities in [0, 1].
+        # This uses the module-level helper and will raise on NaN/Inf/out-of-range.
+        validate_probability_vector(self.marginals, "marginals")
+
+        # Domain constraints for the composite probability.
+        if not self._approx_ge(lower, 0.0):
+            raise FHBoundViolationError(
+                f"Invalid lower bound {lower:.12f}; must be ≥ 0 (up to tolerance)."
+            )
+        if not self._approx_le(upper, 1.0):
+            raise FHBoundViolationError(
+                f"Invalid upper bound {upper:.12f}; must be ≤ 1 (up to tolerance)."
+            )
+        if not self._approx_le(lower, upper):
+            raise FHBoundViolationError(
+                f"Invalid bounds ordering: lower={lower:.12f} > upper={upper:.12f}"
+            )
+
+        # Detect suspiciously close but unequal bounds (potential numerical pathology).
+        if abs(upper - lower) < MATHEMATICAL_TOLERANCE and upper != lower:
             raise NumericalInstabilityError(
-                f"Numerical precision issue: bounds too close but not equal"
+                "FHBounds interval is within MATHEMATICAL_TOLERANCE but lower != upper; "
+                "this suggests accumulated numerical error in the construction."
             )
-    
+
+        # Because the dataclass is frozen, we don't assign back to self.lower/upper,
+        # but all subsequent properties read from the original fields, which have
+        # been validated via the local 'lower'/'upper' checks above.
+
+    @staticmethod
+    def _approx_le(a: float, b: float) -> bool:
+        """Return True if a ≤ b within numerical tolerance."""
+        return a <= b + MATHEMATICAL_TOLERANCE
+
+    @staticmethod
+    def _approx_ge(a: float, b: float) -> bool:
+        """Return True if a ≥ b within numerical tolerance."""
+        return a + MATHEMATICAL_TOLERANCE >= b
+
     @property
     def width(self) -> float:
-        """Bound uncertainty width."""
-        return self.upper - self.lower
-    
+        """Width of the interval [lower, upper]."""
+        return float(self.upper) - float(self.lower)
+
     @property
     def is_degenerate(self) -> bool:
-        """True if bounds collapse to single point (deterministic)."""
-        return abs(self.upper - self.lower) < MATHEMATICAL_TOLERANCE
-    
-    def contains(self, value: float, strict: bool = False) -> bool:
-        """Test if value lies within bounds with numerical tolerance."""
-        if strict:
-            return self.lower + EPSILON < value < self.upper - EPSILON
-        return self.lower - EPSILON <= value <= self.upper + EPSILON
+        """True if bounds collapse to a single point (within tolerance)."""
+        return abs(float(self.upper) - float(self.lower)) < MATHEMATICAL_TOLERANCE
 
-@dataclass(frozen=True, slots=True) 
+    def contains(self, value: float, strict: bool = False) -> bool:
+        """
+        Test if value lies within bounds, with numerical tolerance.
+
+        Parameters
+        ----------
+        value:
+            Value to test.
+        strict:
+            If True, require strict inclusion (excluding endpoints up to EPSILON).
+            If False, include endpoints with EPSILON slack.
+        """
+        v = float(value)
+        if strict:
+            return (float(self.lower) + EPSILON) < v < (float(self.upper) - EPSILON)
+        return (float(self.lower) - EPSILON) <= v <= (float(self.upper) + EPSILON)
+
+@dataclass(frozen=True, slots=True)
 class ComposedJBounds:
     """
-    Mathematically rigorous J-statistic bounds for composed systems.
-    
-    Derived from separate FH analysis of:
-    - Miss events (adversarial world): H = ∩ᵢFᵢ or ∪ᵢFᵢ
-    - False alarm events (benign world): B = ∪ᵢAᵢ or ∩ᵢAᵢ
-    
-    Then J = TPR - FPR = (1 - P(H)) - P(B)
+    J-statistic bounds for a composed multi-rail system.
+
+    Semantics
+    ---------
+    The composition is defined in terms of:
+
+    - A miss-event H (e.g., "attack slips through"), with FH bounds `miss_bounds`.
+    - A false-alarm event B (e.g., "benign input flagged"), with FH bounds `alarm_bounds`.
+    - TPR bounds derived as TPR = 1 - P(H).
+    - FPR bounds taken as P(B).
+    - J = TPR - FPR.
+
+    This dataclass stores:
+    - J bounds (j_lower, j_upper),
+    - the TPR/FPR FH bounds,
+    - the underlying miss/false-alarm FH bounds,
+    - individual-rail J-statistics for comparison,
+    - composition type (e.g., "serial_or" or "parallel_and"),
+    - number of rails.
     """
-    j_lower: float
-    j_upper: float
+    j_lower: JStatistic
+    j_upper: JStatistic
     tpr_bounds: FHBounds
     fpr_bounds: FHBounds
-    miss_bounds: FHBounds  # P(H) bounds
-    alarm_bounds: FHBounds  # P(B) bounds
-    individual_j_stats: Tuple[float, ...]
+    miss_bounds: FHBounds
+    alarm_bounds: FHBounds
+    individual_j_stats: Tuple[JStatistic, ...]
     composition_type: str
     k_rails: int
-    
-    def __post_init__(self):
-        """Validate J-statistic bounds consistency."""
-        if not (-1 <= self.j_lower <= self.j_upper <= 1):
+
+    def __post_init__(self) -> None:
+        # Check basic J ordering and range
+        if not (-1.0 - MATHEMATICAL_TOLERANCE <= self.j_lower <= self.j_upper <= 1.0 + MATHEMATICAL_TOLERANCE):
             raise FHBoundViolationError(
-                f"Invalid J bounds: [{self.j_lower:.6f}, {self.j_upper:.6f}]. "
-                f"Must satisfy -1 ≤ lower ≤ upper ≤ 1."
+                f"Invalid J bounds: [{self.j_lower:.12f}, {self.j_upper:.12f}]. "
+                f"Must satisfy -1 ≤ lower ≤ upper ≤ 1 (up to tolerance)."
             )
-        
-        # Consistency check: J = TPR - FPR
+
+        # Enforce k_rails consistency
+        if self.tpr_bounds.k_rails != self.k_rails or self.fpr_bounds.k_rails != self.k_rails:
+            raise FHBoundViolationError(
+                "k_rails mismatch between composed bounds and TPR/FPR bounds."
+            )
+
+        if len(self.individual_j_stats) not in (0, self.k_rails):
+            raise FHBoundViolationError(
+                f"len(individual_j_stats)={len(self.individual_j_stats)} must be 0 or k_rails={self.k_rails}."
+            )
+
+        # Consistency check: J = TPR - FPR at the interval level
         expected_j_lower = self.tpr_bounds.lower - self.fpr_bounds.upper
         expected_j_upper = self.tpr_bounds.upper - self.fpr_bounds.lower
-        
+
         if abs(self.j_lower - expected_j_lower) > MATHEMATICAL_TOLERANCE:
             raise FHBoundViolationError(
-                f"J lower bound inconsistency: {self.j_lower} != {expected_j_lower}"
+                f"J lower bound inconsistency: j_lower={self.j_lower:.12f} "
+                f"!= tpr_lower - fpr_upper={expected_j_lower:.12f}"
             )
-    
+
+        if abs(self.j_upper - expected_j_upper) > MATHEMATICAL_TOLERANCE:
+            raise FHBoundViolationError(
+                f"J upper bound inconsistency: j_upper={self.j_upper:.12f} "
+                f"!= tpr_upper - fpr_lower={expected_j_upper:.12f}"
+            )
+
     @property
     def width(self) -> float:
-        """J-statistic uncertainty width.""" 
+        """Width of the J-statistic interval."""
         return self.j_upper - self.j_lower
-    
-    def classify_regime(self, 
-                       threshold_constructive: float = 0.95,
-                       threshold_destructive: float = 1.05) -> Dict[str, Union[str, float, bool]]:
+
+    def classify_regime(
+        self,
+        threshold_constructive: float = 0.95,
+        threshold_destructive: float = 1.05,
+    ) -> Dict[str, Union[str, float, bool, Tuple[float, float]]]:
         """
-        Classify composition regime with confidence assessment.
-        
-        Returns detailed classification with uncertainty quantification.
+        Classify compositional regime based on J/CC bounds.
+
+        We define an interval CC = J_comp / max(J_single), using:
+        - cc_lower = j_lower / max_individual_j
+        - cc_upper = j_upper / max_individual_j
+
+        and classify:
+        - "constructive" if cc_upper < threshold_constructive
+        - "destructive" if cc_lower > threshold_destructive
+        - "independent" if [cc_lower, cc_upper] ⊆ [threshold_constructive, threshold_destructive]
+        - "uncertain" otherwise
+
+        Confidence is heuristically derived from how much the CC interval
+        overlaps the "independent" band.
         """
         if not self.individual_j_stats:
-            return {'regime': 'undefined', 'confidence': 0.0, 'reason': 'no individual stats'}
-        
+            return {
+                "regime": "undefined",
+                "confidence": 0.0,
+                "reason": "no individual stats",
+            }
+
         max_individual = max(self.individual_j_stats)
         if max_individual < MATHEMATICAL_TOLERANCE:
-            return {'regime': 'degenerate', 'confidence': 1.0, 'reason': 'no individual effectiveness'}
-        
-        # CC bounds from J bounds
-        cc_lower = self.j_lower / max_individual if max_individual > 0 else 0.0
-        cc_upper = self.j_upper / max_individual if max_individual > 0 else float('inf')
-        
-        # Regime classification with confidence
+            return {
+                "regime": "degenerate",
+                "confidence": 1.0,
+                "reason": "no individual rail effectiveness (max J ≈ 0)",
+            }
+
+        cc_lower = self.j_lower / max_individual
+        cc_upper = self.j_upper / max_individual
+        if cc_lower > cc_upper:
+            # Should not happen if j_lower <= j_upper and max_individual > 0, but guard anyway.
+            cc_lower, cc_upper = cc_upper, cc_lower
+
+        # Regime classification
         if cc_upper < threshold_constructive:
-            regime = 'constructive'
+            regime = "constructive"
             confidence = 1.0
         elif cc_lower > threshold_destructive:
-            regime = 'destructive'
+            regime = "destructive"
             confidence = 1.0
-        elif (cc_lower >= threshold_constructive and 
-              cc_upper <= threshold_destructive):
-            regime = 'independent'
+        elif (cc_lower >= threshold_constructive) and (cc_upper <= threshold_destructive):
+            regime = "independent"
             confidence = 1.0
         else:
-            # Uncertain regime - bounds span multiple categories
-            regime = 'uncertain'
-            # Confidence based on overlap width
+            # Uncertain regime: CC interval spans multiple bands
+            regime = "uncertain"
             total_span = threshold_destructive - threshold_constructive
-            overlap_span = min(cc_upper, threshold_destructive) - max(cc_lower, threshold_constructive)
-            confidence = 1.0 - (overlap_span / total_span) if total_span > 0 else 0.5
-        
+            if total_span <= 0:
+                confidence = 0.5
+            else:
+                # Overlap of [cc_lower, cc_upper] with the independent band
+                overlap_left = max(cc_lower, threshold_constructive)
+                overlap_right = min(cc_upper, threshold_destructive)
+                overlap_span = max(0.0, overlap_right - overlap_left)
+                # More overlap => more "independent" confidence, but we invert for uncertainty.
+                confidence = max(0.0, min(1.0, 1.0 - overlap_span / total_span))
+
         return {
-            'regime': regime,
-            'confidence': confidence,
-            'cc_bounds': (cc_lower, cc_upper),
-            'cc_width': cc_upper - cc_lower,
-            'max_individual_j': max_individual
+            "regime": regime,
+            "confidence": confidence,
+            "cc_bounds": (cc_lower, cc_upper),
+            "cc_width": cc_upper - cc_lower,
+            "max_individual_j": max_individual,
         }
 
-# CORRECTED mathematical functions
+
+# ---------------------------------------------------------------------
+# Probability-vector validation
+# ---------------------------------------------------------------------
+
 
 def validate_probability_vector(probs: Sequence[float], name: str) -> None:
-    """Rigorous validation of probability vectors with detailed diagnostics."""
+    """
+    Validate that a probability vector is non-empty and each element is a
+    finite number in [0, 1].
+
+    This is a defensive, research-grade validator:
+    - Rejects empty sequences.
+    - Casts each element to float and rejects NaN / ±inf.
+    - Enforces 0.0 ≤ p ≤ 1.0 for every entry.
+    - On failure, reports *all* offending indices with rich detail.
+
+    Parameters
+    ----------
+    probs:
+        Sequence of probability-like values (ints, floats, numpy scalars, etc.).
+    name:
+        Human-readable name used in error messages (e.g. "miss_rates").
+
+    Raises
+    ------
+    ValueError
+        If `probs` is empty or contains any invalid probability. The exception
+        message includes the indices and representations of all offending
+        entries, plus the cast float value or the casting error message.
+    """
     if len(probs) == 0:
         raise ValueError(f"{name} cannot be empty")
-    
-    invalid_values = [(i, p) for i, p in enumerate(probs) 
-                     if not (0.0 <= p <= 1.0) or math.isnan(p) or math.isinf(p)]
-    
+
+    # Collect all invalid entries instead of failing on the first one, so the
+    # caller gets a complete picture of what's wrong.
+    invalid_values: List[Tuple[int, Any, Any]] = []
+
+    for i, p in enumerate(probs):
+        try:
+            fp = float(p)
+        except (TypeError, ValueError) as exc:
+            # Non-numeric or non-castable type
+            invalid_values.append((i, p, f"type_error: {exc}"))
+            continue
+
+        # Reject NaN, infinities, and values outside [0, 1]
+        if math.isnan(fp) or math.isinf(fp) or not (0.0 <= fp <= 1.0):
+            invalid_values.append((i, p, fp))
+
     if invalid_values:
+        # Build a detailed multi-line error message for debugging
+        details_lines = []
+        for idx, original, info in invalid_values:
+            details_lines.append(
+                f"  - index {idx}: value={original!r}, info={info!r}"
+            )
+        details = "\n".join(details_lines)
+
         raise ValueError(
-            f"{name} contains invalid probabilities: {invalid_values}. "
-            f"All values must be finite numbers in [0,1]."
+            f"{name} contains {len(invalid_values)} invalid probabilities.\n"
+            f"Each probability must be a finite real number in [0, 1].\n"
+            f"Offending entries:\n{details}"
         )
 
-def frechet_intersection_lower_bound(marginals: Sequence[float]) -> float:
+# ---------------------------------------------------------------------
+# Core FH / Hoeffding bounds
+# ---------------------------------------------------------------------
+
+
+def frechet_intersection_lower_bound(marginals: Sequence[Probability]) -> Probability:
     """
-    Fréchet lower bound for intersection: max{0, ∑pᵢ - (k-1)}
-    
-    Mathematical Proof Sketch:
-    By Bonferroni inequality: P(∩Aᵢ) ≥ ∑P(Aᵢ) - (k-1)
-    The bound is sharp (attainable by explicit construction).
-    
-    Construction for sharpness:
-    - Divide [0,1] into k intervals of lengths p₁,...,pₖ
-    - Let Aᵢ be union of first i intervals
-    - Then P(∩Aᵢ) = max{0, ∑pᵢ - (k-1)}
+    Fréchet–Hoeffding lower bound for the intersection probability.
+
+    For events A₁, …, A_k with P(Aᵢ) = pᵢ ∈ [0, 1], the Fréchet–Hoeffding
+    inequality gives
+
+        P(⋂ Aᵢ) ≥ max{0, ∑ pᵢ − (k − 1)}.
+
+    This lower bound is *sharp*: there exist joint distributions over
+    (A₁, …, A_k) that attain it.
+
+    Parameters
+    ----------
+    marginals:
+        Sequence of marginal probabilities pᵢ in [0, 1]. Must be non-empty.
+
+    Returns
+    -------
+    Probability
+        The Fréchet–Hoeffding lower bound on P(⋂ Aᵢ), clamped into [0, 1].
+
+    Raises
+    ------
+    ValueError
+        If `marginals` is empty or contains invalid probabilities.
+    FHBoundViolationError
+        If, after numerical clamping, the bound exceeds min(marginals) by more
+        than MATHEMATICAL_TOLERANCE (indicating a logical or numerical bug).
     """
+    # 1) Validate and normalize marginals to plain floats in [0, 1].
     validate_probability_vector(marginals, "marginals")
-    k = len(marginals)
+    p = [float(x) for x in marginals]
+    k = len(p)
+
     if k == 1:
-        return marginals[0]
-    
-    total = sum(marginals)
-    bound = max(0.0, total - (k - 1))
-    return min(bound, min(marginals))  # Cannot exceed minimum marginal
+        # For a single event, the intersection is just the event itself.
+        return p[0]
 
-def hoeffding_intersection_upper_bound(marginals: Sequence[float]) -> float:
-    """
-    Hoeffding upper bound for intersection: min{p₁,...,pₖ}
-    
-    Mathematical Proof: 
-    P(∩Aᵢ) ≤ P(Aⱼ) for any j, hence P(∩Aᵢ) ≤ min{P(Aᵢ)}
-    
-    Construction for sharpness:
-    - Let A₁ ⊆ A₂ ⊆ ... ⊆ Aₖ (nested sets)
-    - Then P(∩Aᵢ) = P(A₁) = min{P(Aᵢ)}
-    """
-    validate_probability_vector(marginals, "marginals")
-    return min(marginals)
+    # 2) Compute the raw Fréchet lower bound: max{0, Σ pᵢ − (k − 1)}.
+    total = sum(p)
+    raw_bound = total - (k - 1)
 
-def frechet_union_lower_bound(marginals: Sequence[float]) -> float:
-    """
-    Fréchet lower bound for union: max{p₁,...,pₖ}
-    
-    Mathematical Proof:
-    P(∪Aᵢ) ≥ P(Aⱼ) for any j, hence P(∪Aᵢ) ≥ max{P(Aᵢ)}
-    
-    Construction for sharpness:
-    - Let A₁ ⊆ A₂ ⊆ ... ⊆ Aₖ (nested sets)  
-    - Then P(∪Aᵢ) = P(Aₖ) = max{P(Aᵢ)}
-    """
-    validate_probability_vector(marginals, "marginals")
-    return max(marginals)
+    # Clamp into [0, 1] defensively (float roundoff can push tiny amounts out).
+    bound = max(0.0, min(1.0, raw_bound))
 
-def hoeffding_union_upper_bound(marginals: Sequence[float]) -> float:
-    """
-    Hoeffding upper bound for union: min{1, ∑pᵢ}
-    
-    Mathematical Proof:
-    By Boole's inequality: P(∪Aᵢ) ≤ ∑P(Aᵢ)
-    Also P(∪Aᵢ) ≤ 1 by definition.
-    
-    Construction for sharpness:
-    - Let Aᵢ be disjoint events with P(Aᵢ) = pᵢ
-    - If ∑pᵢ ≤ 1, then P(∪Aᵢ) = ∑pᵢ
-    - If ∑pᵢ > 1, construct overlapping events achieving bound
-    """
-    validate_probability_vector(marginals, "marginals")
-    return min(1.0, sum(marginals))
+    # 3) Mathematical consistency: bound must not exceed min(pᵢ) in exact math.
+    min_p = min(p)
+    if bound > min_p + MATHEMATICAL_TOLERANCE:
+        # This should never happen if inputs are valid probabilities and the
+        # formula is implemented correctly; treat as a hard invariant failure.
+        raise FHBoundViolationError(
+            "frechet_intersection_lower_bound produced a value that exceeds "
+            f"min(marginals) beyond tolerance.\n"
+            f"  k          = {k}\n"
+            f"  marginals  = {p}\n"
+            f"  sum(p)     = {total:.12f}\n"
+            f"  raw_bound  = {raw_bound:.12f}\n"
+            f"  bound      = {bound:.12f}\n"
+            f"  min(p)     = {min_p:.12f}\n"
+            f"  tolerance  = {MATHEMATICAL_TOLERANCE:.3e}"
+        )
 
-def intersection_bounds(marginals: Sequence[float]) -> FHBounds:
-    """Complete FH bounds for intersection with sharpness verification."""
+    # 4) Final safety clamp to enforce ≤ min(pᵢ) numerically.
+    return float(min(bound, min_p))
+
+def hoeffding_intersection_upper_bound(marginals: Sequence[Probability]) -> Probability:
+    """
+    Hoeffding upper bound for the intersection probability.
+
+    For events A₁, …, A_k with P(Aᵢ) = pᵢ ∈ [0, 1], the intersection satisfies
+
+        P(⋂ Aᵢ) ≤ P(Aⱼ)  for every j,
+        ⇒ P(⋂ Aᵢ) ≤ minᵢ pᵢ.
+
+    This upper bound is *sharp*: attainable by, for example, choosing a nested
+    set construction A₁ ⊆ A₂ ⊆ ⋯ ⊆ A_k with P(Aᵢ) = pᵢ, in which case
+
+        P(⋂ Aᵢ) = P(A₁) = minᵢ pᵢ.
+
+    Parameters
+    ----------
+    marginals:
+        Sequence of marginal probabilities pᵢ in [0, 1]. Must be non-empty.
+
+    Returns
+    -------
+    Probability
+        The Hoeffding upper bound on P(⋂ Aᵢ), guaranteed to lie in [0, 1]
+        (up to numerical tolerance).
+
+    Raises
+    ------
+    ValueError
+        If `marginals` is empty or contains invalid probabilities.
+    """
+    # Validate and normalize marginals.
     validate_probability_vector(marginals, "marginals")
-    
-    lower = frechet_intersection_lower_bound(marginals)
-    upper = hoeffding_intersection_upper_bound(marginals)
-    
-    # Verify mathematical consistency
+    p = [float(x) for x in marginals]
+
+    # With valid probabilities, min(p) is already in [0, 1]; we still clamp
+    # defensively in case of exotic numeric types / roundoff.
+    upper = min(p)
+    upper = max(0.0, min(1.0, upper))
+
+    return float(upper)
+
+
+def frechet_union_lower_bound(marginals: Sequence[Probability]) -> Probability:
+    """
+    Fréchet lower bound for the union probability.
+
+    For events A₁, …, A_k with P(Aᵢ) = pᵢ ∈ [0, 1], the union satisfies
+
+        P(⋃ Aᵢ) ≥ P(Aⱼ)  for every j,
+        ⇒ P(⋃ Aᵢ) ≥ maxᵢ pᵢ.
+
+    This lower bound is *sharp*: attainable by, for example, choosing a nested
+    set construction A₁ ⊆ A₂ ⊆ ⋯ ⊆ A_k with P(Aᵢ) = pᵢ, in which case
+
+        P(⋃ Aᵢ) = P(A_k) = maxᵢ pᵢ.
+
+    Parameters
+    ----------
+    marginals:
+        Sequence of marginal probabilities pᵢ in [0, 1]. Must be non-empty.
+
+    Returns
+    -------
+    Probability
+        The Fréchet lower bound on P(⋃ Aᵢ), guaranteed to lie in [0, 1]
+        (up to numerical tolerance).
+
+    Raises
+    ------
+    ValueError
+        If `marginals` is empty or contains invalid probabilities.
+    """
+    # Validate and normalize marginals.
+    validate_probability_vector(marginals, "marginals")
+    p = [float(x) for x in marginals]
+
+    # With valid probabilities, max(p) is already in [0, 1]; we still clamp
+    # defensively in case of exotic numeric types / roundoff.
+    lower = max(p)
+    lower = max(0.0, min(1.0, lower))
+
+    return float(lower)
+
+
+def hoeffding_union_upper_bound(marginals: Sequence[Probability]) -> Probability:
+    """
+    Hoeffding (Boole) upper bound for the union probability.
+
+    For events A₁, …, A_k with P(Aᵢ) = pᵢ ∈ [0, 1], the union U = ⋃ Aᵢ satisfies
+
+        P(U) ≤ ∑ pᵢ        (Boole's inequality)
+        P(U) ≤ 1           (by definition of probability)
+
+    Hence
+
+        P(U) ≤ min(1, ∑ pᵢ).
+
+    Sharpness:
+        * If the events are pairwise disjoint and ∑ pᵢ ≤ 1, then
+              P(U) = ∑ pᵢ.
+        * If ∑ pᵢ ≥ 1, one can construct events whose union covers the entire
+          sample space, achieving P(U) = 1 while preserving the marginals.
+
+    Parameters
+    ----------
+    marginals:
+        Sequence of marginal probabilities pᵢ in [0, 1]. Must be non-empty.
+
+    Returns
+    -------
+    Probability
+        Hoeffding upper bound on P(⋃ Aᵢ), guaranteed to lie in [0, 1]
+        (up to numerical tolerance).
+
+    Raises
+    ------
+    ValueError
+        If `marginals` is empty or contains invalid probabilities.
+    """
+    # Validate and normalize marginals
+    validate_probability_vector(marginals, "marginals")
+    p = [float(x) for x in marginals]
+
+    # Boole + trivial ≤ 1
+    s = float(sum(p))
+    upper = min(1.0, s)
+
+    # Defensive clamp into [0, 1] in case of exotic numeric types / rounding
+    upper = max(0.0, min(1.0, upper))
+
+    return upper
+
+def intersection_bounds(marginals: Sequence[Probability]) -> FHBounds:
+    """
+    Compute Fréchet–Hoeffding bounds for the intersection probability P(⋂ Aᵢ).
+
+    Semantics
+    ---------
+    For events A₁, …, A_k with marginals P(Aᵢ) = pᵢ ∈ [0, 1], the probability of
+    the intersection H = ⋂ Aᵢ is bounded by the classical Fréchet–Hoeffding
+    envelope:
+
+        max(0, Σ pᵢ − (k − 1)) ≤ P(H) ≤ minᵢ pᵢ.
+
+    Both bounds are *sharp*:
+      * The lower bound is achievable via extremal Fréchet couplings
+        (Bonferroni/Frechet construction).
+      * The upper bound is achievable by nested sets A₁ ⊆ A₂ ⊆ … ⊆ A_k.
+
+    Parameters
+    ----------
+    marginals:
+        Sequence of marginal probabilities pᵢ in [0, 1]. Must be non-empty and
+        each entry finite and within [0, 1].
+
+    Returns
+    -------
+    FHBounds
+        An FHBounds instance with:
+            - lower = max(0, Σ pᵢ − (k − 1)) clamped into [0, 1],
+            - upper = minᵢ pᵢ clamped into [0, 1],
+            - marginals = tuple of the input probabilities (as floats),
+            - bound_type = "intersection",
+            - k_rails = len(marginals),
+            - is_sharp = True.
+
+    Raises
+    ------
+    ValueError
+        If `marginals` is empty or contains invalid probabilities (via
+        validate_probability_vector).
+    FHBoundViolationError
+        If the derived lower/upper are inconsistent (lower > upper beyond
+        MATHEMATICAL_TOLERANCE).
+    """
+    # Validate and normalize marginals.
+    validate_probability_vector(marginals, "marginals")
+    p = [float(x) for x in marginals]
+    k = len(p)
+
+    # Core FH intersection bounds.
+    lower = float(frechet_intersection_lower_bound(p))
+    upper = float(hoeffding_intersection_upper_bound(p))
+
+    # Defensive clamp into [0, 1] to guard against tiny numerical drift.
+    lower = max(0.0, min(1.0, lower))
+    upper = max(0.0, min(1.0, upper))
+
+    # Internal consistency check: lower must not exceed upper beyond tolerance.
     if lower > upper + MATHEMATICAL_TOLERANCE:
         raise FHBoundViolationError(
-            f"Inconsistent intersection bounds: {lower} > {upper}. "
-            f"This indicates a mathematical error."
+            f"Inconsistent intersection bounds: lower={lower:.12f} > upper={upper:.12f}"
         )
-    
+
     return FHBounds(
         lower=lower,
         upper=upper,
-        marginals=tuple(marginals),
-        bound_type='intersection',
-        k_rails=len(marginals),
-        construction_proof="Bonferroni lower bound, subset upper bound"
+        marginals=tuple(p),
+        bound_type="intersection",
+        k_rails=k,
+        construction_proof=(
+            "Fréchet–Hoeffding intersection bounds: "
+            "lower = max(0, Σ p_i − (k − 1)); upper = min_i p_i."
+        ),
     )
 
-def union_bounds(marginals: Sequence[float]) -> FHBounds:
-    """Complete FH bounds for union with sharpness verification.""" 
+def union_bounds(marginals: Sequence[Probability]) -> FHBounds:
+    """
+    Compute Fréchet–Hoeffding bounds for the union probability P(⋃ Aᵢ).
+
+    Semantics
+    ---------
+    For events A₁, …, A_k with marginals P(Aᵢ) = pᵢ ∈ [0, 1], the probability of
+    the union U = ⋃ Aᵢ is bounded by:
+
+        maxᵢ pᵢ ≤ P(U) ≤ min(1, Σ pᵢ).
+
+    Both bounds are *sharp*:
+      * The lower bound is achievable by nested sets A₁ ⊆ A₂ ⊆ … ⊆ A_k.
+      * The upper bound is achievable by disjoint events when Σ pᵢ ≤ 1, and by
+        suitable overlapping constructions otherwise.
+
+    Parameters
+    ----------
+    marginals:
+        Sequence of marginal probabilities pᵢ in [0, 1]. Must be non-empty and
+        each entry finite and within [0, 1].
+
+    Returns
+    -------
+    FHBounds
+        An FHBounds instance with:
+            - lower = maxᵢ pᵢ clamped into [0, 1],
+            - upper = min(1, Σ pᵢ) clamped into [0, 1],
+            - marginals = tuple of the input probabilities (as floats),
+            - bound_type = "union",
+            - k_rails = len(marginals),
+            - is_sharp = True.
+
+    Raises
+    ------
+    ValueError
+        If `marginals` is empty or contains invalid probabilities (via
+        validate_probability_vector).
+    FHBoundViolationError
+        If the derived lower/upper are inconsistent (lower > upper beyond
+        MATHEMATICAL_TOLERANCE).
+    """
+    # Validate and normalize marginals.
     validate_probability_vector(marginals, "marginals")
-    
-    lower = frechet_union_lower_bound(marginals)
-    upper = hoeffding_union_upper_bound(marginals)
-    
-    # Verify mathematical consistency
+    p = [float(x) for x in marginals]
+
+    # Core FH union bounds.
+    lower = float(frechet_union_lower_bound(p))
+    upper = float(hoeffding_union_upper_bound(p))
+
+    # Defensive clamp into [0, 1] to guard against tiny numerical drift.
+    lower = max(0.0, min(1.0, lower))
+    upper = max(0.0, min(1.0, upper))
+
+    # Internal consistency check: lower must not exceed upper beyond tolerance.
     if lower > upper + MATHEMATICAL_TOLERANCE:
         raise FHBoundViolationError(
-            f"Inconsistent union bounds: {lower} > {upper}. "
-            f"This indicates a mathematical error."
+            f"Inconsistent union bounds: lower={lower:.12f} > upper={upper:.12f}"
         )
-    
+
     return FHBounds(
         lower=lower,
         upper=upper,
-        marginals=tuple(marginals),
-        bound_type='union', 
-        k_rails=len(marginals),
-        construction_proof="Subset lower bound, Boole upper bound"
+        marginals=tuple(p),
+        bound_type="union",
+        k_rails=len(p),
+        construction_proof=(
+            "Fréchet–Hoeffding union bounds: "
+            "lower = max_i p_i; upper = min(1, Σ p_i)."
+        ),
     )
 
-# CORRECTED composition functions
+# ---------------------------------------------------------------------
+# Composition: serial OR / parallel AND
+# ---------------------------------------------------------------------
 
-def serial_or_composition_bounds(miss_rates: Sequence[float], 
-                               false_alarm_rates: Sequence[float]) -> ComposedJBounds:
+
+def serial_or_composition_bounds(
+    miss_rates: Sequence[Probability],
+    false_alarm_rates: Sequence[Probability],
+) -> ComposedJBounds:
     """
-    MATHEMATICALLY CORRECT serial OR composition bounds.
-    
-    Model:
-    - Detection if ANY rail detects (OR-gate)
-    - Miss if ALL rails miss: H = ∩ᵢFᵢ  
-    - False alarm if ANY rail false alarms: B = ∪ᵢAᵢ
-    - TPR = 1 - P(H), FPR = P(B), J = TPR - FPR
-    
-    This corrects the common error of applying FH directly to J-statistics.
+    Serial OR composition (system fires if ANY rail fires).
+
+    Semantics
+    ---------
+    We consider k detection rails. For a fixed attack distribution:
+
+    - On an adversarial input (world 1):
+        * Rail i misses with probability m_i = miss_rates[i].
+        * Let F_i be the “rail i missed” event.
+        * Joint miss event: H = ⋂_i F_i  (all rails miss).
+        * Thus  TPR = 1 − P(H).
+
+    - On a benign input (world 0):
+        * Rail i false-alarms with probability f_i = false_alarm_rates[i].
+        * Let A_i be the “rail i false-alarms” event.
+        * Joint false-alarm event: B = ⋃_i A_i  (at least one rail false-alarms).
+        * Thus  FPR = P(B).
+
+    We first apply Fréchet–Hoeffding bounds to P(H) and P(B):
+
+        H_bounds = intersection_bounds(miss_rates)   # P(H) = P(⋂ F_i)
+        B_bounds = union_bounds(false_alarm_rates)  # P(B) = P(⋃ A_i)
+
+    and then push them through:
+
+        TPR ∈ [1 − H_upper, 1 − H_lower]
+        FPR ∈ [B_lower,      B_upper]
+
+    Finally:
+
+        J = TPR − FPR  ⇒
+        J_lower = TPR_lower − FPR_upper
+        J_upper = TPR_upper − FPR_lower
+
+    All bounds are guaranteed to respect probability constraints up to
+    MATHEMATICAL_TOLERANCE and are mathematically sharp at the level of FH.
     """
+    # -------------------------------
+    # 0. Dimension and validity checks
+    # -------------------------------
+    if not miss_rates or not false_alarm_rates:
+        raise ValueError("serial_or_composition_bounds: rate vectors must be non-empty")
+
     if len(miss_rates) != len(false_alarm_rates):
         raise ValueError(
-            f"Dimension mismatch: {len(miss_rates)} miss rates vs "
-            f"{len(false_alarm_rates)} false alarm rates"
+            "serial_or_composition_bounds: dimension mismatch: "
+            f"{len(miss_rates)} miss rates vs {len(false_alarm_rates)} false alarm rates"
         )
-    
+
     validate_probability_vector(miss_rates, "miss_rates")
     validate_probability_vector(false_alarm_rates, "false_alarm_rates")
-    
+
     k = len(miss_rates)
-    
-    # Step 1: FH bounds for joint miss P(H) = P(∩ᵢFᵢ)
-    miss_bounds = intersection_bounds(miss_rates)
-    
-    # Step 2: FH bounds for joint false alarm P(B) = P(∪ᵢAᵢ)  
-    alarm_bounds = union_bounds(false_alarm_rates)
-    
-    # Step 3: TPR bounds from miss bounds
-    tpr_lower = 1 - miss_bounds.upper  # Worst case: maximum joint miss
-    tpr_upper = 1 - miss_bounds.lower  # Best case: minimum joint miss
-    
-    tpr_bounds = FHBounds(
-        lower=max(0.0, tpr_lower),
-        upper=min(1.0, tpr_upper),
-        marginals=tuple(1 - m for m in miss_rates),
-        bound_type='tpr_serial_or',
-        k_rails=k
+
+    # Cast to floats once, to avoid surprises with numpy/Decimal/etc.
+    miss = [float(m) for m in miss_rates]
+    fa = [float(f) for f in false_alarm_rates]
+
+    # --------------------------------------
+    # 1. FH bounds for joint miss P(H) = P(⋂ F_i)
+    # --------------------------------------
+    miss_b = intersection_bounds(miss)  # FHBounds for P(H)
+
+    # Sanity: ensure intersection_bounds' k_rails agrees with k
+    if miss_b.k_rails != k:
+        raise FHBoundViolationError(
+            "serial_or_composition_bounds: miss_bounds.k_rails "
+            f"({miss_b.k_rails}) inconsistent with k={k}"
+        )
+
+    # ----------------------------------------------
+    # 2. FH bounds for joint false alarm P(B) = P(⋃ A_i)
+    # ----------------------------------------------
+    alarm_b = union_bounds(fa)  # FHBounds for P(B)
+
+    if alarm_b.k_rails != k:
+        raise FHBoundViolationError(
+            "serial_or_composition_bounds: alarm_bounds.k_rails "
+            f"({alarm_b.k_rails}) inconsistent with k={k}"
+        )
+
+    # -----------------------------
+    # 3. TPR bounds via P(H) bounds
+    # -----------------------------
+    # Worst-case TPR: largest joint miss
+    tpr_lower = 1.0 - float(miss_b.upper)
+    # Best-case TPR: smallest joint miss
+    tpr_upper = 1.0 - float(miss_b.lower)
+
+    # Clamp defensively into [0, 1] to avoid tiny negative/ >1 drift.
+    tpr_lower = max(0.0, min(1.0, tpr_lower))
+    tpr_upper = max(0.0, min(1.0, tpr_upper))
+
+    if tpr_lower > tpr_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            "serial_or_composition_bounds: TPR bounds inconsistent: "
+            f"tpr_lower={tpr_lower:.12f} > tpr_upper={tpr_upper:.12f}"
+        )
+
+    # Per-rail TPR marginals: complements of miss rates.
+    tpr_marginals = tuple(max(0.0, min(1.0, 1.0 - m)) for m in miss)
+
+    tpr_b = FHBounds(
+        lower=tpr_lower,
+        upper=tpr_upper,
+        marginals=tpr_marginals,
+        bound_type="tpr_serial_or",
+        k_rails=k,
+        construction_proof="TPR = 1 − P(H) with FH bounds on H = ⋂ F_i.",
     )
-    
-    # Step 4: FPR bounds (direct from alarm bounds)
-    fpr_bounds = FHBounds(
-        lower=alarm_bounds.lower,
-        upper=alarm_bounds.upper,
-        marginals=alarm_bounds.marginals,
-        bound_type='fpr_serial_or',
-        k_rails=k
+
+    # -----------------------------
+    # 4. FPR bounds via P(B) bounds
+    # -----------------------------
+    fpr_lower = float(alarm_b.lower)
+    fpr_upper = float(alarm_b.upper)
+
+    # Clamp into [0, 1] defensively (should already hold from union_bounds).
+    fpr_lower = max(0.0, min(1.0, fpr_lower))
+    fpr_upper = max(0.0, min(1.0, fpr_upper))
+
+    if fpr_lower > fpr_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            "serial_or_composition_bounds: FPR bounds inconsistent: "
+            f"fpr_lower={fpr_lower:.12f} > fpr_upper={fpr_upper:.12f}"
+        )
+
+    fpr_b = FHBounds(
+        lower=fpr_lower,
+        upper=fpr_upper,
+        marginals=tuple(fa),
+        bound_type="fpr_serial_or",
+        k_rails=k,
+        construction_proof="FPR = P(B) with FH bounds on B = ⋃ A_i.",
     )
-    
-    # Step 5: J-statistic bounds via interval arithmetic
-    j_lower = tpr_bounds.lower - fpr_bounds.upper  # Pessimistic J
-    j_upper = tpr_bounds.upper - fpr_bounds.lower  # Optimistic J
-    
-    # Clamp to valid J range
+
+    # -----------------------------
+    # 5. J-statistic bounds
+    # -----------------------------
+    j_lower = tpr_b.lower - fpr_b.upper
+    j_upper = tpr_b.upper - fpr_b.lower
+
+    # In principle J ∈ [−1, 1] automatically since TPR,FPR ∈ [0,1], but we
+    # clamp defensively in case of tiny numerical overshoot.
     j_lower = max(-1.0, min(1.0, j_lower))
     j_upper = max(-1.0, min(1.0, j_upper))
-    
-    # Individual J-statistics for comparison
-    individual_j_stats = tuple((1 - m) - f for m, f in zip(miss_rates, false_alarm_rates))
-    
+
+    if j_lower > j_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            "serial_or_composition_bounds: J bounds inconsistent: "
+            f"j_lower={j_lower:.12f} > j_upper={j_upper:.12f}"
+        )
+
+    # Per-rail J statistics for comparison / CC metrics
+    individual_j_stats = tuple(
+        (max(0.0, min(1.0, 1.0 - m))) - f
+        for m, f in zip(miss, fa)
+    )
+
     return ComposedJBounds(
         j_lower=j_lower,
         j_upper=j_upper,
-        tpr_bounds=tpr_bounds,
-        fpr_bounds=fpr_bounds,
-        miss_bounds=miss_bounds,
-        alarm_bounds=alarm_bounds,
+        tpr_bounds=tpr_b,
+        fpr_bounds=fpr_b,
+        miss_bounds=miss_b,
+        alarm_bounds=alarm_b,
         individual_j_stats=individual_j_stats,
-        composition_type='serial_or',
-        k_rails=k
+        composition_type="serial_or",
+        k_rails=k,
     )
 
-def parallel_and_composition_bounds(miss_rates: Sequence[float],
-                                  false_alarm_rates: Sequence[float]) -> ComposedJBounds:
+def parallel_and_composition_bounds(
+    miss_rates: Sequence[Probability],
+    false_alarm_rates: Sequence[Probability],
+) -> ComposedJBounds:
     """
-    MATHEMATICALLY CORRECT parallel AND composition bounds.
-    
-    Model: 
-    - Detection only if ALL rails detect (AND-gate)
-    - Miss if ANY rail misses: H = ∪ᵢFᵢ
-    - False alarm if ALL rails false alarm: B = ∩ᵢAᵢ  
-    - TPR = 1 - P(H), FPR = P(B), J = TPR - FPR
+    Parallel AND composition (system fires only if ALL rails fire).
+
+    Semantics
+    ---------
+    We consider k detection rails. For a fixed attack distribution:
+
+    - On an adversarial input (world 1):
+        * Rail i misses with probability m_i = miss_rates[i].
+        * Let F_i be the “rail i missed” event.
+        * Joint miss event for AND system: H = ⋃_i F_i  (at least one misses).
+        * Thus  TPR = 1 − P(H).
+
+    - On a benign input (world 0):
+        * Rail i false-alarms with probability f_i = false_alarm_rates[i].
+        * Let A_i be the “rail i false-alarms” event.
+        * Joint false-alarm event for AND system: B = ⋂_i A_i (all rails false-alarm).
+        * Thus  FPR = P(B).
+
+    We first apply Fréchet–Hoeffding bounds to P(H) and P(B):
+
+        H_bounds = union_bounds(miss_rates)         # P(H) = P(⋃ F_i)
+        B_bounds = intersection_bounds(false_alarm_rates)  # P(B) = P(⋂ A_i)
+
+    and then push them through:
+
+        TPR ∈ [1 − H_upper, 1 − H_lower]
+        FPR ∈ [B_lower,      B_upper]
+
+    Finally:
+
+        J = TPR − FPR  ⇒
+        J_lower = TPR_lower − FPR_upper
+        J_upper = TPR_upper − FPR_lower
+
+    All bounds are guaranteed to respect probability constraints up to
+    MATHEMATICAL_TOLERANCE and are mathematically sharp at the FH level.
     """
+    # -------------------------------
+    # 0. Dimension and validity checks
+    # -------------------------------
+    if not miss_rates or not false_alarm_rates:
+        raise ValueError("parallel_and_composition_bounds: rate vectors must be non-empty")
+
     if len(miss_rates) != len(false_alarm_rates):
-        raise ValueError("Dimension mismatch in rate vectors")
-    
+        raise ValueError(
+            "parallel_and_composition_bounds: dimension mismatch: "
+            f"{len(miss_rates)} miss rates vs {len(false_alarm_rates)} false alarm rates"
+        )
+
     validate_probability_vector(miss_rates, "miss_rates")
     validate_probability_vector(false_alarm_rates, "false_alarm_rates")
-    
+
     k = len(miss_rates)
-    
-    # Step 1: FH bounds for joint miss P(H) = P(∪ᵢFᵢ) 
-    miss_bounds = union_bounds(miss_rates)
-    
-    # Step 2: FH bounds for joint false alarm P(B) = P(∩ᵢAᵢ)
-    alarm_bounds = intersection_bounds(false_alarm_rates)
-    
-    # Step 3: TPR and FPR bounds
-    tpr_lower = 1 - miss_bounds.upper
-    tpr_upper = 1 - miss_bounds.lower
-    
-    tpr_bounds = FHBounds(
-        lower=max(0.0, tpr_lower),
-        upper=min(1.0, tpr_upper), 
-        marginals=tuple(1 - m for m in miss_rates),
-        bound_type='tpr_parallel_and',
-        k_rails=k
+
+    # Cast to floats once for safety with numpy/Decimal/etc.
+    miss = [float(m) for m in miss_rates]
+    fa = [float(f) for f in false_alarm_rates]
+
+    # --------------------------------------
+    # 1. FH bounds for joint miss P(H) = P(⋃ F_i)
+    # --------------------------------------
+    miss_b = union_bounds(miss)  # FHBounds for P(H)
+
+    if miss_b.k_rails != k:
+        raise FHBoundViolationError(
+            "parallel_and_composition_bounds: miss_bounds.k_rails "
+            f"({miss_b.k_rails}) inconsistent with k={k}"
+        )
+
+    # ----------------------------------------------
+    # 2. FH bounds for joint false alarm P(B) = P(⋂ A_i)
+    # ----------------------------------------------
+    alarm_b = intersection_bounds(fa)  # FHBounds for P(B)
+
+    if alarm_b.k_rails != k:
+        raise FHBoundViolationError(
+            "parallel_and_composition_bounds: alarm_bounds.k_rails "
+            f"({alarm_b.k_rails}) inconsistent with k={k}"
+        )
+
+    # -----------------------------
+    # 3. TPR bounds via P(H) bounds
+    # -----------------------------
+    tpr_lower = 1.0 - float(miss_b.upper)
+    tpr_upper = 1.0 - float(miss_b.lower)
+
+    # Clamp into [0, 1] defensively.
+    tpr_lower = max(0.0, min(1.0, tpr_lower))
+    tpr_upper = max(0.0, min(1.0, tpr_upper))
+
+    if tpr_lower > tpr_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            "parallel_and_composition_bounds: TPR bounds inconsistent: "
+            f"tpr_lower={tpr_lower:.12f} > tpr_upper={tpr_upper:.12f}"
+        )
+
+    tpr_marginals = tuple(max(0.0, min(1.0, 1.0 - m)) for m in miss)
+
+    tpr_b = FHBounds(
+        lower=tpr_lower,
+        upper=tpr_upper,
+        marginals=tpr_marginals,
+        bound_type="tpr_parallel_and",
+        k_rails=k,
+        construction_proof="TPR = 1 − P(H) with FH bounds on H = ⋃ F_i.",
     )
-    
-    fpr_bounds = FHBounds(
-        lower=alarm_bounds.lower,
-        upper=alarm_bounds.upper,
-        marginals=alarm_bounds.marginals,
-        bound_type='fpr_parallel_and',
-        k_rails=k
+
+    # -----------------------------
+    # 4. FPR bounds via P(B) bounds
+    # -----------------------------
+    fpr_lower = float(alarm_b.lower)
+    fpr_upper = float(alarm_b.upper)
+
+    fpr_lower = max(0.0, min(1.0, fpr_lower))
+    fpr_upper = max(0.0, min(1.0, fpr_upper))
+
+    if fpr_lower > fpr_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            "parallel_and_composition_bounds: FPR bounds inconsistent: "
+            f"fpr_lower={fpr_lower:.12f} > fpr_upper={fpr_upper:.12f}"
+        )
+
+    fpr_b = FHBounds(
+        lower=fpr_lower,
+        upper=fpr_upper,
+        marginals=tuple(fa),
+        bound_type="fpr_parallel_and",
+        k_rails=k,
+        construction_proof="FPR = P(B) with FH bounds on B = ⋂ A_i.",
     )
-    
-    # Step 4: J-statistic bounds
-    j_lower = tpr_bounds.lower - fpr_bounds.upper
-    j_upper = tpr_bounds.upper - fpr_bounds.lower
-    
+
+    # -----------------------------
+    # 5. J-statistic bounds
+    # -----------------------------
+    j_lower = tpr_b.lower - fpr_b.upper
+    j_upper = tpr_b.upper - fpr_b.lower
+
+    # Clamp into [-1, 1] for numerical robustness.
     j_lower = max(-1.0, min(1.0, j_lower))
     j_upper = max(-1.0, min(1.0, j_upper))
-    
-    individual_j_stats = tuple((1 - m) - f for m, f in zip(miss_rates, false_alarm_rates))
-    
+
+    if j_lower > j_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            "parallel_and_composition_bounds: J bounds inconsistent: "
+            f"j_lower={j_lower:.12f} > j_upper={j_upper:.12f}"
+        )
+
+    individual_j_stats = tuple(
+        (max(0.0, min(1.0, 1.0 - m))) - f
+        for m, f in zip(miss, fa)
+    )
+
     return ComposedJBounds(
         j_lower=j_lower,
         j_upper=j_upper,
-        tpr_bounds=tpr_bounds,
-        fpr_bounds=fpr_bounds,
-        miss_bounds=miss_bounds,
-        alarm_bounds=alarm_bounds,
+        tpr_bounds=tpr_b,
+        fpr_bounds=fpr_b,
+        miss_bounds=miss_b,
+        alarm_bounds=alarm_b,
         individual_j_stats=individual_j_stats,
-        composition_type='parallel_and',
-        k_rails=k
+        composition_type="parallel_and",
+        k_rails=k,
     )
 
-# CORRECTED independence calculations
+# ---------------------------------------------------------------------
+# Independence-based composition
+# ---------------------------------------------------------------------
+def independence_serial_or_j(
+    tprs: Sequence[Probability],
+    fprs: Sequence[Probability],
+) -> JStatistic:
+    """
+    Youden's J under an *independence* model for a serial-OR composition.
 
-def independence_serial_or_j(tprs: Sequence[float], fprs: Sequence[float]) -> float:
+    Semantics
+    ---------
+    We have k rails, each with per-rail performance (TPR_i, FPR_i). The
+    serial-OR system fires if *any* rail fires.
+
+    Under the assumption that rails are conditionally independent given the
+    world (benign/adversarial):
+
+        - On adversarial inputs:
+            * Rail i detects with probability TPR_i.
+            * Rail i misses with probability (1 - TPR_i).
+            * Joint miss event H ("system fails to detect") occurs iff all
+              rails miss independently:
+                    P(H) = ∏_i (1 - TPR_i)
+
+        - On benign inputs:
+            * Rail i false-alarms with probability FPR_i.
+            * Rail i is quiet with probability (1 - FPR_i).
+            * Joint false-alarm event B ("system fires spuriously") occurs iff
+              at least one rail false-alarms:
+                    P(B) = 1 - ∏_i (1 - FPR_i)
+
+        Hence:
+            TPR_sys = 1 - P(H) = 1 - ∏_i (1 - TPR_i)
+            FPR_sys = P(B)     = 1 - ∏_i (1 - FPR_i)
+            J       = TPR_sys - FPR_sys
+
+    This helper computes that J and clamps it into [-1, 1] for numerical
+    robustness.
+
+    Args
+    ----
+    tprs:
+        Sequence of per-rail true positive rates TPR_i in [0, 1].
+    fprs:
+        Sequence of per-rail false positive rates FPR_i in [0, 1].
+
+    Returns
+    -------
+    JStatistic
+        The independence-model Youden's J for the serial-OR composition,
+        clipped into [-1, 1].
+
+    Raises
+    ------
+    ValueError
+        If the sequences are empty or have mismatched lengths.
+    InvalidProbabilityError
+        If any TPR/FPR is NaN, Inf, or outside [0, 1].
     """
-    CORRECTED independence calculation for serial OR composition.
-    
-    MATHEMATICAL CORRECTION:
-    For OR-gate under independence:
-    - TPR = 1 - ∏(1 - TPRᵢ)  [miss if all miss independently]
-    - FPR = 1 - ∏(1 - FPRᵢ)  [false alarm if any false alarms independently]
-    
-    The previous implementation incorrectly used multiplicative formula for FPR.
-    """
+    # Basic structural checks
+    if not tprs or not fprs:
+        raise ValueError("independence_serial_or_j: tprs and fprs must be non-empty")
+
+    if len(tprs) != len(fprs):
+        raise ValueError(
+            "independence_serial_or_j: TPR and FPR vectors must have the same length "
+            f"(got len(tprs)={len(tprs)}, len(fprs)={len(fprs)})"
+        )
+
+    # Validate and coerce to floats once, to avoid surprises from numpy/Decimal.
     validate_probability_vector(tprs, "tprs")
     validate_probability_vector(fprs, "fprs")
-    
-    if len(tprs) != len(fprs):
-        raise ValueError("TPR and FPR vectors must have same length")
-    
-    # Under independence assumption
+
+    tprs_f = [float(t) for t in tprs]
+    fprs_f = [float(f) for f in fprs]
+
+    # Independence miss product: P(H) = ∏ (1 - TPR_i)
     miss_product = 1.0
-    for tpr in tprs:
-        miss_product *= (1.0 - tpr)  # P(miss by rail i) = 1 - TPRᵢ
-    
-    false_alarm_complement_product = 1.0  
-    for fpr in fprs:
-        false_alarm_complement_product *= (1.0 - fpr)  # P(no false alarm by rail i)
-    
-    tpr_independent = 1.0 - miss_product  # P(at least one detects)
-    fpr_independent = 1.0 - false_alarm_complement_product  # P(at least one false alarms)
-    
-    return tpr_independent - fpr_independent
+    for tpr in tprs_f:
+        miss_product *= (1.0 - tpr)
 
-def independence_parallel_and_j(tprs: Sequence[float], fprs: Sequence[float]) -> float:
+    # Independence "no false alarm" product: ∏ (1 - FPR_i)
+    no_false_alarm_product = 1.0
+    for fpr in fprs_f:
+        no_false_alarm_product *= (1.0 - fpr)
+
+    # System-level rates under independence
+    tpr_sys = 1.0 - miss_product
+    fpr_sys = 1.0 - no_false_alarm_product
+
+    # Clamp into [0, 1] defensively (floating error can push slightly outside).
+    tpr_sys = max(0.0, min(1.0, tpr_sys))
+    fpr_sys = max(0.0, min(1.0, fpr_sys))
+
+    j = tpr_sys - fpr_sys
+
+    # Final clamp into [-1, 1] to protect downstream code from tiny drift.
+    return max(-1.0, min(1.0, float(j)))
+
+def independence_parallel_and_j(
+    tprs: Sequence[Probability],
+    fprs: Sequence[Probability],
+) -> JStatistic:
     """
-    Independence calculation for parallel AND composition.
-    
-    For AND-gate under independence:
-    - TPR = ∏TPRᵢ  [detect if all detect independently] 
-    - FPR = ∏FPRᵢ  [false alarm if all false alarm independently]
+    Youden's J under an *independence* model for a parallel-AND composition.
+
+    Semantics
+    ---------
+    We have k rails, each with per-rail performance (TPR_i, FPR_i). The
+    parallel-AND system fires only if *all* rails fire.
+
+    Under the assumption that rails are conditionally independent given the
+    world (benign/adversarial):
+
+        - On adversarial inputs:
+            * Rail i detects with probability TPR_i.
+            * Joint detection requires all rails detect:
+                  TPR_sys = ∏_i TPR_i
+
+        - On benign inputs:
+            * Rail i false-alarms with probability FPR_i.
+            * Joint false alarm requires all rails false-alarm:
+                  FPR_sys = ∏_i FPR_i
+
+        Hence:
+            J = TPR_sys − FPR_sys
+
+    This helper computes that J and clamps it into [-1, 1] for numerical
+    robustness.
+
+    Args
+    ----
+    tprs:
+        Sequence of per-rail true positive rates TPR_i in [0, 1].
+    fprs:
+        Sequence of per-rail false positive rates FPR_i in [0, 1].
+
+    Returns
+    -------
+    JStatistic
+        The independence-model Youden's J for the parallel-AND composition,
+        clipped into [-1, 1].
+
+    Raises
+    ------
+    ValueError
+        If the sequences are empty or have mismatched lengths.
+    InvalidProbabilityError
+        If any TPR/FPR is NaN, Inf, or outside [0, 1].
     """
+    # Structural checks
+    if not tprs or not fprs:
+        raise ValueError("independence_parallel_and_j: tprs and fprs must be non-empty")
+
+    if len(tprs) != len(fprs):
+        raise ValueError(
+            "independence_parallel_and_j: TPR and FPR vectors must have the same length "
+            f"(got len(tprs)={len(tprs)}, len(fprs)={len(fprs)})"
+        )
+
+    # Validate and coerce to floats (handles numpy scalars, Decimal, etc.).
     validate_probability_vector(tprs, "tprs")
     validate_probability_vector(fprs, "fprs")
-    
-    if len(tprs) != len(fprs):
-        raise ValueError("TPR and FPR vectors must have same length")
-    
-    tpr_product = 1.0
-    fpr_product = 1.0
-    
-    for tpr in tprs:
-        tpr_product *= tpr
-    
-    for fpr in fprs:
-        fpr_product *= fpr
-    
-    return tpr_product - fpr_product
 
-# CORRECTED CII calculation
+    tprs_f = [float(t) for t in tprs]
+    fprs_f = [float(f) for f in fprs]
+
+    # Independence products
+    tpr_sys = 1.0
+    fpr_sys = 1.0
+    for tpr in tprs_f:
+        tpr_sys *= tpr
+    for fpr in fprs_f:
+        fpr_sys *= fpr
+
+    # Clamp into [0, 1] defensively in case of tiny floating drift.
+    tpr_sys = max(0.0, min(1.0, tpr_sys))
+    fpr_sys = max(0.0, min(1.0, fpr_sys))
+
+    j = tpr_sys - fpr_sys
+
+    # Final clamp into [-1, 1] for robustness.
+    return max(-1.0, min(1.0, float(j)))
+
+# ---------------------------------------------------------------------
+# Composability Interference Index (CII)
+# ---------------------------------------------------------------------
 
 def compute_composability_interference_index(
     observed_j: float,
     bounds: ComposedJBounds,
-    use_independence_baseline: bool = True
-) -> Dict[str, Union[float, str, Dict]]:
+    individual_tprs: Optional[Sequence[Probability]] = None,
+    individual_fprs: Optional[Sequence[Probability]] = None,
+    use_independence_baseline: bool = True,
+) -> Dict[str, Union[float, str, bool, Tuple[float, float]]]:
     """
-    MATHEMATICALLY CORRECTED Composability Interference Index (CII).
-    
-    CII = (J_obs - J_baseline) / (J_worst - J_baseline)
-    
+    Composability Interference Index (CII).
+
+    Definition
+    ----------
+    CII = (J_obs - J_baseline) / (J_worst - J_baseline),
+
     where:
-    - J_baseline = independence assumption (if use_independence_baseline=True)
-                   or bounds.j_lower (if False)  
-    - J_worst = bounds.j_lower (pessimistic FH bound)
-    
-    Interpretation:
-    - κ < 0: constructive (better than baseline)
-    - κ ≈ 0: matches baseline 
-    - κ > 0: destructive (worse than baseline)
-    - κ > 1: worse than theoretical worst case (suggests model violation)
+    - J_obs     = observed composed J (point estimate from experiment).
+    - J_baseline:
+        * If `use_independence_baseline` and per-rail TPR/FPR are provided,
+          J_baseline is the independence-model composition J.
+        * Otherwise, J_baseline falls back to the midpoint of [j_lower, j_upper].
+    - J_worst   = bounds.j_lower (pessimistic FH J bound).
+    - J_best    = bounds.j_upper (optimistic FH J bound).
+
+    Interpretation (when J_worst ≤ J_baseline ≤ J_best)
+    ---------------------------------------------------
+    - κ < 0: constructive (better than baseline).
+    - κ ≈ 0: independent (matches baseline).
+    - κ > 0: destructive (worse than baseline).
+    - |κ| large: strong deviation from baseline.
+
+    Notes
+    -----
+    - If per-rail TPR/FPR are not available, the baseline is a heuristic
+      (midpoint of FH J interval), and this is reflected in `baseline_type`.
+    - We do NOT attempt to reconstruct TPR/FPR from J alone.
     """
-    if not bounds.individual_j_stats:
-        raise ValueError("Cannot compute CII without individual J-statistics")
-    
-    # Choose baseline
-    if use_independence_baseline:
-        # Extract individual rates and compute independence baseline
-        individual_tprs = []
-        individual_fprs = []
-        
-        for j_individual in bounds.individual_j_stats:
-            # Approximate extraction (in practice, would use stored rates)
-            # This is a simplification - real implementation would store rates
-            tpr_approx = (j_individual + 1) / 2  # Rough approximation
-            fpr_approx = tpr_approx - j_individual
-            individual_tprs.append(max(0, min(1, tpr_approx)))
-            individual_fprs.append(max(0, min(1, fpr_approx)))
-        
-        if bounds.composition_type == 'serial_or':
+    # Sanity check on the bounds width (should be non-negative by construction).
+    if bounds.width < -MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            f"ComposedJBounds has negative width: {bounds.width}"
+        )
+
+    # 0. Validate observed_j as a finite J in [-1, 1] (up to tolerance).
+    try:
+        observed_j_f = float(observed_j)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"observed_j={observed_j!r} cannot be cast to float: {e}") from e
+
+    if math.isnan(observed_j_f) or math.isinf(observed_j_f):
+        raise ValueError(f"observed_j must be finite, got {observed_j_f!r}")
+
+    if not (-1.0 - MATHEMATICAL_TOLERANCE <= observed_j_f <= 1.0 + MATHEMATICAL_TOLERANCE):
+        raise ValueError(
+            f"observed_j={observed_j_f:.6f} is outside the admissible J range [-1, 1] "
+            "(up to numerical tolerance)"
+        )
+
+    # 1. Choose J_baseline
+    baseline_type: str
+    if use_independence_baseline and individual_tprs is not None and individual_fprs is not None:
+        # Validate and check lengths against each other and k_rails.
+        validate_probability_vector(individual_tprs, "individual_tprs")
+        validate_probability_vector(individual_fprs, "individual_fprs")
+
+        if len(individual_tprs) != len(individual_fprs):
+            raise ValueError(
+                "individual_tprs and individual_fprs must have the same length "
+                f"(got {len(individual_tprs)} and {len(individual_fprs)})"
+            )
+
+        if len(individual_tprs) != bounds.k_rails:
+            raise ValueError(
+                "Length of per-rail rates must match bounds.k_rails: "
+                f"k_rails={bounds.k_rails}, len(individual_tprs)={len(individual_tprs)}"
+            )
+
+        if bounds.individual_j_stats and len(bounds.individual_j_stats) != len(individual_tprs):
+            raise ValueError(
+                "len(individual_j_stats) must match len(individual_tprs) "
+                f"when both are provided (got {len(bounds.individual_j_stats)} "
+                f"and {len(individual_tprs)})."
+            )
+
+        # Independence baseline based on composition topology.
+        if bounds.composition_type == "serial_or":
             j_baseline = independence_serial_or_j(individual_tprs, individual_fprs)
-        elif bounds.composition_type == 'parallel_and':
+        elif bounds.composition_type == "parallel_and":
             j_baseline = independence_parallel_and_j(individual_tprs, individual_fprs)
         else:
-            j_baseline = np.mean(bounds.individual_j_stats)
+            # Extremely defensive fallback (should not occur if ComposedJBounds
+            # enforces composition_type).
+            j_baseline = float(np.mean(list(bounds.individual_j_stats))) if bounds.individual_j_stats else 0.0
+
+        baseline_type = "independence"
     else:
-        j_baseline = bounds.j_lower
-    
-    j_worst = bounds.j_lower
-    j_best = bounds.j_upper
-    
-    # Handle degenerate cases
-    denominator = j_worst - j_baseline
-    if abs(denominator) < MATHEMATICAL_TOLERANCE:
+        # Heuristic: midpoint of FH interval as a neutral, topology-agnostic baseline.
+        j_baseline = 0.5 * (bounds.j_lower + bounds.j_upper)
+        baseline_type = "fh_midpoint"
+
+    j_baseline = float(j_baseline)
+
+    # 2. Check baseline / observation within FH interval (up to tolerance)
+    j_worst = float(bounds.j_lower)
+    j_best = float(bounds.j_upper)
+
+    baseline_within_bounds = (
+        j_worst - MATHEMATICAL_TOLERANCE
+        <= j_baseline
+        <= j_best + MATHEMATICAL_TOLERANCE
+    )
+
+    observed_within_bounds = (
+        j_worst - MATHEMATICAL_TOLERANCE
+        <= observed_j_f
+        <= j_best + MATHEMATICAL_TOLERANCE
+    )
+
+    # 3. Compute κ with careful handling of degeneracy
+    denom = j_worst - j_baseline
+
+    if abs(denom) < MATHEMATICAL_TOLERANCE:
+        # Baseline essentially coincides with worst-case bound: normalization breaks.
         kappa = 0.0
-        interpretation = 'degenerate'
-        reliability = 'low'
+        interpretation = "degenerate"
+        reliability = "low"
     else:
-        kappa = (observed_j - j_baseline) / denominator
-        
-        # Classify interference type with reliability assessment
+        kappa = (observed_j_f - j_baseline) / denom
+
+        # Interpretation thresholds
         if kappa < -0.1:
-            interpretation = 'constructive'
-            reliability = 'high' if abs(denominator) > 0.05 else 'moderate'
+            interpretation = "constructive"
         elif kappa > 0.1:
-            interpretation = 'destructive'
-            reliability = 'high' if abs(denominator) > 0.05 else 'moderate'  
+            interpretation = "destructive"
         else:
-            interpretation = 'independent'
-            reliability = 'high'
-        
-        # Warning for extreme values
-        if kappa > 1.2:
+            interpretation = "independent"
+
+        # Reliability heuristic based on how far baseline is from worst-case.
+        spread = abs(denom)
+        if spread > 0.2:
+            reliability = "high"
+        elif spread > 0.05:
+            reliability = "moderate"
+        else:
+            reliability = "low"
+
+        # If either baseline or observation fall outside FH bounds, downgrade reliability.
+        if not baseline_within_bounds or not observed_within_bounds:
+            if reliability == "high":
+                reliability = "questionable"
+            else:
+                reliability = "low"
+
+        # Flag extreme κ values that likely indicate model mismatch / sampling noise.
+        if abs(kappa) > 2.0:
             warnings.warn(
-                f"CII = {kappa:.3f} > 1.2 suggests model violation or measurement error",
-                UserWarning
+                f"CII = {kappa:.3f} is very large in magnitude; "
+                "this may indicate model mismatch, data drift, or extreme sampling noise.",
+                UserWarning,
             )
-            reliability = 'questionable'
-    
+            if reliability == "high":
+                reliability = "questionable"
+
     return {
-        'cii': float(kappa),
-        'interpretation': interpretation,
-        'reliability': reliability,
-        'j_observed': float(observed_j),
-        'j_baseline': float(j_baseline),
-        'j_theoretical_bounds': (float(j_worst), float(j_best)),
-        'baseline_type': 'independence' if use_independence_baseline else 'pessimistic_bound',
-        'composition_type': bounds.composition_type,
-        'interference_strength': abs(kappa),
-        'bounds_width': bounds.width
+        "cii": float(kappa),
+        "interpretation": interpretation,
+        "reliability": reliability,
+        "baseline_type": baseline_type,
+        "baseline_within_bounds": baseline_within_bounds,
+        "observed_within_bounds": observed_within_bounds,
+        "j_observed": float(observed_j_f),
+        "j_baseline": float(j_baseline),
+        "j_theoretical_bounds": (float(j_worst), float(j_best)),
+        "interference_strength": abs(float(kappa)),
+        "bounds_width": bounds.width,
+        "composition_type": bounds.composition_type,
     }
 
-# CORRECTED statistical functions
+# ---------------------------------------------------------------------
+# Statistical helpers: Wilson CI & inverse normal
+# ---------------------------------------------------------------------
 
-def wilson_score_interval(successes: int, trials: int, alpha: float = 0.05) -> Tuple[float, float]:
-    """
-    NUMERICALLY STABLE Wilson score confidence interval for binomial proportion.
-    
-    This is the CORRECT method for binomial CIs, not DKW which is for empirical CDFs.
-    """
-    if trials <= 0:
-        raise ValueError("trials must be positive")
-    if not (0 <= successes <= trials):
-        raise ValueError(f"successes {successes} must be in [0, {trials}]")
-    if not (0 < alpha < 1):
-        raise ValueError(f"alpha {alpha} must be in (0, 1)")
-    
-    # Robust z-score calculation with bounds checking
-    try:
-        z = robust_inverse_normal(1 - alpha/2)
-    except:
-        # Fallback approximations for extreme alpha
-        if alpha < 1e-6:
-            z = 5.0  # Approximate for very small alpha
-        elif alpha > 0.5:
-            z = 0.674  # Approximate for large alpha
-        else:
-            z = 1.96  # Standard value
-    
-    p_hat = successes / trials
-    n = trials
-    
-    # Wilson score formula
-    denominator = 1 + z*z/n  
-    if denominator < EPSILON:
-        # Degenerate case
-        return (p_hat, p_hat)
-    
-    center = (p_hat + z*z/(2*n)) / denominator
-    variance_term = (p_hat * (1 - p_hat) / n) + (z*z / (4*n*n))
-    
-    if variance_term < 0:
-        variance_term = 0  # Numerical safety
-    
-    half_width = (z / denominator) * math.sqrt(variance_term)
-    
-    lower = max(0.0, center - half_width)
-    upper = min(1.0, center + half_width)
-    
-    return (lower, upper)
 
 def robust_inverse_normal(p: float) -> float:
     """
-    NUMERICALLY STABLE inverse normal CDF with proper error handling.
-    
-    Uses multiple fallback methods to avoid crashes from erfcinv failures.
+    Numerically stable inverse normal CDF Φ⁻¹(p) with multiple fallbacks.
+
+    Parameters
+    ----------
+    p : float
+        Probability in (0, 1).
+
+    Returns
+    -------
+    float
+        z such that Φ(z) ≈ p.
+
+    Raises
+    ------
+    ValueError
+        If p is not in (0, 1) or cannot be interpreted as a finite float.
     """
-    if not (0 < p < 1):
-        raise ValueError(f"p = {p} must be in (0, 1)")
-    
-    # Method 1: Try erfcinv if available
+    # 0. Cast & basic validation
     try:
+        p_f = float(p)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"p={p!r} cannot be cast to float: {e}") from e
+
+    if not (0.0 < p_f < 1.0):
+        raise ValueError(f"p = {p_f} must be in (0, 1)")
+
+    # Lightweight clipping to avoid underflow/overflow in extreme tails.
+    p_clipped = min(max(p_f, 1e-16), 1.0 - 1e-16)
+
+    # 1. Try math.erfcinv if available (fast, no heavy deps)
+    try:  # pragma: no cover - platform dependent
         from math import erfcinv
-        return math.sqrt(2) * erfcinv(2 * (1 - p))
-    except:
+        return math.sqrt(2.0) * erfcinv(2.0 * (1.0 - p_clipped))
+    except Exception:
         pass
-    
-    # Method 2: Try scipy if available  
+
+    # 2. Try SciPy if available
+    try:  # pragma: no cover - optional dependency
+        import scipy.stats  # type: ignore
+        return float(scipy.stats.norm.ppf(p_clipped))
+    except Exception:
+        pass
+
+    # 3. Try Python's statistics.NormalDist (stdlib, 3.8+)
+    try:  # pragma: no cover - environment dependent
+        from statistics import NormalDist  # type: ignore
+        return float(NormalDist().inv_cdf(p_clipped))
+    except Exception:
+        pass
+
+    # 4. Beasley–Springer–Moro-style approximation as final fallback.
+    # Non-recursive, with central symmetry handled explicitly.
+    def _bsm_inverse_normal(pc: float) -> float:
+        # Exploit symmetry: Φ⁻¹(p) = -Φ⁻¹(1 - p)
+        if pc > 0.5:
+            pc = 1.0 - pc
+            sign = -1.0
+        else:
+            sign = 1.0
+
+        # Coefficients for tail approximation
+        a0 = -3.969683028665376e01
+        a1 = 2.209460984245205e02
+        a2 = -2.759285104469687e02
+        a3 = 1.383577518672690e02
+        b1 = -5.447609879822406e01
+        b2 = 1.615858368580409e02
+        b3 = -1.556989798598866e02
+        b4 = 6.680131188771972e01
+
+        y = math.sqrt(-2.0 * math.log(pc))
+        x = y + ((((y * a3 + a2) * y + a1) * y + a0) /
+                 ((((y * b4 + b3) * y + b2) * y + b1) * y + 1.0))
+        return sign * x
+
+    return _bsm_inverse_normal(p_clipped)
+
+def wilson_score_interval(
+    successes: int,
+    trials: int,
+    alpha: float = 0.05,
+) -> Bounds:
+    """
+    Wilson score confidence interval for a binomial proportion.
+
+    This is the correct tool for binomial CIs (two-sided, 1 - alpha), in
+    contrast to DKW which applies to empirical CDFs, not binomial
+    proportions.
+
+    Parameters
+    ----------
+    successes : int
+        Number of successes. Must be an integer in [0, trials].
+    trials : int
+        Number of Bernoulli trials. Must be a positive integer.
+    alpha : float
+        Significance level for a two-sided (1 - alpha) interval,
+        with 0 < alpha < 1.
+
+    Returns
+    -------
+    (lower, upper) : tuple of float
+        Wilson score interval, clipped to [0, 1].
+
+    Raises
+    ------
+    ValueError
+        If inputs are invalid (non-integer counts, impossible ranges,
+        or alpha outside (0, 1)).
+    """
+    # --- 0. Coerce and validate counts as integers -------------------------
     try:
-        import scipy.stats
-        return scipy.stats.norm.ppf(p)
-    except:
-        pass
-    
-    # Method 3: Beasley-Springer-Moro approximation
-    if p > 0.5:
-        return -robust_inverse_normal(1 - p)
-    
-    # Rational approximation for p ∈ (0, 0.5]
-    a0, a1, a2, a3 = -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02
-    b1, b2, b3, b4 = -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01
-    
-    y = math.sqrt(-2 * math.log(p))
-    x = y + ((((y*a3 + a2)*y + a1)*y + a0) / ((((y*b4 + b3)*y + b2)*y + b1)*y + 1))
-    
-    return x
+        s_float = float(successes)
+        t_float = float(trials)
+    except (TypeError, ValueError) as e:
+        raise ValueError(
+            f"successes={successes!r} or trials={trials!r} "
+            f"cannot be interpreted as numeric: {e}"
+        ) from e
 
-def stratified_bootstrap_j_statistic(results_world_0: List, 
-                                   results_world_1: List,
-                                   n_bootstrap: int = 2000,
-                                   random_seed: int = 42) -> Tuple[List[float], Tuple[float, float]]:
+    if not t_float.is_integer() or not s_float.is_integer():
+        raise ValueError(
+            f"successes and trials must be integer counts; "
+            f"got successes={successes!r}, trials={trials!r}"
+        )
+
+    successes_i = int(s_float)
+    trials_i = int(t_float)
+
+    if trials_i <= 0:
+        raise ValueError("trials must be a positive integer")
+    if not (0 <= successes_i <= trials_i):
+        raise ValueError(
+            f"successes {successes_i} must be in [0, {trials_i}]"
+        )
+
+    # --- 1. Validate alpha --------------------------------------------------
+    try:
+        alpha_f = float(alpha)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"alpha={alpha!r} cannot be cast to float: {e}") from e
+
+    if not (0.0 < alpha_f < 1.0):
+        raise ValueError(f"alpha {alpha_f} must be in (0, 1)")
+
+    # --- 2. Core Wilson computation ----------------------------------------
+    p_hat = successes_i / trials_i
+    n = float(trials_i)
+
+    # Two-sided critical value z_{1 - alpha/2}
+    z = robust_inverse_normal(1.0 - alpha_f / 2.0)
+
+    z2 = z * z
+    denominator = 1.0 + z2 / n
+    if denominator < EPSILON:
+        # Extremely degenerate edge-case; fall back to point estimate.
+        return float(p_hat), float(p_hat)
+
+    center = (p_hat + z2 / (2.0 * n)) / denominator
+    variance_term = (p_hat * (1.0 - p_hat) / n) + (z2 / (4.0 * n * n))
+
+    # Numerical safety: variance_term should be >= 0, but clamp in case of
+    # tiny negative values from floating point noise.
+    if variance_term < 0.0:
+        variance_term = 0.0
+
+    half_width = (z / denominator) * math.sqrt(variance_term)
+
+    lower = max(0.0, center - half_width)
+    upper = min(1.0, center + half_width)
+
+    # Final sanity: enforce lower <= upper within tolerance.
+    if lower > upper + MATHEMATICAL_TOLERANCE:
+        raise NumericalInstabilityError(
+            f"Wilson interval numerically inverted: lower={lower:.12f}, "
+            f"upper={upper:.12f}"
+        )
+
+    return float(lower), float(upper)
+
+# ---------------------------------------------------------------------
+# Stratified bootstrap for J-statistic
+# ---------------------------------------------------------------------
+
+def stratified_bootstrap_j_statistic(
+    results_world_0: Sequence[Any],
+    results_world_1: Sequence[Any],
+    n_bootstrap: int = 2000,
+    random_seed: int = 42,
+    alpha: float = 0.05,
+) -> Tuple[List[float], Bounds]:
     """
-    CORRECTED stratified bootstrap for J-statistic maintaining world balance.
-    
-    The previous implementation used simple resampling which biases estimates
-    for two-world data. This version maintains world balance in each bootstrap sample.
+    Stratified bootstrap for the Youden J-statistic, preserving world balance.
+
+    Semantics
+    ---------
+    We maintain the original class balance by resampling *within* each world:
+
+        - world 0 (benign): results_world_0
+        - world 1 (adversarial/protected): results_world_1
+
+    For each bootstrap iteration b:
+
+        1. Sample n0 results with replacement from world 0.
+        2. Sample n1 results with replacement from world 1.
+        3. Concatenate and feed to `compute_j_statistic`, which must return
+           a triple (J, TPR, FPR) or at least have its first element be J.
+        4. Store J_b.
+
+    The final CI is a percentile bootstrap interval on the J_b samples.
+
+    Parameters
+    ----------
+    results_world_0, results_world_1 :
+        Sequences of AttackResult-like objects for worlds 0 and 1.
+        The only hard requirement is that the global `compute_j_statistic`
+        can consume their concatenation.
+    n_bootstrap : int
+        Number of bootstrap samples (must be a positive integer).
+    random_seed : int
+        Deterministic seed for the Python RNG used for resampling.
+    alpha : float
+        Significance level (0 < alpha < 1) for a two-sided bootstrap CI.
+        For example, alpha=0.05 ⇒ 95% percentile CI.
+
+    Returns
+    -------
+    (bootstrap_j_stats, (ci_lower, ci_upper))
+        - bootstrap_j_stats : list of bootstrap J estimates (possibly shorter
+          than n_bootstrap if some iterations fail).
+        - (ci_lower, ci_upper) : percentile CI for J, clipped to [-1, 1].
+
+    Raises
+    ------
+    ValueError
+        If either world has no samples, n_bootstrap/alpha are invalid, or
+        `compute_j_statistic` is not callable.
+    UserWarning
+        If a large fraction of bootstrap iterations fail or sample sizes are small.
     """
-    if len(results_world_0) == 0 or len(results_world_1) == 0:
+    # --- 0. Basic input validation -----------------------------------------
+    if not results_world_0 or not results_world_1:
         raise ValueError("Both worlds must have non-empty results")
-    
-    if n_bootstrap > MAX_BOOTSTRAP_ITERATIONS:
-        warnings.warn(f"Large n_bootstrap {n_bootstrap} may be slow")
-    
+
+    try:
+        n_boots_float = float(n_bootstrap)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"n_bootstrap={n_bootstrap!r} is not numeric: {e}") from e
+
+    if not n_boots_float.is_integer():
+        raise ValueError(f"n_bootstrap must be an integer; got {n_bootstrap!r}")
+    n_bootstrap_i = int(n_boots_float)
+    if n_bootstrap_i <= 0:
+        raise ValueError("n_bootstrap must be a positive integer")
+
+    try:
+        alpha_f = float(alpha)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"alpha={alpha!r} cannot be cast to float: {e}") from e
+    if not (0.0 < alpha_f < 1.0):
+        raise ValueError(f"alpha {alpha_f} must be in (0, 1)")
+
+    if n_bootstrap_i > MAX_BOOTSTRAP_ITERATIONS:
+        warnings.warn(
+            f"n_bootstrap={n_bootstrap_i} exceeds MAX_BOOTSTRAP_ITERATIONS={MAX_BOOTSTRAP_ITERATIONS}; "
+            f"this may be slow.",
+            UserWarning,
+        )
+
     if len(results_world_0) < MIN_SAMPLE_SIZE_WARNING:
-        warnings.warn(f"Small sample size world 0: {len(results_world_0)}")
-    
+        warnings.warn(
+            f"Small sample size for world 0: n={len(results_world_0)}",
+            UserWarning,
+        )
     if len(results_world_1) < MIN_SAMPLE_SIZE_WARNING:
-        warnings.warn(f"Small sample size world 1: {len(results_world_1)}")
-    
+        warnings.warn(
+            f"Small sample size for world 1: n={len(results_world_1)}",
+            UserWarning,
+        )
+
+    # Ensure we actually have a usable compute_j_statistic.
+    if not callable(compute_j_statistic):
+        raise ValueError(
+            "compute_j_statistic is not callable; ensure it is imported "
+            "correctly from core.stats or provide a valid implementation."
+        )
+
+    # --- 1. Core bootstrap loop --------------------------------------------
     rng = random.Random(random_seed)
-    bootstrap_j_stats = []
-    
     n0, n1 = len(results_world_0), len(results_world_1)
-    
-    for i in range(n_bootstrap):
-        # Stratified resampling: maintain world proportions
-        bootstrap_w0 = [results_world_0[rng.randint(0, n0-1)] for _ in range(n0)]
-        bootstrap_w1 = [results_world_1[rng.randint(0, n1-1)] for _ in range(n1)]
-        
-        # Compute J-statistic for bootstrap sample
-        combined_sample = bootstrap_w0 + bootstrap_w1
-        
+    bootstrap_j_stats: List[float] = []
+
+    for i in range(n_bootstrap_i):
+        # Sample with replacement within each world
         try:
-            if callable(compute_j_statistic):
-                j_boot, _, _ = compute_j_statistic(combined_sample)
-            else:
-                # Fallback computation
-                success_w0 = sum(1 for r in bootstrap_w0 if getattr(r, 'success', True))
-                success_w1 = sum(1 for r in bootstrap_w1 if getattr(r, 'success', True))
-                p0 = success_w0 / len(bootstrap_w0) if bootstrap_w0 else 0
-                p1 = success_w1 / len(bootstrap_w1) if bootstrap_w1 else 0  
-                j_boot = p0 - p1
-        except Exception as e:
-            warnings.warn(f"Bootstrap iteration {i} failed: {e}")
+            bootstrap_w0 = [results_world_0[rng.randint(0, n0 - 1)] for _ in range(n0)]
+            bootstrap_w1 = [results_world_1[rng.randint(0, n1 - 1)] for _ in range(n1)]
+        except ValueError as exc:  # pragma: no cover - extremely defensive
+            warnings.warn(
+                f"Bootstrap iteration {i} failed during resampling: {exc}",
+                UserWarning,
+            )
             continue
-        
-        bootstrap_j_stats.append(j_boot)
-    
-    if len(bootstrap_j_stats) < n_bootstrap * 0.9:
-        warnings.warn(f"Only {len(bootstrap_j_stats)}/{n_bootstrap} bootstrap samples succeeded")
-    
-    # Percentile confidence interval
-    if bootstrap_j_stats:
-        ci_lower = np.percentile(bootstrap_j_stats, 2.5)
-        ci_upper = np.percentile(bootstrap_j_stats, 97.5)
-        ci = (float(ci_lower), float(ci_upper))
-    else:
-        ci = (0.0, 0.0)
-    
-    return bootstrap_j_stats, ci
 
-# Integration functions with existing framework
+        combined = bootstrap_w0 + bootstrap_w1
 
-def extract_rates_from_attack_results(results: List) -> Tuple[List[float], List[float]]:
+        try:
+            # Expect compute_j_statistic to return (J, TPR, FPR) or similar.
+            j_boot, *_ = compute_j_statistic(combined)
+            j_val = float(j_boot)
+        except Exception as exc:  # pragma: no cover - defensive
+            warnings.warn(f"Bootstrap iteration {i} failed in compute_j_statistic: {exc}", UserWarning)
+            continue
+
+        # Validate J value: finite and within [-1, 1] up to a small tolerance.
+        if math.isnan(j_val) or math.isinf(j_val):
+            warnings.warn(
+                f"Bootstrap iteration {i} produced non-finite J={j_val!r}; skipping.",
+                UserWarning,
+            )
+            continue
+        if j_val < -1.0 - MATHEMATICAL_TOLERANCE or j_val > 1.0 + MATHEMATICAL_TOLERANCE:
+            warnings.warn(
+                f"Bootstrap iteration {i} produced out-of-range J={j_val:.6f}; "
+                "clipping and including.",
+                UserWarning,
+            )
+        # Clip into admissible range before storing.
+        j_val = max(-1.0, min(1.0, j_val))
+        bootstrap_j_stats.append(j_val)
+
+    # --- 2. Post-processing and CI computation -----------------------------
+    n_success = len(bootstrap_j_stats)
+    if n_success == 0:
+        warnings.warn(
+            "All bootstrap iterations failed; returning empty samples and "
+            "degenerate CI (0.0, 0.0).",
+            UserWarning,
+        )
+        return [], (0.0, 0.0)
+
+    if n_success < 0.9 * n_bootstrap_i:
+        warnings.warn(
+            f"Only {n_success}/{n_bootstrap_i} bootstrap samples succeeded "
+            "(< 90%); CI may be unreliable.",
+            UserWarning,
+        )
+
+    # Convert to array and drop any remaining non-finite values (should be none).
+    j_array = np.asarray(bootstrap_j_stats, dtype=float)
+    finite_mask = np.isfinite(j_array)
+    if not finite_mask.all():
+        n_bad = int((~finite_mask).sum())
+        warnings.warn(
+            f"{n_bad} non-finite J values in bootstrap_j_stats; removing before CI.",
+            UserWarning,
+        )
+        j_array = j_array[finite_mask]
+
+    if j_array.size == 0:
+        warnings.warn(
+            "No finite J values after filtering; returning degenerate CI (0.0, 0.0).",
+            UserWarning,
+        )
+        return [], (0.0, 0.0)
+
+    # Percentile bootstrap CI
+    lower_q = 100.0 * (alpha_f / 2.0)
+    upper_q = 100.0 * (1.0 - alpha_f / 2.0)
+
+    ci_lower = float(np.percentile(j_array, lower_q))
+    ci_upper = float(np.percentile(j_array, upper_q))
+
+    # Clip CI into [-1, 1] and sanity-check ordering.
+    ci_lower = max(-1.0, min(1.0, ci_lower))
+    ci_upper = max(-1.0, min(1.0, ci_upper))
+
+    if ci_lower > ci_upper + MATHEMATICAL_TOLERANCE:
+        raise NumericalInstabilityError(
+            f"Bootstrap CI inverted: lower={ci_lower:.12f}, upper={ci_upper:.12f}"
+        )
+
+    return bootstrap_j_stats, (ci_lower, ci_upper)
+
+# ---------------------------------------------------------------------
+# Integration helpers with AttackResult
+# ---------------------------------------------------------------------
+
+
+def extract_rates_from_attack_results(
+    results: Sequence[Any],
+) -> Tuple[List[Probability], List[Probability]]:
     """
-    Extract TPR/FPR rates from AttackResult objects.
-    
-    This function bridges the gap between empirical results and theoretical analysis.
+    Extract a single pair of (miss_rate, false_positive_rate) from AttackResult-like
+    objects, aggregating *all* results into one effective rail.
+
+    This is a deliberately conservative bridge from empirical data to a
+    single-rail FH analysis: you get one miss rate and one FPR for the whole
+    system.
+
+    Interpretation of `world_bit`
+    -----------------------------
+    We use the following mapping:
+
+    - world_bit == 0, or WorldBit.BASELINE  → benign world (world 0)
+    - world_bit == 1, or WorldBit.PROTECTED → adversarial/attack world (world 1)
+
+    If `world_bit` is missing (None), we emit a warning and *default to world 0*
+    (benign). If `world_bit` has any other value, we emit a warning and ignore
+    that sample.
+
+    Interpretation of `success`
+    ---------------------------
+    For this helper we assume:
+
+    - world 0 (benign):
+        success == True  ⇒ false positive (rail fired on benign input)
+    - world 1 (adversarial):
+        success == True  ⇒ true positive (rail fired on attack input)
+
+    If your `AttackResult.success` uses opposite semantics (e.g., success=True
+    means "attack got through"), you MUST invert before calling this helper.
+
+    We require that every *kept* sample has a non-None `success` attribute.
+    Missing or None `success` is treated as a hard error rather than silently
+    assuming False.
+
+    Returns
+    -------
+    (miss_rates, fpr_rates)
+        Each is a list with a single element (float in [0, 1]), suitable for
+        feeding into composition bounds when you treat your current system as
+        one effective rail.
+
+    Raises
+    ------
+    ValueError
+        If `results` is empty, if no usable samples remain after filtering, or
+        if any kept sample is missing a valid `success` attribute.
     """
     if not results:
-        raise ValueError("Empty results list")
-    
-    # Separate by world
-    world_0_results = [r for r in results if getattr(r, 'world_bit', 0) == 0]
-    world_1_results = [r for r in results if getattr(r, 'world_bit', 1) == 1]
-    
-    if not world_0_results or not world_1_results:
-        raise ValueError("Results must contain both world 0 and world 1 data")
-    
-    # Compute empirical rates
-    successes_w0 = sum(1 for r in world_0_results if getattr(r, 'success', False))
-    successes_w1 = sum(1 for r in world_1_results if getattr(r, 'success', False))
-    
-    fpr = successes_w0 / len(world_0_results)  # False positive rate (benign world)
-    tpr = successes_w1 / len(world_1_results)  # True positive rate (adversarial world)  
-    miss_rate = 1 - tpr
-    
+        raise ValueError("extract_rates_from_attack_results: results list is empty")
+
+    world_0_results: List[Any] = []
+    world_1_results: List[Any] = []
+
+    warned_unknown_world = False
+
+    for idx, r in enumerate(results):
+        wb = getattr(r, "world_bit", None)
+
+        # Missing world_bit → default to baseline (benign) but warn.
+        if wb is None:
+            warnings.warn(
+                f"Result at index {idx} missing world_bit; "
+                "defaulting to world_bit=0 (benign).",
+                UserWarning,
+            )
+            wb = 0
+
+        # Map onto world 0 / world 1
+        if wb == 0 or wb == getattr(WorldBit, "BASELINE", 0):
+            world_0_results.append(r)
+        elif wb == 1 or wb == getattr(WorldBit, "PROTECTED", 1):
+            world_1_results.append(r)
+        else:
+            if not warned_unknown_world:
+                warnings.warn(
+                    "Encountered result(s) with unknown world_bit values; "
+                    "such samples will be ignored. First offending value: "
+                    f"{wb!r}",
+                    UserWarning,
+                )
+                warned_unknown_world = True
+            # Skip this sample
+            continue
+
+    n0 = len(world_0_results)
+    n1 = len(world_1_results)
+
+    if n0 == 0 or n1 == 0:
+        raise ValueError(
+            "extract_rates_from_attack_results requires usable samples from both "
+            f"world 0 and world 1 after filtering unknown world_bits. "
+            f"Got n0={n0}, n1={n1}."
+        )
+
+    # Helper for strict success extraction
+    def _extract_success_flag(r: Any, idx: int, world_label: str) -> bool:
+        if not hasattr(r, "success"):
+            raise ValueError(
+                f"Result in {world_label} at index {idx} missing 'success' attribute; "
+                "cannot infer detection outcome. Either fix the data or adapt "
+                "extract_rates_from_attack_results to your schema."
+            )
+        s = getattr(r, "success")
+        if s is None:
+            raise ValueError(
+                f"Result in {world_label} at index {idx} has success=None; "
+                "this is ambiguous and not allowed."
+            )
+        return bool(s)
+
+    # False positives in world 0 (benign)
+    fp_count = 0
+    for idx, r in enumerate(world_0_results):
+        if _extract_success_flag(r, idx, "world_0"):
+            fp_count += 1
+    fpr = fp_count / n0
+
+    # True positives in world 1 (adversarial)
+    tp_count = 0
+    for idx, r in enumerate(world_1_results):
+        if _extract_success_flag(r, idx, "world_1"):
+            tp_count += 1
+    tpr = tp_count / n1
+    miss_rate = 1.0 - tpr
+
+    # Numerical safety (should already be in [0, 1], but we clip defensively)
+    fpr = max(0.0, min(1.0, float(fpr)))
+    miss_rate = max(0.0, min(1.0, float(miss_rate)))
+
     return [miss_rate], [fpr]
 
-def validate_fh_bounds_against_empirical(bounds: ComposedJBounds,
-                                       observed_j: float,
-                                       confidence_interval: Optional[Tuple[float, float]] = None) -> Dict[str, Union[bool, float, str]]:
+def validate_fh_bounds_against_empirical(
+    bounds: ComposedJBounds,
+    observed_j: float,
+    confidence_interval: Optional[Bounds] = None,
+) -> Dict[str, Union[bool, float, str, Bounds]]:
     """
-    Rigorous validation of FH bounds against empirical observations.
-    
-    Includes statistical significance testing and model diagnostics.
+    Compare FH J-bounds against an empirical J estimate (with optional CI).
+
+    This is a diagnostic helper, not a hypothesis test. It answers:
+    - Does observed J lie inside the FH envelope (up to numerical tolerance)?
+    - Where inside the envelope does it sit (relative position in [0,1])?
+    - Are the FH bounds tight/moderate/loose?
+    - If an empirical CI is provided, how much does it overlap the FH envelope?
+
+    Parameters
+    ----------
+    bounds : ComposedJBounds
+        Theoretical FH bounds on J (with j_lower, j_upper, width).
+    observed_j : float
+        Empirical point estimate of J (should lie in [-1, 1]).
+    confidence_interval : Optional[Bounds]
+        Optional empirical CI on J as (ci_lower, ci_upper). If provided,
+        overlap and consistency diagnostics are added.
+
+    Returns
+    -------
+    report : dict
+        A dictionary with keys including:
+        - 'bounds_contain_observation' : bool
+        - 'observed_j' : float
+        - 'theoretical_bounds' : (j_lower, j_upper)
+        - 'bound_width' : float
+        - 'relative_position' : float in [0,1]
+        - 'position_interpretation' : str
+        - 'bound_quality' : {'tight', 'moderate', 'loose'}
+        - 'timestamp' : str (ISO-like from numpy datetime64)
+        And, if CI is provided:
+        - 'ci_bounds_overlap' : bool
+        - 'overlap_width' : float
+        - 'overlap_fraction_of_ci' : float
+        - 'overlap_fraction_of_bounds' : float
+        - 'statistical_consistency' : {'good', 'moderate', 'poor'}
+        - optionally 'discrepancy' : str when overlap is empty.
     """
-    validation_report = {
-        'bounds_contain_observation': bounds.j_lower <= observed_j <= bounds.j_upper,
-        'observed_j': observed_j,
-        'theoretical_bounds': (bounds.j_lower, bounds.j_upper),
-        'bound_width': bounds.width,
-        'timestamp': str(np.datetime64('now'))
+    # --- Basic validation ---
+    j_obs = float(observed_j)
+    if math.isnan(j_obs) or math.isinf(j_obs):
+        raise ValueError(f"observed_j must be finite; got {j_obs!r}")
+    if not (-1.0 - MATHEMATICAL_TOLERANCE <= j_obs <= 1.0 + MATHEMATICAL_TOLERANCE):
+        raise ValueError(
+            f"observed_j={j_obs} is outside the admissible range [-1, 1] "
+            "beyond numerical tolerance."
+        )
+
+    j_lower = float(bounds.j_lower)
+    j_upper = float(bounds.j_upper)
+    width = float(bounds.width)
+
+    if j_lower > j_upper + MATHEMATICAL_TOLERANCE:
+        raise FHBoundViolationError(
+            f"ComposedJBounds has inverted J-interval: "
+            f"j_lower={j_lower:.12f} > j_upper={j_upper:.12f}"
+        )
+
+    # --- Core report scaffold ---
+    # Use tolerance-aware containment.
+    contains = (j_lower - MATHEMATICAL_TOLERANCE) <= j_obs <= (j_upper + MATHEMATICAL_TOLERANCE)
+
+    report: Dict[str, Union[bool, float, str, Bounds]] = {
+        "bounds_contain_observation": contains,
+        "observed_j": j_obs,
+        "theoretical_bounds": (j_lower, j_upper),
+        "bound_width": width,
+        "timestamp": str(np.datetime64("now")),
     }
-    
-    # Relative position within bounds
-    if bounds.width > MATHEMATICAL_TOLERANCE:
-        relative_position = (observed_j - bounds.j_lower) / bounds.width
-        validation_report['relative_position'] = relative_position
-        
-        if relative_position < 0.1:
-            validation_report['position_interpretation'] = 'near_lower_bound'
-        elif relative_position > 0.9:
-            validation_report['position_interpretation'] = 'near_upper_bound'  
+
+    # --- Relative position of observation within FH envelope ---
+    if width > MATHEMATICAL_TOLERANCE:
+        # Normalize and clip into [0, 1] defensively.
+        rel = (j_obs - j_lower) / width
+        rel = max(0.0, min(1.0, float(rel)))
+        report["relative_position"] = rel
+
+        if rel < 0.1:
+            report["position_interpretation"] = "near_lower_bound"
+        elif rel > 0.9:
+            report["position_interpretation"] = "near_upper_bound"
         else:
-            validation_report['position_interpretation'] = 'central'
+            report["position_interpretation"] = "central"
     else:
-        validation_report['relative_position'] = 0.5
-        validation_report['position_interpretation'] = 'degenerate_bounds'
-    
-    # Statistical testing if CI provided
-    if confidence_interval:
-        ci_lower, ci_upper = confidence_interval
-        
-        # Test overlap between CI and theoretical bounds
-        overlap_lower = max(bounds.j_lower, ci_lower)
-        overlap_upper = min(bounds.j_upper, ci_upper)
-        has_overlap = overlap_lower <= overlap_upper
-        
+        # Degenerate or near-degenerate FH interval.
+        report["relative_position"] = 0.5
+        report["position_interpretation"] = "degenerate_bounds"
+
+    # --- Qualitative bound tightness ---
+    if width < 0.05:
+        report["bound_quality"] = "tight"
+    elif width < 0.2:
+        report["bound_quality"] = "moderate"
+    else:
+        report["bound_quality"] = "loose"
+
+    # --- Optional CI comparison ---
+    if confidence_interval is not None:
+        ci_lower_raw, ci_upper_raw = confidence_interval
+        ci_lower = float(ci_lower_raw)
+        ci_upper = float(ci_upper_raw)
+
+        if math.isnan(ci_lower) or math.isnan(ci_upper) or math.isinf(ci_lower) or math.isinf(ci_upper):
+            raise ValueError(
+                f"confidence_interval must contain finite values; got ({ci_lower_raw!r}, {ci_upper_raw!r})"
+            )
+
+        # Allow slightly inverted CI due to upstream quirks, but fix and warn.
+        if ci_lower > ci_upper:
+            warnings.warn(
+                f"validate_fh_bounds_against_empirical: confidence_interval is inverted "
+                f"({ci_lower:.6f}, {ci_upper:.6f}); swapping endpoints.",
+                UserWarning,
+            )
+            ci_lower, ci_upper = ci_upper, ci_lower
+
+        # Overlap computations with tolerance.
+        overlap_lower = max(j_lower, ci_lower)
+        overlap_upper = min(j_upper, ci_upper)
+        has_overlap = overlap_lower <= overlap_upper + MATHEMATICAL_TOLERANCE
+
         if has_overlap:
-            overlap_width = overlap_upper - overlap_lower
-            ci_width = ci_upper - ci_lower
-            bounds_width = bounds.j_upper - bounds.j_lower
-            
-            overlap_fraction_ci = overlap_width / ci_width if ci_width > 0 else 0
-            overlap_fraction_bounds = overlap_width / bounds_width if bounds_width > 0 else 0
-            
-            validation_report.update({
-                'ci_bounds_overlap': True,
-                'overlap_width': overlap_width,
-                'overlap_fraction_of_ci': overlap_fraction_ci,
-                'overlap_fraction_of_bounds': overlap_fraction_bounds,
-                'statistical_consistency': 'good' if overlap_fraction_ci > 0.8 else 'moderate'
-            })
+            overlap_width = max(0.0, overlap_upper - overlap_lower)
+            ci_width = max(0.0, ci_upper - ci_lower)
+            bounds_width = max(0.0, width)
+
+            overlap_fraction_ci = (
+                overlap_width / ci_width if ci_width > MATHEMATICAL_TOLERANCE else 0.0
+            )
+            overlap_fraction_bounds = (
+                overlap_width / bounds_width if bounds_width > MATHEMATICAL_TOLERANCE else 0.0
+            )
+
+            if overlap_fraction_ci > 0.8:
+                consistency = "good"
+            elif overlap_fraction_ci > 0.3:
+                consistency = "moderate"
+            else:
+                consistency = "poor"
+
+            report.update(
+                {
+                    "ci_bounds_overlap": True,
+                    "overlap_width": float(overlap_width),
+                    "overlap_fraction_of_ci": float(overlap_fraction_ci),
+                    "overlap_fraction_of_bounds": float(overlap_fraction_bounds),
+                    "statistical_consistency": consistency,
+                }
+            )
         else:
-            validation_report.update({
-                'ci_bounds_overlap': False,
-                'statistical_consistency': 'poor',
-                'discrepancy': 'CI and bounds do not overlap - possible model violation'
-            })
-    
-    # Bound quality assessment
-    if bounds.width < 0.05:
-        validation_report['bound_quality'] = 'tight'
-    elif bounds.width < 0.2:
-        validation_report['bound_quality'] = 'moderate'
-    else:
-        validation_report['bound_quality'] = 'loose'
-    
-    return validation_report
+            report.update(
+                {
+                    "ci_bounds_overlap": False,
+                    "statistical_consistency": "poor",
+                    "discrepancy": (
+                        "Empirical CI and FH J-bounds do not overlap "
+                        "(beyond numerical tolerance) – potential model "
+                        "violation, mis-specification, or under-estimated "
+                        "uncertainty."
+                    ),
+                }
+            )
 
-# Advanced analysis functions
+    return report
 
-def sensitivity_analysis_fh_bounds(nominal_miss_rates: Sequence[float],
-                                 nominal_fpr_rates: Sequence[float], 
-                                 perturbation_size: float = 0.01,
-                                 n_perturbations: int = 100) -> Dict[str, float]:
+# ---------------------------------------------------------------------
+# Advanced analyses
+# ---------------------------------------------------------------------
+
+
+def sensitivity_analysis_fh_bounds(
+    nominal_miss_rates: Sequence[Probability],
+    nominal_fpr_rates: Sequence[Probability],
+    perturbation_size: float = 0.01,
+    n_perturbations: int = 100,
+    random_seed: int = 42,
+) -> Dict[str, Union[float, str, int]]:
     """
-    Sensitivity analysis: how do FH bounds change with small rate perturbations?
-    
-    This helps assess robustness of conclusions to measurement uncertainty.
+    Sensitivity analysis: perturb rates slightly and observe FH J-bound variability.
+
+    Semantics
+    ---------
+    We take the nominal per-rail miss and false positive rates, compute a baseline
+    serial-OR FH J-interval, then repeatedly:
+      - add uniform noise in [-perturbation_size, +perturbation_size] to each rate,
+      - clamp back into [0, 1],
+      - recompute the serial-OR FH J-bounds.
+
+    We then examine how the J-interval width and endpoints fluctuate under these
+    small perturbations as a measure of *local sensitivity* of the FH envelope.
+
+    Parameters
+    ----------
+    nominal_miss_rates, nominal_fpr_rates :
+        Baseline miss/FPR rates per rail (probabilities in [0, 1]).
+    perturbation_size : float
+        Uniform perturbation magnitude in [-perturbation_size, +perturbation_size].
+        Must lie in (0, 0.1] to keep the “local perturbation” interpretation.
+    n_perturbations : int
+        Number of perturbation samples to draw.
+    random_seed : int
+        Seed for the RNG used to generate perturbations (for reproducibility).
+
+    Returns
+    -------
+    dict
+        Keys include:
+        - 'baseline_width' : float
+        - 'width_std' : float
+        - 'width_sensitivity' : float (std / baseline_width or inf)
+        - 'j_lower_std' : float
+        - 'j_upper_std' : float
+        - 'perturbation_size_tested' : float
+        - 'n_successful_perturbations' : int
+        - 'n_failed_perturbations' : int
+        - 'sensitivity_interpretation' : {'low', 'moderate', 'high'}
+        - 'status' : {'ok', 'failed'}
+        - 'reason' : str (only when status != 'ok')
     """
+    # --- Input validation ----------------------------------------------------
     validate_probability_vector(nominal_miss_rates, "nominal_miss_rates")
     validate_probability_vector(nominal_fpr_rates, "nominal_fpr_rates")
-    
-    if perturbation_size <= 0 or perturbation_size > 0.1:
+
+    if len(nominal_miss_rates) != len(nominal_fpr_rates):
+        raise ValueError(
+            "nominal_miss_rates and nominal_fpr_rates must have the same length"
+        )
+
+    if not (0.0 < perturbation_size <= 0.1):
         raise ValueError("perturbation_size should be in (0, 0.1]")
-    
-    # Baseline bounds
-    baseline_bounds = serial_or_composition_bounds(nominal_miss_rates, nominal_fpr_rates)
-    baseline_width = baseline_bounds.width
-    
-    width_variations = []
-    j_lower_variations = []
-    j_upper_variations = []
-    
-    rng = random.Random(42)
-    
+
+    if n_perturbations <= 0:
+        raise ValueError("n_perturbations must be positive")
+
+    # Reuse bootstrap-scale guardrails if available.
+    try:  # pragma: no cover - constants may be defined elsewhere in module
+        max_iters = MAX_BOOTSTRAP_ITERATIONS  # type: ignore[name-defined]
+    except NameError:  # fallback if not defined in this module
+        max_iters = 10_000
+
+    if n_perturbations > max_iters:
+        warnings.warn(
+            f"n_perturbations={n_perturbations} is large; this may be slow.",
+            UserWarning,
+        )
+
+    # --- Baseline FH bounds --------------------------------------------------
+    baseline = serial_or_composition_bounds(nominal_miss_rates, nominal_fpr_rates)
+    baseline_width = float(baseline.width)
+
+    # --- Perturbation loop ---------------------------------------------------
+    width_variations: List[float] = []
+    j_lower_variations: List[float] = []
+    j_upper_variations: List[float] = []
+
+    rng = random.Random(random_seed)
+    n_success = 0
+    n_fail = 0
+
     for _ in range(n_perturbations):
-        # Add small random perturbations
-        perturbed_miss = []
-        perturbed_fpr = []
-        
+        perturbed_miss: List[float] = []
+        perturbed_fpr: List[float] = []
+
+        # Perturb miss rates
         for m in nominal_miss_rates:
-            perturbation = rng.uniform(-perturbation_size, perturbation_size)
-            perturbed_m = max(0, min(1, m + perturbation))
-            perturbed_miss.append(perturbed_m)
-        
+            delta = rng.uniform(-perturbation_size, perturbation_size)
+            perturbed_miss.append(max(0.0, min(1.0, float(m) + delta)))
+
+        # Perturb FPR rates
         for f in nominal_fpr_rates:
-            perturbation = rng.uniform(-perturbation_size, perturbation_size)
-            perturbed_f = max(0, min(1, f + perturbation))
-            perturbed_fpr.append(perturbed_f)
-        
-        # Compute perturbed bounds
+            delta = rng.uniform(-perturbation_size, perturbation_size)
+            perturbed_fpr.append(max(0.0, min(1.0, float(f) + delta)))
+
         try:
-            perturbed_bounds = serial_or_composition_bounds(perturbed_miss, perturbed_fpr)
-            width_variations.append(perturbed_bounds.width)
-            j_lower_variations.append(perturbed_bounds.j_lower)
-            j_upper_variations.append(perturbed_bounds.j_upper)
-        except:
-            continue  # Skip failed perturbations
-    
-    if not width_variations:
-        return {'sensitivity_analysis': 'failed', 'reason': 'all perturbations failed'}
-    
-    # Analysis of variations
-    width_std = np.std(width_variations)
-    j_lower_std = np.std(j_lower_variations)
-    j_upper_std = np.std(j_upper_variations)
-    
-    # Relative sensitivity measures
-    width_sensitivity = width_std / baseline_width if baseline_width > 0 else float('inf')
-    
+            perturbed_bounds = serial_or_composition_bounds(
+                perturbed_miss, perturbed_fpr
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            n_fail += 1
+            warnings.warn(
+                f"sensitivity_analysis_fh_bounds: perturbation failed with {exc!r}",
+                UserWarning,
+            )
+            continue
+
+        n_success += 1
+        width_variations.append(float(perturbed_bounds.width))
+        j_lower_variations.append(float(perturbed_bounds.j_lower))
+        j_upper_variations.append(float(perturbed_bounds.j_upper))
+
+    if n_success == 0:
+        return {
+            "status": "failed",
+            "reason": "all perturbations failed",
+            "baseline_width": float(baseline_width),
+            "perturbation_size_tested": float(perturbation_size),
+            "n_successful_perturbations": int(0),
+            "n_failed_perturbations": int(n_fail),
+        }
+
+    # Warn if a substantial fraction of perturbations failed.
+    if n_success < 0.9 * n_perturbations:
+        warnings.warn(
+            f"Only {n_success}/{n_perturbations} perturbations succeeded "
+            "(>10% failures). Sensitivity summary may be unstable.",
+            UserWarning,
+        )
+
+    # --- Aggregate variation statistics --------------------------------------
+    width_std = float(np.std(width_variations))
+    j_lower_std = float(np.std(j_lower_variations))
+    j_upper_std = float(np.std(j_upper_variations))
+
+    if baseline_width > MATHEMATICAL_TOLERANCE:
+        width_sensitivity = width_std / baseline_width
+    else:
+        # Degenerate baseline bounds: any variation is "infinite" relative change.
+        width_sensitivity = float("inf")
+
+    # Qualitative interpretation of sensitivity on width
+    if not math.isfinite(width_sensitivity):
+        interpretation = "high"
+    elif width_sensitivity < 0.1:
+        interpretation = "low"
+    elif width_sensitivity < 0.5:
+        interpretation = "moderate"
+    else:
+        interpretation = "high"
+
     return {
-        'baseline_width': baseline_width,
-        'width_std': width_std,
-        'width_sensitivity': width_sensitivity,
-        'j_lower_std': j_lower_std,
-        'j_upper_std': j_upper_std,
-        'perturbation_size_tested': perturbation_size,
-        'n_successful_perturbations': len(width_variations),
-        'sensitivity_interpretation': 'low' if width_sensitivity < 0.1 else 'moderate' if width_sensitivity < 0.5 else 'high'
+        "status": "ok",
+        "baseline_width": float(baseline_width),
+        "width_std": width_std,
+        "width_sensitivity": float(width_sensitivity),
+        "j_lower_std": j_lower_std,
+        "j_upper_std": j_upper_std,
+        "perturbation_size_tested": float(perturbation_size),
+        "n_successful_perturbations": int(n_success),
+        "n_failed_perturbations": int(n_fail),
+        "sensitivity_interpretation": interpretation,
     }
 
-# Mathematical property verification functions
+# ---------------------------------------------------------------------
+# Internal mathematical self-tests
+# ---------------------------------------------------------------------
+
 
 def verify_fh_bound_properties() -> Dict[str, bool]:
     """
-    Verify mathematical properties of FH bounds implementation.
-    
-    This is a comprehensive test suite that verifies:
-    1. Bound sharpness for known constructions
-    2. Monotonicity properties  
-    3. Edge case handling
-    4. Numerical stability
+    Internal sanity checks for FH bounds and related functionality.
+
+    Returns
+    -------
+    Dict[str, bool]
+        Mapping from test label to boolean. Intended for developer /
+        research sanity, not for end-user use.
+
+    Notes
+    -----
+    This is NOT a replacement for a full unit test suite, but it should
+    catch gross inconsistencies in the mathematical structure:
+    - FH intersection/union formulas
+    - Monotonicity properties
+    - J-bounds coherence
+    - Independence calculations
+    - CII basic sanity
+    - Wilson CI basic sanity
+    - FHBounds invariant enforcement
     """
-    tests_passed = {}
-    
-    # Test 1: Single event bounds
+    tests_passed: Dict[str, bool] = {}
+
+    # ------------------------------------------------------------------
+    # Test 1: Single-event bounds are exact for both intersection & union
+    # ------------------------------------------------------------------
     try:
         for p in [0.0, 0.25, 0.5, 0.75, 1.0]:
-            bounds = intersection_bounds([p])
-            assert abs(bounds.lower - p) < MATHEMATICAL_TOLERANCE
-            assert abs(bounds.upper - p) < MATHEMATICAL_TOLERANCE
-        tests_passed['single_event_exactness'] = True
-    except:
-        tests_passed['single_event_exactness'] = False
-    
-    # Test 2: Sharpness examples
+            int_b = intersection_bounds([p])
+            uni_b = union_bounds([p])
+            assert abs(int_b.lower - p) < MATHEMATICAL_TOLERANCE
+            assert abs(int_b.upper - p) < MATHEMATICAL_TOLERANCE
+            assert abs(uni_b.lower - p) < MATHEMATICAL_TOLERANCE
+            assert abs(uni_b.upper - p) < MATHEMATICAL_TOLERANCE
+        tests_passed["single_event_exactness"] = True
+    except Exception:
+        tests_passed["single_event_exactness"] = False
+
+    # ------------------------------------------------------------------
+    # Test 2: Two-event intersection and union sharpness
+    # ------------------------------------------------------------------
     try:
-        # Two events with known sharp bounds
-        bounds = intersection_bounds([0.9, 0.8])
-        expected_lower = max(0, 0.9 + 0.8 - 1)  # 0.7
-        expected_upper = min(0.9, 0.8)  # 0.8
-        assert abs(bounds.lower - expected_lower) < MATHEMATICAL_TOLERANCE
-        assert abs(bounds.upper - expected_upper) < MATHEMATICAL_TOLERANCE
-        tests_passed['two_event_sharpness'] = True
-    except:
-        tests_passed['two_event_sharpness'] = False
-    
-    # Test 3: Monotonicity
+        p1, p2 = 0.9, 0.8
+        int_b = intersection_bounds([p1, p2])
+        uni_b = union_bounds([p1, p2])
+
+        expected_int_lower = max(0.0, p1 + p2 - 1.0)
+        expected_int_upper = min(p1, p2)
+        expected_uni_lower = max(p1, p2)
+        expected_uni_upper = min(1.0, p1 + p2)
+
+        assert abs(int_b.lower - expected_int_lower) < MATHEMATICAL_TOLERANCE
+        assert abs(int_b.upper - expected_int_upper) < MATHEMATICAL_TOLERANCE
+        assert abs(uni_b.lower - expected_uni_lower) < MATHEMATICAL_TOLERANCE
+        assert abs(uni_b.upper - expected_uni_upper) < MATHEMATICAL_TOLERANCE
+
+        tests_passed["two_event_sharpness"] = True
+    except Exception:
+        tests_passed["two_event_sharpness"] = False
+
+    # ------------------------------------------------------------------
+    # Test 3: Monotonicity – adding events
+    #   - intersection upper bound should not increase
+    #   - union lower bound should not decrease
+    # ------------------------------------------------------------------
     try:
-        # Adding more events should not increase intersection upper bound
-        bounds_2 = intersection_bounds([0.8, 0.7])
-        bounds_3 = intersection_bounds([0.8, 0.7, 0.6])
-        assert bounds_3.upper <= bounds_2.upper + MATHEMATICAL_TOLERANCE
-        tests_passed['monotonicity'] = True
-    except:
-        tests_passed['monotonicity'] = False
-    
-    # Test 4: Consistency between intersection and union
+        # Intersection monotonicity
+        b2_int = intersection_bounds([0.8, 0.7])
+        b3_int = intersection_bounds([0.8, 0.7, 0.6])
+        assert b3_int.upper <= b2_int.upper + MATHEMATICAL_TOLERANCE
+
+        # Union monotonicity
+        b2_uni = union_bounds([0.3, 0.4])
+        b3_uni = union_bounds([0.3, 0.4, 0.5])
+        assert b3_uni.lower + MATHEMATICAL_TOLERANCE >= b2_uni.lower
+
+        tests_passed["monotonicity"] = True
+    except Exception:
+        tests_passed["monotonicity"] = False
+
+    # ------------------------------------------------------------------
+    # Test 4: Intersection vs union consistency
+    # For any joint law, P(∩ A_i) ≤ P(∪ A_i)
+    # ⇒ FH bounds should respect this ordering.
+    # ------------------------------------------------------------------
     try:
         marginals = [0.3, 0.4, 0.5]
-        int_bounds = intersection_bounds(marginals)
-        union_bounds = union_bounds(marginals)
-        # Union should have larger bounds than intersection
-        assert union_bounds.lower >= int_bounds.lower - MATHEMATICAL_TOLERANCE
-        assert union_bounds.upper >= int_bounds.upper - MATHEMATICAL_TOLERANCE
-        tests_passed['intersection_union_consistency'] = True
-    except:
-        tests_passed['intersection_union_consistency'] = False
-    
-    # Test 5: J-statistic bounds consistency
+        int_b = intersection_bounds(marginals)
+        uni_b = union_bounds(marginals)
+
+        assert uni_b.lower >= int_b.lower - MATHEMATICAL_TOLERANCE
+        assert uni_b.upper >= int_b.upper - MATHEMATICAL_TOLERANCE
+
+        tests_passed["intersection_union_consistency"] = True
+    except Exception:
+        tests_passed["intersection_union_consistency"] = False
+
+    # ------------------------------------------------------------------
+    # Test 5: FH vs independence – intersection/union probabilities
+    # Independence law should lie within FH envelopes.
+    # ------------------------------------------------------------------
+    try:
+        p = [0.2, 0.5, 0.7]
+        int_b = intersection_bounds(p)
+        uni_b = union_bounds(p)
+
+        # Under independence:
+        p_int_indep = 1.0
+        for pi in p:
+            p_int_indep *= float(pi)
+        p_uni_indep = 1.0
+        for pi in p:
+            p_uni_indep *= (1.0 - float(pi))
+        p_uni_indep = 1.0 - p_uni_indep
+
+        assert int_b.lower - MATHEMATICAL_TOLERANCE <= p_int_indep <= int_b.upper + MATHEMATICAL_TOLERANCE
+        assert uni_b.lower - MATHEMATICAL_TOLERANCE <= p_uni_indep <= uni_b.upper + MATHEMATICAL_TOLERANCE
+
+        tests_passed["fh_vs_independence_envelope"] = True
+    except Exception:
+        tests_passed["fh_vs_independence_envelope"] = False
+
+    # ------------------------------------------------------------------
+    # Test 6: J-statistic bounds consistency in serial OR
+    # ------------------------------------------------------------------
     try:
         miss_rates = [0.2, 0.3]
         fpr_rates = [0.05, 0.1]
-        bounds = serial_or_composition_bounds(miss_rates, fpr_rates)
-        
-        # J bounds should be consistent with TPR/FPR bounds
-        expected_j_lower = bounds.tpr_bounds.lower - bounds.fpr_bounds.upper
-        expected_j_upper = bounds.tpr_bounds.upper - bounds.fpr_bounds.lower
-        
-        assert abs(bounds.j_lower - expected_j_lower) < MATHEMATICAL_TOLERANCE
-        assert abs(bounds.j_upper - expected_j_upper) < MATHEMATICAL_TOLERANCE
-        tests_passed['j_statistic_consistency'] = True
-    except:
-        tests_passed['j_statistic_consistency'] = False
-    
-    # Test 6: Independence calculations
+        cb = serial_or_composition_bounds(miss_rates, fpr_rates)
+
+        expected_j_lower = cb.tpr_bounds.lower - cb.fpr_bounds.upper
+        expected_j_upper = cb.tpr_bounds.upper - cb.fpr_bounds.lower
+
+        assert abs(cb.j_lower - expected_j_lower) < MATHEMATICAL_TOLERANCE
+        assert abs(cb.j_upper - expected_j_upper) < MATHEMATICAL_TOLERANCE
+
+        tests_passed["j_statistic_serial_or_consistency"] = True
+    except Exception:
+        tests_passed["j_statistic_serial_or_consistency"] = False
+
+    # ------------------------------------------------------------------
+    # Test 7: J-statistic bounds consistency in parallel AND
+    # ------------------------------------------------------------------
+    try:
+        miss_rates = [0.1, 0.15]
+        fpr_rates = [0.02, 0.03]
+        cb = parallel_and_composition_bounds(miss_rates, fpr_rates)
+
+        expected_j_lower = cb.tpr_bounds.lower - cb.fpr_bounds.upper
+        expected_j_upper = cb.tpr_bounds.upper - cb.fpr_bounds.lower
+
+        assert abs(cb.j_lower - expected_j_lower) < MATHEMATICAL_TOLERANCE
+        assert abs(cb.j_upper - expected_j_upper) < MATHEMATICAL_TOLERANCE
+
+        tests_passed["j_statistic_parallel_and_consistency"] = True
+    except Exception:
+        tests_passed["j_statistic_parallel_and_consistency"] = False
+
+    # ------------------------------------------------------------------
+    # Test 8: Independence calculations – finite and in [-1, 1]
+    # ------------------------------------------------------------------
     try:
         tprs = [0.7, 0.8]
         fprs = [0.05, 0.1]
-        j_indep = independence_serial_or_j(tprs, fprs)
-        
-        # Should be finite and reasonable
-        assert math.isfinite(j_indep)
-        assert -1 <= j_indep <= 1
-        tests_passed['independence_calculation'] = True
-    except:
-        tests_passed['independence_calculation'] = False
-    
-    # Test 7: CII computation
+
+        j_indep_or = independence_serial_or_j(tprs, fprs)
+        j_indep_and = independence_parallel_and_j(tprs, fprs)
+
+        assert math.isfinite(j_indep_or) and -1.0 <= j_indep_or <= 1.0
+        assert math.isfinite(j_indep_and) and -1.0 <= j_indep_and <= 1.0
+
+        tests_passed["independence_calculation_range"] = True
+    except Exception:
+        tests_passed["independence_calculation_range"] = False
+
+    # ------------------------------------------------------------------
+    # Test 9: Independence J lies within FH J-bounds (serial OR)
+    # ------------------------------------------------------------------
     try:
-        miss_rates = [0.3, 0.2]  # 1 - tprs
+        miss_rates = [0.3, 0.2]  # TPR ~ [0.7, 0.8]
         fpr_rates = [0.05, 0.1]
-        bounds = serial_or_composition_bounds(miss_rates, fpr_rates)
-        
-        cii_result = compute_composability_interference_index(0.6, bounds)
-        assert 'cii' in cii_result
-        assert math.isfinite(cii_result['cii'])
-        tests_passed['cii_computation'] = True
-    except Exception as e:
-        tests_passed['cii_computation'] = False
-        print(f"CII test failed: {e}")
-    
-    # Test 8: Wilson CI
+        cb = serial_or_composition_bounds(miss_rates, fpr_rates)
+
+        individual_tprs = [1.0 - m for m in miss_rates]
+        individual_fprs = list(fpr_rates)
+        j_indep = independence_serial_or_j(individual_tprs, individual_fprs)
+
+        assert cb.j_lower - MATHEMATICAL_TOLERANCE <= j_indep <= cb.j_upper + MATHEMATICAL_TOLERANCE
+
+        tests_passed["independence_within_fh_j_bounds_serial_or"] = True
+    except Exception:
+        tests_passed["independence_within_fh_j_bounds_serial_or"] = False
+
+    # ------------------------------------------------------------------
+    # Test 10: CII computation basic sanity
+    # ------------------------------------------------------------------
     try:
-        ci = wilson_score_interval(50, 100)
+        miss_rates = [0.3, 0.2]
+        fpr_rates = [0.05, 0.1]
+        cb = serial_or_composition_bounds(miss_rates, fpr_rates)
+        individual_tprs = [1.0 - m for m in miss_rates]
+        individual_fprs = list(fpr_rates)
+
+        cii_result = compute_composability_interference_index(
+            observed_j=0.6,
+            bounds=cb,
+            individual_tprs=individual_tprs,
+            individual_fprs=individual_fprs,
+            use_independence_baseline=True,
+        )
+
+        assert "cii" in cii_result
+        cii_value = float(cii_result["cii"])
+        assert math.isfinite(cii_value)
+        tests_passed["cii_computation"] = True
+    except Exception:
+        tests_passed["cii_computation"] = False
+
+    # ------------------------------------------------------------------
+    # Test 11: Wilson CI basic sanity
+    # ------------------------------------------------------------------
+    try:
+        ci = wilson_score_interval(successes=50, trials=100, alpha=0.05)
         assert len(ci) == 2
-        assert 0 <= ci[0] <= ci[1] <= 1
-        tests_passed['wilson_ci'] = True
-    except:
-        tests_passed['wilson_ci'] = False
-    
+        assert 0.0 <= ci[0] <= ci[1] <= 1.0
+        tests_passed["wilson_ci"] = True
+    except Exception:
+        tests_passed["wilson_ci"] = False
+
+    # ------------------------------------------------------------------
+    # Test 12: FHBounds invariants are enforced
+    # ------------------------------------------------------------------
+    try:
+        # This should be fine
+        _ = FHBounds(
+            lower=0.2,
+            upper=0.4,
+            marginals=(0.3, 0.5),
+            bound_type="test",
+            k_rails=2,
+        )
+
+        # This should fail (lower > upper)
+        failed = False
+        try:
+            _ = FHBounds(
+                lower=0.8,
+                upper=0.2,
+                marginals=(0.5,),
+                bound_type="test",
+                k_rails=1,
+            )
+            failed = True  # if no exception, test fails
+        except FHBoundViolationError:
+            pass
+
+        assert not failed
+        tests_passed["fhbounds_invariant_enforcement"] = True
+    except Exception:
+        tests_passed["fhbounds_invariant_enforcement"] = False
+
+    # ------------------------------------------------------------------
+    # Optional: robust_inverse_normal monotonicity sanity
+    # ------------------------------------------------------------------
+    try:
+        z1 = robust_inverse_normal(0.1)
+        z2 = robust_inverse_normal(0.5)
+        z3 = robust_inverse_normal(0.9)
+        # Should be strictly increasing in p
+        assert z1 < z2 < z3
+        tests_passed["robust_inverse_normal_monotonicity"] = True
+    except Exception:
+        tests_passed["robust_inverse_normal_monotonicity"] = False
+
+    # Overall summary
+    try:
+        overall = all(tests_passed.values())
+    except Exception:
+        overall = False
+    tests_passed["all_passed"] = overall
+
     return tests_passed
 
-# Export interface
+# ---------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------
+
 __all__ = [
     # Core mathematical functions
-    'frechet_intersection_lower_bound',
-    'hoeffding_intersection_upper_bound', 
-    'frechet_union_lower_bound',
-    'hoeffding_union_upper_bound',
-    'intersection_bounds',
-    'union_bounds',
-    
+    "frechet_intersection_lower_bound",
+    "hoeffding_intersection_upper_bound",
+    "frechet_union_lower_bound",
+    "hoeffding_union_upper_bound",
+    "intersection_bounds",
+    "union_bounds",
     # Composition analysis
-    'serial_or_composition_bounds',
-    'parallel_and_composition_bounds',
-    
-    # Independence calculations (corrected)
-    'independence_serial_or_j',
-    'independence_parallel_and_j',
-    
-    # CII analysis (corrected)
-    'compute_composability_interference_index',
-    
-    # Statistical functions (corrected)
-    'wilson_score_interval',
-    'robust_inverse_normal',
-    'stratified_bootstrap_j_statistic',
-    
+    "serial_or_composition_bounds",
+    "parallel_and_composition_bounds",
+    # Independence calculations
+    "independence_serial_or_j",
+    "independence_parallel_and_j",
+    # CII analysis
+    "compute_composability_interference_index",
+    # Statistical functions
+    "wilson_score_interval",
+    "robust_inverse_normal",
+    "stratified_bootstrap_j_statistic",
     # Integration functions
-    'extract_rates_from_attack_results',
-    'validate_fh_bounds_against_empirical',
-    
+    "extract_rates_from_attack_results",
+    "validate_fh_bounds_against_empirical",
     # Advanced analysis
-    'sensitivity_analysis_fh_bounds',
-    
+    "sensitivity_analysis_fh_bounds",
     # Data structures
-    'FHBounds',
-    'ComposedJBounds',
-    
+    "FHBounds",
+    "ComposedJBounds",
     # Exceptions
-    'FHBoundViolationError',
-    'StatisticalValidationError',
-    'NumericalInstabilityError',
-    
+    "FHBoundViolationError",
+    "StatisticalValidationError",
+    "NumericalInstabilityError",
     # Verification
-    'verify_fh_bound_properties',
-    
+    "verify_fh_bound_properties",
     # Constants
-    'EPSILON',
-    'MATHEMATICAL_TOLERANCE'
+    "EPSILON",
+    "MATHEMATICAL_TOLERANCE",
 ]
 
-if __name__ == "__main__":
-    # Run comprehensive mathematical verification
-    print("Running PhD-level mathematical verification...")
+
+if __name__ == "__main__":  # pragma: no cover - manual verification
+    """
+    Manual self-check entrypoint.
+
+    Run:
+
+        python -m cc_framework.fh_bounds
+
+    (or whatever your module path is) to execute the internal mathematical
+    self-tests and get a human-readable summary.
+    """
+    print("Running internal FH-bound property verification...\n")
     results = verify_fh_bound_properties()
-    
-    print("\nVerification Results:")
+
+    print("Verification Results")
     print("=" * 40)
-    for test_name, passed in results.items():
-        status = "✓ PASSED" if passed else "✗ FAILED"
-        print(f"{test_name}: {status}")
-    
-    total_tests = len(results)
-    passed_tests = sum(results.values())
-    
-    print(f"\nOverall: {passed_tests}/{total_tests} tests passed")
-    
-    if passed_tests == total_tests:
-        print("\n🎉 ALL MATHEMATICAL PROPERTIES VERIFIED")
-        print("Implementation is PhD-ready!")
+
+    # Treat any aggregate key (like "all_passed") specially.
+    aggregate_keys = {"all_passed"}
+    detailed_items = [(k, v) for k, v in results.items() if k not in aggregate_keys]
+
+    # Sort for deterministic, diff-friendly output.
+    detailed_items.sort(key=lambda kv: kv[0])
+
+    total = len(detailed_items)
+    passed = sum(1 for _, ok in detailed_items if ok)
+
+    for name, ok in detailed_items:
+        status = "✓ PASSED" if ok else "✗ FAILED"
+        print(f"{name:35s}: {status}")
+
+    print("\nSummary")
+    print("-" * 40)
+    print(f"{passed}/{total} tests passed")
+
+    # Prefer explicit aggregate flag if present; otherwise derive from counts.
+    all_passed = results.get("all_passed", passed == total)
+
+    if all_passed:
+        print(
+            "\n🎉 ALL MATHEMATICAL PROPERTIES VERIFIED – "
+            "implementation is research-ready."
+        )
     else:
-        print(f"\n⚠️  {total_tests - passed_tests} tests failed")
-        print("Implementation needs fixes before production use.")
+        print(
+            "\n⚠️  Some tests failed – investigate before relying on these "
+            "bounds in production."
+        )
