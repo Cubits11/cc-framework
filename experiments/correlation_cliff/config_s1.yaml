@@ -1,1 +1,100 @@
+# experiments/correlation_cliff/config_s1.yaml
+# -----------------------------------------------------------------------------
+# Correlation Cliff Experiment Config (S1 template)
+# -----------------------------------------------------------------------------
+experiment:
+  name: "correlation_cliff_s1"
+  description: >
+    Two-world (w=0, w=1) binary guardrail composition experiment.
+    Sweeps dependence via FH-linear interpolation and measures CC_max(λ).
+  author: "YOU"
+  created_utc: "2025-12-20"
 
+# -----------------------------------------------------------------------------
+# Core marginals (YOU fill these with your S1 values)
+# Worlds: w=0 (protected/low leakage), w=1 (unprotected/high leakage) by default,
+# but nothing in the code assumes ordering; metrics use absolute gaps.
+# -----------------------------------------------------------------------------
+marginals:
+  w0:
+    pA: 0.20      # TODO: replace with your S1 p_A^0
+    pB: 0.18      # TODO: replace with your S1 p_B^0
+  w1:
+    pA: 0.62      # TODO: replace with your S1 p_A^1
+    pB: 0.55      # TODO: replace with your S1 p_B^1
+
+# -----------------------------------------------------------------------------
+# Dependence path: FH-linear interpolation p11(λ)=L+λ(U-L), λ∈[0,1]
+# -----------------------------------------------------------------------------
+dependence_path:
+  type: "fh_linear"
+  lambda_grid:
+    start: 0.0
+    stop: 1.0
+    num: 201
+
+  # Optional: refine around the estimated crossing (CC=1)
+  refine:
+    enabled: true
+    half_width: 0.08
+    num: 401
+
+# Composition rule: "OR" or "AND"
+composition:
+  rule: "OR"
+
+# -----------------------------------------------------------------------------
+# Sampling
+# -----------------------------------------------------------------------------
+sampling:
+  n_per_world: 20000
+  seed: 20251220
+
+# -----------------------------------------------------------------------------
+# Bootstrap
+# BCa is the default. We bootstrap counts via multinomial on empirical cell probs
+# (equivalent to classic resampling, but far faster).
+# -----------------------------------------------------------------------------
+bootstrap:
+  enabled: true
+  B: 2000
+  alpha: 0.05
+  method: "bca"
+  multinomial_resampling: true
+
+  # Curve-level threshold bootstrap: resample each (λ,w) contingency table,
+  # recompute CC curve, solve for λ⋆ per replicate.
+  threshold:
+    enabled: true
+    solve_target_cc: 1.0
+
+# -----------------------------------------------------------------------------
+# Output locations
+# -----------------------------------------------------------------------------
+output:
+  out_dir: "experiments/correlation_cliff/outputs"
+  tables_dir: "experiments/correlation_cliff/outputs/tables"
+  figures_dir: "experiments/correlation_cliff/outputs/figures"
+  overwrite: true
+
+# -----------------------------------------------------------------------------
+# Sanity checks (fail-fast)
+# -----------------------------------------------------------------------------
+sanity:
+  enforce_fh_bounds: true
+  enforce_probability_simplex: true
+  enforce_jc_envelope: true
+  # z-score tolerance for marginal deviation check in simulation
+  tol_marginals_sigma: 3.0
+
+# -----------------------------------------------------------------------------
+# Reporting
+# -----------------------------------------------------------------------------
+reporting:
+  # Include both quick delta CIs + BCa CIs
+  include_delta_ci: true
+  include_bca_ci: true
+  ci_label: "95%"
+
+  # Save intermediate artifacts (counts, per-world probs)
+  save_contingency_tables: true
