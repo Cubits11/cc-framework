@@ -10,10 +10,6 @@ import pandas as pd
 
 Rule = Literal["OR", "AND"]
 
-
-# =============================================================================
-# PhD-level theory core
-# =============================================================================
 """
 Correlation Cliff Theory Module
 ===============================
@@ -299,4 +295,33 @@ def fh_pC_interval(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
     return (lo, hi)
 
 
-def jc_envelope_from_intervals(int0: Tuple[float, float], int1: Tuple[float, floa]()_
+def jc_envelope_from_intervals(int0: Tuple[float, float], int1: Tuple[float, float]) -> Tuple[float, float]:
+    """
+    Given feasible intervals for pC^0 and pC^1, compute the induced feasible envelope for
+        JC = |pC^1 - pC^0|.
+
+    This is an absolute sanity constraint; empirical JC outside this indicates a bug
+    (or violated assumptions). :contentReference[oaicite:7]{index=7}
+
+    Let I0=[a0,b0], I1=[a1,b1]. Then:
+      - Max |x-y| occurs at endpoints.
+      - Min |x-y| is 0 if intervals overlap, else distance between them.
+    """
+    a0, b0 = int0
+    a1, b1 = int1
+
+    # J_min: overlap => 0, else gap
+    if b0 >= a1 and b1 >= a0:
+        jmin = 0.0
+    else:
+        jmin = min(abs(a1 - b0), abs(a0 - b1))
+
+    # J_max: farthest endpoints
+    jmax = max(abs(a1 - b0), abs(b1 - a0), abs(a1 - a0), abs(b1 - b0))
+    return (float(jmin), float(jmax))
+
+
+def compute_fh_jc_envelope(marg: TwoWorldMarginals, rule: Rule) -> Tuple[float, float]:
+    int0 = fh_pC_interval(marg.w0.pA, marg.w0.pB, rule)
+    int1 = fh_pC_interval(marg.w1.pA, marg.w1.pB, rule)
+    return jc_envelope_from_intervals(int0, int1)
