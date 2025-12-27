@@ -214,12 +214,19 @@ def simulate_replicate_at_lambda(
     out["JC_hat"] = float(JC_hat)
     out["CC_hat"] = float(CC_hat)
 
+    def _nan_robust_avg(a: float, b: float) -> float:
+        vals = [a, b]
+        valid = [v for v in vals if not math.isnan(v)]
+        if not valid:
+            return float("nan")
+        return float(sum(valid) / len(valid))
+
     phi0 = float(out.get("phi_hat_w0", float("nan")))
     phi1 = float(out.get("phi_hat_w1", float("nan")))
     tau0 = float(out.get("tau_hat_w0", float("nan")))
     tau1 = float(out.get("tau_hat_w1", float("nan")))
-    out["phi_hat_avg"] = float(0.5 * (phi0 + phi1))
-    out["tau_hat_avg"] = float(0.5 * (tau0 + tau1))
+    out["phi_hat_avg"] = _nan_robust_avg(phi0, phi1)
+    out["tau_hat_avg"] = _nan_robust_avg(tau0, tau1)
 
     pC0_true = float(out.get("pC_true_w0", float("nan")))
     pC1_true = float(out.get("pC_true_w1", float("nan")))
