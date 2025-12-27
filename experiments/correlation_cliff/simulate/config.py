@@ -63,6 +63,10 @@ class SimConfig:
     _lambda_index_map: Dict[float, int] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if isinstance(self.rule, str):
+            self.rule = self.rule.upper()  # type: ignore[assignment]
+        if isinstance(self.path, str):
+            self.path = self.path.lower()  # type: ignore[assignment]
         validate_cfg(self)
         # Build an order-invariant lambda index mapping (for stable_per_cell seeding).
         # Use rounded keys to make float parsing stable across YAML/JSON representations.
