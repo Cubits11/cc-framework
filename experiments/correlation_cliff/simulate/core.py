@@ -255,7 +255,13 @@ def simulate_replicate_at_lambda(
     # Optional: theory reference overlays (separate, explicitly labeled)
     if cfg.include_theory_reference and callable(U.compute_metrics_for_lambda):
         try:
-            theory = U.compute_metrics_for_lambda(cfg.marginals, cfg.rule, lam_f)  # type: ignore[misc]
+            theory = U.compute_metrics_for_lambda(
+                cfg.marginals,
+                cfg.rule,
+                lam_f,
+                path=cfg.path,
+                path_params=cfg.path_params,
+            )  # type: ignore[misc]
             out["CC_theory_ref"] = float(theory.get("CC", float("nan")))
             out["JC_theory_ref"] = float(theory.get("JC", float("nan")))
             out["dC_theory_ref"] = float(theory.get("dC", float("nan")))
