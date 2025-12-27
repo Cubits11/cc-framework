@@ -9,22 +9,58 @@ Core simulation harness:
 - simulate_grid
 - summarize_simulation
 
-This is the heart of the experiment: construct joint -> sample -> compute estimates -> diagnostics.
+Research-OS guarantees:
+- Deterministic results under stable_per_cell seeding, invariant to lambda ordering.
+- Sequential seeding is deterministic for a given iteration order, but order-dependent by design.
+- Explicit per-world validity flags + stage + message.
+- Stable output schema with no meta-key collisions.
 """
 
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Sequence, Tuple
 
 import math
 import numpy as np
 import pandas as pd
 
-from .config import SimConfig
-from .config import validate_cfg
+from .config import SimConfig, validate_cfg
 from .paths import p11_from_path
 from .sampling import draw_joint_counts, empirical_from_counts, rng_for_cell, validate_cell_probs
 from . import utils as U
 
 
+# ----------------------------
+# Local helpers (strictness)
+# ----------------------------
+def _strict_nonneg_int(x: Any, name: str) -> int:
+    if isinstance(x, bool):
+        raise TypeError(f"{name} must be an int >= 0, got bool {x!r}")
+    if not isinstance(x, int):
+        raise TypeError(f"{name} must be an int >= 0, got {type(x).__name__}={x!r}")
+    if x < 0:
+        raise ValueError(f"{name} must be >= 0, got {x}")
+    return x
+
+
+def _finite_unit_interval(x: Any, name: str) -> float:
+    if isinstance(x, bool):
+        raise TypeError(f"{name} must be a finite float in [0,1], got bool {x!r}")
+    xf = float(x)
+    if not (math.isfinite(xf) and 0.0 <= xf <= 1.0):
+        raise ValueError(f"{name} must be finite and in [0,1], got {x!r}")
+    return xf
+
+
+def _nan_robust_avg(a: float, b: float) -> float:
+    vals = [a, b]
+    valid = [v for v in vals if math.isfinite(v) and not math.isnan(v)]
+    if not valid:
+        return float("nan")
+    return float(sum(valid) / len(valid))
+
+
+# ----------------------------
+# Per-replicate simulation
+# ----------------------------
 def simulate_replicate_at_lambda(
     cfg: SimConfig,
     *,
@@ -35,16 +71,20 @@ def simulate_replicate_at_lambda(
 ) -> Dict[str, Any]:
     """
     Simulate one replicate at a given lambda.
+
+    Notes on RNG:
+    - stable_per_cell: ignores `rng` and uses rng_for_cell(seed, rep, lam_index, world)
+    - sequential: uses `rng` as a base stream, but derives per-world substreams to avoid
+      world-to-world coupling while retaining order dependence.
     """
-    lam_f = float(lam)
-    if not (0.0 <= lam_f <= 1.0) or not math.isfinite(lam_f):
-        raise ValueError(f"lambda must be finite and in [0,1], got {lam!r}")
-    li = int(lam_index)
-    rp = int(rep)
-    if li < 0:
-        raise ValueError(f"lambda_index must be >=0, got {lam_index!r}")
-    if rp < 0:
-        raise ValueError(f"rep must be >=0, got {rep!r}")
+    lam_f = _finite_unit_interval(lam, "lambda")
+    li = _strict_nonneg_int(lam_index, "lambda_index")
+    rp = _strict_nonneg_int(rep, "rep")
+
+    if not isinstance(rng, np.random.Generator):
+        raise TypeError(f"rng must be a numpy.random.Generator, got {type(rng).__name__}")
+
+    row_ctx = f"(lam={lam_f:.6g}, idx={li}, rep={rp})"
 
     out: Dict[str, Any] = {
         "lambda": lam_f,
@@ -56,13 +96,18 @@ def simulate_replicate_at_lambda(
         "seed_policy": cfg.seed_policy,
         "n_per_world": int(cfg.n),
         "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
+        "row_ok": True,  # will be refined after world runs
+        "row_error_stage": "",
+        "row_error_msg": "",
     }
 
+    # Envelope is a population property; always computable from marginals + rule.
     jmin, jmax = U.compute_fh_jc_envelope(cfg.marginals, cfg.rule)
     out["JC_env_min"] = float(jmin)
     out["JC_env_max"] = float(jmax)
 
-    _WORLD_NUM_FIELDS = (
+    # World schema: keep consistent column names across all rows.
+    _WORLD_NUM_FIELDS: Tuple[str, ...] = (
         "pA_true", "pB_true", "p00_true", "p01_true", "p10_true", "p11_true",
         "n00", "n01", "n10", "n11",
         "p00_hat", "p01_hat", "p10_hat", "p11_hat",
@@ -74,8 +119,10 @@ def simulate_replicate_at_lambda(
 
     def _prime_world_schema(w: int) -> None:
         out[f"world_valid_w{w}"] = True
+        out[f"invalid_joint_w{w}"] = False  # summarizer expects this prefix
         out[f"world_error_stage_w{w}"] = ""
         out[f"world_error_msg_w{w}"] = ""
+        out[f"rng_seed_w{w}"] = float("nan")  # only populated for sequential
         for base in _WORLD_NUM_FIELDS:
             out[f"{base}_w{w}"] = float("nan")
 
@@ -84,40 +131,74 @@ def simulate_replicate_at_lambda(
         out[f"world_error_stage_w{w}"] = str(stage)
         out[f"world_error_msg_w{w}"] = str(msg)
 
+        # Flag as "invalid_joint" for any upstream joint/sampling issues.
+        out[f"invalid_joint_w{w}"] = stage in (
+            "p11_from_path",
+            "joint_cells_from_marginals",
+            "validate_joint_probs",
+            "draw_joint_counts",
+        )
+
     for w in (0, 1):
         _prime_world_schema(w)
 
+    # ----------------------------
+    # World loop
+    # ----------------------------
     for w, wm in ((0, cfg.marginals.w0), (1, cfg.marginals.w1)):
+        w_ctx = f"{row_ctx}, w={w}"
         out[f"pA_true_w{w}"] = float(wm.pA)
         out[f"pB_true_w{w}"] = float(wm.pB)
 
-        rng_w = rng if cfg.seed_policy == "sequential" else rng_for_cell(cfg.seed, rp, li, w)
+        # RNG policy:
+        if cfg.seed_policy == "stable_per_cell":
+            rng_w = rng_for_cell(cfg.seed, rp, li, w)
+        else:
+            # Derive per-world substream seed from the sequential base RNG (order-dependent by design),
+            # to reduce artificial cross-world coupling.
+            seed_w = int(rng.integers(0, 2**32 - 1, dtype=np.uint32))
+            out[f"rng_seed_w{w}"] = float(seed_w)
+            rng_w = np.random.default_rng(seed_w)
 
+        # p11 from chosen path
         try:
-            p11, meta = p11_from_path(wm.pA, wm.pB, lam_f, path=cfg.path, path_params=cfg.path_params)
+            p11, meta = p11_from_path(
+                float(wm.pA), float(wm.pB), lam_f,
+                path=cfg.path,
+                path_params=cfg.path_params,
+            )
         except Exception as e:
             if cfg.hard_fail_on_invalid:
                 raise
             _mark_world_invalid(w, stage="p11_from_path", msg=f"{type(e).__name__}: {e}")
             continue
 
-        for mk, mv in meta.items():
-            out[f"{mk}_w{w}"] = float(mv)
+        # Meta: prefix to avoid collisions with real columns.
+        if isinstance(meta, dict):
+            for mk, mv in meta.items():
+                try:
+                    out[f"pathmeta_{mk}_w{w}"] = float(mv)
+                except Exception:
+                    # Keep meta robust; never allow it to crash the simulation.
+                    out[f"pathmeta_{mk}_w{w}"] = float("nan")
 
+        # Build joint cells
         try:
-            cells = U.joint_cells_from_marginals(wm.pA, wm.pB, float(p11))
+            cells = U.joint_cells_from_marginals(float(wm.pA), float(wm.pB), float(p11))
         except Exception as e:
             if cfg.hard_fail_on_invalid:
                 raise
             _mark_world_invalid(w, stage="joint_cells_from_marginals", msg=f"{type(e).__name__}: {e}")
             continue
 
+        # Validate joint probabilities (no renorm; tiny clip allowed)
         try:
             _ = validate_cell_probs(
-                np.array([cells["p00"], cells["p01"], cells["p10"], cells["p11"]], dtype=float),
+                np.array([cells["p00"], cells["p01"], cells["p10"], cells["p11"]], dtype=np.float64),
                 prob_tol=cfg.prob_tol,
                 allow_tiny_negative=cfg.allow_tiny_negative,
                 tiny_negative_eps=cfg.tiny_negative_eps,
+                context=w_ctx,
             )
         except Exception as e:
             if cfg.hard_fail_on_invalid:
@@ -130,6 +211,7 @@ def simulate_replicate_at_lambda(
         out[f"p10_true_w{w}"] = float(cells["p10"])
         out[f"p11_true_w{w}"] = float(cells["p11"])
 
+        # Sample multinomial counts
         try:
             n00, n01, n10, n11 = draw_joint_counts(
                 rng_w,
@@ -141,6 +223,7 @@ def simulate_replicate_at_lambda(
                 prob_tol=cfg.prob_tol,
                 allow_tiny_negative=cfg.allow_tiny_negative,
                 tiny_negative_eps=cfg.tiny_negative_eps,
+                context=w_ctx,
             )
         except Exception as e:
             if cfg.hard_fail_on_invalid:
@@ -153,6 +236,7 @@ def simulate_replicate_at_lambda(
         out[f"n10_w{w}"] = int(n10)
         out[f"n11_w{w}"] = int(n11)
 
+        # Empirical estimates from counts
         try:
             hats = empirical_from_counts(
                 n=cfg.n,
@@ -161,7 +245,7 @@ def simulate_replicate_at_lambda(
                 n10=n10,
                 n11=n11,
                 rule=cfg.rule,
-                context=f"(lam={lam_f:.6g}, idx={li}, rep={rp}, w={w})",
+                context=w_ctx,
             )
         except Exception as e:
             if cfg.hard_fail_on_invalid:
@@ -169,12 +253,14 @@ def simulate_replicate_at_lambda(
             _mark_world_invalid(w, stage="empirical_from_counts", msg=f"{type(e).__name__}: {e}")
             continue
 
+        # Avoid collisions with raw count fields already stored in out.
         _COLLIDE = {"n", "n00", "n01", "n10", "n11"}
         for hk, hv in hats.items():
             if hk in _COLLIDE:
                 continue
             out[f"{hk}_w{w}"] = float(hv)
 
+        # Population overlays (true metrics)
         try:
             pC_true = float(U.pC_from_joint(cfg.rule, cells, pA=float(wm.pA), pB=float(wm.pB)))
             phi_true = float(U.phi_from_joint(float(wm.pA), float(wm.pB), float(cells["p11"])))
@@ -185,75 +271,81 @@ def simulate_replicate_at_lambda(
             _mark_world_invalid(w, stage="population_overlays", msg=f"{type(e).__name__}: {e}")
             continue
 
-        out[f"pC_true_w{w}"] = float(pC_true)
-        out[f"phi_true_w{w}"] = float(phi_true)
-        out[f"tau_true_w{w}"] = float(tau_true)
+        out[f"pC_true_w{w}"] = pC_true
+        out[f"phi_true_w{w}"] = phi_true
+        out[f"tau_true_w{w}"] = tau_true
 
+    # ----------------------------
+    # Cross-world aggregate metrics
+    # ----------------------------
     w0_ok = bool(out.get("world_valid_w0", False))
     w1_ok = bool(out.get("world_valid_w1", False))
-    out["worlds_valid"] = bool(w0_ok and w1_ok)
+    worlds_valid = bool(w0_ok and w1_ok)
+    out["worlds_valid"] = worlds_valid
 
-    pA0 = float(out.get("pA_hat_w0", float("nan")))
-    pA1 = float(out.get("pA_hat_w1", float("nan")))
-    pB0 = float(out.get("pB_hat_w0", float("nan")))
-    pB1 = float(out.get("pB_hat_w1", float("nan")))
-    pC0 = float(out.get("pC_hat_w0", float("nan")))
-    pC1 = float(out.get("pC_hat_w1", float("nan")))
+    # Row OK means: replicate is fully valid (both worlds valid)
+    out["row_ok"] = worlds_valid
 
-    JA_hat = abs(pA1 - pA0)
-    JB_hat = abs(pB1 - pB0)
-    Jbest_hat = max(JA_hat, JB_hat)
-    dC_hat = (pC1 - pC0)
-    JC_hat = abs(dC_hat)
-    CC_hat = (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
+    if worlds_valid:
+        pA0 = float(out["pA_hat_w0"])
+        pA1 = float(out["pA_hat_w1"])
+        pB0 = float(out["pB_hat_w0"])
+        pB1 = float(out["pB_hat_w1"])
+        pC0 = float(out["pC_hat_w0"])
+        pC1 = float(out["pC_hat_w1"])
 
-    out["JA_hat"] = float(JA_hat)
-    out["JB_hat"] = float(JB_hat)
-    out["Jbest_hat"] = float(Jbest_hat)
-    out["dC_hat"] = float(dC_hat)
-    out["JC_hat"] = float(JC_hat)
-    out["CC_hat"] = float(CC_hat)
+        JA_hat = abs(pA1 - pA0)
+        JB_hat = abs(pB1 - pB0)
+        Jbest_hat = max(JA_hat, JB_hat)
+        dC_hat = (pC1 - pC0)
+        JC_hat = abs(dC_hat)
+        CC_hat = (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
 
-    def _nan_robust_avg(a: float, b: float) -> float:
-        vals = [a, b]
-        valid = [v for v in vals if not math.isnan(v)]
-        if not valid:
-            return float("nan")
-        return float(sum(valid) / len(valid))
+        out["JA_hat"] = float(JA_hat)
+        out["JB_hat"] = float(JB_hat)
+        out["Jbest_hat"] = float(Jbest_hat)
+        out["dC_hat"] = float(dC_hat)
+        out["JC_hat"] = float(JC_hat)
+        out["CC_hat"] = float(CC_hat)
 
-    phi0 = float(out.get("phi_hat_w0", float("nan")))
-    phi1 = float(out.get("phi_hat_w1", float("nan")))
-    tau0 = float(out.get("tau_hat_w0", float("nan")))
-    tau1 = float(out.get("tau_hat_w1", float("nan")))
-    out["phi_hat_avg"] = _nan_robust_avg(phi0, phi1)
-    out["tau_hat_avg"] = _nan_robust_avg(tau0, tau1)
+        phi0 = float(out.get("phi_hat_w0", float("nan")))
+        phi1 = float(out.get("phi_hat_w1", float("nan")))
+        tau0 = float(out.get("tau_hat_w0", float("nan")))
+        tau1 = float(out.get("tau_hat_w1", float("nan")))
+        out["phi_hat_avg"] = _nan_robust_avg(phi0, phi1)
+        out["tau_hat_avg"] = _nan_robust_avg(tau0, tau1)
+    else:
+        # Explicitly mark cross-world outputs as NaN (don’t let NaN propagation be “silent logic”)
+        for k in ("JA_hat", "JB_hat", "Jbest_hat", "dC_hat", "JC_hat", "CC_hat", "phi_hat_avg", "tau_hat_avg"):
+            out[k] = float("nan")
+
+    # Population-level cross-world baselines (JA/JB from marginals always computable)
+    JA_pop = abs(float(cfg.marginals.w1.pA) - float(cfg.marginals.w0.pA))
+    JB_pop = abs(float(cfg.marginals.w1.pB) - float(cfg.marginals.w0.pB))
+    Jbest_pop = max(JA_pop, JB_pop)
+    out["JA_pop"] = float(JA_pop)
+    out["JB_pop"] = float(JB_pop)
+    out["Jbest_pop"] = float(Jbest_pop)
 
     pC0_true = float(out.get("pC_true_w0", float("nan")))
     pC1_true = float(out.get("pC_true_w1", float("nan")))
     dC_pop = pC1_true - pC0_true
     JC_pop = abs(dC_pop)
-
-    JA_pop = abs(float(cfg.marginals.w1.pA) - float(cfg.marginals.w0.pA))
-    JB_pop = abs(float(cfg.marginals.w1.pB) - float(cfg.marginals.w0.pB))
-    Jbest_pop = max(JA_pop, JB_pop)
     CC_pop = (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
 
     out["dC_pop"] = float(dC_pop)
     out["JC_pop"] = float(JC_pop)
-    out["JA_pop"] = float(JA_pop)
-    out["JB_pop"] = float(JB_pop)
-    out["Jbest_pop"] = float(Jbest_pop)
     out["CC_pop"] = float(CC_pop)
 
     phi0_true = float(out.get("phi_true_w0", float("nan")))
     phi1_true = float(out.get("phi_true_w1", float("nan")))
     tau0_true = float(out.get("tau_true_w0", float("nan")))
     tau1_true = float(out.get("tau_true_w1", float("nan")))
-    out["phi_pop_avg"] = float(0.5 * (phi0_true + phi1_true))
-    out["tau_pop_avg"] = float(0.5 * (tau0_true + tau1_true))
+    out["phi_pop_avg"] = _nan_robust_avg(phi0_true, phi1_true)
+    out["tau_pop_avg"] = _nan_robust_avg(tau0_true, tau1_true)
 
     # Optional: theory reference overlays (separate, explicitly labeled)
-    if cfg.include_theory_reference and callable(U.compute_metrics_for_lambda):
+    if cfg.include_theory_reference and callable(getattr(U, "compute_metrics_for_lambda", None)):
         try:
             theory = U.compute_metrics_for_lambda(
                 cfg.marginals,
@@ -272,8 +364,10 @@ def simulate_replicate_at_lambda(
         except Exception as e:
             out["theory_ref_error"] = f"{type(e).__name__}: {e}"
 
+    # Envelope violation check on JC_hat (only meaningful if worlds valid)
     tol = float(cfg.envelope_tol)
-    if math.isfinite(JC_hat) and math.isfinite(float(jmin)) and math.isfinite(float(jmax)):
+    JC_hat = float(out.get("JC_hat", float("nan")))
+    if worlds_valid and math.isfinite(JC_hat) and math.isfinite(float(jmin)) and math.isfinite(float(jmax)):
         low = float(jmin) - tol
         high = float(jmax) + tol
         violated_low = JC_hat < low
@@ -297,26 +391,29 @@ def simulate_replicate_at_lambda(
     return out
 
 
+# ----------------------------
+# Grid simulation
+# ----------------------------
 def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
     """
     Run simulation across all lambdas and replicates.
 
-    IMPORTANT: stable_per_cell seeding uses cfg.lambda_index_for_seed(lam) so results
-    do not change if lambdas are re-ordered.
+    stable_per_cell:
+      - uses cfg.lambda_index_for_seed(lam) + rng_for_cell(...) => order-invariant
+    sequential:
+      - draws from a base RNG seeded by cfg.seed => order-dependent by design
     """
     validate_cfg(cfg)
 
     lambdas_list = [float(x) for x in cfg.lambdas]
     if len(lambdas_list) == 0:
         raise ValueError("cfg.lambdas must be non-empty.")
+
     for i, lam in enumerate(lambdas_list):
         if not math.isfinite(lam) or not (0.0 <= lam <= 1.0):
             raise ValueError(f"Invalid lambda at index {i}: got {lam!r}")
 
-    if cfg.seed_policy == "sequential":
-        base_rng = np.random.default_rng(int(cfg.seed))
-    else:
-        base_rng = np.random.default_rng(0)  # intentionally unused
+    base_rng = np.random.default_rng(int(cfg.seed)) if cfg.seed_policy == "sequential" else np.random.default_rng(0)
 
     total = int(cfg.n_reps) * int(len(lambdas_list))
     rows: list[Dict[str, Any]] = []
@@ -324,8 +421,7 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
 
     for rep in range(int(cfg.n_reps)):
         for lam in lambdas_list:
-            # canonical lambda index for order-invariance
-            lam_index = cfg.lambda_index_for_seed(lam)
+            lam_index = cfg.lambda_index_for_seed(lam)  # canonical index for stable_per_cell seeding
             try:
                 row = simulate_replicate_at_lambda(
                     cfg,
@@ -334,7 +430,8 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                     rep=int(rep),
                     rng=base_rng,
                 )
-                row.setdefault("row_ok", True)
+                # Ensure row-level fields exist even if older code paths forget them
+                row.setdefault("row_ok", bool(row.get("worlds_valid", False)))
                 row.setdefault("row_error_stage", "")
                 row.setdefault("row_error_msg", "")
                 rows_append(row)
@@ -351,6 +448,8 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                         "seed": int(cfg.seed),
                         "seed_policy": cfg.seed_policy,
                         "n_per_world": int(cfg.n),
+                        "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
+                        "worlds_valid": False,
                         "row_ok": False,
                         "row_error_stage": "simulate_replicate_at_lambda",
                         "row_error_msg": f"{type(e).__name__}: {e}",
@@ -367,6 +466,9 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
     return df
 
 
+# ----------------------------
+# Summaries
+# ----------------------------
 def summarize_simulation(
     df_long: pd.DataFrame,
     *,
@@ -475,43 +577,14 @@ def summarize_simulation(
             row["JC_env_violation_rate"] = float("nan")
             row["JC_env_violation_n"] = 0
 
+        # Summarize invalid-joint flags emitted by core
         inv_cols = [c for c in g.columns if c.startswith("invalid_joint_w")]
         for c in inv_cols:
             v = g[c].fillna(False).astype(bool)
             row[f"{c}_rate"] = float(v.mean()) if len(v) > 0 else float("nan")
             row[f"{c}_n"] = int(v.sum())
 
+        # Population columns should be constant within a group; report drift if not.
         for col in pop_cols:
             if col in g.columns:
-                s = pd.to_numeric(g[col], errors="coerce").dropna()
-                if s.empty:
-                    row[col] = float("nan")
-                    row[f"{col}_drift"] = float("nan")
-                    row[f"{col}_nonconstant"] = False
-                else:
-                    v0 = float(s.iloc[0])
-                    drift = float(s.max() - s.min()) if len(s) > 1 else 0.0
-                    row[col] = v0
-                    row[f"{col}_drift"] = drift
-                    row[f"{col}_nonconstant"] = bool(drift != 0.0)
-
-        for col in theory_cols:
-            if col in g.columns:
-                s = pd.to_numeric(g[col], errors="coerce").dropna()
-                if s.empty:
-                    row[col] = float("nan")
-                    row[f"{col}_drift"] = float("nan")
-                    row[f"{col}_nonconstant"] = False
-                else:
-                    v0 = float(s.iloc[0])
-                    drift = float(s.max() - s.min()) if len(s) > 1 else 0.0
-                    row[col] = v0
-                    row[f"{col}_drift"] = drift
-                    row[f"{col}_nonconstant"] = bool(drift != 0.0)
-
-        groups.append(row)
-
-    df_sum = pd.DataFrame(groups)
-    sort_cols = [c for c in ("rule", "path", "lambda") if c in df_sum.columns]
-    df_sum = df_sum.sort_values(sort_cols, kind="mergesort").reset_index(drop=True) if sort_cols else df_sum.sort_values("lambda", kind="mergesort").reset_index(drop=True)
-    return df_sum
+                s
