@@ -1,8 +1,29 @@
 # experiments/correlation_cliff/theory.py
 from __future__ import annotations
 
+"""
+Public façade for the correlation_cliff theory package.
+
+Design intent:
+- This module is the *single import surface* for theory + analysis helpers.
+- All intra-package imports are forced to be package-relative to avoid sys.path shadowing.
+- Optional SciPy support is detected precisely (ImportError only) and the failure is recorded.
+"""
+
 from dataclasses import dataclass
-from typing import Dict, Iterable, Literal, Optional, Tuple, List, Sequence, TypedDict, Union, cast
+from importlib import import_module
+from typing import (
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    TypedDict,
+    Union,
+    cast,
+)
 
 import math
 import numpy as np
@@ -11,17 +32,59 @@ import pandas as pd
 Rule = Literal["OR", "AND"]
 
 # -----------------------------
+# Package-relative imports only
+# -----------------------------
+# If someone runs this file as a script (top-level), relative imports are ambiguous.
+# Fail loudly so experiments don't silently import the wrong modules.
+if not __package__:
+    raise ImportError(
+        "correlation_cliff.theory must be imported as part of its package "
+        "(e.g., `from experiments.correlation_cliff import theory`). "
+        "Running this module top-level is intentionally unsupported."
+    )
+
+_core = import_module(".theory_core", package=__package__)
+_analysis = import_module(".theory_analysis", package=__package__)
+
+# ---------------------------------------
+# Re-export analysis helpers (no wildcard)
+# ---------------------------------------
+# Prefer theory_analysis.__all__ as the canonical public surface.
+# If it's missing, fall back to "no leading underscore" as a conservative default.
+_analysis_public: List[str]
+if hasattr(_analysis, "__all__"):
+    _analysis_public = list(cast(Sequence[str], getattr(_analysis, "__all__")))
+else:
+    _analysis_public = [n for n in dir(_analysis) if not n.startswith("_")]
+
+# Import-time collision detection: if analysis exports collide with names here,
+# you want to know immediately (not via a weird runtime shadowing bug).
+for _name in _analysis_public:
+    if _name in globals():
+        raise RuntimeError(
+            f"theory_analysis export name collision: '{_name}' already exists in theory.py. "
+            "Rename one side or explicitly curate theory_analysis.__all__."
+        )
+    globals()[_name] = getattr(_analysis, _name)
+
+# Curated export surface for `from ... import *` consumers and for IDEs.
+__all__ = ["Rule", *_analysis_public]
+
+# -----------------------------
 # Optional SciPy (Gaussian path)
 # -----------------------------
+# SciPy is optional. If missing, Gaussian-copula p11 may fall back to Monte Carlo,
+# but we record the import error so callers can decide whether to warn/fail.
+_SCIPY_IMPORT_ERROR: Optional[ImportError] = None
 try:
-    # SciPy is optional. If missing, Gaussian-copula p11 falls back to Monte Carlo.
-    from scipy.stats import norm  # type: ignore
-    from scipy.stats import multivariate_normal  # type: ignore
-
+    from scipy.stats import norm  # type: ignore[import-not-found]
+    from scipy.stats import multivariate_normal  # type: ignore[import-not-found]
     _HAVE_SCIPY = True
-except Exception:
+except ImportError as e:
+    norm = None  # type: ignore[assignment]
+    multivariate_normal = None  # type: ignore[assignment]
     _HAVE_SCIPY = False
-
+    _SCIPY_IMPORT_ERROR = e
 
 """
 Correlation Cliff Theory Module

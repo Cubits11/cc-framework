@@ -5,96 +5,123 @@
 experiment:
   name: "correlation_cliff_s1"
   description: >
-    Two-world (w=0, w=1) binary guardrail composition experiment.
-    Sweeps dependence via FH-linear interpolation and measures CC_max(λ).
-  author: "YOU"
-  created_utc: "2025-12-20"
+    Two-world (w=0, w=1) binary guardrail composition experiment under
+    fixed-marginals, variable-dependence model. Sweeps dependence via
+    FH-linear interpolation, computes CC(λ) = JC(λ)/Jbest, identifies
+    threshold λ⋆ where CC crosses 1 (neutrality), and validates with
+    finite-sample simulation, BCa bootstrap UQ, and FH envelope checks.
+    Marginals chosen to ensure non-degenerate JA/JB >0, nontrivial FH
+    widths b(w)>0, and cliff existence (CC(0)>1, CC(1)<1 for OR).
+  author: "Pranav Bhave"
+  created_utc: "2025-12-21"  # Updated to current date for run
 
 # -----------------------------------------------------------------------------
-# Core marginals (YOU fill these with your S1 values)
-# Worlds: w=0 (protected/low leakage), w=1 (unprotected/high leakage) by default,
-# but nothing in the code assumes ordering; metrics use absolute gaps.
+# Core marginals (S1 values from Table 1 in vision PDF)
+# Worlds: w=0 (protected/low trigger/leakage), w=1 (unprotected/high trigger/leakage).
+# Chosen to yield JA=0.50, JB=0.40, Jbest=0.50; FH widths w0:0.15, w1:0.30.
+# Verified analytically: OR CC(0)=1.300>1, CC(1)=1.000=1 (cliff exists).
 # -----------------------------------------------------------------------------
 marginals:
   w0:
-    pA: 0.20      # TODO: replace with your S1 p_A^0
-    pB: 0.18      # TODO: replace with your S1 p_B^0
+    pA: 0.20
+    pB: 0.15
   w1:
-    pA: 0.62      # TODO: replace with your S1 p_A^1
-    pB: 0.55      # TODO: replace with your S1 p_B^1
+    pA: 0.70
+    pB: 0.55
 
 # -----------------------------------------------------------------------------
-# Dependence path: FH-linear interpolation p11(λ)=L+λ(U-L), λ∈[0,1]
+# Dependence paths: Primary FH-linear; options for sensitivity (power, scurve, gaussian_tau)
+# Lambda grid: Two-stage as per section 8.2 (coarse for scan, refine for precision).
+# Refine targets ±0.02 in ρ⋆ (avg phi) via dense neighborhood around estimated λ⋆.
 # -----------------------------------------------------------------------------
-dependence_path:
-  type: "fh_linear"
-  lambda_grid:
-    start: 0.0
-    stop: 1.0
-    num: 201
+dependence_paths:
+  primary:
+    type: "fh_linear"  # Convex interp L+λ(U-L); yields closed-form cliff (eq.8)
+    lambda_grid_coarse:
+      start: 0.0
+      stop: 1.0
+      num: 21     # Coarse as per PDF: 0,0.05,...,1.0 for initial scan
+    refine:
+      enabled: true
+      half_width: 0.08  # δ=0.08 around λ⋆ estimate for ±0.02 ρ precision
+      num: 401    # Fine step h≈0.0004 for interpolation/root-finding stability
+      method: "uniform"  # Alt: adaptive (bisect until precision met)
 
-  # Optional: refine around the estimated crossing (CC=1)
-  refine:
-    enabled: true
-    half_width: 0.08
-    num: 401
+  sensitivity:  # Run these post-primary for limitations (nonlinear copulas)
+    - type: "fh_power"
+      gamma: 2.0  # Convex transform λ^γ for slower initial dependence ramp
+    - type: "fh_scurve"
+      k: 8.0     # Sigmoid-like for smooth mid-range transition
+    - type: "gaussian_tau"
+      ppf_clip_eps: 1e-12  # Avoid ±∞ in norm.ppf for pA/B near 0/1
 
-# Composition rule: "OR" or "AND"
+# Composition rule: Primary "OR"; sensitivity for "AND" (flips monotonicity per Prop.1)
 composition:
-  rule: "OR"
+  primary_rule: "OR"
+  sensitivity_rules: ["AND"]  # Re-run full pipeline for each
 
 # -----------------------------------------------------------------------------
-# Sampling
+# Sampling: Multinomial per (w,λ,rep); independent worlds (no CRN variance reduction)
+# n_per_world: 20k for Var(ΔC)≈O(1/n)=5e-5, stable BCa with B=2k
+# Seed: Date-based for repro; policy "stable_per_cell" for refactor invariance
 # -----------------------------------------------------------------------------
 sampling:
   n_per_world: 20000
-  seed: 20251220
+  n_reps: 100   # MC reps per λ for empirical means/stds before bootstrap
+  seed: 20251221  # Updated date; use np.random.SeedSequence for streams
+  seed_policy: "stable_per_cell"  # Key by (seed, rep, lambda_idx, world)
 
 # -----------------------------------------------------------------------------
-# Bootstrap
-# BCa is the default. We bootstrap counts via multinomial on empirical cell probs
-# (equivalent to classic resampling, but far faster).
+# Bootstrap: BCa for CC(λ) CIs (Alg.1); curve-level for λ⋆/ρ⋆ UQ (resample all)
+# Multinomial resampling: Equivalent to bootstrap but O(1) per rep (faster for large n)
+# Threshold solve: Interp CC curve, root-find λ⋆ s.t. CC=1; handle piecewise if sign-flip
 # -----------------------------------------------------------------------------
 bootstrap:
   enabled: true
-  B: 2000
-  alpha: 0.05
-  method: "bca"
-  multinomial_resampling: true
+  B: 2000       # For stable BCa z0/a; research suggests B≥1000 for accel
+  alpha: 0.05   # 95% CI; report [lower, upper]
+  method: "bca" # Bias-corrected accelerated; fallback "percentile" if unstable
+  multinomial_resampling: true  # Fast equiv to resample; seed per rep
+  include_delta_method: true     # Quick asymptotic Var(CC) overlay (App.A)
 
-  # Curve-level threshold bootstrap: resample each (λ,w) contingency table,
-  # recompute CC curve, solve for λ⋆ per replicate.
   threshold:
     enabled: true
     solve_target_cc: 1.0
+    neutrality_eta: 0.05  # Band [1-η,1+η]; classify only if CI excludes
+    solve_method: "interp_root"  # Linear interp + scipy.optimize.root
+    precision_target_rho: 0.02   # Re-refine if CI width > target
 
 # -----------------------------------------------------------------------------
-# Output locations
+# Output locations: Versioned dirs; save CSVs with md5 hashes for repro
 # -----------------------------------------------------------------------------
 output:
-  out_dir: "experiments/correlation_cliff/outputs"
-  tables_dir: "experiments/correlation_cliff/outputs/tables"
-  figures_dir: "experiments/correlation_cliff/outputs/figures"
-  overwrite: true
+  out_dir: "experiments/correlation_cliff/outputs/s1_20251221"
+  tables_dir: "experiments/correlation_cliff/outputs/s1_20251221/tables"
+  figures_dir: "experiments/correlation_cliff/outputs/s1_20251221/figures"
+  overwrite: false  # False for safety; append timestamp if exists
+  save_hashes: true # MD5 for CSVs/figures to verify repro runs
 
 # -----------------------------------------------------------------------------
-# Sanity checks (fail-fast)
+# Sanity checks (fail-fast as per App.C): Hard raises on violations
 # -----------------------------------------------------------------------------
 sanity:
-  enforce_fh_bounds: true
-  enforce_probability_simplex: true
-  enforce_jc_envelope: true
-  # z-score tolerance for marginal deviation check in simulation
-  tol_marginals_sigma: 3.0
+  enforce_fh_bounds: true       # p11 ∈ [L,U]; clip/raise on construct
+  enforce_probability_simplex: true  # p_ab ≥0, sum=1 within 1e-12 tol
+  enforce_jc_envelope: true     # Empirical JC in derived interval (sec.11)
+  tol_marginals_sigma: 3.0      # Z-score for emp pA/B vs true (finite n)
+  tol_theory_emp_mismatch: 1e-3 # Flag if |CC_theory - CC_emp| > tol
+  check_no_sign_flip: true      # Assume/verify ΔC no zero-cross (Assump.1)
+  check_monotonicity: true      # Numerical dΔC/dλ sign per rule (Prop.1)
 
 # -----------------------------------------------------------------------------
-# Reporting
+# Reporting: Include delta/BCa CIs; save intermediates; gen Figure 1 panels
 # -----------------------------------------------------------------------------
 reporting:
-  # Include both quick delta CIs + BCa CIs
   include_delta_ci: true
   include_bca_ci: true
   ci_label: "95%"
-
-  # Save intermediate artifacts (counts, per-world probs)
-  save_contingency_tables: true
+  neutrality_band_eta: 0.05     # For classification (Remark 1)
+  save_contingency_tables: true # Per (w,λ,rep): counts/probs
+  save_theory_emp_diff: true    # Panel (c): Analytic vs emp with CIs
+  figure_formats: ["pdf", "png"] # Vector for pub; raster for quick view
+  repro_log: true               # JSON: git hash, python ver, deps, config
