@@ -10,42 +10,94 @@ Primary responsibility:
 - Import the local `experiments.correlation_cliff.theory` façade without hiding bugs.
 - Export the required theory symbols as a stable surface for simulate/* modules.
 - Provide small deterministic helpers (like lambda grid builder).
+
+Research-OS invariants:
+- Never "fix" import problems by falling back when the real error is inside the target module.
+- Validate theory surface eagerly: crash early, crash loud.
 """
 
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Literal, Mapping, Optional, Sequence
 
 import logging
 import math
-
 import numpy as np
 
 LOG = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-# Import theory without hiding bugs (and without trusting a wrong shadow module)
+# Import theory without hiding bugs (and without trusting wrong shadow modules)
 # -----------------------------------------------------------------------------
-def _import_theory_module():
+_REQUIRED_EXPORTS = (
+    "FHBounds",
+    "TwoWorldMarginals",
+    "WorldMarginals",
+    "compute_fh_jc_envelope",
+    "fh_bounds",
+    "joint_cells_from_marginals",
+    "kendall_tau_a_from_joint",
+    "phi_from_joint",
+    "p11_fh_linear",
+    "pC_from_joint",
+)
+
+
+def _can_fallback_to_script_import(err: ImportError, attempted: str) -> bool:
     """
-    Import the local correlation_cliff theory module without hiding real defects.
+    Decide whether it is safe to fall back to script import.
+    We only fall back when the package import fails because the *package/module*
+    couldn't be found, not because an internal dependency inside theory failed.
+    """
+    # ModuleNotFoundError has .name; ImportError may too.
+    name = getattr(err, "name", None)
+
+    # If the missing module is scipy/numpy/etc, do NOT fall back (that would mask a real defect).
+    if isinstance(name, str) and name and (name != attempted) and not name.startswith(attempted):
+        return False
+
+    # If the missing module is the attempted theory module (or its parent), fallback is reasonable.
+    return True
+
+
+def _import_theory_module() -> tuple[Any, str]:
+    """
+    Import correlation_cliff theory façade without masking real defects.
 
     Strategy:
-    - Prefer package-relative import: from .. import theory  (when imported as a package)
-    - If and only if that fails with ImportError, fall back to script import: import theory
+    1) Prefer explicit package import via computed parent package:
+         import_module("<parent>.theory")
+    2) Only if that fails because the package/module can't be found (NOT internal deps),
+       fall back to `import theory` for script-like execution contexts.
 
     Guardrail:
     - After import, validate expected symbols exist to reduce sys.path shadowing risks.
     """
-    # 1) Prefer package-relative import
-    try:
-        from .. import theory as T  # type: ignore
-        mode = "package"
-    except ImportError:
-        # 2) Script-style fallback (only on ImportError)
+    # Compute parent package robustly.
+    pkg = __package__ or ""
+    parent = pkg.rsplit(".", 1)[0] if "." in pkg else ""
+    attempted = f"{parent}.theory" if parent else "theory"
+
+    # 1) Package import
+    if parent:
         try:
-            import theory as T  # type: ignore
+            T = import_module(f"{parent}.theory")
+            mode = "package"
+        except ImportError as e:
+            # Only fallback if this is genuinely "module not found" for the attempted target.
+            if not _can_fallback_to_script_import(e, attempted=f"{parent}.theory"):
+                raise
+            T = None
+            mode = "package_failed"
+    else:
+        T = None
+        mode = "no_parent_package"
+
+    # 2) Script fallback (only when package import context isn't available)
+    if T is None:
+        try:
+            T = import_module("theory")
             mode = "script"
         except ImportError as e:
             raise ImportError(
@@ -55,29 +107,25 @@ def _import_theory_module():
                 "Or install the package so relative imports work."
             ) from e
 
-    required = [
-        "FHBounds",
-        "TwoWorldMarginals",
-        "WorldMarginals",
-        "compute_fh_jc_envelope",
-        "fh_bounds",
-        "joint_cells_from_marginals",
-        "kendall_tau_a_from_joint",
-        "phi_from_joint",
-        "p11_fh_linear",
-        "pC_from_joint",
-    ]
-    missing = [name for name in required if not hasattr(T, name)]
+    # Validate surface
+    missing = [name for name in _REQUIRED_EXPORTS if not hasattr(T, name)]
     if missing:
         origin = getattr(T, "__file__", "<unknown>")
         raise ImportError(
             "Imported a module named 'theory' but it does not look like the "
-            "correlation_cliff theory surface.\n"
+            "correlation_cliff theory façade.\n"
             f"Import mode: {mode}\n"
             f"Module origin: {origin}\n"
             f"Missing expected exports: {missing}\n"
             "This usually means sys.path shadowing (imported the wrong module), "
             "or your correlation_cliff/theory.py is incomplete."
+        )
+
+    # Optional: extra guard against bizarre shadow modules
+    origin = getattr(T, "__file__", "") or ""
+    if mode == "script" and origin and ("correlation_cliff" not in origin.replace("\\", "/")):
+        LOG.warning(
+            "simulate.utils imported 'theory' in script mode from unexpected location: %s", origin
         )
 
     LOG.debug("Imported theory module in %s mode from %s", mode, getattr(T, "__file__", "<unknown>"))
@@ -86,7 +134,7 @@ def _import_theory_module():
 
 T, THEORY_IMPORT_MODE = _import_theory_module()
 
-# Bind required symbols explicitly (crash early if theory surface changes).
+# Bind required symbols explicitly (crash early if theory surface changes)
 FHBounds = T.FHBounds
 TwoWorldMarginals = T.TwoWorldMarginals
 WorldMarginals = T.WorldMarginals
@@ -98,7 +146,7 @@ phi_from_joint = T.phi_from_joint
 p11_fh_linear = T.p11_fh_linear
 pC_from_joint = T.pC_from_joint
 
-# Optional: reference overlay helper (never assumed path-consistent).
+# Optional: reference overlay helper (never assumed path-consistent)
 compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(T, "compute_metrics_for_lambda", None)
 
 
@@ -119,6 +167,7 @@ def build_linear_lambda_grid(
 
     Contract:
     - `num` is the number of points returned (after endpoint handling).
+    - Strict typing: bool is rejected for num.
     - validates finiteness + interval ordering; optional endpoint snapping.
 
     Endpoint control via `closed`:
@@ -132,12 +181,16 @@ def build_linear_lambda_grid(
     np.ndarray
         1D array, strictly increasing (unless num==1), of length `num`.
     """
+    if isinstance(num, bool):
+        raise TypeError(f"num must be an int, got bool {num!r}")
     try:
         num_i = int(num)
     except Exception as e:
-        raise ValueError(f"num must be an int, got {num!r}") from e
+        raise TypeError(f"num must be an int, got {num!r}") from e
     if num_i < 1:
         raise ValueError(f"num must be >= 1, got {num_i}")
+    if num_i != num:
+        raise TypeError(f"num must be an integer (no silent coercion), got {num!r}")
 
     a = float(start)
     b = float(stop)
@@ -163,14 +216,13 @@ def build_linear_lambda_grid(
     else:  # right
         grid = np.linspace(a, b, num=num_i + 1, endpoint=True, dtype=float)[1:]
 
-    if snap_eps:
-        eps = float(snap_eps)
-        if not (math.isfinite(eps) and eps >= 0.0):
-            raise ValueError(f"snap_eps must be finite and >= 0, got {snap_eps!r}")
-        if eps > 0.0 and grid.size > 0:
-            grid = grid.copy()
-            grid[np.abs(grid - a) <= eps] = a
-            grid[np.abs(grid - b) <= eps] = b
+    eps = float(snap_eps)
+    if not math.isfinite(eps) or eps < 0.0:
+        raise ValueError(f"snap_eps must be finite and >= 0, got {snap_eps!r}")
+    if eps > 0.0 and grid.size > 0:
+        grid = grid.copy()
+        grid[np.abs(grid - a) <= eps] = a
+        grid[np.abs(grid - b) <= eps] = b
 
     grid = np.asarray(grid, dtype=dtype)
     if grid.ndim != 1 or grid.size != num_i:
@@ -181,3 +233,20 @@ def build_linear_lambda_grid(
         raise RuntimeError("Internal error: grid is not strictly increasing.")
 
     return grid
+
+
+__all__ = [
+    "THEORY_IMPORT_MODE",
+    "FHBounds",
+    "TwoWorldMarginals",
+    "WorldMarginals",
+    "compute_fh_jc_envelope",
+    "fh_bounds",
+    "joint_cells_from_marginals",
+    "kendall_tau_a_from_joint",
+    "phi_from_joint",
+    "p11_fh_linear",
+    "pC_from_joint",
+    "compute_metrics_for_lambda",
+    "build_linear_lambda_grid",
+]
