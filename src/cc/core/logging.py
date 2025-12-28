@@ -87,7 +87,6 @@ import secrets
 import socket
 import subprocess
 import sys
-import sys
 import time
 import threading
 from collections import deque
@@ -122,7 +121,6 @@ __all__ = [
 ]
 
 SCHEMA_ID_DEFAULT = "core/logging.v5"  # Upgraded for changes
-SCHEMA_ID_DEFAULT = "core/logging.v4"  # Upgraded
 _LOCKFILE_SUFFIX = ".lock"
 
 # Built-in PII regexes applied to both keys and string values.
@@ -403,11 +401,6 @@ def _deep_redact(
             s = p.sub(mask, s)
         return s
 
-    def _redact_string(s: str) -> str:
-        for p in patterns:
-            s = p.sub(mask, s)
-        return s
-
     if isinstance(obj, dict):
         out: Dict[str, Any] = {}
         for k, v in obj.items():
@@ -444,7 +437,6 @@ def _deep_redact(
 
 
 def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[re.Pattern]:
-def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[re.Pattern]:
     out: List[re.Pattern] = []
     if not pats:
         return out
@@ -455,6 +447,7 @@ def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[
             if strict_mode:
                 raise LoggingError(f"Invalid redaction regex '{p}': {e}")
             # Fail-soft: ignore invalid in non-strict mode
+            continue
     return out
 
 # ---------------------------------------------------------------------------
@@ -743,50 +736,7 @@ class ChainedJSONLLogger:
         # ------------------------------------------------------------------
         # Environment snapshot (optional)
         # ------------------------------------------------------------------
-        self._env_snapshot: Optional[Dict[str, Any]] = None
-        if self.capture_env:
-            # Defaults so keys are always present and truthy
-            python_str = "unknown"
-        platform_str = "unknown"
-        pip_freeze: Optional[List[str]] = None
-
-        # Best-effort collection; we never let this break logger construction
-        try:
-            try:
-                python_str = platform.python_version()
-            except Exception:
-                # Fallback to sys.version, still non-empty
-                python_str = sys.version.split()[0]
-        except Exception:
-            python_str = "unknown"
-
-        try:
-            try:
-                platform_str = platform.platform()
-            except Exception:
-                platform_str = sys.platform
-        except Exception:
-            platform_str = "unknown"
-
-        try:
-            out = subprocess.check_output(
-                [sys.executable, "-m", "pip", "freeze"],
-                stderr=subprocess.DEVNULL,
-            )
-            if isinstance(out, bytes):
-                out = out.decode("utf-8", errors="replace")
-            pip_freeze = [
-                line.strip() for line in out.splitlines() if line.strip()
-            ]
-        except Exception:
-            pip_freeze = None
-
-        self._env_snapshot = {
-            "python": python_str,
-            "platform": platform_str,
-            "pip_freeze": pip_freeze,
-        }
-
+        self._env_snapshot = _capture_env_snapshot() if self.capture_env else None
 
     # ------------------------------------------------------------------ helpers
 
@@ -1096,46 +1046,47 @@ class ChainedJSONLLogger:
         require_lock = bool(self.lockfile is not None and (self.strict_mode or effective_verify))
 
         with self._thread_lock:
-            locked = self._acquire_process_lock_if_needed(require_lock=require_lock)
+            locked = False
             try:
+                locked = self._acquire_process_lock_if_needed(require_lock=require_lock)
+
                 # ----------------------------------------------------------
-                # 1) Rotation (size-based) before append
+                # 1) Rotation (size-based) BEFORE append
                 # ----------------------------------------------------------
+                prev_head = self.last_sha  # capture chain tip *before* rotate resets it
                 rotated = self._maybe_rotate()
                 if rotated is not None:
-                    # Emit rotation marker into the *new* file (fresh chain).
-                    # We deliberately disable verify_on_write here to avoid
-                    # nested verification/lock complications.
+                    # Emit marker into the *new* file (fresh chain). We explicitly
+                    # disable verify_on_write to avoid nested verify/lock complexity.
                     try:
                         self.log_event(
                             "rotation_new_chain",
                             fields={
                                 "rotated_from": rotated,
-                                "previous_head": self.last_sha,
+                                "previous_head": prev_head,
                             },
                             verify_on_write=False,
                             level="info",
-                            level="info",
+                            extra_meta={"rotation_marker": True},
                         )
                     except Exception as e:
                         if self.enable_prometheus:
                             try:
                                 LOG_ERRORS.labels(type="rotation_marker").inc()
                             except Exception:
-                                # Metrics themselves might be misconfigured; best-effort only.
                                 pass
                         if self.strict_mode:
                             raise LoggingError(f"Rotation marker failed: {e}") from e
+                        # non-strict: swallow marker failure and continue
 
                 # ----------------------------------------------------------
-                # 2) Build envelope meta (with level in extra, unless caller
-                #    explicitly overrode it).
+                # 2) Build envelope meta (level is defaulted, never overwritten)
                 # ----------------------------------------------------------
                 meta_extra: Dict[str, Any] = dict(extra_meta) if extra_meta else {}
                 meta_extra.setdefault("level", level)
                 meta = self._build_meta(meta_extra, seed)
 
-                # Construct canonical record (handles redaction + JSON strictness)
+                # Construct canonical record (redaction + JSON strictness)
                 rec = self._make_record(payload, meta)
 
                 # ----------------------------------------------------------
@@ -1172,35 +1123,28 @@ class ChainedJSONLLogger:
                 if self.enable_prometheus:
                     try:
                         LOG_ENTRIES.labels(level=level).inc()
-                        size = self.path.stat().st_size if self.path.exists() else 0
+                        try:
+                            size = self.path.stat().st_size if self.path.exists() else 0
+                        except Exception:
+                            size = 0
                         LOG_SIZE.set(size)
                     except Exception as e:
-                        # Try to record the metrics failure itself
                         try:
                             LOG_ERRORS.labels(type="metrics").inc()
                         except Exception:
-                            # Even LOG_ERRORS may be misconfigured; never let this double-fail.
                             pass
-
                         if self.strict_mode:
-                            # In strict mode, observability failure is surfaced.
                             raise LoggingError(
                                 f"Prometheus metrics update failed: {e}"
                             ) from e
-                        # Non-strict: swallow metrics failure after best-effort logging.
+                        # non-strict: swallow metrics failure
 
                 # ----------------------------------------------------------
-                # 7) Post-log hook (alerts, external sinks), with recursion guard
+                # 7) Post-log hook (alerts / sinks), with recursion guard
                 # ----------------------------------------------------------
                 self._post_log(sha)
-
-                if self.enable_prometheus:
-                    LOG_ENTRIES.inc()
-                    LOG_SIZE.set(self.path.stat().st_size)
-
-                self._post_log(sha)
-
                 return sha
+
             finally:
                 self._release_process_lock_if_needed(locked)
 

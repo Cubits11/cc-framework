@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT))          # so `import scripts` works
+sys.path.insert(0, str(REPO_ROOT / "src"))  # so `import cc...` works even without PYTHONPATH
 
 import numpy as np
 import pytest
