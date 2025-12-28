@@ -881,11 +881,12 @@ class AdaptiveExperimentEngine:
             end = time.time()
             self._record_time("total_session", end - start)
 
-            result = AttackResult(
+            transcript = json.dumps(history, sort_keys=True, separators=(",", ":"))
+            result = AttackResult.from_transcript(
                 world_bit=world_bit,
                 success=final_success,
                 attack_id=f"{session_id}_world{world_bit}",
-                transcript_hash=self._hash_transcript(history),
+                transcript=transcript,
                 guardrails_applied=",".join(spec.name for spec in world_cfg.guardrail_stack),
                 rng_seed=int(self.rng.bit_generator.random_raw() & 0xFFFFFFFF),
                 timestamp=end,

@@ -382,15 +382,17 @@ class SessionWorker:
         This stub should be replaced with real orchestration logic for remote
         execution. We return a no-op result so the parallel harness functions.
         """
-        return AttackResult(
+        session_id = session_config.get("session_id", f"session_{self.worker_id}")
+        transcript = f"mock_session:{session_id}|worker_id:{self.worker_id}"
+        return AttackResult.from_transcript(
             world_bit=0,
             success=False,
             attack_id=f"mock_{self.worker_id}",
-            transcript_hash="mock_hash",
+            transcript=transcript,
             guardrails_applied="mock",
             rng_seed=42,
             timestamp=time.time(),
-            session_id=session_config.get("session_id", f"session_{self.worker_id}"),
+            session_id=session_id,
             attack_strategy="MockAttacker",
             utility_score=0.0,
         )
@@ -683,11 +685,12 @@ class AdaptiveExperimentEngine:
             end = time.time()
             self._record_time("total_session", end - start)
 
-            result = AttackResult(
+            transcript = json.dumps(history, sort_keys=True, separators=(",", ":"))
+            result = AttackResult.from_transcript(
                 world_bit=world_bit,
                 success=final_success,
                 attack_id=f"{session_id}_world{world_bit}",
-                transcript_hash=self._hash_transcript(history),
+                transcript=transcript,
                 guardrails_applied=",".join(spec.name for spec in world_cfg.guardrail_stack),
                 rng_seed=int(self.rng.bit_generator.random_raw() & 0xFFFFFFFF),
                 timestamp=end,

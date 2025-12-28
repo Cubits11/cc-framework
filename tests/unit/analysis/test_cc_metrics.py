@@ -5,33 +5,29 @@ Unit tests for CC metrics computation
 
 import numpy as np
 
-from cc.core.models import AttackResult
 from cc.core.stats import bootstrap_ci_with_cc, compute_j_statistic
+from tests._factories import mk_attack_result
 
 
 class TestCCMetrics:
     def test_perfect_defense(self):
         """Test J=0 for perfect defense"""
         results = [
-            AttackResult(
+            mk_attack_result(
                 world_bit=0,
                 success=True,
                 attack_id=f"a{i}",
-                transcript_hash="",
                 guardrails_applied="",
                 rng_seed=i,
-                timestamp=0,
             )
             for i in range(100)
         ] + [
-            AttackResult(
+            mk_attack_result(
                 world_bit=1,
                 success=False,
                 attack_id=f"a{i}",
-                transcript_hash="",
                 guardrails_applied="g1",
                 rng_seed=i,
-                timestamp=0,
             )
             for i in range(100, 200)
         ]
@@ -50,14 +46,12 @@ class TestCCMetrics:
             # Same success rate regardless of world
             success = rng.random() < 0.6
             results.append(
-                AttackResult(
+                mk_attack_result(
                     world_bit=world,
                     success=success,
                     attack_id=f"a{i}",
-                    transcript_hash="",
                     guardrails_applied="g1" if world else "",
                     rng_seed=i,
-                    timestamp=0,
                 )
             )
 
@@ -72,14 +66,12 @@ class TestCCMetrics:
             world = i % 2
             success = (i % 3) == 0 if world == 0 else (i % 5) == 0
             results.append(
-                AttackResult(
+                mk_attack_result(
                     world_bit=world,
                     success=success,
                     attack_id=f"a{i}",
-                    transcript_hash="",
                     guardrails_applied="",
                     rng_seed=i,
-                    timestamp=0,
                 )
             )
 

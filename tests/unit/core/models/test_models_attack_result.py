@@ -28,6 +28,7 @@ from cc.core.models import (
     _iso_from_unix,
     MAX_REASONABLE_UNIX_TIMESTAMP,
 )
+from tests._factories import mk_attack_result
 
 
 # ---------------------------------------------------------------------
@@ -87,12 +88,10 @@ def test_attack_result_valid_and_iso_time_shape(
         # Normalize negative/zero timestamps to "now" – mirrors model logic.
         timestamp = time.time()
 
-    th = _hash_text("dummy")
-    ar = AttackResult(
+    ar = mk_attack_result(
         world_bit=WorldBit.BASELINE,
         success=success,
         attack_id=attack_id,
-        transcript_hash=th,
         guardrails_applied=guardrails_applied,
         rng_seed=rng_seed,
         timestamp=timestamp,
@@ -130,6 +129,21 @@ def test_attack_result_transcript_hash_length_enforced():
         )
 
 
+def test_attack_result_transcript_hash_hex_enforced():
+    """
+    transcript_hash must be hex-encoded, not arbitrary characters.
+    """
+    with pytest.raises(ValidationError):
+        AttackResult(
+            world_bit=WorldBit.BASELINE,
+            success=True,
+            attack_id="id",
+            transcript_hash="g" * 64,
+            guardrails_applied="ga",
+            rng_seed=42,
+        )
+
+
 def test_attack_result_invalid_utility_nan_and_inf():
     """
     utility_score must be finite; NaN and ±inf are rejected.
@@ -138,13 +152,21 @@ def test_attack_result_invalid_utility_nan_and_inf():
         Many stats routines assume finite utilities; allowing NaN/inf would
         create silent propagation bugs.
     """
+    base = mk_attack_result(
+        world_bit=WorldBit.BASELINE,
+        success=True,
+        attack_id="id",
+        guardrails_applied="ga",
+        rng_seed=42,
+    )
     common_kwargs = dict(
         world_bit=WorldBit.BASELINE,
         success=True,
         attack_id="id",
-        transcript_hash=_hash_text("x"),
+        transcript_hash=base.transcript_hash,
         guardrails_applied="ga",
         rng_seed=42,
+        timestamp=base.timestamp,
     )
     with pytest.raises(ValidationError):
         AttackResult(**common_kwargs, utility_score=math.nan)
@@ -237,14 +259,12 @@ def test_attack_result_semantic_hash_excludes_metadata_fields():
         world_bit=WorldBit.BASELINE,
         success=True,
         attack_id="attack-1",
-        transcript_hash=_hash_text("payload"),
         guardrails_applied="ga",
         rng_seed=123,
     )
 
-    ar1 = AttackResult(**base_kwargs)
-    time.sleep(0.01)  # ensure different timestamps / updated_at
-    ar2 = AttackResult(**base_kwargs)
+    ar1 = mk_attack_result(**base_kwargs, timestamp=0.0)
+    ar2 = mk_attack_result(**base_kwargs, timestamp=1.0)
 
     # Default hashes should usually differ because of metadata.
     h1 = ar1.blake3_hash(use_cache=False)

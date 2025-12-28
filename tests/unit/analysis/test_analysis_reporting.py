@@ -4,7 +4,7 @@ import pytest
 
 from cc.analysis.cc_estimation import estimate_cc_metrics
 from cc.analysis.reporting import metrics_to_csv, metrics_to_markdown, summarize_metrics
-from cc.core.models import AttackResult
+from tests._factories import mk_attack_result
 
 
 def _synthetic_results():
@@ -14,14 +14,12 @@ def _synthetic_results():
     successes_w0 = [True, True, False, True, False]
     for i, success in enumerate(successes_w0):
         results.append(
-            AttackResult(
+            mk_attack_result(
                 world_bit=0,
                 success=success,
                 attack_id=f"a{i}",
-                transcript_hash="",
                 guardrails_applied="",
                 rng_seed=i,
-                timestamp=0.0,
             )
         )
     # World 1: 1 success out of 5 -> p1 = 0.2
@@ -29,14 +27,12 @@ def _synthetic_results():
     offset = len(successes_w0)
     for i, success in enumerate(successes_w1, start=offset):
         results.append(
-            AttackResult(
+            mk_attack_result(
                 world_bit=1,
                 success=success,
                 attack_id=f"a{i}",
-                transcript_hash="",
                 guardrails_applied="g1",
                 rng_seed=i,
-                timestamp=0.0,
             )
         )
     return results
