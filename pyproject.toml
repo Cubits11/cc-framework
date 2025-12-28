@@ -88,6 +88,9 @@ package-dir = { "" = "src" }
 where = ["src"]
 include = ["cc*"]
 
+[tool.setuptools.package-data]
+"cc.adapters" = ["nemo_configs/minimal/*"]
+
 # --- pytest ---
 [tool.pytest.ini_options]
 testpaths = ["tests"]
