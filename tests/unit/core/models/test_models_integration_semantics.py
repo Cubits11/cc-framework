@@ -21,8 +21,8 @@ from cc.core.models import (
     GuardrailSpec,
     WorldBit,
     WorldConfig,
-    _hash_text,
 )
+from tests._factories import mk_attack_result
 
 
 # ---------------------------------------------------------------------
@@ -140,19 +140,17 @@ def test_integration_attack_results_mark_world_bit_consistently():
     Sanity: AttackResults produced for baseline vs protected worlds should
     have world_bit flags matching the intended world.
     """
-    baseline_result = AttackResult(
+    baseline_result = mk_attack_result(
         world_bit=WorldBit.BASELINE,
         success=True,
         attack_id="baseline-1",
-        transcript_hash=_hash_text("baseline"),
         guardrails_applied="baseline",
         rng_seed=1,
     )
-    protected_result = AttackResult(
+    protected_result = mk_attack_result(
         world_bit=WorldBit.PROTECTED,
         success=False,
         attack_id="protected-1",
-        transcript_hash=_hash_text("protected"),
         guardrails_applied="protected",
         rng_seed=2,
     )

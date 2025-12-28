@@ -5,7 +5,7 @@ import pytest
 
 from cc.analysis.cc_estimation import estimate_cc_metrics
 from cc.analysis.reporting import metrics_to_csv, metrics_to_markdown, summarize_metrics
-from cc.core.models import AttackResult
+from tests._factories import mk_attack_result
 
 
 def _sha256_hex(s: str) -> str:
@@ -22,14 +22,12 @@ def _synthetic_results():
     for i, success in enumerate(successes_w0):
         attack_id = f"a{i}"
         results.append(
-            AttackResult(
+            mk_attack_result(
                 world_bit=0,
                 success=success,
-                attack_id=attack_id,
-                transcript_hash=_sha256_hex(f"w0:{attack_id}"),
+                attack_id=f"a{i}",
                 guardrails_applied="",
                 rng_seed=i,
-                timestamp=0.0,
             )
         )
 
@@ -39,14 +37,12 @@ def _synthetic_results():
     for i, success in enumerate(successes_w1, start=offset):
         attack_id = f"a{i}"
         results.append(
-            AttackResult(
+            mk_attack_result(
                 world_bit=1,
                 success=success,
-                attack_id=attack_id,
-                transcript_hash=_sha256_hex(f"w1:{attack_id}"),
+                attack_id=f"a{i}",
                 guardrails_applied="g1",
                 rng_seed=i,
-                timestamp=0.0,
             )
         )
 

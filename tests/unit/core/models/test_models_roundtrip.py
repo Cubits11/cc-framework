@@ -25,9 +25,9 @@ from cc.core.models import (
     ModelBase,
     WorldBit,
     WorldConfig,
-    _hash_text,
 )
 from cc.core.schema import SCHEMA_VERSION as _SCHEMA_VERSION
+from tests._factories import mk_attack_result
 
 
 # ---------------------------------------------------------------------
@@ -60,14 +60,13 @@ def roundtrip_via_json(model_cls: Type[ModelBase], data: Dict[str, Any]) -> None
     [
         (
             AttackResult,
-            {
-                "world_bit": WorldBit.BASELINE,
-                "success": True,
-                "attack_id": "id",
-                "transcript_hash": _hash_text("x"),
-                "guardrails_applied": "ga",
-                "rng_seed": 42,
-            },
+            mk_attack_result(
+                world_bit=WorldBit.BASELINE,
+                success=True,
+                attack_id="id",
+                guardrails_applied="ga",
+                rng_seed=42,
+            ).model_dump(exclude={"iso_time"}),
         ),
         (
             GuardrailSpec,
@@ -135,14 +134,13 @@ def _valid_attack_result_fields() -> Dict[str, Any]:
     provides a default; schema_version-specific tests below exercise
     explicit setting and roundtrip behaviour.
     """
-    return {
-        "world_bit": WorldBit.BASELINE,
-        "success": True,
-        "attack_id": "id",
-        "transcript_hash": _hash_text("x"),
-        "guardrails_applied": "ga",
-        "rng_seed": 42,
-    }
+    return mk_attack_result(
+        world_bit=WorldBit.BASELINE,
+        success=True,
+        attack_id="id",
+        guardrails_applied="ga",
+        rng_seed=42,
+    ).model_dump(exclude={"iso_time"})
 
 
 def test_roundtrip_attack_result_extra_fields_ignored() -> None:
@@ -210,10 +208,13 @@ def test_roundtrip_attack_result_schema_version_roundtrip_through_json() -> None
     """
     schema_version specified in the instance should roundtrip through JSON.
     """
-    ar = AttackResult(
-        **_valid_attack_result_fields(),
-        schema_version=_SCHEMA_VERSION,
-    )
+    ar = mk_attack_result(
+        world_bit=WorldBit.BASELINE,
+        success=True,
+        attack_id="id",
+        guardrails_applied="ga",
+        rng_seed=42,
+    ).model_copy(update={"schema_version": _SCHEMA_VERSION})
     dumped = ar.model_dump_json()
     loaded = AttackResult.model_validate_json(dumped)
     assert loaded.schema_version == _SCHEMA_VERSION
