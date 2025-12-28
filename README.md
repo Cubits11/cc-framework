@@ -217,6 +217,43 @@ class MyCustomGuardrail(Guardrail):
         self.threshold = np.percentile(scores, 100 * (1 - target_fpr))
 ```
 
+### How to add a new adapter
+
+To integrate a third-party guardrail system (e.g., Llama Guard, NeMo Guardrails, Guardrails AI),
+implement the `cc.adapters.GuardrailAdapter` interface and return a `Decision` object.
+
+1. Create a new adapter module under `src/cc/adapters/`.
+2. Implement:
+   - `name`, `version`, `supports_input_check`, `supports_output_check`
+   - `check(prompt: str, response: str | None, metadata: dict) -> Decision`
+3. Register it in `src/cc/adapters/registry.py` (add to `ADAPTER_REGISTRY`).
+4. Ensure the adapter raises a clear `ImportError` when optional dependencies are missing.
+5. Add a pytest smoke test in `tests/unit/adapters/`.
+
+Example skeleton:
+
+```python
+from cc.adapters import Decision, GuardrailAdapter
+
+class MyAdapter(GuardrailAdapter):
+    name = "my_adapter"
+    version = "0.1.0"
+    supports_input_check = True
+    supports_output_check = False
+
+    def check(self, prompt, response, metadata):
+        raw = {"provider": "my_api", "prompt": prompt}
+        return Decision(
+            verdict="allow",
+            category=None,
+            score=None,
+            rationale="Default allow.",
+            raw=raw,
+            adapter_name=self.name,
+            adapter_version=self.version,
+        )
+```
+
 ### Custom Attackers
 
 ```python

@@ -1,0 +1,8 @@
+define user requests explicit harm
+  "bomb"
+  "explosive"
+  "how to kill"
+
+define flow block explicit harm
+  user requests explicit harm
+  bot refuse
