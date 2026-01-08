@@ -6,7 +6,7 @@ Week-6 upgrades:
 - --write-inplace and --write-config-out (mutually exclusive) to persist calibrated threshold
 - --window-lo/--window-hi to enforce α-window (default [0.04, 0.06]); non-zero exit if violated
 - Always write a flat calibration_summary.json with:
-  {name, threshold, fpr, n_texts, alpha_cap, target_window, timestamp}
+  {name, threshold, fpr, n_texts, alpha_cap, target_window, stack_fpr, timestamp}
 - Print exactly one concise line with calibration outcome
 - Only modify guardrails[0].params.threshold (others preserved)
 """
@@ -24,7 +24,9 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import yaml
 
+from cc.core.guardrail_api import GuardrailAdapter
 from cc.core.logging import ChainedJSONLLogger
+from cc.core.registry import build_guardrails
 from cc.guardrails.toy_threshold import ToyThresholdGuardrail
 
 
@@ -179,6 +181,28 @@ def calibrate_guardrail_entry(entry: Dict[str, Any],
     }
 
 
+def estimate_stack_fpr(cfg: Dict[str, Any], benign_texts: List[str]) -> Optional[float]:
+    guardrail_cfgs = cfg.get("guardrails") or []
+    if not guardrail_cfgs or not benign_texts:
+        return None
+    try:
+        stack = build_guardrails(guardrail_cfgs)
+    except Exception:
+        return None
+    adapters = [GuardrailAdapter(guardrail) for guardrail in stack]
+    blocked = 0
+    for text in benign_texts:
+        try:
+            for adapter in adapters:
+                is_blocked, _score = adapter.evaluate(text)
+                if is_blocked:
+                    blocked += 1
+                    break
+        except Exception:
+            return None
+    return blocked / float(len(benign_texts))
+
+
 # --------------------------
 # CLI
 # --------------------------
@@ -251,6 +275,8 @@ def main() -> None:
     lo = float(args.window_lo)
     hi = float(args.window_hi)
 
+    stack_fpr = estimate_stack_fpr(cfg, benign_texts)
+
     # Persist flat calibration summary
     flat_summary = {
         "name": name,
@@ -259,6 +285,7 @@ def main() -> None:
         "n_texts": int(result["n_texts"]),
         "alpha_cap": alpha_cap,
         "target_window": [lo, hi],
+        "stack_fpr": None if stack_fpr is None else float(stack_fpr),
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
     with summary_path.open("w", encoding="utf-8") as f:
