@@ -35,6 +35,8 @@ python -m cc.exp.run_two_world --config experiments/configs/custom.yaml
 
 * `results/aggregates/summary.csv` – aggregate metrics including `cc_max`.
 * `results/**/audit.jsonl` – JSONL audit trail of interactions.
+* `checkpoints/<experiment_id>/guardrail_audit.jsonl` – tamper-evident audit log for guardrail evaluations (hash-chained).
+* `runs/bench.audit.jsonl` – tamper-evident audit log for adapter benchmark runs.
 * `figs/` – diagnostic plots and protocol diagrams.
 
 ## 5. Troubleshooting
@@ -42,5 +44,11 @@ python -m cc.exp.run_two_world --config experiments/configs/custom.yaml
 * Missing figures → ensure dependencies `matplotlib` and `seaborn` are installed.
 * Long runtimes → decrease `n_sessions` in the configuration.
 * Non‑deterministic results → set the `seed` field in configs.
+
+To verify an audit log:
+
+```bash
+python -m cc.utils.audit_verify checkpoints/<experiment_id>/guardrail_audit.jsonl
+```
 
 For a deeper architectural overview see [docs/index.md](index.md).

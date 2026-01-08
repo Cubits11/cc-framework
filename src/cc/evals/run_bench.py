@@ -54,13 +54,17 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     ap.add_argument("--label-field", default="label")
     ap.add_argument("--review-policy", choices=["block", "allow"], default="block")
     ap.add_argument("--out", default="runs/bench.jsonl", help="JSONL output path.")
+    ap.add_argument("--audit-out", default=None, help="Optional JSONL audit log path.")
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args(argv)
 
     seed = set_seed(args.seed)
-    adapters = _init_adapters(args.adapters, args.adapter_config)
+    adapters, adapter_configs = _init_adapters(args.adapters, args.adapter_config)
     dataset = load_dataset(Path(args.dataset))
 
+    adapter_config_hashes = {
+        name: _hash_adapter_config(cfg) for name, cfg in adapter_configs.items()
+    }
     cfg = BenchConfig(
         dataset=str(args.dataset),
         adapters=[a.name for a in adapters],
@@ -81,8 +85,10 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         "code_version": __version__,
         "git_sha": _git_sha(),
         "adapter_versions": {a.name: a.version for a in adapters},
+        "adapter_config_hashes": adapter_config_hashes,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    audit_out_path = Path(args.audit_out) if args.audit_out else Path(args.out).with_suffix(".audit.jsonl")
 
     results = run_benchmark(
         dataset=dataset,
@@ -94,12 +100,18 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         review_policy=args.review_policy,
         run_meta=run_meta,
         out_path=Path(args.out),
+        audit_out_path=audit_out_path,
     )
     print(json.dumps(results["summary"], indent=2))
 
 
 def _hash_config(cfg: BenchConfig) -> str:
     payload = json.dumps(asdict(cfg), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _hash_adapter_config(config: Dict[str, Any]) -> str:
+    payload = json.dumps(config, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -114,19 +126,24 @@ def _git_sha() -> Optional[str]:
         return None
 
 
-def _init_adapters(adapters_arg: str, config_path: Optional[str]) -> List[GuardrailAdapter]:
+def _init_adapters(
+    adapters_arg: str,
+    config_path: Optional[str],
+) -> Tuple[List[GuardrailAdapter], Dict[str, Dict[str, Any]]]:
     config = {}
     if config_path:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
     adapters = []
+    adapter_configs: Dict[str, Dict[str, Any]] = {}
     for name in [a.strip() for a in adapters_arg.split(",") if a.strip()]:
         cls = ADAPTER_REGISTRY.get(name)
         if cls is None:
             raise ValueError(f"Unknown adapter: {name}")
         kwargs = config.get(name, {})
+        adapter_configs[name] = dict(kwargs)
         adapters.append(cls(**kwargs))
-    return adapters
+    return adapters, adapter_configs
 
 
 def load_dataset(path: Path) -> List[Dict[str, Any]]:
@@ -154,6 +171,7 @@ def run_benchmark(
     review_policy: str,
     run_meta: Dict[str, Any],
     out_path: Path,
+    audit_out_path: Optional[Path],
 ) -> Dict[str, Any]:
     y_true: List[int] = []
     per_adapter_preds: Dict[str, List[int]] = {a.name: [] for a in adapters}
@@ -173,6 +191,17 @@ def run_benchmark(
             blocked = _decision_to_blocked(decision, review_policy)
             per_adapter_preds[adapter.name].append(int(blocked))
             blocked_flags.append(blocked)
+            if audit_out_path and decision.audit:
+                append_jsonl(
+                    str(audit_out_path),
+                    {
+                        "record_type": "guardrail_adapter_audit",
+                        "index": idx,
+                        "adapter": adapter.name,
+                        "audit": decision.audit,
+                        "run_meta": run_meta,
+                    },
+                )
 
         composed = _compose(blocked_flags, composition)
         composed_preds.append(int(composed))

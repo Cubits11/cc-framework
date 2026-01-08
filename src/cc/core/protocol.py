@@ -73,6 +73,8 @@ from scipy import stats  # required for t / normal ops (legacy parts)
 import statsmodels.api as sm
 
 # Core imports from CC-Framework
+from cc.adapters.base import build_audit_payload, fingerprint_payload
+from cc.cartographer.audit import append_jsonl
 from cc.core.attackers import AttackStrategy
 from cc.core.logging import ChainedJSONLLogger, audit_context
 from cc.core.models import AttackResult, GuardrailSpec, WorldConfig
@@ -825,6 +827,9 @@ class AdaptiveExperimentEngine:
 
         # Guardrail stack cache
         self._guardrail_cache: Dict[str, List[Guardrail]] = {}
+        self._guardrail_audit_log_path: Optional[Path] = None
+        self._active_experiment_id: Optional[str] = None
+        self._current_session_id: Optional[str] = None
 
     # ------------------------------------------------------------------ GUARDRAILS
 
@@ -878,11 +883,20 @@ class AdaptiveExperimentEngine:
 
         for guardrail in stack:
             try:
+                eval_started_at = time.time()
                 if hasattr(guardrail, "evaluate"):
                     b, s = guardrail.evaluate(text)  # type: ignore[attr-defined]
                 else:
                     s = float(guardrail.score(text))
                     b = bool(guardrail.blocks(text))
+                eval_completed_at = time.time()
+                self._log_guardrail_audit(
+                    guardrail=guardrail,
+                    prompt=text,
+                    verdict="block" if b else "allow",
+                    started_at=eval_started_at,
+                    completed_at=eval_completed_at,
+                )
                 max_score = max(max_score, float(s))
                 if b:
                     blocked = True
@@ -924,93 +938,97 @@ class AdaptiveExperimentEngine:
         world_cfg = world_configs[world_bit]
         stack = self.build_guardrail_stack(world_cfg.guardrail_stack)
 
-        with audit_context(self.logger, "attack_session", session_id=session_id, world=world_bit):
-            history: List[Dict[str, Any]] = []
-            triggered: List[str] = []
-            final_success = False
+        self._current_session_id = session_id
+        try:
+            with audit_context(self.logger, "attack_session", session_id=session_id, world=world_bit):
+                history: List[Dict[str, Any]] = []
+                triggered: List[str] = []
+                final_success = False
 
-            for turn in range(self.episode_length):
-                t0 = time.time()
-                attack = attacker.generate_attack(history)
-                prompt = str(attack.get("prompt", ""))
-                self._record_time("attack_generation", time.time() - t0)
+                for turn in range(self.episode_length):
+                    t0 = time.time()
+                    attack = attacker.generate_attack(history)
+                    prompt = str(attack.get("prompt", ""))
+                    self._record_time("attack_generation", time.time() - t0)
 
-                t1 = time.time()
-                is_blocked, score, trigs = self.apply_guardrail_stack(stack, prompt)
-                self._record_time("guardrail_evaluation", time.time() - t1)
-                if trigs:
-                    triggered.extend(trigs)
+                    t1 = time.time()
+                    is_blocked, score, trigs = self.apply_guardrail_stack(stack, prompt)
+                    self._record_time("guardrail_evaluation", time.time() - t1)
+                    if trigs:
+                        triggered.extend(trigs)
 
-                if is_blocked:
-                    success = False
-                    response = "BLOCKED"
-                else:
-                    success = bool(self.rng.random() < float(world_cfg.baseline_success_rate))
-                    response = "SUCCESS" if success else "FAILURE"
+                    if is_blocked:
+                        success = False
+                        response = "BLOCKED"
+                    else:
+                        success = bool(self.rng.random() < float(world_cfg.baseline_success_rate))
+                        response = "SUCCESS" if success else "FAILURE"
 
-                feedback = {
-                    "turn": int(turn),
-                    "prompt": self._sanitize_prompt(prompt),
-                    "response": response,
-                    "success": success,
-                    "blocked": is_blocked,
-                    "block_score": float(score),
-                    "triggered_guardrails": list(trigs),
-                }
-                history.append(feedback)
+                    feedback = {
+                        "turn": int(turn),
+                        "prompt": self._sanitize_prompt(prompt),
+                        "response": response,
+                        "success": success,
+                        "blocked": is_blocked,
+                        "block_score": float(score),
+                        "triggered_guardrails": list(trigs),
+                    }
+                    history.append(feedback)
 
-                attacker.update_strategy(attack, feedback)
+                    attacker.update_strategy(attack, feedback)
 
-                if success:
-                    final_success = True
-                    break
+                    if success:
+                        final_success = True
+                        break
 
-            end = time.time()
-            self._record_time("total_session", end - start)
+                end = time.time()
+                self._record_time("total_session", end - start)
 
-            transcript = json.dumps(history, sort_keys=True, separators=(",", ":"))
-            result = AttackResult.from_transcript(
-                world_bit=world_bit,
-                success=final_success,
-                attack_id=f"{session_id}_world{world_bit}",
-                transcript=transcript,
-                guardrails_applied=",".join(spec.name for spec in world_cfg.guardrail_stack),
-                rng_seed=int(self.rng.bit_generator.random_raw() & 0xFFFFFFFF),
-                timestamp=end,
-                session_id=session_id,
-                attack_strategy=type(attacker).__name__,
-                utility_score=self._compute_utility_score(history),
-            )
-
-            if collect_metadata:
-                self.session_metadata.append(
-                    SessionMetadata(
-                        session_id=session_id,
-                        world_bit=world_bit,
-                        start_time=start,
-                        end_time=end,
-                        turns=len(history),
-                        final_success=final_success,
-                        attack_history=history,
-                        guardrails_triggered=sorted(set(triggered)),
-                        utility_score=result.utility_score,
-                    )
+                transcript = json.dumps(history, sort_keys=True, separators=(",", ":"))
+                result = AttackResult.from_transcript(
+                    world_bit=world_bit,
+                    success=final_success,
+                    attack_id=f"{session_id}_world{world_bit}",
+                    transcript=transcript,
+                    guardrails_applied=",".join(spec.name for spec in world_cfg.guardrail_stack),
+                    rng_seed=int(self.rng.bit_generator.random_raw() & 0xFFFFFFFF),
+                    timestamp=end,
+                    session_id=session_id,
+                    attack_strategy=type(attacker).__name__,
+                    utility_score=self._compute_utility_score(history),
                 )
 
-            self.results.append(result)
-            self.logger.log(
-                {
-                    "event": "session_complete",
-                    "session_id": session_id,
-                    "world_bit": world_bit,
-                    "success": final_success,
-                    "turns": len(history),
-                    "duration": end - start,
-                    "guardrails_triggered": sorted(set(triggered)),
-                    "attack_strategy": type(attacker).__name__,
-                }
-            )
-            return result
+                if collect_metadata:
+                    self.session_metadata.append(
+                        SessionMetadata(
+                            session_id=session_id,
+                            world_bit=world_bit,
+                            start_time=start,
+                            end_time=end,
+                            turns=len(history),
+                            final_success=final_success,
+                            attack_history=history,
+                            guardrails_triggered=sorted(set(triggered)),
+                            utility_score=result.utility_score,
+                        )
+                    )
+
+                self.results.append(result)
+                self.logger.log(
+                    {
+                        "event": "session_complete",
+                        "session_id": session_id,
+                        "world_bit": world_bit,
+                        "success": final_success,
+                        "turns": len(history),
+                        "duration": end - start,
+                        "guardrails_triggered": sorted(set(triggered)),
+                        "attack_strategy": type(attacker).__name__,
+                    }
+                )
+                return result
+        finally:
+            self._current_session_id = None
 
     # ------------------------------------------------------------ ADAPTIVE DRIVER
 
@@ -1043,6 +1061,8 @@ class AdaptiveExperimentEngine:
                 "bayesian_stopping": bool(self.enable_bayesian_stopping),
             }
         )
+        self._active_experiment_id = experiment_id
+        self._init_guardrail_audit_log(experiment_id)
 
         session_results: List[AttackResult] = []
 
@@ -1142,6 +1162,8 @@ class AdaptiveExperimentEngine:
         finally:
             if session_results:
                 self._save_checkpoint(experiment_id, session_results, final=True)
+            self._active_experiment_id = None
+            self._guardrail_audit_log_path = None
 
         return session_results
 
@@ -1356,6 +1378,53 @@ class AdaptiveExperimentEngine:
         }.get(bucket)
         if metric_name:
             self.metrics_collector.record_metric(metric_name, float(delta))
+
+    def _init_guardrail_audit_log(self, experiment_id: str) -> None:
+        ckpt_dir = Path("checkpoints") / experiment_id
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+        self._guardrail_audit_log_path = ckpt_dir / "guardrail_audit.jsonl"
+
+    def _log_guardrail_audit(
+        self,
+        guardrail: Guardrail,
+        prompt: str,
+        verdict: str,
+        started_at: float,
+        completed_at: float,
+    ) -> None:
+        if not self._guardrail_audit_log_path or not self._active_experiment_id:
+            return
+        parameters: Dict[str, Any] = {}
+        if hasattr(guardrail, "threshold"):
+            try:
+                parameters["threshold"] = float(getattr(guardrail, "threshold"))
+            except Exception:
+                pass
+        config_fingerprint = fingerprint_payload(parameters) if parameters else None
+        payload = build_audit_payload(
+            prompt=prompt,
+            response=None,
+            adapter_name=guardrail.__class__.__name__,
+            adapter_version=str(getattr(guardrail, "version", "unknown")),
+            parameters=parameters,
+            decision=verdict,  # type: ignore[arg-type]
+            category=None,
+            rationale=None,
+            started_at=started_at,
+            completed_at=completed_at,
+            vendor_request_id=None,
+            config_fingerprint=config_fingerprint,
+        )
+        append_jsonl(
+            str(self._guardrail_audit_log_path),
+            {
+                "record_type": "guardrail_audit",
+                "experiment_id": self._active_experiment_id,
+                "session_id": self._current_session_id,
+                "guardrail": guardrail.__class__.__name__,
+                "payload": payload,
+            },
+        )
 
     def _save_checkpoint(self, experiment_id: str, results: List[AttackResult], final: bool = False) -> None:
         """Write JSON checkpoint with full experiment snapshot."""
