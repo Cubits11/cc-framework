@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from .base import Decision, GuardrailAdapter
+from .base import Decision, GuardrailAdapter, build_audit_payload
 
 DEFAULT_RAILS_PATH = Path(__file__).with_name("nemo_configs") / "minimal"
 
@@ -23,6 +25,8 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
     version: str = "unknown"
     supports_input_check: bool = True
     supports_output_check: bool = True
+    _config_fingerprint: Optional[str] = field(default=None, init=False)
+    _resolved_config_path: Optional[Path] = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.rails is not None:
@@ -37,10 +41,29 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
         config = RailsConfig.from_path(str(cfg_path))
         self.rails = LLMRails(config)
         self.version = getattr(config, "version", "unknown")
+        self._resolved_config_path = cfg_path
+        self._config_fingerprint = _fingerprint_rails_config(cfg_path)
 
     def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
+        started_at = time.time()
         reply, context = _run_rails(self.rails, prompt, response)
+        completed_at = time.time()
         verdict, category, rationale = _decision_from_context(context, reply)
+        parameters = {"rails_config_path": str(self._resolved_config_path or "")}
+        audit_payload = build_audit_payload(
+            prompt=prompt,
+            response=response,
+            adapter_name=self.name,
+            adapter_version=self.version,
+            parameters=parameters,
+            decision=verdict,
+            category=category,
+            rationale=rationale,
+            started_at=started_at,
+            completed_at=completed_at,
+            vendor_request_id=_extract_request_id(context),
+            config_fingerprint=self._config_fingerprint,
+        )
         return Decision(
             verdict=verdict,
             category=category,
@@ -49,6 +72,7 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
             raw={"reply": reply, "context": context, "metadata": metadata},
             adapter_name=self.name,
             adapter_version=self.version,
+            audit=audit_payload,
         )
 
 
@@ -109,3 +133,24 @@ def _looks_like_refusal(text: str) -> bool:
         )
     )
 
+
+def _fingerprint_rails_config(path: Path) -> Optional[str]:
+    if not path.exists():
+        return None
+    files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
+    hasher = hashlib.sha256()
+    for file_path in files:
+        rel = file_path.name if path.is_file() else str(file_path.relative_to(path))
+        hasher.update(rel.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(file_path.read_bytes())
+        hasher.update(b"\0")
+    return hasher.hexdigest()
+
+
+def _extract_request_id(context: Dict[str, Any]) -> Optional[str]:
+    for key in ("request_id", "id", "trace_id"):
+        val = context.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+    return None
