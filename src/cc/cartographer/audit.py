@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -360,7 +361,11 @@ def _ci(
     lo, hi = ci
     if lo is None or hi is None:
         return None
-    return (float(lo), float(hi))
+    lo_f = float(lo)
+    hi_f = float(hi)
+    if not math.isfinite(lo_f) or not math.isfinite(hi_f):
+        return None
+    return (lo_f, hi_f)
 
 
 def _to_str_list(items: Iterable[Any]) -> list[str]:
@@ -393,6 +398,20 @@ def make_record(
     name_a = cast(str, cfg.get("A", "A"))
     name_b = cast(str, cfg.get("B", "B"))
 
+    j_comp_ci_norm = _ci(j_comp_ci)
+    denom = max(float(j_a), float(j_b))
+    cc_max_ci = (
+        (j_comp_ci_norm[0] / denom, j_comp_ci_norm[1] / denom)
+        if j_comp_ci_norm is not None and denom > 0.0
+        else None
+    )
+    j_add = float(j_a) + float(j_b) - float(j_a) * float(j_b)
+    delta_add_ci = (
+        (j_comp_ci_norm[0] - j_add, j_comp_ci_norm[1] - j_add)
+        if j_comp_ci_norm is not None
+        else None
+    )
+
     rec: Dict[str, Any] = {
         "meta": {
             "schema": "cartographer/audit.v1",
@@ -413,9 +432,11 @@ def make_record(
             "J_B": float(j_b),
             "J_B_CI": _ci(j_b_ci),
             "J_comp": float(j_comp),
-            "J_comp_CI": _ci(j_comp_ci),
+            "J_comp_CI": j_comp_ci_norm,
             "CC_max": float(cc_max),
+            "CC_max_CI": cc_max_ci,
             "Delta_add": float(delta_add),
+            "Delta_add_CI": delta_add_ci,
         },
         "decision": str(decision),
         "figures": _to_str_list(figures),
