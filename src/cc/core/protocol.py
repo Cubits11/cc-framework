@@ -70,6 +70,7 @@ from typing import Any, Dict, List, Optional, Tuple, TypeAlias
 
 import numpy as np
 from scipy import stats  # required for t / normal ops (legacy parts)
+import statsmodels.api as sm
 
 # Core imports from CC-Framework
 from cc.core.attackers import AttackStrategy
@@ -143,7 +144,7 @@ class BayesianTestResult:
 class CausalEffect:
     """Causal effect estimation result (difference in means)."""
     ate: float  # Average Treatment Effect (p1 - p0)
-    se: float   # Standard Error (already ICC-adjusted)
+    se: float   # Standard Error (cluster-robust or mixed-effects)
     ci_lower: float
     ci_upper: float
     p_value: float
@@ -174,6 +175,9 @@ class ICCAnalysis:
     Computed via one-way random-effects ANOVA:
         ICC(1) = (MS_between - MS_within) / (MS_between + (m̄ - 1) * MS_within)
 
+    Design effect accounts for unequal cluster sizes via:
+        DE = 1 + ICC * (m̄ - 1) * (1 + CV^2)
+
     Cluster labels are based on attack strategy identity (attack_strategy).
     """
     global_icc: float
@@ -196,10 +200,25 @@ class ICCComputer:
       1. Identify cluster labels from AttackResult.attack_strategy
       2. Run one-way ANOVA decomposition
       3. Compute ICC(1) as per Shrout & Fleiss (1979)
-      4. Derive design effect and effective sample size
+      4. Derive design effect and effective sample size, adjusting for
+         unequal cluster sizes using the coefficient of variation (CV)
+         of cluster sizes: DE = 1 + ICC * (m̄ - 1) * (1 + CV^2)
 
     Note: For binary data, this is an approximation; consider GLMM for precision.
     """
+
+    @staticmethod
+    def _cluster_labels(results: List[AttackResult]) -> np.ndarray:
+        """Return cluster labels using the same attack-strategy rules as ICC."""
+        labels: List[str] = []
+        for r in results:
+            if getattr(r, "attack_strategy", None) is not None:
+                labels.append(str(r.attack_strategy))
+            elif getattr(r, "strategy_type", None) is not None:
+                labels.append(str(r.strategy_type))
+            else:
+                labels.append("unknown")
+        return np.array(labels)
 
     @staticmethod
     def compute_icc(results: List[AttackResult]) -> ICCAnalysis:
@@ -224,16 +243,7 @@ class ICCComputer:
             )
 
         # AttackResult may have .attack_strategy or .strategy_type
-        labels: List[str] = []
-        for r in results:
-            if getattr(r, "attack_strategy", None) is not None:
-                labels.append(str(r.attack_strategy))
-            elif getattr(r, "strategy_type", None) is not None:
-                labels.append(str(r.strategy_type))
-            else:
-                labels.append("unknown")
-
-        labels_arr = np.array(labels)
+        labels_arr = ICCComputer._cluster_labels(results)
         unique_clusters, cluster_index = np.unique(labels_arr, return_inverse=True)
         k = unique_clusters.size
         n = successes.size
@@ -257,9 +267,14 @@ class ICCComputer:
         icc = ICCComputer._compute_icc_oneway(successes, cluster_index)
         icc = float(np.clip(icc, 0.0, 1.0))
 
-        # Design effect and effective N
+        # Design effect and effective N (adjusted for unequal cluster sizes)
+        cluster_sizes = np.bincount(cluster_index)
         m_bar = float(n) / float(k)
-        design_effect = 1.0 + icc * (m_bar - 1.0)
+        if k > 1 and m_bar > 0.0:
+            cv = float(np.std(cluster_sizes, ddof=1) / m_bar)
+        else:
+            cv = 0.0
+        design_effect = 1.0 + icc * (m_bar - 1.0) * (1.0 + cv ** 2)
         design_effect = max(design_effect, 1.0)
         effective_n = int(round(n / design_effect))
         widening_factor = float(np.sqrt(design_effect))
@@ -477,19 +492,81 @@ class BayesianSequentialTester:
 
 class CausalInferenceEngine:
     """
-    Causal effect estimation with ICC-aware standard errors.
+    Causal effect estimation with cluster-robust standard errors.
 
     ATE = E[Y|W=1] - E[Y|W=0]
 
     Steps:
-      1. Compute p0, p1, naive SE (difference in proportions)
-      2. Use ICCComputer to get design effect
-      3. Inflate SE by sqrt(design_effect)
-      4. Compute Welch-style t-test, CI, Cohen's d, post-hoc power
+      1. Compute OLS estimate of the ATE (difference in means).
+      2. Use a cluster-robust sandwich variance estimator for SEs.
+      3. If clusters are too small/imbalanced, fall back to a random-intercept
+         mixed-effects model (linear probability model).
+      4. Compute t-test, CI, Cohen's d, post-hoc power using cluster df.
     """
 
     def __init__(self, icc_computer: Optional[ICCComputer] = None):
         self.icc_computer = icc_computer or ICCComputer()
+
+    @staticmethod
+    def _cluster_robust_ols(
+        y: np.ndarray,
+        w: np.ndarray,
+        cluster_index: np.ndarray,
+    ) -> Tuple[float, float, int]:
+        x = np.column_stack([np.ones_like(w), w])
+        n, k = x.shape
+        if n <= k:
+            raise ValueError("Insufficient observations for cluster-robust OLS.")
+
+        x_tx = x.T @ x
+        if np.linalg.matrix_rank(x_tx) < k:
+            raise ValueError("Singular design matrix in cluster-robust OLS.")
+
+        beta = np.linalg.solve(x_tx, x.T @ y)
+        residuals = y - x @ beta
+
+        unique_clusters = np.unique(cluster_index)
+        g = unique_clusters.size
+        if g < 2:
+            raise ValueError("Need at least two clusters for robust variance.")
+
+        meat = np.zeros((k, k))
+        for cluster_id in unique_clusters:
+            mask = cluster_index == cluster_id
+            s = x[mask].T @ residuals[mask]
+            meat += np.outer(s, s)
+
+        x_tx_inv = np.linalg.inv(x_tx)
+        adjustment = (g / (g - 1.0)) * ((n - 1.0) / (n - k))
+        var_beta = x_tx_inv @ meat @ x_tx_inv * adjustment
+
+        se = float(np.sqrt(max(var_beta[1, 1], 0.0)))
+        df = max(int(g - 1), 1)
+        return float(beta[1]), se, df
+
+    @staticmethod
+    def _mixedlm_ate(
+        y: np.ndarray,
+        w: np.ndarray,
+        cluster_index: np.ndarray,
+    ) -> Tuple[float, float, int]:
+        x = sm.add_constant(w, has_constant="add")
+        model = sm.MixedLM(y, x, groups=cluster_index)
+        result = model.fit(reml=False, method="lbfgs", disp=False)
+        ate = float(result.params[1])
+        se = float(result.bse[1])
+        df = max(int(result.df_resid), 1)
+        return ate, se, df
+
+    @staticmethod
+    def _should_use_mixedlm(cluster_sizes: np.ndarray) -> bool:
+        if cluster_sizes.size < 4:
+            return True
+        m_bar = float(np.mean(cluster_sizes))
+        if m_bar <= 0.0:
+            return True
+        cv = float(np.std(cluster_sizes, ddof=1) / m_bar) if cluster_sizes.size > 1 else 0.0
+        return np.min(cluster_sizes) < 2 or cv > 1.0
 
     def estimate_ate(self, results: List[AttackResult]) -> CausalEffect:
         w0 = [r.success for r in results if r.world_bit == 0]
@@ -512,22 +589,32 @@ class CausalInferenceEngine:
         n0 = len(w0)
         n1 = len(w1)
 
-        # Naive SEs
+        # Variance components for Cohen's d
         var0 = max(p0 * (1.0 - p0), 1e-12)
         var1 = max(p1 * (1.0 - p1), 1e-12)
-        se0 = float(np.sqrt(var0 / max(n0, 1)))
-        se1 = float(np.sqrt(var1 / max(n1, 1)))
-        se_diff = float(np.sqrt(se0 ** 2 + se1 ** 2))
+
+        y = np.array([1.0 if r.success else 0.0 for r in results], dtype=float)
+        w = np.array([1.0 if r.world_bit == 1 else 0.0 for r in results], dtype=float)
+        labels = self.icc_computer._cluster_labels(results)
+        unique_clusters, cluster_index = np.unique(labels, return_inverse=True)
+        cluster_sizes = np.bincount(cluster_index)
 
         ate = p1 - p0
+        method = "cluster_robust_ols"
+        try:
+            if self._should_use_mixedlm(cluster_sizes):
+                ate, se_diff_adj, df = self._mixedlm_ate(y, w, cluster_index)
+                method = "mixedlm_random_intercept"
+            else:
+                ate, se_diff_adj, df = self._cluster_robust_ols(y, w, cluster_index)
+        except Exception:
+            # Fallback: treat samples as independent when robust estimators fail.
+            se0 = float(np.sqrt(var0 / max(n0, 1)))
+            se1 = float(np.sqrt(var1 / max(n1, 1)))
+            se_diff_adj = float(np.sqrt(se0 ** 2 + se1 ** 2))
+            df = max(min(n0, n1) - 1, 1)
+            method = "welch_t_test_independent"
 
-        # ICC-based design effect
-        icc_analysis = self.icc_computer.compute_icc(results)
-        de = max(icc_analysis.design_effect, 1.0)
-        se_diff_adj = se_diff * np.sqrt(de)
-
-        # Welch-Satterthwaite df (approx)
-        df = max(min(n0, n1) - 1, 1)
         if se_diff_adj <= 0.0:
             t_stat = 0.0
             p_value = 1.0
@@ -558,7 +645,7 @@ class CausalInferenceEngine:
             ci_lower=ci_lower,
             ci_upper=ci_upper,
             p_value=p_value,
-            method="welch_t_test_icc_adjusted",
+            method=method,
             cohens_d=cohens_d,
             power=power,
         )
