@@ -11,6 +11,7 @@ import os
 import random
 import subprocess
 import time
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -29,6 +30,7 @@ from ..core.metrics import cc_max as cc_max_metric, delta_add as delta_add_metri
 # Cartographer audit (tamper-evident chain helpers)
 from ..cartographer import audit as cart_audit
 
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
 # Config utilities
@@ -167,15 +169,29 @@ def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int,
     if not calibration_summary:
         return {0: 0.0, 1: 0.0}
 
-    guardrails = calibration_summary.get("guardrails") or []
-    if not guardrails:
-        return {0: 0.0, 1: 0.0}
+    composed_fpr = None
+    for key in ("stack_fpr", "composition_fpr", "composed_fpr"):
+        value = calibration_summary.get(key)
+        if isinstance(value, (int, float)):
+            composed_fpr = float(value)
+            break
 
     # Base world (no guardrail stack in our two-world protocol).
     world_fprs = {0: 0.0}
 
+    if composed_fpr is not None:
+        world_fprs[1] = max(0.0, min(1.0, composed_fpr))
+        return world_fprs
+
+    guardrails = calibration_summary.get("guardrails") or []
+    if not guardrails:
+        return {0: 0.0, 1: 0.0}
+
     # Composition world uses the stack of guardrails; approximate stack FPR via
     # complementary probability assuming independence between guardrails.
+    logger.warning(
+        "Calibration summary missing composed FPR; using independence approximation for stack FPR."
+    )
     comp_survival = 1.0
     for entry in guardrails:
         fpr = float(entry.get("fpr", 0.0))
