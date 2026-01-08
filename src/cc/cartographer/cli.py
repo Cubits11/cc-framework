@@ -173,7 +173,7 @@ def _cmd_run(argv: List[str]) -> None:
     )
 
     # Tamper-evident audit append
-    rec = audit.make_record(cfg, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, decision, [fig_path])
+    rec = audit.make_record(cfg, None, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, decision, [fig_path])
     sha = audit.append_jsonl(args.audit, rec)
 
     # Console outputs (human + machine)

@@ -24,6 +24,18 @@ Design notes (A)
 - We STRIP any user-supplied 'sha256'/'prev_sha256'/'record_hash'/'prev_hash'
   from input records before computing the hash, to prevent poisoning.
 
+Record schema (v1)
+------------------
+Each audit record includes:
+  - meta: schema version + timestamp
+  - cfg: compact experiment parameters used for plotting/suggestions
+  - cfg_full: extended metadata used for provenance/debugging (guardrail specs,
+              attacker settings, calibration summaries, config hashes)
+  - metrics: J/CC metrics used for decisions
+  - decision: human-readable action string
+  - figures: paths or figure identifiers
+  - prev_sha256 / sha256: chain fields (added on append)
+
 Design notes (B)
 ----------------
 - The FH auditor uses `envelope_over_rocs` to compute the J ceiling grid
@@ -375,6 +387,7 @@ def _to_str_list(items: Iterable[Any]) -> list[str]:
 
 def make_record(
     cfg: Mapping[str, Any],
+    cfg_full: Optional[Mapping[str, Any]],
     j_a: float,
     j_a_ci: Optional[Tuple[Optional[float], Optional[float]]],
     j_b: float,
@@ -388,10 +401,13 @@ def make_record(
 ) -> Dict[str, Any]:
     """
     Build a JSON-serializable audit record. CI fields are `null` if not available.
+    cfg_full may include guardrail specs, attacker settings, calibration summaries,
+    and config hashes for provenance.
     """
     comp = cast(str, cfg.get("comp", "AND"))
     name_a = cast(str, cfg.get("A", "A"))
     name_b = cast(str, cfg.get("B", "B"))
+    full_cfg_payload = dict(cfg_full) if cfg_full is not None else {}
 
     rec: Dict[str, Any] = {
         "meta": {
@@ -407,6 +423,7 @@ def make_record(
             "samples": cfg.get("samples"),
             "seed": cfg.get("seed"),
         },
+        "cfg_full": full_cfg_payload,
         "metrics": {
             "J_A": float(j_a),
             "J_A_CI": _ci(j_a_ci),
@@ -434,6 +451,7 @@ def make_record(
 def append_record(
     path: str,
     cfg: Mapping[str, Any],
+    cfg_full: Optional[Mapping[str, Any]],
     j_a: float,
     j_a_ci: Optional[Tuple[Optional[float], Optional[float]]],
     j_b: float,
@@ -453,6 +471,7 @@ def append_record(
     """
     rec = make_record(
         cfg=cfg,
+        cfg_full=cfg_full,
         j_a=j_a,
         j_a_ci=j_a_ci,
         j_b=j_b,

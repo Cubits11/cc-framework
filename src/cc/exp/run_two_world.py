@@ -553,10 +553,20 @@ def main() -> None:
 
         # Build the cfg slice expected by cart_audit.make_record (fields it uses)
         cfg_slice = _audit_cfg(cfg, n_sessions, seed)
+        cfg_full = {
+            "guardrails": cfg.get("guardrails", []),
+            "attacker": cfg.get("attacker", {}),
+            "calibration_summary": calibration_summary,
+            "config_hashes": {
+                "config_sha256": cfg_sha,
+                "config_sha256_source": "stable_json",
+            },
+        }
         # Append to the same chain file; figures left empty (downstream scripts may add)
         cart_audit.append_record(
             path=str(log_path),
             cfg=cfg_slice,
+            cfg_full=cfg_full,
             j_a=float(metrics_for_audit["J_A"]),
             j_a_ci=None if metrics_for_audit.get("J_A_CI") in (None, [], ()) else tuple(metrics_for_audit["J_A_CI"]),  # type: ignore
             j_b=float(metrics_for_audit["J_B"]),
