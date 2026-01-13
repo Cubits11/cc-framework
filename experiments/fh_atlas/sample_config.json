@@ -1,0 +1,19 @@
+{
+  "seed": 7,
+  "k_values": [2, 3],
+  "miss_rate_grid": [0.05, 0.1],
+  "fpr_rate_grid": [0.01, 0.05],
+  "copula_families": [
+    "independence",
+    "comonotonic",
+    "countermonotonic",
+    "clayton",
+    "gumbel",
+    "frank"
+  ],
+  "theta_grid": [0.5, 1.0, 2.0],
+  "composition_types": ["serial_or"],
+  "sample_sizes": [300],
+  "bootstrap_iterations": 200,
+  "output_dir": "outputs/fh_atlas"
+}
