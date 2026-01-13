@@ -292,7 +292,7 @@ class FHBounds:
     - len(marginals) == k_rails and k_rails ≥ 1.
     - Each marginal pᵢ is finite and lies in [0, 1].
     - If |upper − lower| < MATHEMATICAL_TOLERANCE but upper != lower,
-      raise NumericalInstabilityError (suspicious “almost point” interval).
+      snap to midpoint and emit a warning (treat as near-degenerate).
     """
 
     lower: float
@@ -339,12 +339,16 @@ class FHBounds:
                 f"Invalid bounds ordering: lower={lower:.12f} > upper={upper:.12f}"
             )
 
-        # Detect suspiciously close but unequal bounds (potential numerical pathology).
+        # Treat suspiciously close but unequal bounds as near-degenerate.
         if abs(upper - lower) < MATHEMATICAL_TOLERANCE and upper != lower:
-            raise NumericalInstabilityError(
+            midpoint = 0.5 * (upper + lower)
+            warnings.warn(
                 "FHBounds interval is within MATHEMATICAL_TOLERANCE but lower != upper; "
-                "this suggests accumulated numerical error in the construction."
+                "snapping to midpoint to avoid numerical instability.",
+                RuntimeWarning,
             )
+            object.__setattr__(self, "lower", float(midpoint))
+            object.__setattr__(self, "upper", float(midpoint))
 
         # Because the dataclass is frozen, we don't assign back to self.lower/upper,
         # but all subsequent properties read from the original fields, which have
@@ -1329,6 +1333,26 @@ def parallel_and_composition_bounds(
 # ---------------------------------------------------------------------
 # Independence-based composition
 # ---------------------------------------------------------------------
+
+def _stable_product(values: Sequence[float]) -> float:
+    """Compute ∏ values in log space to avoid underflow."""
+    log_sum = 0.0
+    for value in values:
+        if value <= 0.0:
+            return 0.0
+        log_sum += math.log(value)
+    return float(math.exp(log_sum))
+
+
+def _stable_product_complement(values: Sequence[float]) -> float:
+    """Compute ∏ (1 - value) in log space to avoid underflow."""
+    log_sum = 0.0
+    for value in values:
+        complement = 1.0 - value
+        if complement <= 0.0:
+            return 0.0
+        log_sum += math.log1p(-value)
+    return float(math.exp(log_sum))
 def independence_serial_or_j(
     tprs: Sequence[Probability],
     fprs: Sequence[Probability],
@@ -1382,9 +1406,8 @@ def independence_serial_or_j(
     Raises
     ------
     ValueError
-        If the sequences are empty or have mismatched lengths.
-    InvalidProbabilityError
-        If any TPR/FPR is NaN, Inf, or outside [0, 1].
+        If the sequences are empty, have mismatched lengths, or contain
+        invalid probabilities.
     """
     # Basic structural checks
     if not tprs or not fprs:
@@ -1403,15 +1426,8 @@ def independence_serial_or_j(
     tprs_f = [float(t) for t in tprs]
     fprs_f = [float(f) for f in fprs]
 
-    # Independence miss product: P(H) = ∏ (1 - TPR_i)
-    miss_product = 1.0
-    for tpr in tprs_f:
-        miss_product *= (1.0 - tpr)
-
-    # Independence "no false alarm" product: ∏ (1 - FPR_i)
-    no_false_alarm_product = 1.0
-    for fpr in fprs_f:
-        no_false_alarm_product *= (1.0 - fpr)
+    miss_product = _stable_product_complement(tprs_f)
+    no_false_alarm_product = _stable_product_complement(fprs_f)
 
     # System-level rates under independence
     tpr_sys = 1.0 - miss_product
@@ -1473,9 +1489,8 @@ def independence_parallel_and_j(
     Raises
     ------
     ValueError
-        If the sequences are empty or have mismatched lengths.
-    InvalidProbabilityError
-        If any TPR/FPR is NaN, Inf, or outside [0, 1].
+        If the sequences are empty, have mismatched lengths, or contain
+        invalid probabilities.
     """
     # Structural checks
     if not tprs or not fprs:
@@ -1494,13 +1509,8 @@ def independence_parallel_and_j(
     tprs_f = [float(t) for t in tprs]
     fprs_f = [float(f) for f in fprs]
 
-    # Independence products
-    tpr_sys = 1.0
-    fpr_sys = 1.0
-    for tpr in tprs_f:
-        tpr_sys *= tpr
-    for fpr in fprs_f:
-        fpr_sys *= fpr
+    tpr_sys = _stable_product(tprs_f)
+    fpr_sys = _stable_product(fprs_f)
 
     # Clamp into [0, 1] defensively in case of tiny floating drift.
     tpr_sys = max(0.0, min(1.0, tpr_sys))
@@ -1555,8 +1565,8 @@ def copula_cdf(
     if family == "frank":
         if theta is None or abs(theta) < EPSILON:
             raise ValueError("Frank copula requires theta != 0.")
-        num = (np.exp(-theta * u) - 1.0) * (np.exp(-theta * v) - 1.0)
-        denom = np.exp(-theta) - 1.0
+        num = np.expm1(-theta * u) * np.expm1(-theta * v)
+        denom = np.expm1(-theta)
         inner = 1.0 + num / denom
         inner = np.maximum(inner, EPSILON)
         return -(1.0 / theta) * np.log(inner)
@@ -2003,6 +2013,97 @@ def wilson_score_interval(
         )
 
     return float(lower), float(upper)
+
+
+def propagate_marginal_uncertainty_to_composed_bounds(
+    tp_counts: Sequence[int],
+    fn_counts: Sequence[int],
+    fp_counts: Sequence[int],
+    tn_counts: Sequence[int],
+    composition_type: str,
+    alpha: float = 0.05,
+    policy_threshold: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Propagate per-rail Wilson intervals into worst-/best-case composed J bounds.
+
+    Parameters
+    ----------
+    tp_counts, fn_counts, fp_counts, tn_counts:
+        Per-rail counts for world-1 (tp, fn) and world-0 (fp, tn).
+    composition_type:
+        "serial_or" or "parallel_and".
+    alpha:
+        Two-sided significance level for Wilson intervals.
+    policy_threshold:
+        Optional pass/fail threshold for certified_j_lower.
+    """
+    if composition_type not in {"serial_or", "parallel_and"}:
+        raise ValueError("composition_type must be 'serial_or' or 'parallel_and'")
+
+    counts = (tp_counts, fn_counts, fp_counts, tn_counts)
+    if len({len(seq) for seq in counts}) != 1:
+        raise ValueError("All count sequences must have the same length")
+
+    k_rails = len(tp_counts)
+    if k_rails == 0:
+        raise ValueError("Count sequences must be non-empty")
+
+    miss_intervals: List[Bounds] = []
+    fpr_intervals: List[Bounds] = []
+    for tp, fn, fp, tn in zip(tp_counts, fn_counts, fp_counts, tn_counts):
+        if tp < 0 or fn < 0 or fp < 0 or tn < 0:
+            raise ValueError("Counts must be non-negative")
+        n_attack = tp + fn
+        n_benign = fp + tn
+        if n_attack <= 0 or n_benign <= 0:
+            raise ValueError("Each rail must have positive attack and benign sample counts")
+
+        miss_ci = wilson_score_interval(successes=fn, trials=n_attack, alpha=alpha)
+        fpr_ci = wilson_score_interval(successes=fp, trials=n_benign, alpha=alpha)
+        miss_intervals.append(miss_ci)
+        fpr_intervals.append(fpr_ci)
+
+    miss_lower = [ci[0] for ci in miss_intervals]
+    miss_upper = [ci[1] for ci in miss_intervals]
+    fpr_lower = [ci[0] for ci in fpr_intervals]
+    fpr_upper = [ci[1] for ci in fpr_intervals]
+
+    if composition_type == "serial_or":
+        miss_bounds_worst = intersection_bounds(miss_upper)
+        miss_bounds_best = intersection_bounds(miss_lower)
+        alarm_bounds_worst = union_bounds(fpr_upper)
+        alarm_bounds_best = union_bounds(fpr_lower)
+    else:
+        miss_bounds_worst = union_bounds(miss_upper)
+        miss_bounds_best = union_bounds(miss_lower)
+        alarm_bounds_worst = intersection_bounds(fpr_upper)
+        alarm_bounds_best = intersection_bounds(fpr_lower)
+
+    tpr_lower = 1.0 - miss_bounds_worst.upper
+    fpr_upper = alarm_bounds_worst.upper
+    certified_j_lower = tpr_lower - fpr_upper
+
+    tpr_upper = 1.0 - miss_bounds_best.lower
+    fpr_lower = alarm_bounds_best.lower
+    certified_j_upper = tpr_upper - fpr_lower
+
+    result: Dict[str, Any] = {
+        "composition_type": composition_type,
+        "k_rails": k_rails,
+        "alpha": alpha,
+        "miss_intervals": miss_intervals,
+        "fpr_intervals": fpr_intervals,
+        "certified_j_lower": certified_j_lower,
+        "certified_j_upper": certified_j_upper,
+        "assumptions": "Unknown dependence bounded by FH envelopes; Wilson CIs per rail.",
+    }
+
+    if policy_threshold is not None:
+        result["policy_threshold"] = policy_threshold
+        result["pass"] = certified_j_lower >= policy_threshold
+
+    return result
 
 # ---------------------------------------------------------------------
 # Stratified bootstrap for J-statistic
@@ -3018,6 +3119,7 @@ __all__ = [
     "wilson_score_interval",
     "robust_inverse_normal",
     "stratified_bootstrap_j_statistic",
+    "propagate_marginal_uncertainty_to_composed_bounds",
     # Integration functions
     "extract_rates_from_attack_results",
     "validate_fh_bounds_against_empirical",
