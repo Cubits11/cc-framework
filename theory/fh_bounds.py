@@ -56,6 +56,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    Literal,
 )
 
 import math
@@ -91,10 +92,143 @@ EPSILON: float = 1e-12
 MATHEMATICAL_TOLERANCE: float = 1e-10
 MAX_BOOTSTRAP_ITERATIONS: int = 10_000
 MIN_SAMPLE_SIZE_WARNING: int = 30
+DEFAULT_CC_RELATIVE_MARGIN: float = 0.05
+DEFAULT_CC_ABSOLUTE_MARGIN: float = 0.0
+DEFAULT_CC_UNCERTAINTY_MULTIPLIER: float = 0.5
 
 Probability = float   # in [0, 1]
 JStatistic = float    # in [-1, 1]
 Bounds = Tuple[float, float]
+CopulaFamily = Literal[
+    "independence",
+    "comonotonic",
+    "countermonotonic",
+    "clayton",
+    "gumbel",
+    "frank",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class CCRegimeThresholds:
+    """
+    Threshold policy for classifying compositional regimes.
+
+    The thresholds define a symmetric independence band around CC = 1:
+        constructive: CC < (1 - margin)
+        destructive: CC > (1 + margin)
+        independent: CC in [1 - margin, 1 + margin]
+
+    The default margin (5%) is a *policy placeholder* intended to absorb
+    sampling noise, model misspecification, and audit tolerances. For
+    enterprise deployments, this should be made policy-driven based on
+    measurement uncertainty and contractual requirements.
+    """
+
+    constructive: float
+    destructive: float
+    margin: float
+    rationale: str
+
+
+def default_cc_regime_thresholds(
+    relative_margin: float = DEFAULT_CC_RELATIVE_MARGIN,
+    absolute_margin: float = DEFAULT_CC_ABSOLUTE_MARGIN,
+    minimum_margin: float = 0.0,
+    rationale: Optional[str] = None,
+) -> CCRegimeThresholds:
+    """
+    Construct default CC regime thresholds centered at 1.0.
+
+    Parameters
+    ----------
+    relative_margin:
+        Fractional slack around 1.0 used to define independence.
+        The default is 5% (0.95/1.05), which provides a conservative
+        buffer for empirical uncertainty.
+    absolute_margin:
+        Absolute minimum slack (useful when CC is near 1 and relative
+        margins are too tight).
+    minimum_margin:
+        Hard lower bound for the margin.
+    rationale:
+        Optional override for the human-readable rationale.
+    """
+    if relative_margin < 0 or absolute_margin < 0 or minimum_margin < 0:
+        raise ValueError("Margins must be non-negative.")
+
+    margin = max(relative_margin, absolute_margin, minimum_margin)
+    if rationale is None:
+        rationale = (
+            "Default independence band uses a symmetric margin around CC=1.0. "
+            "The 5% (0.95/1.05) default is a policy placeholder that absorbs "
+            "typical estimation error and modeling drift; adjust via policy or "
+            "derive from empirical uncertainty for audits."
+        )
+    return CCRegimeThresholds(
+        constructive=1.0 - margin,
+        destructive=1.0 + margin,
+        margin=margin,
+        rationale=rationale,
+    )
+
+
+def derive_cc_thresholds_from_uncertainty(
+    cc_interval_width: float,
+    relative_floor: float = DEFAULT_CC_RELATIVE_MARGIN,
+    absolute_floor: float = DEFAULT_CC_ABSOLUTE_MARGIN,
+    uncertainty_multiplier: float = DEFAULT_CC_UNCERTAINTY_MULTIPLIER,
+) -> CCRegimeThresholds:
+    """
+    Derive CC regime thresholds by expanding the independence band to
+    cover uncertainty in the CC interval.
+
+    The margin is computed as:
+        margin = max(relative_floor, absolute_floor, uncertainty_multiplier * cc_interval_width)
+
+    This makes the independence band at least as wide as a configurable
+    fraction of the CC uncertainty, while never narrower than the policy
+    floor. This helps avoid classifying noise-driven intervals as
+    constructive/destructive.
+    """
+    if cc_interval_width < 0:
+        raise ValueError("cc_interval_width must be non-negative.")
+    if relative_floor < 0 or absolute_floor < 0 or uncertainty_multiplier < 0:
+        raise ValueError("Floors and multiplier must be non-negative.")
+
+    margin = max(relative_floor, absolute_floor, uncertainty_multiplier * cc_interval_width)
+    rationale = (
+        "Independence band widened to absorb CC interval uncertainty. "
+        "Margin = max(relative_floor, absolute_floor, uncertainty_multiplier * cc_width)."
+    )
+    return CCRegimeThresholds(
+        constructive=1.0 - margin,
+        destructive=1.0 + margin,
+        margin=margin,
+        rationale=rationale,
+    )
+
+
+def compute_cc_bounds(
+    j_lower: float,
+    j_upper: float,
+    max_individual_j: float,
+) -> Tuple[float, float]:
+    """
+    Compute CC bounds from a J interval and the strongest individual J.
+
+    CC = J_comp / max(J_single) for max(J_single) > 0.
+    Interval arithmetic yields:
+        cc_lower = j_lower / max_individual_j
+        cc_upper = j_upper / max_individual_j
+    """
+    if max_individual_j <= MATHEMATICAL_TOLERANCE:
+        raise ValueError("max_individual_j must be positive to define CC.")
+    cc_lower = j_lower / max_individual_j
+    cc_upper = j_upper / max_individual_j
+    if cc_lower > cc_upper:
+        cc_lower, cc_upper = cc_upper, cc_lower
+    return cc_lower, cc_upper
 
 
 # ---------------------------------------------------------------------
@@ -330,6 +464,7 @@ class ComposedJBounds:
         self,
         threshold_constructive: float = 0.95,
         threshold_destructive: float = 1.05,
+        threshold_policy: Optional[CCRegimeThresholds] = None,
     ) -> Dict[str, Union[str, float, bool, Tuple[float, float]]]:
         """
         Classify compositional regime based on J/CC bounds.
@@ -337,6 +472,24 @@ class ComposedJBounds:
         We define an interval CC = J_comp / max(J_single), using:
         - cc_lower = j_lower / max_individual_j
         - cc_upper = j_upper / max_individual_j
+
+        Regime proof sketch
+        -------------------
+        1) FH + composition yields J_comp ∈ [j_lower, j_upper].
+        2) Let J_max = max(J_single) with J_max > 0.
+        3) Divide the entire interval by J_max (interval arithmetic) to get
+           CC ∈ [j_lower / J_max, j_upper / J_max].
+        4) Independence is defined as CC ≈ 1. A policy margin ε defines the
+           independence band [1 − ε, 1 + ε].
+        5) If cc_upper < 1 − ε, then all admissible CC values are strictly
+           below the independence band → constructive interference.
+        6) If cc_lower > 1 + ε, then all admissible CC values are above the
+           independence band → destructive interference.
+        7) If CC interval lies entirely within the band, we classify as
+           independent; otherwise, the regime is uncertain.
+
+        The default ε is 0.05 (0.95/1.05), which is a policy placeholder that
+        should be tightened or expanded based on uncertainty analysis.
 
         and classify:
         - "constructive" if cc_upper < threshold_constructive
@@ -362,11 +515,17 @@ class ComposedJBounds:
                 "reason": "no individual rail effectiveness (max J ≈ 0)",
             }
 
-        cc_lower = self.j_lower / max_individual
-        cc_upper = self.j_upper / max_individual
-        if cc_lower > cc_upper:
-            # Should not happen if j_lower <= j_upper and max_individual > 0, but guard anyway.
-            cc_lower, cc_upper = cc_upper, cc_lower
+        cc_lower, cc_upper = compute_cc_bounds(self.j_lower, self.j_upper, max_individual)
+
+        if threshold_policy is None:
+            threshold_policy = default_cc_regime_thresholds(
+                relative_margin=DEFAULT_CC_RELATIVE_MARGIN,
+                absolute_margin=DEFAULT_CC_ABSOLUTE_MARGIN,
+            )
+
+        threshold_constructive = threshold_policy.constructive
+        threshold_destructive = threshold_policy.destructive
+        margin = threshold_policy.margin
 
         # Regime classification
         if cc_upper < threshold_constructive:
@@ -398,6 +557,9 @@ class ComposedJBounds:
             "cc_bounds": (cc_lower, cc_upper),
             "cc_width": cc_upper - cc_lower,
             "max_individual_j": max_individual,
+            "thresholds": (threshold_constructive, threshold_destructive),
+            "margin": margin,
+            "threshold_rationale": threshold_policy.rationale,
         }
 
 
@@ -1348,6 +1510,131 @@ def independence_parallel_and_j(
 
     # Final clamp into [-1, 1] for robustness.
     return max(-1.0, min(1.0, float(j)))
+
+# ---------------------------------------------------------------------
+# Copula-based visualization helpers
+# ---------------------------------------------------------------------
+
+def copula_cdf(
+    family: CopulaFamily,
+    u: np.ndarray,
+    v: np.ndarray,
+    theta: Optional[float] = None,
+) -> np.ndarray:
+    """
+    Compute the bivariate copula CDF on a grid.
+
+    This helper is intentionally lightweight (numpy only) and designed for
+    generating *plot-ready* surfaces that visualize dependence structures.
+    """
+    u = np.asarray(u, dtype=float)
+    v = np.asarray(v, dtype=float)
+    u = np.clip(u, EPSILON, 1.0 - EPSILON)
+    v = np.clip(v, EPSILON, 1.0 - EPSILON)
+
+    if family == "independence":
+        return u * v
+    if family == "comonotonic":
+        return np.minimum(u, v)
+    if family == "countermonotonic":
+        return np.maximum(u + v - 1.0, 0.0)
+
+    if family == "clayton":
+        if theta is None or theta <= 0:
+            raise ValueError("Clayton copula requires theta > 0.")
+        inner = np.maximum(u ** (-theta) + v ** (-theta) - 1.0, EPSILON)
+        return inner ** (-1.0 / theta)
+
+    if family == "gumbel":
+        if theta is None or theta < 1:
+            raise ValueError("Gumbel copula requires theta >= 1.")
+        log_u = -np.log(u)
+        log_v = -np.log(v)
+        return np.exp(-((log_u ** theta + log_v ** theta) ** (1.0 / theta)))
+
+    if family == "frank":
+        if theta is None or abs(theta) < EPSILON:
+            raise ValueError("Frank copula requires theta != 0.")
+        num = (np.exp(-theta * u) - 1.0) * (np.exp(-theta * v) - 1.0)
+        denom = np.exp(-theta) - 1.0
+        inner = 1.0 + num / denom
+        inner = np.maximum(inner, EPSILON)
+        return -(1.0 / theta) * np.log(inner)
+
+    raise ValueError(f"Unknown copula family: {family!r}")
+
+
+def copula_grid(
+    family: CopulaFamily,
+    theta: Optional[float] = None,
+    grid_size: int = 51,
+) -> Dict[str, np.ndarray]:
+    """
+    Generate a (U, V, C) grid for copula visualization.
+
+    Returns a dict with keys:
+        - "u": grid of U coordinates
+        - "v": grid of V coordinates
+        - "cdf": copula CDF values
+
+    Example:
+        grid = copula_grid("clayton", theta=2.0, grid_size=51)
+        # Use matplotlib to plot grid["cdf"] as a surface.
+    """
+    if grid_size < 2:
+        raise ValueError("grid_size must be >= 2.")
+
+    axis = np.linspace(0.0, 1.0, grid_size)
+    u, v = np.meshgrid(axis, axis)
+    cdf = copula_cdf(family, u, v, theta=theta)
+    return {"u": u, "v": v, "cdf": cdf}
+
+
+def copula_experiment_plan() -> List[Dict[str, str]]:
+    """
+    Provide a structured brainstorm for copula-based visualization experiments.
+
+    The returned list is designed to seed dossier appendix visuals and
+    sensitivity analysis of CC/CII under dependence shifts.
+    """
+    return [
+        {
+            "experiment": "Independence baseline surface",
+            "family": "independence",
+            "goal": "Visualize the CC=1 reference case.",
+            "risk_gap": "Confirms that independence is a *band*, not a point.",
+        },
+        {
+            "experiment": "Comonotonic extreme",
+            "family": "comonotonic",
+            "goal": "Show maximal positive dependence (upper FH sharpness).",
+            "risk_gap": "Highlights worst-case false alarms in serial OR.",
+        },
+        {
+            "experiment": "Countermonotonic extreme",
+            "family": "countermonotonic",
+            "goal": "Show maximal negative dependence (lower FH sharpness).",
+            "risk_gap": "Highlights best-case misses for parallel AND.",
+        },
+        {
+            "experiment": "Clayton tail dependence sweep",
+            "family": "clayton",
+            "goal": "Plot theta ∈ {0.5, 1, 2, 5} to expose lower-tail coupling.",
+            "risk_gap": "Reveals hidden joint failures (miss clustering).",
+        },
+        {
+            "experiment": "Gumbel tail dependence sweep",
+            "family": "gumbel",
+            "goal": "Plot theta ∈ {1, 1.5, 2, 4} to expose upper-tail coupling.",
+            "risk_gap": "Reveals joint alarm inflation under correlation.",
+        },
+        {
+            "experiment": "Frank symmetric dependence sweep",
+            "family": "frank",
+            "goal": "Plot theta ∈ {-5, -2, 2, 5} for symmetric dependence shifts.",
+            "risk_gap": "Demonstrates both constructive and destructive shifts.",
+        },
+    ]
 
 # ---------------------------------------------------------------------
 # Composability Interference Index (CII)
@@ -2718,6 +3005,15 @@ __all__ = [
     "independence_parallel_and_j",
     # CII analysis
     "compute_composability_interference_index",
+    # CC regime thresholds
+    "default_cc_regime_thresholds",
+    "derive_cc_thresholds_from_uncertainty",
+    "compute_cc_bounds",
+    "CCRegimeThresholds",
+    # Copula visualization helpers
+    "copula_cdf",
+    "copula_grid",
+    "copula_experiment_plan",
     # Statistical functions
     "wilson_score_interval",
     "robust_inverse_normal",
@@ -2739,6 +3035,9 @@ __all__ = [
     # Constants
     "EPSILON",
     "MATHEMATICAL_TOLERANCE",
+    "DEFAULT_CC_RELATIVE_MARGIN",
+    "DEFAULT_CC_ABSOLUTE_MARGIN",
+    "DEFAULT_CC_UNCERTAINTY_MULTIPLIER",
 ]
 
 
