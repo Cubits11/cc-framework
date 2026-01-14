@@ -353,6 +353,11 @@ make verify-audit
 make test
 ```
 
+### Lineage Manifests
+
+Each run emits a reproducibility manifest plus a hash chain under `runs/manifest/`.
+See [docs/reproducibility.md](docs/reproducibility.md) for the schema and CLI usage.
+
 ### Reports
 - CC only: `python -m cc.cartographer.cli build-reports --mode cc`
 - CCC only: `python -m cc.cartographer.cli build-reports --mode ccc` (requires addenda CSVs under `evaluation/ccc/addenda/`)

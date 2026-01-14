@@ -43,4 +43,38 @@ Run the project inside Docker to mirror CI:
 devcontainer open .
 ```
 
+## 6. Run Lineage Manifests
+
+Each run emits a manifest JSON plus a hash-chain companion under `runs/manifest/`.
+The manifest captures reproducibility-critical lineage metadata:
+
+```json
+{
+  "run_id": "run_2f9c9e4c1d2a",
+  "created_at": 1735087361.123,
+  "config_hashes": {
+    "audit_config_blake3": "b8f7..."
+  },
+  "dataset_ids": [
+    "datasets/prompts.jsonl",
+    "datasets/benign_prompts.jsonl"
+  ],
+  "guardrail_versions": {
+    "KeywordBlocker": "unknown",
+    "RegexFilter": "unknown"
+  },
+  "git_sha": "9e1a1d4..."
+}
+```
+
+The hash chain (`runs/manifest/<run_id>.jsonl`) is append-only and links each
+record with `prev_sha256` → `sha256` pointers for tamper evidence. To query
+manifests:
+
+```bash
+python -m cc.cli.manifest list
+python -m cc.cli.manifest show --run-id run_2f9c9e4c1d2a
+python -m cc.cli.manifest show --hash <chain_head_sha256>
+```
+
 For more on running experiments see [experiments-guide.md](experiments-guide.md).

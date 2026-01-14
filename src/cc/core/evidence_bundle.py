@@ -31,9 +31,15 @@ from cc.adapters.base import (
     summarize_value,
 )
 from cc.cartographer import audit as audit_chain
+from cc.core.manifest import (
+    RunManifest,
+    build_config_hashes,
+    emit_run_manifest,
+    guardrail_versions_from_instances,
+)
 from cc.core.guardrail_api import GuardrailAdapter
 from cc.core.registry import build_guardrails
-from cc.utils.artifacts import write_json
+from cc.utils.artifacts import detect_git_commit, write_json
 
 
 def _utc_now() -> str:
@@ -328,6 +334,27 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
     write_json(metrics_path, metrics)
     write_json(manifest_path, manifest)
 
+    config_payload = {
+        "prompt_source": str(config.prompt_source),
+        "guardrails": config.guardrails,
+        "composition": config.composition,
+        "seed": config.seed,
+        "benign_calibration_source": (
+            str(config.benign_calibration_source) if config.benign_calibration_source else None
+        ),
+    }
+    dataset_ids = [str(config.prompt_source)]
+    if config.benign_calibration_source:
+        dataset_ids.append(str(config.benign_calibration_source))
+    run_manifest = RunManifest(
+        run_id=run_id,
+        config_hashes=build_config_hashes(config_payload, label="evidence_config_blake3"),
+        dataset_ids=dataset_ids,
+        guardrail_versions=guardrail_versions_from_instances(guardrail_instances),
+        git_sha=detect_git_commit(),
+    )
+    manifest_artifacts = emit_run_manifest(run_manifest)
+
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(exist_ok=True)
     plot_paths: List[str] = []
@@ -397,6 +424,9 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
         "attestation_path": str(attestation_path),
         "hashes_path": str(hashes_path),
         "plot_paths": plot_paths,
+        "run_manifest_path": manifest_artifacts["manifest_path"],
+        "run_manifest_chain": manifest_artifacts["chain_path"],
+        "run_manifest_chain_head": manifest_artifacts["chain_head"],
     }
 
 
