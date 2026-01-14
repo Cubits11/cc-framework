@@ -26,12 +26,14 @@ pip freeze > runs/requirements.lock
 
 * Set `seed` in configuration files for RNG control.
 * Use `PYTHONHASHSEED=0` when invoking Python for bit‑wise reproducibility.
-* Archive `audit.jsonl` and generated figures with each run.
+* Archive `audit.jsonl`, run manifests, and generated figures with each run.
 
 ## 4. Data and Artifacts
 
 * `datasets/` holds fixed input corpora; avoid modifying in‑place.
-* Results under `results/` are timestamped; keep raw outputs for peer review.
+* Run manifests live under `runs/<shard>/<hash>/manifest.json` and include config + dataset hashes.
+* Results live under `results/<shard>/<hash>/` with figures under `figures/<shard>/<hash>/`.
+* Deterministic hashes mean identical inputs land in the same storage path.
 * Use `make verify-statistics` to validate statistical assumptions.
 
 ## 5. Sharing Environments

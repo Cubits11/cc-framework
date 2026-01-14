@@ -1,9 +1,16 @@
 # experiments/run.py
 import argparse
+import hashlib
+import json
+import subprocess
 import sys
+import time
+from pathlib import Path
 from typing import Any, Dict
 
 import yaml
+
+from cc.io.storage import LocalStorageBackend, dataset_hash_from_config
 
 
 REQUIRED_SECTIONS = ["experiment", "protocol", "worlds", "attacker"]
@@ -48,6 +55,31 @@ def load_config(path: str) -> Dict[str, Any]:
     return config
 
 
+def _stable_json(obj: Any) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _sha256_hex(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _git_commit(repo_root: Path) -> str:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=str(repo_root),
+        )
+        return out.stdout.strip() if out.returncode == 0 else "unknown"
+    except Exception:
+        return "unknown"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run two-world experiment")
     parser.add_argument("--config", required=True, help="Path to YAML config")
@@ -86,6 +118,13 @@ def main() -> int:
     print(f"Starting experiment: {config['experiment']['name']}")
     print(f"Sessions: {config['experiment']['n_sessions']} | Seed: {config['experiment']['seed']}")
 
+    repo_root = _repo_root()
+    git_sha = _git_commit(repo_root)
+    cfg_sha = _sha256_hex(_stable_json(config))
+    dataset_sha = dataset_hash_from_config(config, base_dir=repo_root)
+    storage = LocalStorageBackend(base_dir=repo_root)
+    started_at = time.time()
+
     try:
         results = run_experiment(config)
     except ImportError as ie:
@@ -103,7 +142,20 @@ def main() -> int:
         print(f"ERROR: Experiment crashed: {e}", file=sys.stderr)
         return 4
 
+    completed_at = time.time()
+    manifest = {
+        "experiment_name": config["experiment"]["name"],
+        "config_sha256": cfg_sha,
+        "dataset_sha256": dataset_sha,
+        "git_sha": git_sha,
+        "started_at_unix": started_at,
+        "completed_at_unix": completed_at,
+        "sessions_completed": len(results),
+    }
+    manifest_path = storage.save_json(manifest, category="runs", filename="manifest.json")
+
     print(f"✓ Completed {len(results)} sessions")
+    print(f"Wrote manifest → {manifest_path}")
     return 0
 
 
