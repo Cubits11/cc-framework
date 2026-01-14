@@ -141,3 +141,23 @@ class LengthGuardrail:
 - [ ] Provide examples for multi-guardrail experimentation.
 - [ ] Benchmark alternative bootstrapping methods for CC estimation.
 - [ ] Add CI workflows executing tests and style checks on pull requests.
+
+## 7. Continuous Integration Expectations
+
+The repository uses GitHub Actions to keep code quality and documentation
+consistent across supported Python versions. CI runs on pull requests and
+pushes, and each job installs the package with the appropriate extras before
+executing its checks.
+
+### 7.1 Lint, Type, and Test Workflow
+
+* **Matrix:** Python 3.9, 3.10, 3.11, and 3.12.
+* **Lint:** `ruff check .` enforces formatting and style rules.
+* **Type check:** `mypy src/cc` validates core package annotations.
+* **Tests:** `pytest -q` runs the test suite quietly to surface regressions.
+
+### 7.2 Documentation Workflow
+
+* **Matrix:** Python 3.9, 3.10, 3.11, and 3.12.
+* **Docs build:** `make docs` calls the Makefile target, which runs
+  `mkdocs build --strict` to treat warnings as failures.
