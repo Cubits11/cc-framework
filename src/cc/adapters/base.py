@@ -347,6 +347,8 @@ def build_audit_payload(
     vendor_request_id: Optional[str] = None,
     config_fingerprint: Optional[str] = None,
     error_summary: Optional[Dict[str, Any]] = None,
+    event_id: Optional[str] = None,
+    created_at: Optional[float] = None,
     # Ledger hooks (optional)
     chain_prev_hash: Optional[str] = None,
     chain_seq: Optional[int] = None,
@@ -395,8 +397,8 @@ def build_audit_payload(
     cfg_fp = config_fingerprint or derived_cfg_fp
 
     # Stable event identity + tamper-evident hash for ledger chaining.
-    created_at = started
-    event_id = fingerprint_payload(
+    created_at_value = float(created_at) if created_at is not None else started
+    event_id_value = event_id or fingerprint_payload(
         {
             "adapter_name": adapter_name,
             "adapter_version": adapter_version,
@@ -423,8 +425,8 @@ def build_audit_payload(
         "vendor_request_id": vendor_request_id,
         "config_fingerprint": cfg_fp,
         # v2 extras
-        "event_id": event_id,
-        "created_at": float(created_at),
+        "event_id": event_id_value,
+        "created_at": created_at_value,
         "prompt_chars": len(prompt),
         "response_chars": (len(response) if response is not None else 0),
         "metadata_summary": metadata_summary,
