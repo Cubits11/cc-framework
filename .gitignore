@@ -26,6 +26,9 @@ runs/*.jsonl.bak
 # OS
 .DS_Store
 
+# Node
+node_modules/
+
 # editor swap/backup files
 *.swp
 *.swo

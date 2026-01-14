@@ -84,6 +84,11 @@ Re-run checklist:
 2. `make demo`
 3. Inspect the artifacts above before sharing results.
 
+### Developer setup
+
+For local development dependencies (including optional Node.js tooling for UI/chart
+work), see [`docs/dev_setup.md`](docs/dev_setup.md).
+
 ## 📊 Methodology
 
 ### Two-World Protocol
