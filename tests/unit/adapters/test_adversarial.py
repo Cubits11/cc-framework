@@ -1,16 +1,10 @@
 """Adversarial tests: leak detection, vendor updates, score stability."""
 from __future__ import annotations
 
-import hashlib
 import json
-from typing import Any, Dict
-
 import pytest
-import numpy as np
 
-from cc.adapters.guardrails_ai import GuardrailsAIAdapter, _sanitize_metadata
-from cc.adapters.llama_guard import LlamaGuardAdapter, _score_from_logits
-from cc.adapters.nemo_guardrails import NeMoGuardrailsAdapter
+from cc.adapters.guardrails_ai import GuardrailsAIAdapter
 
 
 # ============================================================================
@@ -66,5 +60,3 @@ def test_adversarial_prompt_scrubbing(adversarial_prompt):
     # Should have prompt_hash
     assert decision.audit["prompt_hash"], "Missing prompt_hash"
     assert len(decision.audit["prompt_hash"]) == 64, "Invalid hash length"
-
-

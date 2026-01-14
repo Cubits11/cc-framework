@@ -147,7 +147,7 @@ def test_metadata_scrubbing_adversarial(adapter_fixture, case, request):
             f"{adapter.name}: metadata leaked '{term[:50]}' in audit"
     
     # Scrubbed metadata should have hashes
-    scrubbed = decision.audit.get("metadata", {})
+    scrubbed = decision.audit.get("metadata_summary", {})
     
     def check_scrubbed(obj, path=""):
         if isinstance(obj, dict):

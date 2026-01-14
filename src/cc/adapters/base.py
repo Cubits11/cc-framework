@@ -13,8 +13,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, is_dataclass, asdict
 import hashlib
 import json
+import re
 import time
-import uuid
 from typing import Any, Dict, Literal, Mapping, Optional, Sequence, TypedDict, Union
 
 
@@ -42,6 +42,25 @@ _SENSITIVE_KEY_FRAGMENTS: Sequence[str] = (
     "client_secret",
     "access_key",
     "session",
+)
+
+_PROMPT_KEY_FRAGMENTS: Sequence[str] = (
+    "prompt",
+    "content",
+    "input",
+    "output",
+    "response",
+    "instruction",
+    "assistant",
+    "user",
+)
+
+_SAFE_PREVIEW_RE = re.compile(r"^[a-zA-Z0-9 _.,:/-]{0,32}$")
+_PII_PATTERNS = (
+    re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
+    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN-like
+    re.compile(r"\b(?:\d[ -]*?){13,16}\b"),  # credit card-ish
+    re.compile(r"\b\d{10,}\b"),  # long digit runs
 )
 
 
@@ -78,9 +97,10 @@ class AuditPayload(AuditPayloadV1, total=False):
     response_chars: int
 
     # Sanitized view for reproducibility without secrets
-    metadata: Dict[str, Any]
+    metadata_summary: Dict[str, Any]
     parameters_fingerprint: str
     metadata_fingerprint: str
+    error_summary: Dict[str, Any]
 
     # Optional link hooks for external ledger / chain layers
     chain_prev_hash: Optional[str]
@@ -103,6 +123,15 @@ def _looks_sensitive_key(key: str) -> bool:
     return any(fragment in k for fragment in _SENSITIVE_KEY_FRAGMENTS)
 
 
+def _looks_prompt_like_key(key: str) -> bool:
+    k = key.lower()
+    return any(fragment in k for fragment in _PROMPT_KEY_FRAGMENTS)
+
+
+def _looks_like_pii(text: str) -> bool:
+    return any(pattern.search(text) for pattern in _PII_PATTERNS)
+
+
 def _redact(obj: Any) -> Any:
     """Deep-redact sensitive keys in mappings, recursively."""
     if isinstance(obj, Mapping):
@@ -117,6 +146,132 @@ def _redact(obj: Any) -> Any:
     if isinstance(obj, (list, tuple, set)):
         return [_redact(x) for x in obj]
     return obj
+
+
+@dataclass(frozen=True)
+class SanitizationPolicy:
+    """Policy for deterministic, leak-safe sanitization."""
+
+    max_depth: int = 6
+    max_list_items: int = 50
+    max_string_length: int = 128
+    allow_preview: bool = False
+
+
+def _safe_preview(text: str, policy: SanitizationPolicy) -> Optional[str]:
+    if not policy.allow_preview:
+        return None
+    if len(text) > 32:
+        return None
+    if _looks_like_pii(text):
+        return None
+    if not _SAFE_PREVIEW_RE.match(text):
+        return None
+    return text
+
+
+def _hash_summary(text: str, policy: SanitizationPolicy) -> Dict[str, Any]:
+    return {
+        "sha256": hash_text(text) or "",
+        "len": len(text),
+        "type": "str",
+        "preview": _safe_preview(text, policy),
+    }
+
+
+def sanitize_value(
+    value: Any,
+    policy: Optional[SanitizationPolicy] = None,
+    *,
+    key: Optional[str] = None,
+    depth: int = 0,
+) -> JsonValue:
+    """Sanitize a value deterministically to prevent leaks.
+
+    Strings are hashed when they are long, match PII, or are under prompt-like keys.
+    Nested containers are traversed with a depth limit.
+    """
+    policy = policy or SanitizationPolicy()
+    if depth > policy.max_depth:
+        return {"__truncated__": True, "type": type(value).__name__}
+
+    if value is None or isinstance(value, (int, float, bool)):
+        return value
+
+    if isinstance(value, str):
+        if _looks_like_pii(value) or len(value) > policy.max_string_length:
+            return _hash_summary(value, policy)
+        if key and (_looks_sensitive_key(key) or _looks_prompt_like_key(key)):
+            return _hash_summary(value, policy)
+        if _looks_prompt_like_key(value):
+            return _hash_summary(value, policy)
+        return value
+
+    if isinstance(value, (bytes, bytearray)):
+        return {"__bytes_hex__": bytes(value).hex()}
+
+    if is_dataclass(value):
+        return sanitize_value(asdict(value), policy, key=key, depth=depth + 1)
+
+    if isinstance(value, Mapping):
+        out: Dict[str, JsonValue] = {}
+        for k in sorted(value.keys(), key=lambda x: str(x)):
+            ks = str(k)
+            out[ks] = sanitize_value(value[k], policy, key=ks, depth=depth + 1)
+        return out
+
+    if isinstance(value, (list, tuple, set)):
+        items = list(value)
+        if isinstance(value, set):
+            items = sorted(items, key=lambda x: str(x))
+        sanitized = [
+            sanitize_value(item, policy, key=key, depth=depth + 1)
+            for item in items[: policy.max_list_items]
+        ]
+        if len(items) > policy.max_list_items:
+            sanitized.append({"__truncated__": len(items) - policy.max_list_items})
+        return sanitized
+
+    return {"__nonserializable__": type(value).__name__}
+
+
+def summarize_value(value: Any, policy: Optional[SanitizationPolicy] = None) -> Dict[str, Any]:
+    """Summarize a value with hash/length/type only (no raw content)."""
+    policy = policy or SanitizationPolicy()
+    if isinstance(value, str):
+        return _hash_summary(value, policy)
+    if value is None:
+        return {"sha256": hash_text("null") or "", "len": 0, "type": "null", "preview": None}
+    sanitized = sanitize_value(value, policy)
+    canonical = canonical_json(sanitized, strict=False)
+    return {
+        "sha256": hashlib.sha256(canonical.encode("utf-8", errors="surrogatepass")).hexdigest(),
+        "len": len(canonical),
+        "type": type(value).__name__,
+        "preview": None,
+    }
+
+
+def sanitize_metadata(metadata: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Summarize metadata with hash/length/type only."""
+    if not metadata:
+        return {}
+    policy = SanitizationPolicy()
+    return {str(k): summarize_value(v, policy) for k, v in sorted(metadata.items())}
+
+
+def sanitize_vendor_payload(payload: Any) -> JsonValue:
+    """Sanitize vendor payloads defensively, including arbitrary objects."""
+    policy = SanitizationPolicy(max_string_length=0)
+    if payload is None:
+        return {}
+    if is_dataclass(payload):
+        return sanitize_value(asdict(payload), policy)
+    if isinstance(payload, Mapping):
+        return sanitize_value(payload, policy)
+    if hasattr(payload, "__dict__"):
+        return sanitize_value(vars(payload), policy)
+    return {"__type__": type(payload).__name__, "sha256": hash_text(repr(payload)) or ""}
 
 
 def _to_jsonable(obj: Any, *, strict: bool) -> JsonValue:
@@ -191,6 +346,7 @@ def build_audit_payload(
     metadata: Optional[Dict[str, Any]] = None,
     vendor_request_id: Optional[str] = None,
     config_fingerprint: Optional[str] = None,
+    error_summary: Optional[Dict[str, Any]] = None,
     # Ledger hooks (optional)
     chain_prev_hash: Optional[str] = None,
     chain_seq: Optional[int] = None,
@@ -218,12 +374,12 @@ def build_audit_payload(
     duration_ms = max(0.0, (completed - started) * 1000.0)
 
     # Redact secrets *before* fingerprinting.
-    safe_parameters = _redact(parameters)
-    safe_metadata = _redact(meta)
+    safe_parameters = sanitize_value(_redact(parameters))
+    metadata_summary = sanitize_metadata(meta)
 
     # Deterministic fingerprints (strict=False so logging cannot crash a run).
     parameters_fp = fingerprint_payload({"parameters": safe_parameters}, strict=False)
-    metadata_fp = fingerprint_payload({"metadata": safe_metadata}, strict=False)
+    metadata_fp = fingerprint_payload({"metadata_summary": metadata_summary}, strict=False)
 
     # Derive a config fingerprint if caller didn't provide one:
     # binds adapter identity + version + parameters fingerprint (and optional metadata fingerprint).
@@ -239,8 +395,17 @@ def build_audit_payload(
     cfg_fp = config_fingerprint or derived_cfg_fp
 
     # Stable event identity + tamper-evident hash for ledger chaining.
-    event_id = uuid.uuid4().hex
     created_at = started
+    event_id = fingerprint_payload(
+        {
+            "adapter_name": adapter_name,
+            "adapter_version": adapter_version,
+            "prompt_hash": hash_text(prompt) or "",
+            "response_hash": hash_text(response),
+            "started_at": started,
+        },
+        strict=False,
+    )
 
     payload: AuditPayload = {
         "schema": AUDIT_SCHEMA_VERSION,
@@ -262,11 +427,12 @@ def build_audit_payload(
         "created_at": float(created_at),
         "prompt_chars": len(prompt),
         "response_chars": (len(response) if response is not None else 0),
-        "metadata": safe_metadata,
+        "metadata_summary": metadata_summary,
         "parameters_fingerprint": parameters_fp,
         "metadata_fingerprint": metadata_fp,
         "chain_prev_hash": chain_prev_hash,
         "chain_seq": chain_seq,
+        "error_summary": error_summary,
     }
 
     # event_hash excludes itself; binds the entire event deterministically.
@@ -339,6 +505,18 @@ class AdapterPermanentError(AdapterError):
     """Raised for non-retryable vendor failures (bad request, policy violation, etc.)."""
 
 
+def error_summary_from_exception(exc: Exception, *, where: str) -> Dict[str, Any]:
+    """Build a safe error summary for audit payloads."""
+    retryable = isinstance(exc, (AdapterTransientError, TimeoutError))
+    message_hash = hash_text(str(exc)) or ""
+    return {
+        "type": type(exc).__name__,
+        "message_hash": message_hash,
+        "where": where,
+        "retryable": retryable,
+    }
+
+
 # ----------------------------
 # Adapter base class
 # ----------------------------
@@ -367,7 +545,7 @@ class GuardrailAdapter(ABC):
             {
                 "adapter_name": self.name,
                 "adapter_version": self.version,
-                "config": _redact(dict(self.get_config())),
+                "config": sanitize_value(_redact(dict(self.get_config()))),
             },
             strict=False,
         )
