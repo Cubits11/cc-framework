@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Type
+from typing import Any, Dict, Type
 
 from .base import GuardrailAdapter
 from .guardrails_ai import GuardrailsAIAdapter
@@ -16,3 +16,16 @@ ADAPTER_REGISTRY: Dict[str, Type[GuardrailAdapter]] = {
     "guardrails_ai": GuardrailsAIAdapter,
 }
 
+def list_adapters() -> Dict[str, Type[GuardrailAdapter]]:
+    return dict(ADAPTER_REGISTRY)
+
+def get_adapter_class(name: str) -> Type[GuardrailAdapter]:
+    key = (name or "").strip()
+    if key not in ADAPTER_REGISTRY:
+        raise KeyError(f"Unknown adapter '{name}'. Available: {sorted(ADAPTER_REGISTRY)}")
+    return ADAPTER_REGISTRY[key]
+
+
+def create_adapter(name: str, **kwargs: Any) -> GuardrailAdapter:
+    cls = get_adapter_class(name)
+    return cls(**kwargs)  # type: ignore[misc]

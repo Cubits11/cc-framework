@@ -49,6 +49,14 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
         reply, context = _run_rails(self.rails, prompt, response)
         completed_at = time.time()
         verdict, category, rationale = _decision_from_context(context, reply)
+        try:
+            reply, context = _run_rails(self.rails, prompt, response)
+            completed_at = time.time()
+            verdict, category, rationale = _decision_from_context(context, reply)
+        except Exception as exc:  # fail-closed
+            reply, context = "", {"error": type(exc).__name__}
+            completed_at = time.time()
+            verdict, category, rationale = "review", "adapter_error", f"NeMo Guardrails errored: {type(exc).__name__}"
         parameters = {"rails_config_path": str(self._resolved_config_path or "")}
         audit_payload = build_audit_payload(
             prompt=prompt,
@@ -63,13 +71,17 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
             completed_at=completed_at,
             vendor_request_id=_extract_request_id(context),
             config_fingerprint=self._config_fingerprint,
+            metadata=_sanitize_metadata(metadata),
         )
         return Decision(
             verdict=verdict,
             category=category,
             score=None,
             rationale=rationale,
-            raw={"reply": reply, "context": context, "metadata": metadata},
+            # Never store raw context; scrub likely prompt-bearing fields.
+            raw={"reply_preview": reply[:200], "reply_hash": _sha256(reply) if reply else None,
+                 "context": _sanitize_context(context), "metadata": _sanitize_metadata(metadata)},
+
             adapter_name=self.name,
             adapter_version=self.version,
             audit=audit_payload,
