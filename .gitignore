@@ -8,6 +8,7 @@ __pycache__/
 *.egg-info/
 .dist-info/
 .cache/
+build/
 .mypy_cache/
 .pytest_cache/
 .coverage
