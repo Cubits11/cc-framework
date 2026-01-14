@@ -67,16 +67,13 @@ print(f"Interaction: {results['interaction_type']}")
 | Step | Command | Outcome |
 | --- | --- | --- |
 | 1 | `make init` | Creates `.venv/` and installs the lightweight requirements listed in `requirements.txt`. |
-| 2 | `make demo` | Trains demo baselines, plots ROC curves, and writes comparison tables using `data/examples/synthetic.csv`. |
+| 2 | `make demo` | Runs `scripts/rails_compare.py` on `datasets/examples/rails_tiny.csv` and writes a summary table. |
 
-Outputs land under `results/baselines/` and `figures/baselines/`:
+Outputs land under `results/baselines/`:
 
 | Artifact | Description |
 | --- | --- |
-| `results/baselines/baseline_metrics.csv` | Held-out metrics for each baseline model. |
-| `results/baselines/baseline_predictions.csv` | Per-example predictions enabling further analysis. |
-| `results/baselines/baseline_comparison.csv` | Sorted metrics table for quick reporting. |
-| `figures/baselines/baseline_roc.png` | ROC overlay showing relative performance. |
+| `results/baselines/rails_summary.csv` | Summary row with J-statistics, FPR/TPR, and independence baselines. |
 
 Re-run checklist:
 
