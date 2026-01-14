@@ -7,7 +7,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Tuple
 
-from .base import Decision, GuardrailAdapter, build_audit_payload, fingerprint_payload
+from .base import (
+    Decision,
+    GuardrailAdapter,
+    build_audit_payload,
+    error_summary_from_exception,
+    fingerprint_payload,
+    sanitize_metadata,
+    sanitize_vendor_payload,
+)
 
 
 @dataclass
@@ -49,9 +57,20 @@ class GuardrailsAIAdapter(GuardrailAdapter):
     def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
         target = response or prompt
         started_at = time.time()
-        result = self.guard.validate(target)
-        completed_at = time.time()
-        verdict, category, rationale = _decision_from_guardrails(result)
+        try:
+            result = self.guard.validate(target)
+            completed_at = time.time()
+            verdict, category, rationale = _decision_from_guardrails(result)
+            error_summary = None
+        except Exception as exc:  # fail-closed
+            completed_at = time.time()
+            result = {"error": type(exc).__name__}
+            verdict, category, rationale = (
+                "review",
+                "adapter_error",
+                f"Guardrails AI errored: {type(exc).__name__}",
+            )
+            error_summary = error_summary_from_exception(exc, where="guardrails.validate")
         parameters = {"validators": list(self._validator_names)}
         audit_payload = build_audit_payload(
             prompt=prompt,
@@ -66,13 +85,15 @@ class GuardrailsAIAdapter(GuardrailAdapter):
             completed_at=completed_at,
             vendor_request_id=_extract_request_id(result),
             config_fingerprint=self._config_fingerprint,
+            metadata=metadata,
+            error_summary=error_summary,
         )
         return Decision(
             verdict=verdict,
             category=category,
             score=getattr(result, "validation_score", None),
             rationale=rationale,
-            raw={"result": _safe_result_payload(result), "metadata": metadata},
+            raw={"result": sanitize_vendor_payload(result), "metadata": sanitize_metadata(metadata)},
             adapter_name=self.name,
             adapter_version=self.version,
             audit=audit_payload,
@@ -89,16 +110,6 @@ def _decision_from_guardrails(result: Any) -> Tuple[str, Optional[str], str]:
         category = getattr(result, "error_type", None) or getattr(result, "error", None)
         return "block", str(category) if category else None, "Guardrails validators failed."
     return "review", None, "Guardrails validators returned an indeterminate result."
-
-
-def _safe_result_payload(result: Any) -> Dict[str, Any]:
-    return {
-        "validation_passed": getattr(result, "validation_passed", None),
-        "is_valid": getattr(result, "is_valid", None),
-        "error": getattr(result, "error", None),
-        "error_type": getattr(result, "error_type", None),
-        "raw": getattr(result, "raw_llm_output", None),
-    }
 
 
 def _extract_request_id(result: Any) -> Optional[str]:
