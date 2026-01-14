@@ -1,7 +1,6 @@
 import math
 from typing import Any, List, Sequence, Tuple
 
-import numpy as np
 import pytest
 
 from cc.theory import fh_bounds as fh

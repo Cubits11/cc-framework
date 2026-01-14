@@ -12,8 +12,6 @@ Scope:
 import time
 from typing import List
 
-import pytest
-
 from cc.core.models import (
     AttackResult,
     AttackStrategy,

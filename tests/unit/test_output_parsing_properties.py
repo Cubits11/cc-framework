@@ -8,8 +8,9 @@ from cc.adapters.llama_guard import _parse_llama_guard_output
 from cc.adapters.nemo_guardrails import _looks_like_refusal
 
 hypothesis = pytest.importorskip("hypothesis")
-from hypothesis import given, settings
-from hypothesis import strategies as st
+given = hypothesis.given
+settings = hypothesis.settings
+st = hypothesis.strategies
 
 
 @settings(seed=0, max_examples=50)

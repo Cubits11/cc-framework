@@ -2,10 +2,10 @@
 """Deterministic tests for attack strategies."""
 
 from cc.core.attackers import (
+    GAConfig,
+    GeneticAlgorithmAttacker,
     RandomInjectionAttacker,
     RandomInjectionConfig,
-    GeneticAlgorithmAttacker,
-    GAConfig,
     _rng,
     _safe_choice,
 )

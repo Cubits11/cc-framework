@@ -10,11 +10,10 @@ Scope:
 - Cross-version schema_version handling for AttackResult
 """
 
-import json
 from typing import Any, Dict, Type
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from cc.core.models import (
     AttackResult,

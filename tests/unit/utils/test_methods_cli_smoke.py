@@ -1,10 +1,15 @@
-import json, sys, subprocess
-from pathlib import Path
+import json
+import subprocess
+import sys
+
 
 def test_methods_cli_smoke(tmp_path):
     out = tmp_path / "week3.json"
     cmd = [
-        sys.executable, "-m", "cc.cartographer.cli", "methods",
+        sys.executable,
+        "-m",
+        "cc.cartographer.cli",
+        "methods",
         "--D", "0.55",
         "--tpr-a", "0.72", "--tpr-b", "0.65",
         "--fpr-a", "0.035", "--fpr-b", "0.050",
@@ -19,10 +24,14 @@ def test_methods_cli_smoke(tmp_path):
     assert payload["point"]["cc_hat"] > 0
     assert "ci" in payload and "wilson" in payload
 
+
 def test_methods_cli_infeasible_alpha(tmp_path):
     # α below max(FPR) should error out
     cmd = [
-        sys.executable, "-m", "cc.cartographer.cli", "methods",
+        sys.executable,
+        "-m",
+        "cc.cartographer.cli",
+        "methods",
         "--D", "0.55",
         "--tpr-a", "0.72", "--tpr-b", "0.65",
         "--fpr-a", "0.035", "--fpr-b", "0.050",

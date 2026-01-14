@@ -10,10 +10,8 @@ Scope:
 - Monte Carlo sanity check of bootstrap CI coverage (slow)
 """
 
-import math
-
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from cc.core.models import CCResult, NUMPY_AVAILABLE
 
