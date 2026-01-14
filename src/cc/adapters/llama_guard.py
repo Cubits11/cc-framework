@@ -3,10 +3,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import time
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from .base import Decision, GuardrailAdapter
+from .base import (
+    Decision,
+    GuardrailAdapter,
+    build_audit_payload,
+    error_summary_from_exception,
+    fingerprint_payload,
+    sanitize_metadata,
+    sanitize_vendor_payload,
+    summarize_value,
+)
 
 LLAMA_GUARD_SYSTEM_PROMPT = (
     "You are a safety classifier. Given a user prompt and optional assistant "
@@ -58,8 +68,20 @@ class LlamaGuardAdapter(GuardrailAdapter):
     version: str = "unknown"
     supports_input_check: bool = True
     supports_output_check: bool = True
+    _config_fingerprint: Optional[str] = field(default=None, init=False)
 
     def __post_init__(self) -> None:
+        self._config_fingerprint = fingerprint_payload(
+            {
+                "model_name": self.model_name,
+                "temperature": self.temperature,
+                "threshold": self.threshold,
+                "score_mode": self.score_mode,
+                "max_new_tokens": self.max_new_tokens,
+                "device_map": self.device_map,
+            },
+            strict=False,
+        )
         if self.generator is not None:
             self.version = self.model_name
             return
@@ -113,19 +135,62 @@ class LlamaGuardAdapter(GuardrailAdapter):
         return decoded.strip(), score, {"decoded": decoded}
 
     def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
-        prompt_text = self._build_prompt(prompt, response)
-        generated, score, raw = self._generate(prompt_text)
-        verdict, category = _parse_llama_guard_output(generated)
-        if score is not None:
-            verdict = "block" if score >= self.threshold else "allow"
+        started_at = time.time()
+        try:
+            prompt_text = self._build_prompt(prompt, response)
+            generated, score, raw = self._generate(prompt_text)
+            completed_at = time.time()
+            verdict, category = _parse_llama_guard_output(generated)
+            if score is not None:
+                verdict = "block" if score >= self.threshold else "allow"
+            rationale = "Llama Guard classification."
+            error_summary = None
+        except Exception as exc:  # fail-closed
+            completed_at = time.time()
+            generated, score, raw = "", None, {"error": type(exc).__name__}
+            verdict, category, rationale = (
+                "review",
+                "adapter_error",
+                f"Llama Guard errored: {type(exc).__name__}",
+            )
+            error_summary = error_summary_from_exception(exc, where="llama_guard.generate")
+        parameters = {
+            "model_name": self.model_name,
+            "temperature": self.temperature,
+            "threshold": self.threshold,
+            "score_mode": self.score_mode,
+            "max_new_tokens": self.max_new_tokens,
+            "device_map": self.device_map,
+        }
+        audit_payload = build_audit_payload(
+            prompt=prompt,
+            response=response,
+            adapter_name=self.name,
+            adapter_version=self.version,
+            parameters=parameters,
+            decision=verdict,
+            category=category,
+            rationale=rationale,
+            started_at=started_at,
+            completed_at=completed_at,
+            vendor_request_id=None,
+            config_fingerprint=self._config_fingerprint,
+            metadata=metadata,
+            error_summary=error_summary,
+        )
         return Decision(
             verdict=verdict,
             category=category,
             score=score,
-            rationale=None,
-            raw={"text": generated, **raw, "metadata": metadata},
+            rationale=rationale,
+            raw={
+                "generated_summary": summarize_value(generated),
+                "raw": sanitize_vendor_payload(raw),
+                "metadata": sanitize_metadata(metadata),
+            },
             adapter_name=self.name,
             adapter_version=self.version,
+            audit=audit_payload,
         )
 
 
