@@ -30,10 +30,10 @@ The philosophy is "publication-ready by default":
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
-from typing import Sequence, Optional, Callable, Dict, Any, Tuple, List
 import warnings
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -578,7 +578,7 @@ def _compose_intersection_from_bounds(
     upper = min(uppers)
 
     # Use midpoints as effective marginals; if intervals are sharp, this is exact.
-    marginals = [0.5 * (l + u) for l, u in zip(lowers, uppers)]
+    marginals = [0.5 * (lower + upper) for lower, upper in zip(lowers, uppers)]
 
     return FHBounds(
         lower=lower,
@@ -626,7 +626,7 @@ def _compose_union_from_bounds(
     lower = max(lowers)
     upper = min(1.0, sum(uppers))
 
-    marginals = [0.5 * (l + u) for l, u in zip(lowers, uppers)]
+    marginals = [0.5 * (lower + upper) for lower, upper in zip(lowers, uppers)]
 
     return FHBounds(
         lower=lower,

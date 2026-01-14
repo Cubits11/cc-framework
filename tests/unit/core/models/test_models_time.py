@@ -14,7 +14,6 @@ These tests are deliberately narrow: they do NOT touch model classes
 import calendar
 import time
 
-import pytest
 from hypothesis import assume, given, strategies as st
 
 from cc.core.models import _iso_from_unix, _now_unix

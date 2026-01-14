@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 from cc.adapters.guardrails_ai import GuardrailsAIAdapter
 from cc.adapters.llama_guard import LlamaGuardAdapter
 from cc.adapters.nemo_guardrails import NeMoGuardrailsAdapter

@@ -14,9 +14,9 @@ Scope:
 
 from typing import Any, Dict, Mapping, Sequence
 
-import pytest
 from hypothesis import given, strategies as st
 from pydantic import ValidationError
+import pytest
 
 from cc.core.models import (
     AttackStrategy,

@@ -18,10 +18,8 @@ import unicodedata
 from typing import Any, Dict
 
 from hypothesis import assume, given, strategies as st
-import pytest
-from hypothesis import given, strategies as st
+
 from cc.core.models import _hash_json, _hash_text
-from cc.core.schema import SCHEMA_VERSION
 
 # ---------------------------------------------------------------------
 # Shared helpers

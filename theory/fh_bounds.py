@@ -52,11 +52,11 @@ from typing import (
     Any,
     Dict,
     List,
+    Literal,
     Optional,
     Sequence,
     Tuple,
     Union,
-    Literal,
 )
 
 import math

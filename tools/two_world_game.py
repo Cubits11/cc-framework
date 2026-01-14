@@ -1,11 +1,19 @@
 # tools/two_world_game.py
 from __future__ import annotations
-import argparse, csv, math, os, random, sys
+
+import argparse
+import csv
+import math
+import os
+import random
+import sys
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
+
 def clamp01(x: float) -> float:
     return max(0.0, min(1.0, x))
+
 
 @dataclass
 class WorldConfig:
@@ -14,8 +22,10 @@ class WorldConfig:
     mean_latency_ms: float = 80.0
     std_latency_ms: float = 8.0
     extra_delay_ms: float = 0.0
+
     def p_block(self, qtype: str) -> float:
         return self.p_block_benign if qtype == "benign" else self.p_block_attack
+
 
 class TwoWorldGame:
     def __init__(
@@ -58,11 +68,13 @@ class TwoWorldGame:
 
         # Hide the mapping and the secret
         self.secret_world = random.choice([0, 1])
-        self.label_map: Dict[str, int] = {"A": 0, "B": 1} if random.choice([True, False]) else {"A": 1, "B": 0}
+        self.label_map: Dict[str, int] = (
+            {"A": 0, "B": 1} if random.choice([True, False]) else {"A": 1, "B": 0}
+        )
 
         # Wald’s SPRT thresholds
         sprt_alpha = clamp01(sprt_alpha)
-        sprt_beta  = clamp01(sprt_beta)
+        sprt_beta = clamp01(sprt_beta)
         # guard against degenerate logs
         eps = 1e-12
         self.sprt_A = math.log(max(eps, (1.0 - sprt_beta) / max(eps, sprt_alpha)))
@@ -162,8 +174,10 @@ class TwoWorldGame:
                 try:
                     q = input("Enter query type ('benign' or 'attack'): ").strip().lower()
                 except EOFError:
-                    print("\nInput interrupted. Exiting."); sys.exit(1)
-                if q in {"benign", "attack"}: return q
+                    print("\nInput interrupted. Exiting.")
+                    sys.exit(1)
+                if q in {"benign", "attack"}:
+                    return q
                 print("Please type 'benign' or 'attack'.")
         return self._epsilon_policy() if self.strategy == "epsilon" else self._info_policy()
 
@@ -174,7 +188,8 @@ class TwoWorldGame:
             qtype = self.choose_query()
             respA, latA = self._query(self.label_map["A"], qtype)
             respB, latB = self._query(self.label_map["B"], qtype)
-            self._tally("A", qtype, respA); self._tally("B", qtype, respB)
+            self._tally("A", qtype, respA)
+            self._tally("B", qtype, respB)
             self.history.append((i, qtype, respA, respB))
             self._update_log_lr(qtype, respA, respB)
 
@@ -191,9 +206,11 @@ class TwoWorldGame:
                 print(f"  logLR = {self.log_lr:+.3f}, posterior(H0) = {self.posterior_H0():.3f}")
 
             if self.log_lr >= self.sprt_A:
-                print("\nSPRT decision: Favor H0 → predict A=W0 (safe), B=W1 (secret)."); break
+                print("\nSPRT decision: Favor H0 → predict A=W0 (safe), B=W1 (secret).")
+                break
             if self.log_lr <= self.sprt_B:
-                print("\nSPRT decision: Favor H1 → predict A=W1 (secret), B=W0 (safe)."); break
+                print("\nSPRT decision: Favor H1 → predict A=W1 (secret), B=W0 (safe).")
+                break
             print()
 
         if self.sprt_B < self.log_lr < self.sprt_A and not self.bot:
@@ -201,40 +218,52 @@ class TwoWorldGame:
                 try:
                     guess = input("Final guess ('A' or 'B'): ").strip().upper()
                 except EOFError:
-                    print("\nInput interrupted. Exiting."); sys.exit(1)
-                if guess in {"A","B"}: break
+                    print("\nInput interrupted. Exiting.")
+                    sys.exit(1)
+                if guess in {"A", "B"}:
+                    break
             guessed_world = self.label_map[guess]
             print("\n✅ Correct!" if guessed_world == self.secret_world else "\n❌ Incorrect.")
 
         self.print_summary()
 
-    def _attack_pairs(self) -> List[Tuple[int,int]]:
-        pairs: List[Tuple[int,int]] = []
+    def _attack_pairs(self) -> List[Tuple[int, int]]:
+        pairs: List[Tuple[int, int]] = []
         for (_i, qtype, respA, respB) in self.history:
-            if qtype != "attack": continue
+            if qtype != "attack":
+                continue
             a = 1 if respA == "Allowed" else 0
             b = 1 if respB == "Allowed" else 0
-            if self.label_map["A"] == 0: pairs.append((a,b))
-            else: pairs.append((b,a))
+            if self.label_map["A"] == 0:
+                pairs.append((a, b))
+            else:
+                pairs.append((b, a))
         return pairs
 
-    def _bootstrap_ci(self, pairs: Sequence[Tuple[int,int]], level: float = 0.95, n: int = 1000) -> Tuple[float,float,float,float,float]:
-        if not pairs: return (0.0,0.0,0.0,0.0,0.0)
+    def _bootstrap_ci(
+        self,
+        pairs: Sequence[Tuple[int, int]],
+        level: float = 0.95,
+        n: int = 1000,
+    ) -> Tuple[float, float, float, float, float]:
+        if not pairs:
+            return (0.0, 0.0, 0.0, 0.0, 0.0)
         m = len(pairs)
-        p0 = sum(a for a,_ in pairs) / m
-        p1 = sum(b for _,b in pairs) / m
+        p0 = sum(a for a, _ in pairs) / m
+        p1 = sum(b for _, b in pairs) / m
         j_hat = p0 - p1
         B = 2000 if m >= 20 else 1000
         diffs = []
         for _ in range(B):
             s0 = s1 = 0
             for _ in range(m):
-                a,b = pairs[random.randint(0, m-1)]
-                s0 += a; s1 += b
-            diffs.append((s0/m) - (s1/m))
+                a, b = pairs[random.randint(0, m - 1)]
+                s0 += a
+                s1 += b
+            diffs.append((s0 / m) - (s1 / m))
         diffs.sort()
-        lo = diffs[int(max(0, (1.0-level)/2.0) * (B-1))]
-        hi = diffs[int((1.0 - max(0, (1.0-level)/2.0)) * (B-1))]
+        lo = diffs[int(max(0, (1.0 - level) / 2.0) * (B - 1))]
+        hi = diffs[int((1.0 - max(0, (1.0 - level) / 2.0)) * (B - 1))]
         return p0, p1, j_hat, lo, hi
 
     def print_summary(self) -> None:
@@ -244,19 +273,19 @@ class TwoWorldGame:
         print("\n--- Summary ---")
         print(f"Benign queries: total={total_benign}")
         if total_benign:
-            rA = ca["b_block"]/ca["benign"] if ca["benign"] else 0.0
-            rB = cb["b_block"]/cb["benign"] if cb["benign"] else 0.0
+            rA = ca["b_block"] / ca["benign"] if ca["benign"] else 0.0
+            rB = cb["b_block"] / cb["benign"] if cb["benign"] else 0.0
             print(f"  A benign block rate: {rA:.2f}")
             print(f"  B benign block rate: {rB:.2f}  (parity ⇒ utility matched)")
 
         print(f"Attack queries: total={total_attack}")
         if total_attack:
-            rA = ca["a_block"]/ca["attack"] if ca["attack"] else 0.0
-            rB = cb["a_block"]/cb["attack"] if cb["attack"] else 0.0
+            rA = ca["a_block"] / ca["attack"] if ca["attack"] else 0.0
+            rB = cb["a_block"] / cb["attack"] if cb["attack"] else 0.0
             print(f"  A attack block rate: {rA:.2f}")
             print(f"  B attack block rate: {rB:.2f}  (secret world should block more)")
 
-            p0,p1,j,lo,hi = self._bootstrap_ci(self._attack_pairs(), 0.95, 1000)
+            p0, p1, j, lo, hi = self._bootstrap_ci(self._attack_pairs(), 0.95, 1000)
             print("\nDistinguishability (attack success):")
             print(f"  p0 = P(Allowed | W0) = {p0:.3f}")
             print(f"  p1 = P(Allowed | W1) = {p1:.3f}")
