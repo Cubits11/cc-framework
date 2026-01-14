@@ -34,6 +34,25 @@ pip freeze > runs/requirements.lock
 * Results under `results/` are timestamped; keep raw outputs for peer review.
 * Use `make verify-statistics` to validate statistical assumptions.
 
+### Synthetic demo dataset provenance
+
+The lightweight baseline demo uses a synthetic rails dataset at
+`datasets/examples/rails_tiny.csv`. It is generated via
+`scripts/generate_rails_demo.py` with a fixed seed (`--seed 7`) and a
+simple latent-factor model that controls label prevalence, signal strength,
+and noise. Regenerate the dataset with:
+
+```bash
+python scripts/generate_rails_demo.py \
+  --out datasets/examples/rails_tiny.csv \
+  --n 200 \
+  --seed 7 \
+  --pos-rate 0.45 \
+  --signal 1.2 \
+  --noise 1.0 \
+  --latent-scale 0.7
+```
+
 ## 5. Sharing Environments
 
 The repository provides a `.devcontainer` specification for containerised development.
