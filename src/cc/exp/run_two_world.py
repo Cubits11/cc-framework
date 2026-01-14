@@ -7,11 +7,11 @@ import argparse
 import csv
 import hashlib
 import json
+import logging
 import os
 import random
 import subprocess
 import time
-import logging
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -26,6 +26,7 @@ from ..core.protocol import TwoWorldProtocol
 from ..core.stats import bootstrap_ci_j_statistic
 from ..analysis.ci import bootstrap_ci, wilson_ci
 from ..core.metrics import cc_max as cc_max_metric, delta_add as delta_add_metric, youden_j
+from ..io.storage import LocalStorageBackend, dataset_hash_from_config
 
 # Cartographer audit (tamper-evident chain helpers)
 from ..cartographer import audit as cart_audit
@@ -457,7 +458,10 @@ def main() -> None:
     git_sha = _git_commit(repo_root)
     cfg_stable = _stable_json(cfg)
     cfg_sha = _sha256_hex(cfg_stable)
+    dataset_sha = dataset_hash_from_config(cfg, base_dir=repo_root)
     exp_id = args.experiment_id or f"exp_{int(time.time())}"
+    storage = LocalStorageBackend(base_dir=repo_root)
+    started_at = time.time()
 
     # Logger
     logger = ChainedJSONLLogger(str(log_path))
@@ -503,6 +507,7 @@ def main() -> None:
                 "experiment_id": exp_id,
                 "config_file": args.config,
                 "config_sha256": cfg_sha,
+                "dataset_sha256": dataset_sha,
                 "n_sessions_requested": n_sessions,
                 "n_sessions_completed": len(results),
                 "attacker_type": type(attacker).__name__,
@@ -580,6 +585,23 @@ def main() -> None:
             fsync=True,
         )
 
+    completed_at = time.time()
+    manifest = {
+        "experiment_id": exp_id,
+        "config_file": args.config,
+        "config_sha256": cfg_sha,
+        "dataset_sha256": dataset_sha,
+        "git_sha": git_sha,
+        "started_at_unix": started_at,
+        "completed_at_unix": completed_at,
+        "artifacts": {
+            "analysis_json": str(out_path),
+            "audit_log": str(log_path),
+            "metrics_csv": str(out_csv) if out_csv else None,
+        },
+    }
+    manifest_path = storage.save_json(manifest, category="runs", filename="manifest.json")
+
     # Console summary
     j = analysis["j_statistic"]
     print("\n=== SUMMARY ===")
@@ -592,6 +614,7 @@ def main() -> None:
     print(f"CC_max        : {metrics_for_audit['CC_max']:.3f}")
     print(f"Wrote analysis → {out_path}")
     print(f"Appended audit → {log_path}")
+    print(f"Wrote manifest → {manifest_path}")
     if out_csv:
         print(f"Wrote scan CSV → {out_csv}")
 

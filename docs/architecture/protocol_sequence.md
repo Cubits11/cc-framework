@@ -45,3 +45,5 @@ flowchart LR
 * Metrics (e.g., `cc_max`) summarise attacker advantage across sessions.
 
 For implementation details see the [Developer Manual](../index.md).
+
+For artifact storage guarantees, see [Storage Layout](storage_layout.md).
