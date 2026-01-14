@@ -10,6 +10,9 @@ __pycache__/
 .cache/
 .mypy_cache/
 .pytest_cache/
+.coverage
+coverage.*
+htmlcov/
 
 # results & runs (keep artifacts small)
 results/raw/
@@ -23,7 +26,14 @@ runs/*.jsonl.bak
 # OS
 .DS_Store
 
+# editor swap/backup files
+*.swp
+*.swo
+*~
+
 # plots (source-of-truth is code)
 figures/*.pdf
 figures/*.png
 
+# runtime logs
+protocol_*.jsonl
