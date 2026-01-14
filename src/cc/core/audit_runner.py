@@ -31,6 +31,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from cc.core.guardrail_api import GuardrailAdapter
+from cc.core.manifest import (
+    RunManifest,
+    build_config_hashes,
+    emit_run_manifest,
+    guardrail_versions_from_instances,
+)
 from cc.core.registry import build_guardrails
 from cc.guardrails.base import Guardrail
 
@@ -206,7 +212,7 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
 
     results_path.write_text("\n".join(results_lines) + ("\n" if results_lines else ""), encoding="utf-8")
 
-    manifest = {
+    execution_manifest = {
         "run_id": run_id,
         "created_at": _utc_now(),
         "git_commit": _git_commit(),
@@ -219,10 +225,31 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
         },
     }
     manifest_path = output_dir / "execution_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.write_text(json.dumps(execution_manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    config_payload = {
+        "prompt_source": str(config.prompt_source),
+        "guardrails": config.guardrails,
+        "composition": config.composition,
+        "benign_calibration_source": (
+            str(config.benign_calibration_source) if config.benign_calibration_source else None
+        ),
+    }
+    dataset_ids = [str(config.prompt_source)]
+    if config.benign_calibration_source:
+        dataset_ids.append(str(config.benign_calibration_source))
+
+    run_manifest = RunManifest(
+        run_id=run_id,
+        config_hashes=build_config_hashes(config_payload, label="audit_config_blake3"),
+        dataset_ids=dataset_ids,
+        guardrail_versions=guardrail_versions_from_instances(guardrail_instances),
+        git_sha=_git_commit(),
+    )
+    manifest_artifacts = emit_run_manifest(run_manifest)
 
     results_merkle_root = _merkle_root(results_lines)
-    manifest_hash = _sha256_json(manifest)
+    manifest_hash = _sha256_json(execution_manifest)
 
     key_path = config.private_key_path or output_dir / "attestation_private_key.pem"
     private_key = _load_private_key(key_path)
@@ -251,6 +278,9 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
         "run_id": run_id,
         "output_dir": str(output_dir),
         "manifest_path": str(manifest_path),
+        "run_manifest_path": manifest_artifacts["manifest_path"],
+        "run_manifest_chain": manifest_artifacts["chain_path"],
+        "run_manifest_chain_head": manifest_artifacts["chain_head"],
         "results_path": str(results_path),
         "attestation_path": str(attestation_path),
     }

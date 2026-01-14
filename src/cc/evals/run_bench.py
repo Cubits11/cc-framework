@@ -17,6 +17,7 @@ import pandas as pd
 from cc import __version__
 from cc.adapters import ADAPTER_REGISTRY, Decision, GuardrailAdapter
 from cc.cartographer.audit import append_jsonl
+from cc.core.manifest import RunManifest, emit_run_manifest
 from cc.core.metrics import (
     cc_max,
     cc_rel,
@@ -88,6 +89,18 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         "adapter_config_hashes": adapter_config_hashes,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+    run_manifest = RunManifest(
+        run_id=run_id,
+        config_hashes={
+            "bench_config_sha256": config_hash,
+            **{f"adapter_config_sha256:{name}": h for name, h in adapter_config_hashes.items()},
+        },
+        dataset_ids=[str(args.dataset)],
+        guardrail_versions={a.name: a.version for a in adapters},
+        git_sha=run_meta["git_sha"],
+    )
+    emit_run_manifest(run_manifest)
     audit_out_path = Path(args.audit_out) if args.audit_out else Path(args.out).with_suffix(".audit.jsonl")
 
     results = run_benchmark(
