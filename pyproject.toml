@@ -94,7 +94,7 @@ include = ["cc*"]
 # --- pytest ---
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --maxfail=1 --disable-warnings --cov=src/cc --cov-report=term-missing"
+addopts = "-q --maxfail=1 --disable-warnings"
 markers = [
   "experiment: gated experiments producing artifacts",
   "perf: gated performance benchmarks",
