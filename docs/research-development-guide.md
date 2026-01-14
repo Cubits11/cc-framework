@@ -44,6 +44,11 @@ This document serves as a Codex-style internal manual for cc-framework developer
    - Record seeds and Git SHAs via the audit logger.
    - Update documentation alongside code changes.
 
+4. **Governance requirements for new experiments**
+   - Complete a dataset card using [`docs/governance/dataset-card-template.md`](governance/dataset-card-template.md).
+   - Complete a model/guardrail card using [`docs/governance/model-guardrail-card-template.md`](governance/model-guardrail-card-template.md).
+   - Map experiment risks to [`docs/governance/risk_taxonomy.yaml`](governance/risk_taxonomy.yaml).
+
 ## 3. Research Questions & Deep-Dive Areas
 
 - How do composability coefficients scale beyond pairwise guardrail combinations?
@@ -177,4 +182,3 @@ python -m cc.cartographer.cli build-reports --mode all
 ---
 
 This guide should evolve with the project. Contributions and updates are welcome.
-

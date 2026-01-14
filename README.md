@@ -86,6 +86,14 @@ Re-run checklist:
 For local development dependencies (including optional Node.js tooling for UI/chart
 work), see [`docs/dev_setup.md`](docs/dev_setup.md).
 
+### Governance artifacts (required for new experiments)
+
+All new experiments must include the following governance artifacts:
+
+- Dataset card: [`docs/governance/dataset-card-template.md`](docs/governance/dataset-card-template.md)
+- Model/guardrail card: [`docs/governance/model-guardrail-card-template.md`](docs/governance/model-guardrail-card-template.md)
+- Risk taxonomy reference: [`docs/governance/risk_taxonomy.yaml`](docs/governance/risk_taxonomy.yaml)
+
 ## 📊 Methodology
 
 ### Two-World Protocol
