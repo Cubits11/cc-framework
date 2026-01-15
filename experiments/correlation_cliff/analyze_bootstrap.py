@@ -1,6 +1,4 @@
 # experiments/correlation_cliff/analyze_bootstrap.py
-from __future__ import annotations
-
 """
 Correlation Cliff — Bootstrap + BCa Uncertainty Module
 =====================================================
@@ -73,12 +71,13 @@ Dependencies
 
 """
 
+from __future__ import annotations
+
+import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Literal
-
-import math
-import json
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -353,16 +352,40 @@ def _jackknife_acceleration_multinomial(
         weights.append(int(weight))
 
     # World 0 removals
-    if n00_0 > 0: add_pattern(n00_0, (n00_0 - 1, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1))
-    if n01_0 > 0: add_pattern(n01_0, (n00_0, n01_0 - 1, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1))
-    if n10_0 > 0: add_pattern(n10_0, (n00_0, n01_0, n10_0 - 1, n11_0), (n00_1, n01_1, n10_1, n11_1))
-    if n11_0 > 0: add_pattern(n11_0, (n00_0, n01_0, n10_0, n11_0 - 1), (n00_1, n01_1, n10_1, n11_1))
+    if n00_0 > 0:
+        add_pattern(
+            n00_0, (n00_0 - 1, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1)
+        )
+    if n01_0 > 0:
+        add_pattern(
+            n01_0, (n00_0, n01_0 - 1, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1)
+        )
+    if n10_0 > 0:
+        add_pattern(
+            n10_0, (n00_0, n01_0, n10_0 - 1, n11_0), (n00_1, n01_1, n10_1, n11_1)
+        )
+    if n11_0 > 0:
+        add_pattern(
+            n11_0, (n00_0, n01_0, n10_0, n11_0 - 1), (n00_1, n01_1, n10_1, n11_1)
+        )
 
     # World 1 removals
-    if n00_1 > 0: add_pattern(n00_1, (n00_0, n01_0, n10_0, n11_0), (n00_1 - 1, n01_1, n10_1, n11_1))
-    if n01_1 > 0: add_pattern(n01_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1 - 1, n10_1, n11_1))
-    if n10_1 > 0: add_pattern(n10_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1 - 1, n11_1))
-    if n11_1 > 0: add_pattern(n11_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1 - 1))
+    if n00_1 > 0:
+        add_pattern(
+            n00_1, (n00_0, n01_0, n10_0, n11_0), (n00_1 - 1, n01_1, n10_1, n11_1)
+        )
+    if n01_1 > 0:
+        add_pattern(
+            n01_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1 - 1, n10_1, n11_1)
+        )
+    if n10_1 > 0:
+        add_pattern(
+            n10_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1 - 1, n11_1)
+        )
+    if n11_1 > 0:
+        add_pattern(
+            n11_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1 - 1)
+        )
 
     if not thetas:
         return 0.0

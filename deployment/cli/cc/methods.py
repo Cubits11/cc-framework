@@ -9,11 +9,9 @@ import click
 import numpy as np
 
 from cc.analysis.cc_estimation import estimate_cc_methods_from_rates
-from cc.cartographer.intervals import (
-    cc_ci_wilson,
-    cc_ci_bootstrap,
-)
 from cc.analysis.generate_figures import plot_roc_fh_slice
+from cc.cartographer.intervals import cc_ci_bootstrap, cc_ci_wilson
+
 
 def _read_binary_series(path: Path) -> np.ndarray:
     """Read 0/1 values from a text or csv file (one per line or comma-separated)."""
@@ -137,7 +135,7 @@ def methods(
     if boo_lo is not None:
         click.echo(f"    Bootstrap   : [{boo_lo:.4f}, {boo_hi:.4f}]   (B={bootstrap_B}, seed={seed})")
     else:
-        click.echo(f"    Bootstrap   : (skipped — provide --y1-samples/--y0-samples)")
+        click.echo("    Bootstrap   : (skipped — provide --y1-samples/--y0-samples)")
 
     if ci_b.get("n1_star") is not None:
         click.echo("\n  Planner (per-class, each term ≤ δ/2):")
