@@ -485,9 +485,17 @@ def _capture_env_snapshot() -> Dict[str, Any]:
     - 'platform' : e.g. 'macOS-15.5-arm64-...' from stdlib platform.platform()
     - 'pip_freeze': list[str] from 'pip freeze'
     """
+    try:
+        platform_str = platform.platform()
+    except Exception:
+        platform_str = "-".join(
+            part
+            for part in (platform.system(), platform.release(), platform.machine())
+            if part
+        )
     return {
         "python": sys.version,
-        "platform": platform.platform(),
+        "platform": platform_str,
         "pip_freeze": _safe_pip_freeze(),
     }
 
@@ -662,8 +670,7 @@ class ChainedJSONLLogger:
         if enc_key_env:
             # Env key overrides argument, and is validated here.
             try:
-                # urlsafe_b64decode will raise on invalid input
-                encryption_key = base64.urlsafe_b64decode(enc_key_env)
+                encryption_key = base64.b64decode(enc_key_env, altchars=b"-_", validate=True)
             except Exception as e:
                 if self.strict_mode:
                     # In strict mode, invalid LOG_ENC_KEY is a hard error

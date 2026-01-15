@@ -44,7 +44,7 @@ def test_experiment_leak_metrics(tmp_path: Path) -> None:
 
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: WPS433
+    import matplotlib.pyplot as plt
 
     adapter = LlamaGuardAdapter(generator=_generator, model_name="mock-llama-guard")
     run_id = os.getenv("CC_EXPERIMENT_RUN_ID", "canary-seed-0")

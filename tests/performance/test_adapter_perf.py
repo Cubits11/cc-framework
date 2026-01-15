@@ -37,7 +37,7 @@ def test_adapter_perf(tmp_path: Path) -> None:
 
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: WPS433
+    import matplotlib.pyplot as plt
 
     adapter = GuardrailsAIAdapter(guard=_FastGuard())
     run_id = os.getenv("CC_PERF_RUN_ID", "perf-run")

@@ -6,8 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Dict, List
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from cc.analysis.week7_utils import independence_and, independence_or
 

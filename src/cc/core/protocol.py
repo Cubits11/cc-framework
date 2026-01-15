@@ -883,6 +883,11 @@ class AdaptiveExperimentEngine:
 
         for guardrail in stack:
             try:
+                guardrail_name = (
+                    guardrail.guardrail.__class__.__name__
+                    if hasattr(guardrail, "guardrail")
+                    else guardrail.__class__.__name__
+                )
                 eval_started_at = time.time()
                 if hasattr(guardrail, "evaluate"):
                     b, s = guardrail.evaluate(text)  # type: ignore[attr-defined]
@@ -900,13 +905,13 @@ class AdaptiveExperimentEngine:
                 max_score = max(max_score, float(s))
                 if b:
                     blocked = True
-                    triggered.append(guardrail.__class__.__name__)
+                    triggered.append(guardrail_name)
                     break
             except Exception as e:  # pragma: no cover - defensive
                 self.logger.log(
                     {
                         "event": "guardrail_error",
-                        "guardrail": guardrail.__class__.__name__,
+                        "guardrail": guardrail_name,
                         "error": str(e),
                         "text_preview": str(text)[:100],
                     }

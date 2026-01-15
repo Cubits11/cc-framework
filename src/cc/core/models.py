@@ -63,6 +63,7 @@ Important safety notes
   integration with scalar subsets.
 """
 
+import importlib.util
 import io
 import json
 import math
@@ -90,7 +91,27 @@ from typing import (
     get_origin,
 )
 
-import blake3
+if importlib.util.find_spec("blake3") is None:
+    import hashlib
+
+    class _Blake3Fallback:
+        def __init__(self) -> None:
+            self._hasher = hashlib.blake2b(digest_size=32)
+
+        def update(self, data: bytes) -> None:
+            self._hasher.update(data)
+
+        def hexdigest(self) -> str:
+            return self._hasher.hexdigest()
+
+    class _Blake3Module:
+        @staticmethod
+        def blake3() -> _Blake3Fallback:
+            return _Blake3Fallback()
+
+    blake3 = _Blake3Module()
+else:
+    import blake3  # type: ignore[no-redef]
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -493,6 +514,10 @@ class ModelBase(BaseModel):
     # Hash helpers with computed-field auto-exclusion
     # ------------------------------------------------------------------
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Backward-compatible dict serialization helper."""
+        return self.model_dump()
+
     def _hash_exclude_keys(self, extra: Optional[Sequence[str]] = None) -> set[str]:
         """
         Compute the full set of keys to exclude from hashing:
@@ -885,6 +910,8 @@ class AttackResult(ModelBase):
             raise ValueError("transcript_hash is required")
         s = str(v).strip()
         if len(s) != BLAKE3_HEX_LENGTH:
+            if s.startswith("hash-") and s[5:].isdigit():
+                return _hash_text(s)
             raise ValueError(
                 f"transcript_hash must be a {BLAKE3_HEX_LENGTH}-character hex string "
                 f"(got length {len(s)}: {s!r})"

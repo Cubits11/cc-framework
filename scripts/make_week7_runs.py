@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
@@ -20,6 +21,10 @@ from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import numpy as np
 import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from cc.analysis.week7_utils import (
     BCaInterval,
