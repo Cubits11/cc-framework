@@ -184,7 +184,7 @@ def run_benchmark(
     review_policy: str,
     run_meta: Dict[str, Any],
     out_path: Path,
-    audit_out_path: Optional[Path],
+    audit_out_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     y_true: List[int] = []
     per_adapter_preds: Dict[str, List[int]] = {a.name: [] for a in adapters}

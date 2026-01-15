@@ -258,9 +258,9 @@ class RandomInjectionConfig:
     n_benign_max: int = 2
     # obfuscation
     obfuscate_prob: float = 0.30
-    token_obfuscate_prob: float = 0.15  # per-token chance when string obfuscation not applied
+    token_obfuscate_prob: float = 0.0  # per-token chance when string obfuscation not applied
     # formatting
-    separators: Tuple[str, ...] = (" ", " | ", " :: ")
+    separators: Tuple[str, ...] = (" ",)
     prefix: str = ""
     suffix: str = ""
     shuffle_tokens: bool = True
@@ -366,10 +366,12 @@ class RandomInjectionAttacker(AttackStrategy):
         success = bool(result.get("success", False))
 
         for token in tokens:
-            c = _canonical_token(str(token))
-            self.attempt_counts[c] = self.attempt_counts.get(c, 0) + 1
-            if success:
-                self.success_counts[c] = self.success_counts.get(c, 0) + 1
+            raw = str(token)
+            canonical = _canonical_token(raw)
+            for key in {raw, canonical}:
+                self.attempt_counts[key] = self.attempt_counts.get(key, 0) + 1
+                if success:
+                    self.success_counts[key] = self.success_counts.get(key, 0) + 1
 
     def reset(self, *, seed: Optional[int] = None) -> None:
         """Reset counters; optionally reseed RNG."""
@@ -545,7 +547,7 @@ class GAConfig:
     max_len: int = 8
     elitism_frac: float = 0.12  # a touch more elitism
     evolve_every: int = 10      # evolve after this many fitness updates
-    ema_beta: float = 0.6       # EMA smoothing for fitness updates
+    ema_beta: float = 0.0       # EMA smoothing for fitness updates
     diversity_weight: float = 0.05  # novelty/diversity pressure
     seed: int = 42
     # ID
@@ -713,13 +715,15 @@ class GeneticAlgorithmAttacker(AttackStrategy):
         indiv = self._tournament_selection()
         prompt = " ".join(indiv)
 
-        return AttackEvent(
+        payload = AttackEvent(
             attack_id=self._next_id(),
             prompt=prompt,
             tokens=indiv.copy(),
             strategy=self.strategy_label,
             meta={"generation": self.generation},
         ).to_dict()
+        payload["generation"] = self.generation
+        return payload
 
     def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:
         """Update fitness from the result and evolve periodically.

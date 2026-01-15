@@ -1319,10 +1319,10 @@ def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
         raise ValueError("n must be positive.")
     if not (0.0 <= vbar <= 0.25):
         raise ValueError("vbar must be in [0, 0.25].")
-    if not (0.0 < delta < 2.0):
-        raise ValueError("delta must be in (0, 2).")
+    if not (0.0 < delta < 1.0):
+        raise ValueError("delta must be in (0, 1).")
 
-    target = log(2.0 / delta)
+    target = log(2.0 / (1.0 - delta))
     lo, hi = 0.0, 1.0
     for _ in range(64):
         denom = 2.0 * vbar + (2.0 / 3.0) * hi
@@ -1384,8 +1384,8 @@ def cc_confint(
 
     v1 = fh_var_envelope(I1)
     v0 = fh_var_envelope(I0)
-    eps1 = invert_bernstein_eps(n1, v1, d1)
-    eps0 = invert_bernstein_eps(n0, v0, d0)
+    eps1 = invert_bernstein_eps(n1, v1, 1.0 - d1)
+    eps0 = invert_bernstein_eps(n0, v0, 1.0 - d0)
     cc_hat = (1.0 - (p1_hat - p0_hat)) / D
     t_half = (eps1 + eps0) / D
     lo, hi = cc_hat - t_half, cc_hat + t_half

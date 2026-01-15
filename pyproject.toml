@@ -36,6 +36,7 @@ dependencies = [
   "plotly>=5.0",
   "jsonlines>=3.0",
   "cryptography>=41.0",
+  "statsmodels>=0.14",
   # core data-layer requirements
   "pydantic>=2.0",
   "blake3>=0.3",

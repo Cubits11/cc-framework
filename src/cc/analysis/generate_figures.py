@@ -148,6 +148,20 @@ def _plot_phase_surface(E: np.ndarray, T: np.ndarray, C: np.ndarray,
     e_best, t_best, c_best = float(E[arg]), float(T[arg]), float(C[arg])
 
     fig, ax = plt.subplots(figsize=(5.6, 4.2))
+    centered = np.vstack([E - float(np.mean(E)), T - float(np.mean(T))])
+    if np.linalg.matrix_rank(centered) < 2:
+        norm = Normalize(vmin=max(0.0, float(np.nanmin(C))), vmax=float(np.nanmax(C)))
+        sc = ax.scatter(E, T, c=C, cmap="cividis", norm=norm, s=60, edgecolor="white", lw=0.6)
+        ax.scatter([last_eps], [last_T], s=90, color=CBLUE, edgecolor="white", lw=0.8, zorder=3, label="last run")
+        ax.scatter([e_best], [t_best], s=180, marker="*", color="#DAA520", edgecolor="black", lw=0.6, zorder=4,
+                   label=f"best (CC={c_best:.2f})")
+        ax.set_xlabel("epsilon"); ax.set_ylabel("T")
+        ax.set_title(r"$CC_{\max}$ phase diagram", pad=6)
+        cbar = fig.colorbar(sc, ax=ax); cbar.set_label(r"$CC_{\max}$")
+        ax.legend(frameon=False, loc="best")
+        _save_opaque(fig, fig_path); plt.close(fig)
+        return
+
     tri = mtri.Triangulation(E, T)
     norm = Normalize(vmin=max(0.0, float(np.nanmin(C))), vmax=float(np.nanmax(C)))
     cs = ax.tricontourf(tri, C, levels=21, cmap="cividis", norm=norm)

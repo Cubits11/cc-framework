@@ -10,17 +10,20 @@ from cc.adapters.nemo_guardrails import _looks_like_refusal
 hypothesis = pytest.importorskip("hypothesis")
 given = hypothesis.given
 settings = hypothesis.settings
+seed = hypothesis.seed
 st = hypothesis.strategies
 
 
-@settings(seed=0, max_examples=50)
+@seed(0)
+@settings(max_examples=50)
 @given(st.text())
 def test_llama_guard_parsing_blocks_on_unsafe(text: str) -> None:
     verdict, _ = _parse_llama_guard_output(f"{text}\nunsafe")
     assert verdict == "block"
 
 
-@settings(seed=0, max_examples=50)
+@seed(0)
+@settings(max_examples=50)
 @given(st.text())
 def test_llama_guard_parsing_allows_without_unsafe(text: str) -> None:
     cleaned = text.lower().replace("unsafe", "")
@@ -28,13 +31,15 @@ def test_llama_guard_parsing_allows_without_unsafe(text: str) -> None:
     assert verdict == "allow"
 
 
-@settings(seed=0, max_examples=50)
+@seed(0)
+@settings(max_examples=50)
 @given(st.sampled_from(["I'm sorry", "I cannot", "cannot assist", "refuse"]))
 def test_nemo_refusal_detection_triggers(phrase: str) -> None:
     assert _looks_like_refusal(f"{phrase} for that request.")
 
 
-@settings(seed=0, max_examples=50)
+@seed(0)
+@settings(max_examples=50)
 @given(st.text(alphabet="xyz", min_size=0, max_size=50))
 def test_nemo_refusal_detection_specific(text: str) -> None:
     assert _looks_like_refusal(text) is False

@@ -596,7 +596,9 @@ def audit_fh_ceiling_by_points(
 
     # Map points to indices by (approximate) match
     def idx_of(M: np.ndarray, pt: Tuple[float, float]) -> Optional[int]:
-        mask = (np.isclose(M[:, 0], pt[0], atol=point_tol)) & (np.isclose(M[:, 1], pt[1], atol=point_tol))
+        mask = (np.isclose(M[:, 0], pt[0], atol=point_tol, rtol=0.0)) & (
+            np.isclose(M[:, 1], pt[1], atol=point_tol, rtol=0.0)
+        )
         where = np.nonzero(mask)[0]
         return int(where[0]) if where.size > 0 else None
 
