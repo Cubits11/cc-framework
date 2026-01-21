@@ -26,7 +26,8 @@ Design notes (Correlation Cliff):
 """
 
 import math
-from typing import Any, Dict, List, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -89,12 +90,12 @@ def _bool_to_float(b: Any) -> float:
 
 
 def _finalize_row(
-    out: Dict[str, Any],
+    out: dict[str, Any],
     *,
     cfg: SimConfig,
     jmin: float,
     jmax: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Populate cross-world and population-level aggregates plus envelope checks.
     """
@@ -118,9 +119,7 @@ def _finalize_row(
         dC_hat = pC1 - pC0
         JC_hat = abs(dC_hat)
         CC_hat = (
-            (JC_hat / Jbest_hat)
-            if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0)
-            else float("nan")
+            (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
         )
 
         out["JA_hat"] = float(JA_hat)
@@ -235,7 +234,7 @@ def simulate_replicate_at_lambda(
     lam_index: int,
     rep: int,
     rng: np.random.Generator,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Simulate one replicate at a given lambda.
 
@@ -253,7 +252,7 @@ def simulate_replicate_at_lambda(
 
     row_ctx = f"(lam={lam_f:.6g}, idx={li}, rep={rp})"
 
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "lambda": lam_f,
         "lambda_index": li,
         "rep": rp,
@@ -278,7 +277,7 @@ def simulate_replicate_at_lambda(
     out["JC_env_max"] = float(jmax)
 
     # World schema: keep consistent column names across all rows.
-    _WORLD_NUM_FIELDS: Tuple[str, ...] = (
+    _WORLD_NUM_FIELDS: tuple[str, ...] = (
         "pA_true",
         "pB_true",
         "p00_true",
@@ -380,7 +379,9 @@ def simulate_replicate_at_lambda(
         except Exception as e:
             if cfg.hard_fail_on_invalid:
                 raise
-            _mark_world_invalid(w, stage="joint_cells_from_marginals", msg=f"{type(e).__name__}: {e}")
+            _mark_world_invalid(
+                w, stage="joint_cells_from_marginals", msg=f"{type(e).__name__}: {e}"
+            )
             continue
 
         # Validate joint probabilities (no renorm; tiny clip allowed)
@@ -510,11 +511,11 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
         else np.random.default_rng(0)
     )
 
-    total = int(cfg.n_reps) * int(len(lambdas_list))
-    rows: list[Dict[str, Any]] = []
+    total = int(cfg.n_reps) * len(lambdas_list)
+    rows: list[dict[str, Any]] = []
     rows_append = rows.append
 
-    _WORLD_NUM_FIELDS: Tuple[str, ...] = (
+    _WORLD_NUM_FIELDS: tuple[str, ...] = (
         "pA_true",
         "pB_true",
         "p00_true",
@@ -543,8 +544,8 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
         "tau_true",
     )
 
-    def _init_row(lam: float, lam_index: int, rep: int, jmin: float, jmax: float) -> Dict[str, Any]:
-        out_row: Dict[str, Any] = {
+    def _init_row(lam: float, lam_index: int, rep: int, jmin: float, jmax: float) -> dict[str, Any]:
+        out_row: dict[str, Any] = {
             "lambda": float(lam),
             "lambda_index": int(lam_index),
             "rep": int(rep),
@@ -557,7 +558,9 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
             else "sequential_standard"
             if cfg.seed_policy == "sequential"
             else "stable_per_cell",
-            "batch_sampling_used": 1.0 if (cfg.seed_policy == "sequential" and cfg.batch_sampling) else 0.0,
+            "batch_sampling_used": 1.0
+            if (cfg.seed_policy == "sequential" and cfg.batch_sampling)
+            else 0.0,
             "n_per_world": int(cfg.n),
             "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
             "row_ok": True,
@@ -576,7 +579,7 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                 out_row[f"{base}_w{w}"] = float("nan")
         return out_row
 
-    def _mark_world_invalid(out_row: Dict[str, Any], w: int, *, stage: str, msg: str) -> None:
+    def _mark_world_invalid(out_row: dict[str, Any], w: int, *, stage: str, msg: str) -> None:
         out_row[f"world_valid_w{w}"] = False
         out_row[f"world_error_stage_w{w}"] = str(stage)
         out_row[f"world_error_msg_w{w}"] = str(msg)
@@ -593,10 +596,10 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
             row_ctx = f"(lam={float(lam):.6g}, idx={lam_index})"
             jmin, jmax = U.compute_fh_jc_envelope(cfg.marginals, cfg.rule)
 
-            world_cache: Dict[int, Dict[str, Any]] = {}
+            world_cache: dict[int, dict[str, Any]] = {}
             for w, wm in ((0, cfg.marginals.w0), (1, cfg.marginals.w1)):
                 w_ctx = f"{row_ctx}, w={w}"
-                cache: Dict[str, Any] = {
+                cache: dict[str, Any] = {
                     "pA_true": float(wm.pA),
                     "pB_true": float(wm.pB),
                     "ok": True,
@@ -752,7 +755,12 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                                 out[f"sample_meta_{mk}_w{w}"] = float("nan")
 
                     counts = cache["counts"][rep]
-                    n00, n01, n10, n11 = (int(counts[0]), int(counts[1]), int(counts[2]), int(counts[3]))
+                    n00, n01, n10, n11 = (
+                        int(counts[0]),
+                        int(counts[1]),
+                        int(counts[2]),
+                        int(counts[3]),
+                    )
                     out[f"n00_w{w}"] = n00
                     out[f"n01_w{w}"] = n01
                     out[f"n10_w{w}"] = n10
@@ -789,7 +797,9 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                     out[f"phi_true_w{w}"] = float(cache.get("phi_true", float("nan")))
                     out[f"tau_true_w{w}"] = float(cache.get("tau_true", float("nan")))
 
-                out = _finalize_row(out, cfg=cfg, jmin=float(out["JC_env_min"]), jmax=float(out["JC_env_max"]))
+                out = _finalize_row(
+                    out, cfg=cfg, jmin=float(out["JC_env_min"]), jmax=float(out["JC_env_max"])
+                )
                 rows_append(out)
 
         df = pd.DataFrame.from_records(rows)
@@ -817,7 +827,10 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                     rng=base_rng,
                 )
                 # Ensure row-level fields exist even if older code paths forget them
-                row.setdefault("worlds_valid", bool(row.get("world_valid_w0", False) and row.get("world_valid_w1", False)))
+                row.setdefault(
+                    "worlds_valid",
+                    bool(row.get("world_valid_w0", False) and row.get("world_valid_w1", False)),
+                )
                 row.setdefault("row_ok", bool(row.get("worlds_valid", False)))
                 row.setdefault("row_error_stage", "")
                 row.setdefault("row_error_msg", "")
@@ -895,19 +908,19 @@ def summarize_simulation(
         raise ValueError(f"quantiles contains duplicates after rounding: {quantiles!r}")
 
     def _q_label(qq: float) -> str:
-        return f"q{int(round(qq * 1000.0)):04d}"
+        return f"q{round(qq * 1000.0):04d}"
 
-    def _qcols(s: pd.Series, prefix: str) -> Dict[str, float]:
+    def _qcols(s: pd.Series, prefix: str) -> dict[str, float]:
         s2 = pd.to_numeric(s, errors="coerce").dropna()
         if s2.empty:
             return {f"{prefix}_{_q_label(qq)}": float("nan") for qq in q}
         qs = s2.quantile(q)
-        out: Dict[str, float] = {}
+        out: dict[str, float] = {}
         for qq in q:
             out[f"{prefix}_{_q_label(qq)}"] = float(qs.loc[qq])
         return out
 
-    group_keys: List[str] = ["lambda"]
+    group_keys: list[str] = ["lambda"]
     for k in ("rule", "path"):
         if k in df_long.columns:
             group_keys.append(k)
@@ -945,9 +958,9 @@ def summarize_simulation(
     )
 
     gb = df.groupby(group_keys, sort=True, dropna=False)
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
 
-    def _constancy_block(g: pd.DataFrame, col: str) -> Dict[str, Any]:
+    def _constancy_block(g: pd.DataFrame, col: str) -> dict[str, Any]:
         """Report population constancy and drift within a group."""
         if col not in g.columns:
             return {}
@@ -977,11 +990,11 @@ def summarize_simulation(
         }
 
     for key, g in gb:
-        row: Dict[str, Any] = {}
+        row: dict[str, Any] = {}
 
         # Materialize group identifiers
         if isinstance(key, tuple):
-            for kname, kval in zip(group_keys, key):
+            for kname, kval in zip(group_keys, key, strict=False):
                 if kname == "lambda":
                     row[kname] = float(kval)
                 else:
@@ -989,11 +1002,11 @@ def summarize_simulation(
         else:
             row["lambda"] = float(key)
 
-        row["n_rows"] = int(len(g))
+        row["n_rows"] = len(g)
         row["n_reps"] = (
             int(pd.to_numeric(g["rep"], errors="coerce").nunique(dropna=True))
             if "rep" in g.columns
-            else int(len(g))
+            else len(g)
         )
 
         # Row validity
@@ -1004,7 +1017,7 @@ def summarize_simulation(
             row["n_row_fail"] = int((~ok).sum())
         else:
             row["row_ok_rate"] = float("nan")
-            row["n_row_ok"] = int(len(g))
+            row["n_row_ok"] = len(g)
             row["n_row_fail"] = 0
 
         # Core stats
@@ -1055,7 +1068,15 @@ def summarize_simulation(
             row.update(_constancy_block(g, col))
 
         # Optional: theory ref overlays constancy
-        for col in ("CC_theory_ref", "JC_theory_ref", "dC_theory_ref", "phi_theory_ref_avg", "tau_theory_ref_avg", "CC_ref_minus_pop", "JC_ref_minus_pop"):
+        for col in (
+            "CC_theory_ref",
+            "JC_theory_ref",
+            "dC_theory_ref",
+            "phi_theory_ref_avg",
+            "tau_theory_ref_avg",
+            "CC_ref_minus_pop",
+            "JC_ref_minus_pop",
+        ):
             row.update(_constancy_block(g, col))
 
         # Optional: report most common failure stages (helps debugging experiment validity)

@@ -11,16 +11,11 @@ Design intent:
 """
 
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from typing import (
-    Dict,
-    Iterable,
-    List,
     Literal,
-    Optional,
-    Sequence,
-    Tuple,
     TypedDict,
     cast,
 )
@@ -50,9 +45,9 @@ _analysis = import_module(".theory_analysis", package=__package__)
 # ---------------------------------------
 # Prefer theory_analysis.__all__ as the canonical public surface.
 # If it's missing, fall back to "no leading underscore" as a conservative default.
-_analysis_public: List[str]
+_analysis_public: list[str]
 if hasattr(_analysis, "__all__"):
-    _analysis_public = list(cast(Sequence[str], getattr(_analysis, "__all__")))
+    _analysis_public = list(cast(Sequence[str], _analysis.__all__))
 else:
     _analysis_public = [n for n in dir(_analysis) if not n.startswith("_")]
 
@@ -74,7 +69,7 @@ __all__ = ["Rule", *_analysis_public]
 # -----------------------------
 # SciPy is optional. If missing, Gaussian-copula p11 may fall back to Monte Carlo,
 # but we record the import error so callers can decide whether to warn/fail.
-_SCIPY_IMPORT_ERROR: Optional[ImportError] = None
+_SCIPY_IMPORT_ERROR: ImportError | None = None
 try:
     from scipy.stats import (
         multivariate_normal,  # type: ignore[import-not-found]
@@ -109,24 +104,24 @@ A,B ∈ {0,1} producing binary triggers. We fix world-wise marginals:
     pB^w = P(B=1 | w)
 
 The unknown risk is the *joint* dependence between A and B inside each world.
-Let p11^w = P(A=1, B=1 | w). By probability axioms (Fréchet–Hoeffding bounds):
+Let p11^w = P(A=1, B=1 | w). By probability axioms (Fréchet-Hoeffding bounds):
 
     L^w = max(0, pA^w + pB^w - 1)
     U^w = min(pA^w, pB^w)
-    L^w ≤ p11^w ≤ U^w
+    L^w <= p11^w <= U^w
 
 Composition rules
 ----------------
 Define composed output C = f(A,B) where:
 
-- OR:  C = A ∨ B  ⇒  pC^w = P(C=1|w) = pA^w + pB^w − p11^w = 1 − p00^w
-- AND: C = A ∧ B  ⇒  pC^w = p11^w
+- OR:  C = A ∨ B  =>  pC^w = P(C=1|w) = pA^w + pB^w - p11^w = 1 - p00^w
+- AND: C = A ∧ B  =>  pC^w = p11^w
 
 Leakage & composability metric
 ------------------------------
 We use a two-world distinguishability gap (Youden-like difference in rates):
 
-    J_X := |pX^1 − pX^0|   for X ∈ {A,B,C}
+    J_X := |pX^1 - pX^0|   for X ∈ {A,B,C}
 
 Normalize by the best singleton rail:
 
@@ -134,14 +129,14 @@ Normalize by the best singleton rail:
     CC_max := J_C / J_best
 
 Interpretation:
-- CC_max > 1 ⇒ composition is *destructive* relative to the best single rail
-- CC_max < 1 ⇒ composition is *constructive* (reduces leakage vs best singleton)
+- CC_max > 1 => composition is *destructive* relative to the best single rail
+- CC_max < 1 => composition is *constructive* (reduces leakage vs best singleton)
 
 Dependence parameterization
 ---------------------------
 The canonical baseline path is FH-linear, per world:
 
-    p11^w(λ) = L^w + λ (U^w − L^w),   λ ∈ [0,1]
+    p11^w(λ) = L^w + λ (U^w - L^w),   λ ∈ [0,1]
 
 This is the convex interpolation between FH extremes; it is “singular” in the
 copula sense, but extremely useful as a *model-free scanner* of feasible joints.
@@ -151,9 +146,9 @@ Key lemma (Affine composition)
 Fix marginals pA^w, pB^w. Then pC^w is affine in p11^w for OR/AND.
 Therefore for any per-world paths p11^w(t), the two-world gap:
 
-    Δ_C(t) := pC^1(t) − pC^0(t)
+    Δ_C(t) := pC^1(t) - pC^0(t)
 
-is affine in δ11(t) := p11^1(t) − p11^0(t).
+is affine in δ11(t) := p11^1(t) - p11^0(t).
 
 Under FH-linear, Δ_C(λ) is affine in λ; hence J_C(λ)=|Δ_C(λ)| is piecewise affine.
 This is why closed-form λ* exists under a “no sign-flip” condition.
@@ -163,22 +158,22 @@ Dependence summaries (interpretability)
 We provide two dependence summaries per world, and their simple average:
 
 - Phi coefficient (binary Pearson correlation):
-      φ^w = (p11^w − pA^w pB^w) / sqrt(pA^w(1−pA^w)pB^w(1−pB^w))
+      φ^w = (p11^w - pA^w pB^w) / sqrt(pA^w(1-pA^w)pB^w(1-pB^w))
 
 - Kendall tau-a (population concordance functional for 2×2):
-      τ_a^w = 2(p00^w p11^w − p01^w p10^w)
+      τ_a^w = 2(p00^w p11^w - p01^w p10^w)
 
 Proof sketch for tau-a (binary):
 Let (A1,B1),(A2,B2) be i.i.d. draws. Kendall tau-a is:
-    τ_a = E[ sgn((A1−A2)(B1−B2)) ].
+    τ_a = E[ sgn((A1-A2)(B1-B2)) ].
 For binary, only pairs with A1≠A2 and B1≠B2 contribute ±1; those correspond to
 concordant (00 vs 11) and discordant (01 vs 10) cases. Computing the probability
-mass of those cases yields τ_a = 2(p00 p11 − p01 p10).
+mass of those cases yields τ_a = 2(p00 p11 - p01 p10).
 
 Sanity envelopes (bug catchers)
 -------------------------------
 Given fixed marginals in each world, FH bounds induce a feasible interval for pC^w,
-and therefore a feasible envelope for J_C = |pC^1 − pC^0| even when dependence is unknown.
+and therefore a feasible envelope for J_C = |pC^1 - pC^0| even when dependence is unknown.
 If empirical estimates violate these envelopes, either:
 - the code is wrong,
 - the inputs are inconsistent,
@@ -312,13 +307,13 @@ def _safe_div(num: float, den: float, eps: float = 0.0) -> float:
 
 def fh_bounds(pA: float, pB: float) -> FHBounds:
     """
-    Fréchet–Hoeffding bounds for p11 given Bernoulli marginals pA, pB.
+    Fréchet-Hoeffding bounds for p11 given Bernoulli marginals pA, pB.
 
     Derivation sketch:
-      - Upper bound: p11 <= P(A=1)=pA and p11 <= P(B=1)=pB ⇒ p11 <= min(pA,pB)
+      - Upper bound: p11 <= P(A=1)=pA and p11 <= P(B=1)=pB => p11 <= min(pA,pB)
       - Lower bound: by inclusion-exclusion,
-            P(A∪B) = pA + pB − p11 <= 1  ⇒  p11 >= pA + pB − 1
-        and of course p11 >= 0 ⇒ p11 >= max(0, pA+pB−1)
+            P(AUB) = pA + pB - p11 <= 1  =>  p11 >= pA + pB - 1
+        and of course p11 >= 0 => p11 >= max(0, pA+pB-1)
     """
     if not (0.0 <= pA <= 1.0 and 0.0 <= pB <= 1.0):
         raise ValueError(f"marginals must be in [0,1], got pA={pA}, pB={pB}")
@@ -338,7 +333,7 @@ DependencePath = Literal["fh_linear", "fh_power", "fh_scurve", "gaussian_copula"
 
 def p11_fh_linear(pA: float, pB: float, lam: float) -> float:
     """
-    FH-linear p11(λ) = L + λ(U−L), λ∈[0,1].
+    FH-linear p11(λ) = L + λ(U-L), λ∈[0,1].
     """
     if not (0.0 <= lam <= 1.0):
         raise ValueError(f"lambda must be in [0,1], got {lam}")
@@ -348,7 +343,7 @@ def p11_fh_linear(pA: float, pB: float, lam: float) -> float:
 
 def p11_fh_power(pA: float, pB: float, lam: float, k: float = 2.0) -> float:
     """
-    Curved but still FH-feasible: p11(λ)=L + λ^k (U−L), λ∈[0,1], k>0.
+    Curved but still FH-feasible: p11(λ)=L + λ^k (U-L), λ∈[0,1], k>0.
 
     Interpretation:
       - k>1: spends more time near the lower bound (slow start, fast finish)
@@ -391,7 +386,7 @@ def p11_gaussian_copula(
     *,
     method: Literal["auto", "scipy", "mc"] = "auto",
     n_mc: int = 200_000,
-    seed: Optional[int] = 12345,
+    seed: int | None = 12345,
 ) -> float:
     """
     Gaussian copula-based p11 (Bernoulli margins via latent thresholding).
@@ -468,7 +463,7 @@ def p11_path(
     lam: float,
     *,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
+    path_params: dict[str, float] | None = None,
 ) -> float:
     """
     Unified p11 path interface.
@@ -506,7 +501,7 @@ def p11_path(
         return p11_fh_scurve(pA, pB, lam, alpha=alpha)
 
     if path == "gaussian_copula":
-        # Map lam ∈ [0,1] to rho ∈ [-1,1]. Default: rho = 2λ − 1
+        # Map lam ∈ [0,1] to rho ∈ [-1,1]. Default: rho = 2λ - 1
         rho = float(path_params.get("rho", 2.0 * lam - 1.0))
         method = cast(Literal["auto", "scipy", "mc"], path_params.get("method", "auto"))
         n_mc = int(path_params.get("n_mc", 200_000))
@@ -529,7 +524,7 @@ def p11_path(
 # =========================
 
 
-def joint_cells_from_marginals(pA: float, pB: float, p11: float) -> Dict[str, float]:
+def joint_cells_from_marginals(pA: float, pB: float, p11: float) -> dict[str, float]:
     """
     Construct full 2×2 joint table given marginals and overlap p11.
 
@@ -563,7 +558,7 @@ def joint_cells_from_marginals(pA: float, pB: float, p11: float) -> Dict[str, fl
     return {"p00": p00, "p01": p01, "p10": p10, "p11": p11}
 
 
-def validate_joint_cells(cells: Dict[str, float], tol: float = 1e-10) -> None:
+def validate_joint_cells(cells: dict[str, float], tol: float = 1e-10) -> None:
     """
     Strict validation for a joint table.
     """
@@ -584,7 +579,7 @@ def validate_joint_cells(cells: Dict[str, float], tol: float = 1e-10) -> None:
 # =========================
 
 
-def pC_from_joint(rule: Rule, cells: Dict[str, float], pA: float, pB: float) -> float:
+def pC_from_joint(rule: Rule, cells: dict[str, float], pA: float, pB: float) -> float:
     """
     Compute pC given composition rule.
     """
@@ -621,7 +616,7 @@ def phi_from_joint(pA: float, pB: float, p11: float) -> float:
     return (p11 - pA * pB) / math.sqrt(denom)
 
 
-def kendall_tau_a_from_joint(cells: Dict[str, float]) -> float:
+def kendall_tau_a_from_joint(cells: dict[str, float]) -> float:
     """
     Kendall tau-a for a 2×2 distribution (population functional):
 
@@ -632,7 +627,7 @@ def kendall_tau_a_from_joint(cells: Dict[str, float]) -> float:
       Only comparisons with A1≠A2 and B1≠B2 contribute ±1.
       Concordant: (00,11) or (11,00) → probability 2 p00 p11
       Discordant: (01,10) or (10,01) → probability 2 p01 p10
-      Thus τ_a = 2 p00 p11 − 2 p01 p10.
+      Thus τ_a = 2 p00 p11 - 2 p01 p10.
     """
     p00, p01, p10, p11 = cells["p00"], cells["p01"], cells["p10"], cells["p11"]
     return 2.0 * (p00 * p11 - p01 * p10)
@@ -657,7 +652,7 @@ def leakage_J(p1: float, p0: float) -> float:
     return abs(p1 - p0)
 
 
-def compute_singleton_Js(marg: TwoWorldMarginals) -> Tuple[float, float, float]:
+def compute_singleton_Js(marg: TwoWorldMarginals) -> tuple[float, float, float]:
     """
     Returns (J_A, J_B, J_best).
     """
@@ -678,7 +673,7 @@ def compute_metrics_for_lambda(
     lam: float,
     *,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
+    path_params: dict[str, float] | None = None,
 ) -> MetricRow:
     """
     Compute analytic probabilities and derived metrics at a single lambda.
@@ -774,7 +769,7 @@ def theory_curve(
     lambdas: Iterable[float],
     *,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
+    path_params: dict[str, float] | None = None,
 ) -> pd.DataFrame:
     """
     Compute theory curve across lambdas.
@@ -799,7 +794,7 @@ def theory_curve(
 # =========================
 
 
-def _affine_form_or_and_one_world(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
+def _affine_form_or_and_one_world(pA: float, pB: float, rule: Rule) -> tuple[float, float]:
     """
     For FH-linear, p11(λ)=L+λW with W=(U-L).
 
@@ -823,7 +818,7 @@ def _affine_form_or_and_one_world(pA: float, pB: float, rule: Rule) -> Tuple[flo
     raise ValueError(f"Unknown rule: {rule}")
 
 
-def deltaC_affine_params_fh_linear(marg: TwoWorldMarginals, rule: Rule) -> Dict[str, float]:
+def deltaC_affine_params_fh_linear(marg: TwoWorldMarginals, rule: Rule) -> dict[str, float]:
     """
     Under FH-linear:
         pC^w(λ) = a_w + b_w λ
@@ -841,11 +836,11 @@ def deltaC_affine_params_fh_linear(marg: TwoWorldMarginals, rule: Rule) -> Dict[
         "b0": float(b0),
         "b1": float(b1),
         "delta0": float(a1 - a0),
-        "slope": float((b1 - b0)),
+        "slope": float(b1 - b0),
     }
 
 
-def detect_abs_kink_fh_linear(marg: TwoWorldMarginals, rule: Rule) -> Optional[float]:
+def detect_abs_kink_fh_linear(marg: TwoWorldMarginals, rule: Rule) -> float | None:
     """
     Detect whether Δ(λ)=pC^1-pC^0 crosses 0 on λ∈[0,1] under FH-linear.
 
@@ -882,7 +877,7 @@ def lambda_star_closed_form_fh_linear(
     target_cc: float = 1.0,
     *,
     require_no_kink: bool = True,
-) -> Optional[float]:
+) -> float | None:
     """
     Closed-form λ* for FH-linear when solving CC(λ*)=target_cc.
 
@@ -902,7 +897,7 @@ def lambda_star_closed_form_fh_linear(
       In that case, prefer grid root-finding in analysis for clarity.
     """
     marg.validate()
-    JA, JB, Jbest = compute_singleton_Js(marg)
+    _JA, _JB, Jbest = compute_singleton_Js(marg)
     if Jbest <= 0.0:
         return None
 
@@ -959,11 +954,11 @@ def find_all_roots_linear_interp(
     x: np.ndarray,
     y: np.ndarray,
     target: float,
-) -> List[float]:
+) -> list[float]:
     """
     Find all roots of y(x)=target using bracketing + linear interpolation on a grid.
     """
-    roots: List[float] = []
+    roots: list[float] = []
     if len(x) != len(y) or len(x) < 2:
         return roots
 
@@ -986,7 +981,7 @@ def find_all_roots_linear_interp(
 
     roots.sort()
     # dedupe
-    out: List[float] = []
+    out: list[float] = []
     for r in roots:
         if not out or abs(r - out[-1]) > 1e-10:
             out.append(r)
@@ -998,7 +993,7 @@ def find_lambda_star_from_curve(
     *,
     target_cc: float = 1.0,
     prefer_first: bool = True,
-) -> Optional[float]:
+) -> float | None:
     """
     Find λ* such that CC(λ*)=target_cc from a curve DataFrame.
 
@@ -1033,12 +1028,12 @@ def find_lambda_star_from_curve(
 # =========================
 
 
-def fh_pC_interval(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
+def fh_pC_interval(pA: float, pB: float, rule: Rule) -> tuple[float, float]:
     """
     FH-induced feasible interval for pC in a single world.
 
-    - OR: pC = pA+pB-p11, p11∈[L,U] ⇒ pC∈[pA+pB-U, pA+pB-L]
-    - AND: pC = p11, p11∈[L,U] ⇒ pC∈[L,U]
+    - OR: pC = pA+pB-p11, p11∈[L,U] => pC∈[pA+pB-U, pA+pB-L]
+    - AND: pC = p11, p11∈[L,U] => pC∈[L,U]
     """
     b = fh_bounds(pA, pB)
     if rule == "OR":
@@ -1052,8 +1047,8 @@ def fh_pC_interval(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
 
 
 def jc_envelope_from_intervals(
-    int0: Tuple[float, float], int1: Tuple[float, float]
-) -> Tuple[float, float]:
+    int0: tuple[float, float], int1: tuple[float, float]
+) -> tuple[float, float]:
     """
     From I0=[a0,b0], I1=[a1,b1], derive feasible envelope for JC=|x-y| with x∈I1,y∈I0.
 
@@ -1068,16 +1063,13 @@ def jc_envelope_from_intervals(
         a1, b1 = b1, a1
 
     overlap = (b0 >= a1) and (b1 >= a0)
-    if overlap:
-        jmin = 0.0
-    else:
-        jmin = min(abs(a1 - b0), abs(a0 - b1))
+    jmin = 0.0 if overlap else min(abs(a1 - b0), abs(a0 - b1))
 
     jmax = max(abs(a1 - b0), abs(b1 - a0), abs(a1 - a0), abs(b1 - b0))
     return (float(_clip01(jmin)), float(_clip01(jmax)))
 
 
-def compute_fh_jc_envelope(marg: TwoWorldMarginals, rule: Rule) -> Tuple[float, float]:
+def compute_fh_jc_envelope(marg: TwoWorldMarginals, rule: Rule) -> tuple[float, float]:
     """
     Absolute sanity envelope for JC implied only by marginals + FH feasibility.
     """
@@ -1097,8 +1089,8 @@ def dependence_at_lambda(
     lam: float,
     *,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
-) -> Dict[str, float]:
+    path_params: dict[str, float] | None = None,
+) -> dict[str, float]:
     """
     Compute (phi_0,phi_1,phi_avg,tau_0,tau_1,tau_avg) at a given lambda and path.
     """
@@ -1139,8 +1131,8 @@ def solve_lambda_star_and_dependence(
     target_cc: float = 1.0,
     prefer_closed_form_fh_linear: bool = True,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
-) -> Dict[str, float]:
+    path_params: dict[str, float] | None = None,
+) -> dict[str, float]:
     """
     End-to-end:
       1) compute theory curve
@@ -1153,7 +1145,7 @@ def solve_lambda_star_and_dependence(
     path_params = path_params or {}
     df = theory_curve(marg, rule, lambdas, path=path, path_params=path_params)
 
-    lam_star: Optional[float] = None
+    lam_star: float | None = None
     if prefer_closed_form_fh_linear and path == "fh_linear":
         lam_star = lambda_star_closed_form_fh_linear(
             marg, rule, target_cc=target_cc, require_no_kink=True
@@ -1205,7 +1197,7 @@ def var_JC_delta(
     *,
     n_per_world: int,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
+    path_params: dict[str, float] | None = None,
     assume_no_kink: bool = True,
 ) -> float:
     """
@@ -1235,7 +1227,7 @@ def var_CC_delta(
     *,
     n_per_world: int,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
+    path_params: dict[str, float] | None = None,
     assume_Jbest_fixed: bool = True,
 ) -> float:
     """
@@ -1244,7 +1236,7 @@ def var_CC_delta(
     Simplest (and typical in this experiment) assumption:
       - J_best is fixed because marginals are configured by design.
       Then:
-        CC = JC / Jbest  ⇒  var(CC_hat) ≈ var(JC_hat) / Jbest^2
+        CC = JC / Jbest  =>  var(CC_hat) ≈ var(JC_hat) / Jbest^2
 
     If you estimate marginals from data and therefore estimate J_best, you can
     extend this with covariance terms (left to analyze_bootstrap.py).
@@ -1275,7 +1267,7 @@ def approx_cc_ci_normal(
     cc_hat: float,
     var_cc: float,
     alpha: float = 0.05,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Quick normal-approx CI:
         cc_hat ± z_{1-alpha/2} * sqrt(var_cc)
@@ -1303,8 +1295,8 @@ def summarize_cliff_conditions(
     rule: Rule,
     *,
     path: DependencePath = "fh_linear",
-    path_params: Optional[Dict[str, float]] = None,
-) -> Dict[str, float]:
+    path_params: dict[str, float] | None = None,
+) -> dict[str, float]:
     """
     Compact “defense-ready” diagnostics for your Methods/Theory writeup.
 
@@ -1334,7 +1326,7 @@ def summarize_cliff_conditions(
         "dC_at_1": float(m1["dC"]),
         "CC_at_0": float(m0["CC"]),
         "CC_at_1": float(m1["CC"]),
-        "path": float(0.0),  # placeholder numeric to keep JSON-friendly in some pipelines
+        "path": 0.0,  # placeholder numeric to keep JSON-friendly in some pipelines
     }
 
     if path == "fh_linear":

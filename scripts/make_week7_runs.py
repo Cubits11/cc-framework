@@ -14,10 +14,10 @@ import argparse
 import hashlib
 import json
 import sys
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import numpy as np
 import yaml
@@ -45,7 +45,7 @@ class RailParams:
     anchor: float
 
 
-RAIL_LIBRARY: Dict[str, RailParams] = {
+RAIL_LIBRARY: dict[str, RailParams] = {
     "keyword": RailParams(base_tpr=0.82, base_fpr=0.052, slope_tpr=0.9, slope_fpr=1.2, anchor=0.65),
     "regex": RailParams(base_tpr=0.75, base_fpr=0.048, slope_tpr=0.7, slope_fpr=1.0, anchor=0.60),
     "semantic": RailParams(
@@ -59,7 +59,7 @@ RAIL_LIBRARY: Dict[str, RailParams] = {
 # ---------------------------------------------------------------------------
 
 
-def calibrate_rate(params: RailParams, threshold: float, jitter: float) -> Tuple[float, float]:
+def calibrate_rate(params: RailParams, threshold: float, jitter: float) -> tuple[float, float]:
     delta = params.anchor - threshold
     tpr = params.base_tpr + params.slope_tpr * delta + jitter
     fpr = params.base_fpr + params.slope_fpr * delta * 0.4 + jitter / 2.0
@@ -70,7 +70,7 @@ def calibrate_rate(params: RailParams, threshold: float, jitter: float) -> Tuple
 
 def sample_guardrail(
     seed: int, episodes: int, rail: str, threshold: float
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     params = RAIL_LIBRARY.get(rail)
     if not params:
         raise ValueError(f"Unknown rail '{rail}'")
@@ -92,7 +92,7 @@ def compose_events(topology: str, events: Sequence[np.ndarray]) -> np.ndarray:
     raise ValueError(f"Unsupported topology: {topology}")
 
 
-def compute_empirical_metrics(world1: np.ndarray, world0: np.ndarray) -> Dict[str, float]:
+def compute_empirical_metrics(world1: np.ndarray, world0: np.ndarray) -> dict[str, float]:
     tpr = float(np.mean(world1))
     fpr = float(np.mean(world0))
     j = tpr - fpr
@@ -104,7 +104,7 @@ def compute_wilson(world: np.ndarray) -> WilsonInterval:
     return wilson_interval(successes, world.size)
 
 
-def compute_bca(world1: np.ndarray, world0: np.ndarray, *, rng_seed: int) -> Dict[str, BCaInterval]:
+def compute_bca(world1: np.ndarray, world0: np.ndarray, *, rng_seed: int) -> dict[str, BCaInterval]:
     delta_interval = bca_bootstrap(
         [world1, world0],
         lambda xs: float(np.mean(xs[0]) - np.mean(xs[1])),
@@ -122,7 +122,7 @@ def compute_bca(world1: np.ndarray, world0: np.ndarray, *, rng_seed: int) -> Dic
 
 def classify_regime(
     j_obs: float, single_js: Sequence[float], independence_j: float
-) -> Tuple[str, float, bool]:
+) -> tuple[str, float, bool]:
     best_single = max(single_js)
     delta_j = j_obs - best_single
     d_lamp = best_single < 0.10
@@ -165,18 +165,18 @@ def main() -> None:
     with config_path.open("r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
 
-    seeds: List[int] = list(cfg.get("seeds", []))
+    seeds: list[int] = list(cfg.get("seeds", []))
     episodes = int(cfg.get("episodes_per_config", 1000))
     fpr_window = cfg.get("fpr_window", [0.04, 0.06])
 
-    threshold_grid: Dict[str, List[float]] = cfg.get("threshold_grid", {})
-    or_compositions: List[List[str]] = cfg.get("or_compositions", [])
-    and_compositions: List[List[str]] = cfg.get("and_compositions", [])
+    threshold_grid: dict[str, list[float]] = cfg.get("threshold_grid", {})
+    or_compositions: list[list[str]] = cfg.get("or_compositions", [])
+    and_compositions: list[list[str]] = cfg.get("and_compositions", [])
 
-    def iter_thresholds(rails: Sequence[str]) -> Iterable[Dict[str, float]]:
+    def iter_thresholds(rails: Sequence[str]) -> Iterable[dict[str, float]]:
         values = [threshold_grid[r] for r in rails]
         for combo in product(*values):
-            yield {rail: float(thr) for rail, thr in zip(rails, combo)}
+            yield {rail: float(thr) for rail, thr in zip(rails, combo, strict=False)}
 
     total_runs = 0
     for topology, compositions in [
@@ -193,7 +193,7 @@ def main() -> None:
                     rng_seed = seed + int(1e6 * sum(thresholds.values()))
                     world1_events = []
                     world0_events = []
-                    per_rail_metrics: Dict[str, Dict[str, float]] = {}
+                    per_rail_metrics: dict[str, dict[str, float]] = {}
 
                     for rail in rails:
                         key_seed = rng_seed + hash(rail) % 10_000

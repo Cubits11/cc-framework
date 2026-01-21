@@ -2,8 +2,8 @@
 """
 Module: bounds
 Purpose:
-  (A) Fréchet–Hoeffding ceilings for composed Youden's J over two ROC curves
-  (B) Finite-sample FH–Bernstein utilities for CC at a fixed operating point θ
+  (A) Fréchet-Hoeffding ceilings for composed Youden's J over two ROC curves
+  (B) Finite-sample FH-Bernstein utilities for CC at a fixed operating point θ
   (C) Seamless bridge to optional Enterprise add-ons if present
 
 Design notes
@@ -22,8 +22,9 @@ Tip: For power users, you can import the advanced classes directly:
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from math import ceil, exp, log
-from typing import Any, Dict, Iterable, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Literal, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -53,28 +54,28 @@ try:
     BoundType = _be.BoundType
 
     _HAS_ENTERPRISE = True
-except Exception:  # noqa: BLE001
+except Exception:
     # Enterprise is optional; quietly continue with the core-only implementation.
     pass
 
 __all__ = [
     # Core ceilings over ROC curves
     "ROCArrayLike",
+    "bernstein_tail",
+    "cc_confint",
+    "cc_two_sided_bound",
+    "ensure_anchors",
+    "envelope_over_rocs",
+    # n-rail FH helpers
+    "fh_and_bounds_n",
+    # FH/Bernstein utilities at a fixed θ
+    "fh_intervals",
+    "fh_or_bounds_n",
+    "fh_var_envelope",
     "frechet_upper",
     "frechet_upper_with_argmax",
     "frechet_upper_with_argmax_points",
-    "envelope_over_rocs",
-    "ensure_anchors",
-    # n-rail FH helpers
-    "fh_and_bounds_n",
-    "fh_or_bounds_n",
-    # FH/Bernstein utilities at a fixed θ
-    "fh_intervals",
-    "fh_var_envelope",
-    "bernstein_tail",
     "invert_bernstein_eps",
-    "cc_two_sided_bound",
-    "cc_confint",
     "needed_n_bernstein",
     "needed_n_bernstein_int",
 ]
@@ -83,23 +84,23 @@ __all__ = [
 if _HAS_ENTERPRISE:
     __all__ += [
         "AdaptiveBounds",
-        "BayesianBounds",
-        "CausalBounds",
-        "StreamingBounds",
-        "MultiObjectiveOptimizer",
-        "BanditThresholdSelector",
-        "GPBounds",
-        "DistributedROCAnalyzer",
-        "ConfidenceSequence",
-        "PredictionInterval",
-        "UncertaintyQuantifier",
         "AdaptiveStrategy",
+        "BanditThresholdSelector",
+        "BayesianBounds",
         "BoundType",
+        "CausalBounds",
+        "ConfidenceSequence",
+        "DistributedROCAnalyzer",
+        "GPBounds",
+        "MultiObjectiveOptimizer",
+        "PredictionInterval",
+        "StreamingBounds",
+        "UncertaintyQuantifier",
     ]
 
 # ---- Types -----------------------------------------------------------------
 
-ROCPoint: TypeAlias = Tuple[float, float]
+ROCPoint: TypeAlias = tuple[float, float]
 ROCArrayLike: TypeAlias = Union[
     Sequence[ROCPoint],
     Iterable[ROCPoint],
@@ -197,7 +198,7 @@ def _frechet_grid_OR(
 # ---- n-rail FH helpers -----------------------------------------------------
 
 
-def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+def fh_and_bounds_n(alphas: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     FH bounds for ∧_i A_i given per-rail trigger rates alphas = P(A_i) with shape (k, ...).
     Returns (lower, upper) where:
@@ -211,7 +212,7 @@ def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], N
     return lower, upper
 
 
-def fh_or_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+def fh_or_bounds_n(alphas: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     FH bounds for ∨_i A_i given per-rail trigger rates alphas = P(A_i) with shape (k, ...).
     Returns (lower, upper) where:
@@ -257,7 +258,7 @@ def frechet_upper(
     use_gpu: bool = False,
     uncertainty: bool = False,
     n_bootstrap: int = 1000,
-) -> Union[float, Tuple[float, Dict[str, float]]]:
+) -> float | tuple[float, dict[str, float]]:
     """
     Fréchet-style *upper bound* on composed Youden's J over two ROC curves.
 
@@ -318,7 +319,7 @@ def frechet_upper_with_argmax(
     comp: Literal["AND", "OR", "and", "or"] = "AND",
     clip: Literal["silent", "warn", "error"] = "silent",
     add_anchors: bool = False,
-) -> Tuple[float, Optional[int], Optional[int]]:
+) -> tuple[float, int | None, int | None]:
     """As `frechet_upper`, but also return (ia, ib) of the maximizing cross-pair."""
     if add_anchors:
         A = ensure_anchors(roc_a, clip=clip)
@@ -357,7 +358,7 @@ def frechet_upper_with_argmax_points(
     comp: Literal["AND", "OR", "and", "or"] = "AND",
     clip: Literal["silent", "warn", "error"] = "silent",
     add_anchors: bool = False,
-) -> Tuple[float, ROCPoint, ROCPoint]:
+) -> tuple[float, ROCPoint, ROCPoint]:
     """
     Like `frechet_upper_with_argmax` but returns the maximizing ROC points themselves:
     (J_max, (fpr_a*, tpr_a*), (fpr_b*, tpr_b*))
@@ -382,7 +383,7 @@ def envelope_over_rocs(
     comp: Literal["AND", "OR", "and", "or"] = "AND",
     clip: Literal["silent", "warn", "error"] = "silent",
     add_anchors: bool = False,
-) -> Tuple[float, NDArray[np.float64]]:
+) -> tuple[float, NDArray[np.float64]]:
     """
     Return (J_max, J_grid) where J_grid has shape (Na, Nb).
     Useful for plotting heatmaps and highlighting the argmax.
@@ -425,11 +426,11 @@ def fh_intervals(
     fpr_a: float,
     fpr_b: float,
     *,
-    alpha_cap: Optional[float] = None,
+    alpha_cap: float | None = None,
     cap_mode: Literal["error", "clip"] = "error",
-) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+) -> tuple[tuple[float, float], tuple[float, float]]:
     """
-    Fréchet–Hoeffding *sharp* intervals for:
+    Fréchet-Hoeffding *sharp* intervals for:
       I1: p1 = P(A ∧ B = 1 | Y=1)   (AND on positives)
       I0: p0 = P(A ∨ B = 1 | Y=0)   (OR  on negatives)
 
@@ -462,7 +463,7 @@ def fh_intervals(
     return (L1, U1), (L0, U0)
 
 
-def fh_var_envelope(interval: Tuple[float, float]) -> float:
+def fh_var_envelope(interval: tuple[float, float]) -> float:
     """
     Return max_{p in [a,b]} p(1-p); 0.25 if 0.5∈[a,b], else max of endpoints.
     """
@@ -476,10 +477,10 @@ def fh_var_envelope(interval: Tuple[float, float]) -> float:
 
 def bernstein_tail(
     *args,
-    t: Optional[float] = None,
-    eps: Optional[float] = None,
-    n: Optional[int] = None,
-    vbar: Optional[float] = None,
+    t: float | None = None,
+    eps: float | None = None,
+    n: int | None = None,
+    vbar: float | None = None,
     D: float = 1.0,
     two_sided: bool = True,
 ) -> float:
@@ -492,7 +493,7 @@ def bernstein_tail(
       • Legacy       : bernstein_tail(n, eps, vbar) where eps=ε directly.
 
     Bound (two-sided):
-      P(|p̂ - p| ≥ ε) ≤ 2 * exp( - n * ε^2 / (2 vbar + (2/3) ε) ).
+      P(|p̂ - p| ≥ ε) <= 2 * exp( - n * ε^2 / (2 vbar + (2/3) ε) ).
 
     Monotonicity:
       increasing in n ↓ (prob decreases), increasing in ε (or t) ↓ (prob decreases).
@@ -545,7 +546,7 @@ def bernstein_tail(
 
 def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
     """
-    Invert  2 * exp( - n * eps^2 / (2 vbar + (2/3) eps) ) ≤ (1 - delta)
+    Invert  2 * exp( - n * eps^2 / (2 vbar + (2/3) eps) ) <= (1 - delta)
     to solve for the smallest eps ≥ 0. Uses bracket + binary search.
     """
     if n <= 0:
@@ -581,8 +582,8 @@ def cc_two_sided_bound(
     n0: int,
     t: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     cap_at_one: bool = False,
 ) -> float:
@@ -605,13 +606,13 @@ def cc_confint(
     p1_hat: float,
     p0_hat: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     delta: float = 0.05,
-    split: Optional[Tuple[float, float]] = None,
+    split: tuple[float, float] | None = None,
     clamp01: bool = False,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Finite-sample two-sided CI for CC: invert classwise Bernstein tails, propagate through D.
     Returns (lo, hi) around CC_hat = (1 - (p1_hat - p0_hat)) / D.
@@ -646,16 +647,16 @@ def cc_confint(
 def needed_n_bernstein(
     t: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     delta: float = 0.05,
-    split: Optional[Tuple[float, float]] = None,
-) -> Tuple[float, float]:
+    split: tuple[float, float] | None = None,
+) -> tuple[float, float]:
     """
-    Closed-form per-class sample sizes (floats) so each Bernstein term ≤ δ_y.
-    Enforce: 2 * exp( - n_y (tD)^2 / ( 2 v̄_y + (2/3) tD ) ) ≤ δ_y
-      ⇒ n_y ≥ (( 2 v̄_y + (2/3) tD ) / (tD)^2) * log(2/δ_y).
+    Closed-form per-class sample sizes (floats) so each Bernstein term <= δ_y.
+    Enforce: 2 * exp( - n_y (tD)^2 / ( 2 v̄_y + (2/3) tD ) ) <= δ_y
+      => n_y ≥ (( 2 v̄_y + (2/3) tD ) / (tD)^2) * log(2/δ_y).
     """
     if t <= 0.0 or D <= 0.0:
         raise ValueError("t and D must be > 0.")
@@ -682,15 +683,15 @@ def needed_n_bernstein(
 def needed_n_bernstein_int(
     t: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     delta: float = 0.05,
-    split: Optional[Tuple[float, float]] = None,
-) -> Tuple[int, int]:
+    split: tuple[float, float] | None = None,
+) -> tuple[int, int]:
     """
     Integer (ceil) per-class sample sizes for planner; wraps `needed_n_bernstein`.
     Returns (max(1, ceil(n1_float)), max(1, ceil(n0_float))).
     """
     n1f, n0f = needed_n_bernstein(t, D, I1, I0, delta=delta, split=split)
-    return max(1, int(ceil(n1f))), max(1, int(ceil(n0f)))
+    return max(1, ceil(n1f)), max(1, ceil(n0f))

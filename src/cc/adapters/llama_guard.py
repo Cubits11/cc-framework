@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable
 
 from .base import (
     Decision,
@@ -25,7 +25,7 @@ LLAMA_GUARD_SYSTEM_PROMPT = (
 )
 
 
-def _default_prompt(prompt: str, response: Optional[str]) -> str:
+def _default_prompt(prompt: str, response: str | None) -> str:
     if response:
         return f"User: {prompt}\nAssistant: {response}"
     return f"User: {prompt}"
@@ -60,7 +60,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
     temperature: float = 0.0
     threshold: float = 0.5
     score_mode: str = "logprob"
-    generator: Optional[Callable[[str], Tuple[str, Optional[float], Dict[str, Any]]]] = None
+    generator: Callable[[str], tuple[str, float | None, dict[str, Any]]] | None = None
     model: Any = None
     tokenizer: Any = None
 
@@ -68,7 +68,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
     version: str = "unknown"
     supports_input_check: bool = True
     supports_output_check: bool = True
-    _config_fingerprint: Optional[str] = field(default=None, init=False)
+    _config_fingerprint: str | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         self._config_fingerprint = fingerprint_payload(
@@ -98,7 +98,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
             )
         self.version = self.model_name
 
-    def _build_prompt(self, prompt: str, response: Optional[str]) -> str:
+    def _build_prompt(self, prompt: str, response: str | None) -> str:
         content = _default_prompt(prompt, response)
         if self.tokenizer is None:
             return content
@@ -110,7 +110,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
             messages, tokenize=False, add_generation_prompt=True
         )
 
-    def _generate(self, prompt_text: str) -> Tuple[str, Optional[float], Dict[str, Any]]:
+    def _generate(self, prompt_text: str) -> tuple[str, float | None, dict[str, Any]]:
         if self.generator is not None:
             return self.generator(prompt_text)
         try:
@@ -134,7 +134,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
             score = _score_from_logits(outputs.scores[0], self.tokenizer)
         return decoded.strip(), score, {"decoded": decoded}
 
-    def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
+    def check(self, prompt: str, response: str | None, metadata: dict[str, Any]) -> Decision:
         started_at = time.time()
         try:
             prompt_text = self._build_prompt(prompt, response)
@@ -194,7 +194,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
         )
 
 
-def _score_from_logits(logits: Any, tokenizer: Any) -> Optional[float]:
+def _score_from_logits(logits: Any, tokenizer: Any) -> float | None:
     try:
         import torch
     except ImportError:  # pragma: no cover - dependency guard
@@ -212,7 +212,7 @@ def _score_from_logits(logits: Any, tokenizer: Any) -> Optional[float]:
     return float(probs[0, unsafe_id])
 
 
-def _parse_llama_guard_output(text: str) -> Tuple[str, Optional[str]]:
+def _parse_llama_guard_output(text: str) -> tuple[str, str | None]:
     lowered = text.lower()
     if "unsafe" in lowered:
         category = None

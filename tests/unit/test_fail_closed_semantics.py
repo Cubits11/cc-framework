@@ -77,7 +77,7 @@ def test_fail_closed_concurrency_stress() -> None:
         results = list(executor.map(_run, prompts))
 
     assert len(results) == len(prompts)
-    for prompt, decision in zip(prompts, results):
+    for prompt, decision in zip(prompts, results, strict=False):
         if "fail" in prompt:
             assert decision.verdict == "review"
             assert decision.audit.get("error_summary", {}).get("type") == "RuntimeError"

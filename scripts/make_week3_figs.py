@@ -79,7 +79,7 @@ def main():
     # CC inputs (either from CLI or JSON)
     cfg = {}
     if args.config_json:
-        with open(args.config_json, "r") as f:
+        with open(args.config_json) as f:
             cfg = json.load(f)
 
     # prefer CLI values if present
@@ -94,17 +94,17 @@ def main():
         # Provide a safe synthetic demo if not provided
         print(f"[warn] Missing CC inputs {missing}; using a synthetic demo set.")
         vals.update(
-            dict(
-                p1_hat=0.42,
-                p0_hat=0.11,
-                n1=500,
-                n0=500,
-                D=0.8,
-                tpr_a=0.78,
-                tpr_b=0.70,
-                fpr_a=0.10,
-                fpr_b=0.12,
-            )
+            {
+                "p1_hat": 0.42,
+                "p0_hat": 0.11,
+                "n1": 500,
+                "n0": 500,
+                "D": 0.8,
+                "tpr_a": 0.78,
+                "tpr_b": 0.70,
+                "fpr_a": 0.10,
+                "fpr_b": 0.12,
+            }
         )
 
     ccfig = plot_cc_ci_comparison(
@@ -120,7 +120,7 @@ def main():
         alpha_cap=args.alpha_cap,
         delta=args.delta,
         outpath=args.out_cccis,
-        title="CC CIs (FH–Bernstein vs. Newcombe)",
+        title="CC CIs (FH-Bernstein vs. Newcombe)",
     )
     print(
         f"[cc-cis] CĈ={ccfig['cc_hat']:.4f}  "

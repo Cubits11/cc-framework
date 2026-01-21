@@ -7,7 +7,7 @@ Subcommands:
   - verify-audit    Verify the tamper-evident JSONL audit chain
   - verify-stats    Lightweight bootstrap sanity check on score plumbing
   - build-reports   Aggregate CC/CCC results into CSV/Markdown under evaluation/reports
-  - methods         FH–Bernstein + Wilson + (optional) Bootstrap CC CI at a fixed θ
+  - methods         FH-Bernstein + Wilson + (optional) Bootstrap CC CI at a fixed θ
 
 Examples:
   python -m cc.cartographer.cli run \
@@ -47,8 +47,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, List, Literal, Mapping, Optional
+from typing import Any, Literal
 
 import numpy as np
 
@@ -117,7 +118,7 @@ def _read_binary_series(path: Path) -> np.ndarray:
     return arr
 
 
-def _maybe_counts_to_phat(k: Optional[int], n: Optional[int]) -> Optional[float]:
+def _maybe_counts_to_phat(k: int | None, n: int | None) -> float | None:
     """
     Convert counts to proportion if both provided; otherwise return None.
     """
@@ -135,7 +136,7 @@ def _maybe_counts_to_phat(k: Optional[int], n: Optional[int]) -> Optional[float]
 # -----------------------------------------------------------------------------
 
 
-def _cmd_run(argv: List[str]) -> None:
+def _cmd_run(argv: list[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli run",
         description="Execute a single run: load scores, compute J/CI and CC, draw a figure, and append to audit.",
@@ -201,7 +202,7 @@ def _cmd_run(argv: List[str]) -> None:
         )
 
 
-def _cmd_verify_audit(argv: List[str]) -> None:
+def _cmd_verify_audit(argv: list[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli verify-audit",
         description="Verify integrity of the append-only JSONL audit chain.",
@@ -212,7 +213,7 @@ def _cmd_verify_audit(argv: List[str]) -> None:
     print("audit chain OK")
 
 
-def _cmd_verify_stats(argv: List[str]) -> None:
+def _cmd_verify_stats(argv: list[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli verify-stats",
         description="Run bootstrap diagnostics to sanity-check score plumbing.",
@@ -232,7 +233,7 @@ def _cmd_verify_stats(argv: List[str]) -> None:
     print("bootstrap diagnostics OK")
 
 
-def _cmd_build_reports(argv: List[str]) -> None:
+def _cmd_build_reports(argv: list[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli build-reports",
         description="Aggregate reports from existing artifacts under results/ and evaluation/ccc/addenda.",
@@ -247,13 +248,13 @@ def _cmd_build_reports(argv: List[str]) -> None:
     reporting.build_all(mode=args.mode)
 
 
-def _cmd_methods(argv: List[str]) -> None:
+def _cmd_methods(argv: list[str]) -> None:
     """
-    Week-3: FH–Bernstein + Wilson + (optional) Bootstrap CC CI at a fixed θ, with planner and figure.
+    Week-3: FH-Bernstein + Wilson + (optional) Bootstrap CC CI at a fixed θ, with planner and figure.
     """
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli methods",
-        description="Compute FH–Bernstein + Wilson + Bootstrap CC CIs at a fixed operating point θ.",
+        description="Compute FH-Bernstein + Wilson + Bootstrap CC CIs at a fixed operating point θ.",
     )
     # Required operating context
     p.add_argument(
@@ -312,7 +313,7 @@ def _cmd_methods(argv: List[str]) -> None:
     if p1_hat is None or p0_hat is None:
         raise SystemExit("Provide either counts (k1,k0) or sample files (y1-samples,y0-samples).")
 
-    # FH–Bernstein core (computes FH intervals, variance envelopes, and planner)
+    # FH-Bernstein core (computes FH intervals, variance envelopes, and planner)
     report = estimate_cc_methods_from_rates(
         p1_hat=p1_hat,
         p0_hat=p0_hat,
@@ -357,7 +358,7 @@ def _cmd_methods(argv: List[str]) -> None:
 
     print(f"\n  CIs (two-sided, δ = {args.delta:.3f}):")
     print(
-        f"    FH–Bernstein: [{ci_b['lo']:.4f}, {ci_b['hi']:.4f}]  (planner t={ci_b.get('target_t')})"
+        f"    FH-Bernstein: [{ci_b['lo']:.4f}, {ci_b['hi']:.4f}]  (planner t={ci_b.get('target_t')})"
     )
     print(f"    Wilson      : [{wil_lo:.4f}, {wil_hi:.4f}]")
     if boo_lo is not None:
@@ -368,7 +369,7 @@ def _cmd_methods(argv: List[str]) -> None:
         print("    Bootstrap   : (skipped — provide --y1-samples/--y0-samples)")
 
     if ci_b.get("n1_star") is not None:
-        print("\n  Planner (per-class, each term ≤ δ/2):")
+        print("\n  Planner (per-class, each term <= δ/2):")
         print(f"    n1* ≈ {ci_b['n1_star']:.1f}   n0* ≈ {ci_b['n0_star']:.1f}")
 
     # Optional figure

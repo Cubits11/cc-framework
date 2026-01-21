@@ -6,7 +6,6 @@ import json
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 
@@ -37,7 +36,7 @@ def _hash_config(config: FHAtlasConfig) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _valid_theta_values(family: str, theta_values: List[float]) -> List[float]:
+def _valid_theta_values(family: str, theta_values: list[float]) -> list[float]:
     if family == "clayton":
         return [theta for theta in theta_values if theta > 0]
     if family == "gumbel":
@@ -60,8 +59,8 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
     plots_dir.mkdir(parents=True, exist_ok=True)
     certificate_dir.mkdir(parents=True, exist_ok=True)
 
-    table_rows: List[Dict[str, object]] = []
-    manifest_entries: List[ManifestEntry] = []
+    table_rows: list[dict[str, object]] = []
+    manifest_entries: list[ManifestEntry] = []
 
     for composition_type in config.composition_types:
         for k in config.k_values:
@@ -86,10 +85,10 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
                         thetas = _valid_theta_values(family, list(config.theta_grid))
                         if not thetas:
                             continue
-                        observed_js: List[float] = []
-                        observed_ci: List[tuple[float, float]] = []
-                        cii_values: List[float] = []
-                        certificate_payload: Dict[str, object] | None = None
+                        observed_js: list[float] = []
+                        observed_ci: list[tuple[float, float]] = []
+                        cii_values: list[float] = []
+                        certificate_payload: dict[str, object] | None = None
 
                         for theta in thetas:
                             for sample_size in config.sample_sizes:

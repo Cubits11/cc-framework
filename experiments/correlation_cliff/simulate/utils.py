@@ -19,7 +19,7 @@ Research-OS invariants:
 import logging
 import math
 from importlib import import_module
-from typing import Any, Callable, Dict, Literal, Optional
+from typing import Any, Callable, Literal
 
 import numpy as np
 
@@ -147,7 +147,7 @@ p11_fh_linear = T.p11_fh_linear
 pC_from_joint = T.pC_from_joint
 
 # Optional: reference overlay helper (never assumed path-consistent)
-compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(
+compute_metrics_for_lambda: Callable[..., dict[str, float]] | None = getattr(
     T, "compute_metrics_for_lambda", None
 )
 
@@ -246,13 +246,13 @@ __all__ = [
     "FHBounds",
     "TwoWorldMarginals",
     "WorldMarginals",
+    "build_linear_lambda_grid",
     "compute_fh_jc_envelope",
+    "compute_metrics_for_lambda",
     "fh_bounds",
     "joint_cells_from_marginals",
     "kendall_tau_a_from_joint",
-    "phi_from_joint",
     "p11_fh_linear",
     "pC_from_joint",
-    "compute_metrics_for_lambda",
-    "build_linear_lambda_grid",
+    "phi_from_joint",
 ]

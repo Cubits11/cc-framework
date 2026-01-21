@@ -9,8 +9,8 @@ hold. It also includes negative controls (independent and shuffled labels).
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, List, Optional
 
 import numpy as np
 
@@ -81,9 +81,9 @@ def run_benchmark(
     n: int,
     pA: float,
     pB: float,
-    p11: Optional[float],
-    seed: Optional[int],
-) -> List[BenchmarkResult]:
+    p11: float | None,
+    seed: int | None,
+) -> list[BenchmarkResult]:
     rng = np.random.default_rng(seed)
     if p11 is None:
         p11 = pA * pB

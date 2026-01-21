@@ -43,10 +43,11 @@ import math
 import platform
 import sys
 import time
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import NormalDist
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -79,8 +80,8 @@ class SweepConfig:
     replicates: int = 1
     jobs: int = 1
     executor: str = "process"  # "process" or "thread"
-    rho_pos: Optional[float] = None  # override rho for positive class only
-    rho_neg: Optional[float] = None  # override rho for negative class only
+    rho_pos: float | None = None  # override rho for positive class only
+    rho_neg: float | None = None  # override rho for negative class only
 
 
 @dataclass(frozen=True)
@@ -92,8 +93,8 @@ class RunMetadata:
     python: str
     platform: str
     numpy: str
-    argv: List[str]
-    config: Dict[str, Any]
+    argv: list[str]
+    config: dict[str, Any]
     elapsed_sec: float
 
 
@@ -175,7 +176,7 @@ def _mu_pos_from_tpr(tpr: float, threshold: float) -> float:
 # -------------------------
 
 
-def _bvn_scores(n: int, rho: float, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
+def _bvn_scores(n: int, rho: float, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
     """
     Sample (X, Y) ~ BVN(0,0,1,1,rho).
     Efficient construction:
@@ -198,7 +199,7 @@ def _simulate_pair_decisions(
     rho_neg: float,
     rho_pos: float,
     rng: np.random.Generator,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """
     Simulate correlated scores for A and B for negative and positive classes.
 
@@ -251,9 +252,9 @@ def _measure_one(
     n_samples: int,
     comp: str,
     rng: np.random.Generator,
-    rho_pos_override: Optional[float] = None,
-    rho_neg_override: Optional[float] = None,
-) -> Dict[str, Any]:
+    rho_pos_override: float | None = None,
+    rho_neg_override: float | None = None,
+) -> dict[str, Any]:
     """
     Measure composed metrics for one configuration.
     Returns a dict of JSON/CSV-safe scalars.
@@ -354,7 +355,7 @@ def _measure_one(
 # -------------------------
 
 
-def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _aggregate_replicates(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Aggregate replicate rows into mean + std columns.
     Keeps deterministic identifiers from the first replicate.
@@ -363,7 +364,7 @@ def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         raise ValueError("No replicate rows provided to aggregate.")
 
     base = rows[0]
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
 
     # Deterministic identifiers (should be identical across replicates)
     keep = [
@@ -408,7 +409,7 @@ def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         out[k] = float(vals.mean())
         out[f"{k}_std"] = float(vals.std(ddof=1)) if len(vals) > 1 else 0.0
 
-    out["replicates"] = int(len(rows))
+    out["replicates"] = len(rows)
     return out
 
 
@@ -430,14 +431,14 @@ def _run_one_cell_worker(
     fpr_b: float,
     seed: int,
     replicates: int,
-    rho_pos: Optional[float],
-    rho_neg: Optional[float],
-) -> Dict[str, Any]:
+    rho_pos: float | None,
+    rho_neg: float | None,
+) -> dict[str, Any]:
     a = GuardrailSpec(tpr=float(tpr_a), fpr=float(fpr_a))
     b = GuardrailSpec(tpr=float(tpr_b), fpr=float(fpr_b))
 
     reps_n = max(1, int(replicates))
-    reps: List[Dict[str, Any]] = []
+    reps: list[dict[str, Any]] = []
     for r in range(reps_n):
         # Deterministic per-cell, per-replicate RNG (stable across process/thread execution)
         ss = np.random.SeedSequence([int(seed), int(i), int(j), int(r)])
@@ -462,7 +463,7 @@ def _run_one_cell_worker(
 # -------------------------
 
 
-def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
+def run_sweep(cfg: SweepConfig) -> list[dict[str, Any]]:
     """
     Run the sweep over rho_grid x tpr_b_grid with deterministic per-cell seeding.
     Supports process-parallel execution on macOS by using a top-level worker.
@@ -478,7 +479,7 @@ def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
 
     # Single-process path (also used as fallback)
     if jobs <= 1:
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for i, rho in enumerate(rho_vals):
             for j, tpr_b in enumerate(tpr_vals):
                 rows.append(
@@ -509,12 +510,12 @@ def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
         from concurrent.futures import ProcessPoolExecutor as Executor
         from concurrent.futures import as_completed
 
-    tasks: List[Tuple[int, int, float, float]] = []
+    tasks: list[tuple[int, int, float, float]] = []
     for i, rho in enumerate(rho_vals):
         for j, tpr_b in enumerate(tpr_vals):
             tasks.append((i, j, rho, tpr_b))
 
-    rows_out: List[Dict[str, Any]] = []
+    rows_out: list[dict[str, Any]] = []
     with Executor(max_workers=jobs) as pool:
         futs = [
             pool.submit(
@@ -558,7 +559,7 @@ def _coerce_csv_value(v: Any) -> Any:
     return v
 
 
-def _write_csv(rows: Iterable[Dict[str, Any]], path: Path) -> None:
+def _write_csv(rows: Iterable[dict[str, Any]], path: Path) -> None:
     rows_l = list(rows)
     if not rows_l:
         return
@@ -623,7 +624,7 @@ def _write_csv(rows: Iterable[Dict[str, Any]], path: Path) -> None:
 
 
 def _plot_heatmap(
-    rows: List[Dict[str, Any]],
+    rows: list[dict[str, Any]],
     out_path: Path,
     value_key: str,
     title: str,
@@ -728,9 +729,9 @@ def run_self_checks() -> None:
     a = GuardrailSpec(tpr=0.82, fpr=0.08)
     b = GuardrailSpec(tpr=0.70, fpr=0.08)
 
-    def measure(rho: float, comp: str) -> Dict[str, Any]:
+    def measure(rho: float, comp: str) -> dict[str, Any]:
         # deterministic but distinct across (rho, comp)
-        bump = int(round((rho + 1.0) * 10_000))
+        bump = round((rho + 1.0) * 10_000)
         bump += 0 if comp.upper() == "AND" else 50_000
         rng = np.random.default_rng(seed + bump)
         return _measure_one(a=a, b=b, rho=rho, n_samples=n, comp=comp, rng=rng)

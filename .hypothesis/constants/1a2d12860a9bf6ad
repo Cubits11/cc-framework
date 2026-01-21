@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/utils/artifacts.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.5, 1.0, 1.96, 100, 'HEAD', 'adapter_versions', 'git', 'git_commit', 'mean', 'p50', 'p95', 'p99', 'platform', 'python_version', 'rerun_command', 'rev-parse', 'run_id', 'utf-8']

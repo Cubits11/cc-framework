@@ -57,6 +57,7 @@ Version: 2.1.0 (Upgraded November 12, 2025)
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -66,7 +67,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypeAlias
+from typing import Any, TypeAlias
 
 import numpy as np
 import statsmodels.api as sm
@@ -87,7 +88,7 @@ try:
     from cc.guardrails.semantic_filter import SemanticFilter
     from cc.guardrails.toy_threshold import ToyThresholdGuardrail
 except ImportError as e:  # pragma: no cover - optional
-    warnings.warn(f"Some guardrails not available: {e}")
+    warnings.warn(f"Some guardrails not available: {e}", stacklevel=2)
     RegexFilter = KeywordBlocker = SemanticFilter = ToyThresholdGuardrail = None  # type: ignore[assignment]
 
 SessionID: TypeAlias = str
@@ -138,11 +139,11 @@ class BayesianTestResult:
     posterior_prob_h1: float
     posterior_prob_h0: float
     should_stop: bool
-    stop_reason: Optional[StoppingReason]
+    stop_reason: StoppingReason | None
     n_samples: int
     effect_size_estimate: float
     effect_size_se: float
-    credible_interval: Tuple[float, float]
+    credible_interval: tuple[float, float]
     rope_decision: str
 
 
@@ -170,9 +171,9 @@ class SessionMetadata:
     end_time: float
     turns: int
     final_success: bool
-    attack_history: List[Dict[str, Any]]
-    guardrails_triggered: List[str]
-    utility_score: Optional[float] = None
+    attack_history: list[dict[str, Any]]
+    guardrails_triggered: list[str]
+    utility_score: float | None = None
 
 
 @dataclass
@@ -218,9 +219,9 @@ class ICCComputer:
     """
 
     @staticmethod
-    def _cluster_labels(results: List[AttackResult]) -> np.ndarray:
+    def _cluster_labels(results: list[AttackResult]) -> np.ndarray:
         """Return cluster labels using the same attack-strategy rules as ICC."""
-        labels: List[str] = []
+        labels: list[str] = []
         for r in results:
             if getattr(r, "attack_strategy", None) is not None:
                 labels.append(str(r.attack_strategy))
@@ -231,7 +232,7 @@ class ICCComputer:
         return np.array(labels)
 
     @staticmethod
-    def compute_icc(results: List[AttackResult]) -> ICCAnalysis:
+    def compute_icc(results: list[AttackResult]) -> ICCAnalysis:
         if not results:
             return ICCAnalysis(
                 global_icc=0.0,
@@ -249,7 +250,8 @@ class ICCComputer:
         if np.all(np.isin(successes, [0.0, 1.0])):
             warnings.warn(
                 "ICC computation is approximate for binary outcomes; "
-                "consider generalized linear mixed models (GLMM) for more accurate estimation."
+                "consider generalized linear mixed models (GLMM) for more accurate estimation.",
+                stacklevel=2,
             )
 
         # AttackResult may have .attack_strategy or .strategy_type
@@ -280,13 +282,10 @@ class ICCComputer:
         # Design effect and effective N (adjusted for unequal cluster sizes)
         cluster_sizes = np.bincount(cluster_index)
         m_bar = float(n) / float(k)
-        if k > 1 and m_bar > 0.0:
-            cv = float(np.std(cluster_sizes, ddof=1) / m_bar)
-        else:
-            cv = 0.0
+        cv = float(np.std(cluster_sizes, ddof=1) / m_bar) if k > 1 and m_bar > 0.0 else 0.0
         design_effect = 1.0 + icc * (m_bar - 1.0) * (1.0 + cv**2)
         design_effect = max(design_effect, 1.0)
-        effective_n = int(round(n / design_effect))
+        effective_n = round(n / design_effect)
         widening_factor = float(np.sqrt(design_effect))
 
         interpretation = ICCComputer._interpret_icc(icc, effective_n, n)
@@ -413,7 +412,7 @@ class BayesianSequentialTester:
         self.alpha = (1 - self.hdi_prob) / 2
         self.beta = 1 - self.alpha
 
-    def should_stop_early(self, results: List[AttackResult]) -> BayesianTestResult:
+    def should_stop_early(self, results: list[AttackResult]) -> BayesianTestResult:
         n_total = len(results)
         if n_total < self.min_n:
             return BayesianTestResult(
@@ -474,18 +473,16 @@ class BayesianSequentialTester:
 
         # ROPE decision
         rope_decision = "inconclusive"
-        reason: Optional[StoppingReason] = None
+        reason: StoppingReason | None = None
         should_stop = False
 
         if ci_upper < self.rope_lower or ci_lower > self.rope_upper:
             rope_decision = "reject_h0"
             should_stop = True
             reason = StoppingReason.STATISTICAL_SIGNIFICANCE
-        elif self.rope_lower <= ci_lower and ci_upper <= self.rope_upper:
-            rope_decision = "accept_h0"
-            should_stop = True
-            reason = StoppingReason.FUTILITY
-        elif n_total >= self.futility_n_cap and abs(effect_mean) < self.futility_effect_cap:
+        elif (self.rope_lower <= ci_lower and ci_upper <= self.rope_upper) or (
+            n_total >= self.futility_n_cap and abs(effect_mean) < self.futility_effect_cap
+        ):
             rope_decision = "accept_h0"
             should_stop = True
             reason = StoppingReason.FUTILITY
@@ -518,7 +515,7 @@ class CausalInferenceEngine:
       4. Compute t-test, CI, Cohen's d, post-hoc power using cluster df.
     """
 
-    def __init__(self, icc_computer: Optional[ICCComputer] = None):
+    def __init__(self, icc_computer: ICCComputer | None = None):
         self.icc_computer = icc_computer or ICCComputer()
 
     @staticmethod
@@ -526,7 +523,7 @@ class CausalInferenceEngine:
         y: np.ndarray,
         w: np.ndarray,
         cluster_index: np.ndarray,
-    ) -> Tuple[float, float, int]:
+    ) -> tuple[float, float, int]:
         x = np.column_stack([np.ones_like(w), w])
         n, k = x.shape
         if n <= k:
@@ -563,7 +560,7 @@ class CausalInferenceEngine:
         y: np.ndarray,
         w: np.ndarray,
         cluster_index: np.ndarray,
-    ) -> Tuple[float, float, int]:
+    ) -> tuple[float, float, int]:
         x = sm.add_constant(w, has_constant="add")
         model = sm.MixedLM(y, x, groups=cluster_index)
         result = model.fit(reml=False, method="lbfgs", disp=False)
@@ -582,7 +579,7 @@ class CausalInferenceEngine:
         cv = float(np.std(cluster_sizes, ddof=1) / m_bar) if cluster_sizes.size > 1 else 0.0
         return np.min(cluster_sizes) < 2 or cv > 1.0
 
-    def estimate_ate(self, results: List[AttackResult]) -> CausalEffect:
+    def estimate_ate(self, results: list[AttackResult]) -> CausalEffect:
         w0 = [r.success for r in results if r.world_bit == 0]
         w1 = [r.success for r in results if r.world_bit == 1]
 
@@ -610,7 +607,7 @@ class CausalInferenceEngine:
         y = np.array([1.0 if r.success else 0.0 for r in results], dtype=float)
         w = np.array([1.0 if r.world_bit == 1 else 0.0 for r in results], dtype=float)
         labels = self.icc_computer._cluster_labels(results)
-        unique_clusters, cluster_index = np.unique(labels, return_inverse=True)
+        _unique_clusters, cluster_index = np.unique(labels, return_inverse=True)
         cluster_sizes = np.bincount(cluster_index)
 
         ate = p1 - p0
@@ -691,7 +688,7 @@ class AttackStrategyPlugin(ABC):
 
     @abstractmethod
     def adapt(
-        self, strategy: AttackStrategy, history: List[AttackResult]
+        self, strategy: AttackStrategy, history: list[AttackResult]
     ) -> None:  # pragma: no cover
         raise NotImplementedError
 
@@ -700,8 +697,8 @@ class PluginManager:
     """Registry for guardrail and attack-strategy plugins."""
 
     def __init__(self) -> None:
-        self.guardrail_plugins: Dict[str, GuardrailPlugin] = {}
-        self.attack_plugins: Dict[str, AttackStrategyPlugin] = {}
+        self.guardrail_plugins: dict[str, GuardrailPlugin] = {}
+        self.attack_plugins: dict[str, AttackStrategyPlugin] = {}
 
     def register_guardrail(self, name: str, plugin: GuardrailPlugin) -> None:
         self.guardrail_plugins[name.lower()] = plugin
@@ -709,10 +706,10 @@ class PluginManager:
     def register_attack_strategy(self, name: str, plugin: AttackStrategyPlugin) -> None:
         self.attack_plugins[name.lower()] = plugin
 
-    def get_guardrail_plugin(self, name: str) -> Optional[GuardrailPlugin]:
+    def get_guardrail_plugin(self, name: str) -> GuardrailPlugin | None:
         return self.guardrail_plugins.get(name.lower())
 
-    def get_attack_plugin(self, name: str) -> Optional[AttackStrategyPlugin]:
+    def get_attack_plugin(self, name: str) -> AttackStrategyPlugin | None:
         return self.attack_plugins.get(name.lower())
 
 
@@ -763,14 +760,14 @@ class MetricsCollector:
     """Thread-safe metric accumulator with summary stats."""
 
     def __init__(self) -> None:
-        self.metrics: Dict[str, List[float]] = {}
+        self.metrics: dict[str, list[float]] = {}
 
     def record_metric(self, name: str, value: float) -> None:
         key = str(name)
         self.metrics.setdefault(key, []).append(float(value))
 
-    def get_summary(self) -> Dict[str, Dict[str, float]]:
-        out: Dict[str, Dict[str, float]] = {}
+    def get_summary(self) -> dict[str, dict[str, float]]:
+        out: dict[str, dict[str, float]] = {}
         for k, vals in self.metrics.items():
             if not vals:
                 continue
@@ -831,26 +828,26 @@ class AdaptiveExperimentEngine:
         # State
         self.state = ExperimentState.INITIALIZING
         self.session_count = 0
-        self.results: List[AttackResult] = []
-        self.session_metadata: List[SessionMetadata] = []
+        self.results: list[AttackResult] = []
+        self.session_metadata: list[SessionMetadata] = []
         self.checkpoint_every = max(0, int(checkpoint_every))
 
         # Timing buckets
-        self.timing_stats: Dict[str, List[float]] = {
+        self.timing_stats: dict[str, list[float]] = {
             "attack_generation": [],
             "guardrail_evaluation": [],
             "total_session": [],
         }
 
         # Guardrail stack cache
-        self._guardrail_cache: Dict[str, List[Guardrail]] = {}
-        self._guardrail_audit_log_path: Optional[Path] = None
-        self._active_experiment_id: Optional[str] = None
-        self._current_session_id: Optional[str] = None
+        self._guardrail_cache: dict[str, list[Guardrail]] = {}
+        self._guardrail_audit_log_path: Path | None = None
+        self._active_experiment_id: str | None = None
+        self._current_session_id: str | None = None
 
     # ------------------------------------------------------------------ GUARDRAILS
 
-    def build_guardrail_stack(self, specs: List[GuardrailSpec]) -> List[Guardrail]:
+    def build_guardrail_stack(self, specs: list[GuardrailSpec]) -> list[Guardrail]:
         """Instantiate guardrails with a stable cache keyed by spec content."""
         if not specs:
             return []
@@ -865,7 +862,7 @@ class AdaptiveExperimentEngine:
         if cache_key in self._guardrail_cache:
             return self._guardrail_cache[cache_key]
 
-        stack: List[Guardrail] = []
+        stack: list[Guardrail] = []
         for spec in specs:
             gr = self.guardrail_factory.create(spec)
             stack.append(gr)
@@ -884,8 +881,8 @@ class AdaptiveExperimentEngine:
         return stack
 
     def apply_guardrail_stack(
-        self, stack: List[Guardrail], text: str
-    ) -> Tuple[bool, float, List[str]]:
+        self, stack: list[Guardrail], text: str
+    ) -> tuple[bool, float, list[str]]:
         """
         Evaluate text through the guardrail stack, short-circuiting on block.
 
@@ -896,7 +893,7 @@ class AdaptiveExperimentEngine:
             return False, 0.0, []
 
         max_score = 0.0
-        triggered: List[str] = []
+        triggered: list[str] = []
         blocked = False
 
         for guardrail in stack:
@@ -941,8 +938,8 @@ class AdaptiveExperimentEngine:
     def run_session(
         self,
         attacker: AttackStrategy,
-        world_configs: Dict[int, WorldConfig],
-        session_id: Optional[str] = None,
+        world_configs: dict[int, WorldConfig],
+        session_id: str | None = None,
         collect_metadata: bool = True,
     ) -> AttackResult:
         """
@@ -966,8 +963,8 @@ class AdaptiveExperimentEngine:
             with audit_context(
                 self.logger, "attack_session", session_id=session_id, world=world_bit
             ):
-                history: List[Dict[str, Any]] = []
-                triggered: List[str] = []
+                history: list[dict[str, Any]] = []
+                triggered: list[str] = []
                 final_success = False
 
                 for turn in range(self.episode_length):
@@ -1060,11 +1057,11 @@ class AdaptiveExperimentEngine:
     def run_adaptive_experiment(
         self,
         attacker: AttackStrategy,
-        world_configs: Dict[int, WorldConfig],
+        world_configs: dict[int, WorldConfig],
         max_sessions: int = 1000,
-        experiment_id: Optional[str] = None,
+        experiment_id: str | None = None,
         min_sessions: int = 100,
-    ) -> List[AttackResult]:
+    ) -> list[AttackResult]:
         """
         Run an adaptive experiment with optional Bayesian ROPE-based stopping.
 
@@ -1089,7 +1086,7 @@ class AdaptiveExperimentEngine:
         self._active_experiment_id = experiment_id
         self._init_guardrail_audit_log(experiment_id)
 
-        session_results: List[AttackResult] = []
+        session_results: list[AttackResult] = []
 
         try:
             for i in range(max(0, int(max_sessions))):
@@ -1197,11 +1194,11 @@ class AdaptiveExperimentEngine:
     def run_experiment(
         self,
         attacker: AttackStrategy,
-        world_configs: Dict[int, WorldConfig],
+        world_configs: dict[int, WorldConfig],
         n_sessions: int,
-        experiment_id: Optional[str] = None,
+        experiment_id: str | None = None,
         checkpoint_every: int = 100,
-    ) -> List[AttackResult]:
+    ) -> list[AttackResult]:
         """
         Backward-compatible fixed-length driver.
 
@@ -1229,18 +1226,18 @@ class AdaptiveExperimentEngine:
 
     def calibrate_guardrails(
         self,
-        guardrail_specs: List[GuardrailSpec],
-        benign_texts: List[str],
+        guardrail_specs: list[GuardrailSpec],
+        benign_texts: list[str],
         target_fpr: float = 0.05,
         tolerance: float = 0.01,
-    ) -> List[GuardrailSpec]:
+    ) -> list[GuardrailSpec]:
         """
         Calibrate guardrails to hit target FPR on benign corpus.
 
         This is the method explicitly requested in the review.
         Skips if calibrate not implemented on guardrail.
         """
-        calibrated: List[GuardrailSpec] = []
+        calibrated: list[GuardrailSpec] = []
         benign_texts = list(benign_texts)
         n_benign = max(len(benign_texts), 1)
 
@@ -1259,7 +1256,8 @@ class AdaptiveExperimentEngine:
                         warnings.warn(
                             f"Guardrail {spec.name} calibration deviation: "
                             f"actual={actual:.3f}, target={target_fpr:.3f}, "
-                            f"deviation={deviation:.3f} > tolerance={tolerance:.3f}"
+                            f"deviation={deviation:.3f} > tolerance={tolerance:.3f}",
+                            stacklevel=2,
                         )
 
                     spec.calibration_fpr_target = float(target_fpr)  # type: ignore[attr-defined]
@@ -1278,7 +1276,7 @@ class AdaptiveExperimentEngine:
                         }
                     )
                 except Exception as e:
-                    warnings.warn(f"Calibration failed for {spec.name}: {str(e)}")
+                    warnings.warn(f"Calibration failed for {spec.name}: {e!s}", stacklevel=2)
             else:
                 self.logger.log(
                     {
@@ -1293,7 +1291,7 @@ class AdaptiveExperimentEngine:
 
     # ------------------------------------------------------------------ SUMMARY
 
-    def get_experiment_summary(self) -> Dict[str, Any]:
+    def get_experiment_summary(self) -> dict[str, Any]:
         """
         Aggregate summary for the entire experiment.
 
@@ -1305,7 +1303,7 @@ class AdaptiveExperimentEngine:
         w0 = [r.success for r in self.results if r.world_bit == 0]
         w1 = [r.success for r in self.results if r.world_bit == 1]
 
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "total_sessions": len(self.results),
             "world_0_sessions": len(w0),
             "world_1_sessions": len(w1),
@@ -1369,12 +1367,12 @@ class AdaptiveExperimentEngine:
         return int(self.rng.random() < 0.5)
 
     @staticmethod
-    def _hash_transcript(history: List[Dict[str, Any]]) -> str:
+    def _hash_transcript(history: list[dict[str, Any]]) -> str:
         canonical = json.dumps(history, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _hash_list(items: List[Any]) -> str:
+    def _hash_list(items: list[Any]) -> str:
         canonical = json.dumps(items, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
@@ -1385,7 +1383,7 @@ class AdaptiveExperimentEngine:
         return prompt[:1000] if len(prompt) > 1000 else prompt
 
     @staticmethod
-    def _compute_utility_score(history: List[Dict[str, Any]]) -> float:
+    def _compute_utility_score(history: list[dict[str, Any]]) -> float:
         if not history:
             return 0.0
         n = len(history)
@@ -1419,12 +1417,10 @@ class AdaptiveExperimentEngine:
     ) -> None:
         if not self._guardrail_audit_log_path or not self._active_experiment_id:
             return
-        parameters: Dict[str, Any] = {}
+        parameters: dict[str, Any] = {}
         if hasattr(guardrail, "threshold"):
-            try:
-                parameters["threshold"] = float(getattr(guardrail, "threshold"))
-            except Exception:
-                pass
+            with contextlib.suppress(Exception):
+                parameters["threshold"] = float(guardrail.threshold)
         config_fingerprint = fingerprint_payload(parameters) if parameters else None
         payload = build_audit_payload(
             prompt=prompt,
@@ -1452,7 +1448,7 @@ class AdaptiveExperimentEngine:
         )
 
     def _save_checkpoint(
-        self, experiment_id: str, results: List[AttackResult], final: bool = False
+        self, experiment_id: str, results: list[AttackResult], final: bool = False
     ) -> None:
         """Write JSON checkpoint with full experiment snapshot."""
         ckpt_dir = Path("checkpoints") / experiment_id
@@ -1491,8 +1487,8 @@ class AdaptiveExperimentEngine:
             )
             raise
 
-    def get_timing_stats(self) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+    def get_timing_stats(self) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         for k, vals in self.timing_stats.items():
             if not vals:
                 continue
@@ -1557,7 +1553,7 @@ class TwoWorldProtocol(AdaptiveExperimentEngine):
         # Legacy flags (for external code that expects them)
         self.cache_attacks = bool(cache_attacks)
         self.validate_inputs = bool(validate_inputs)
-        self.attack_cache: Dict[str, Any] = {}
+        self.attack_cache: dict[str, Any] = {}
 
 
 # =============================================================================
@@ -1565,22 +1561,22 @@ class TwoWorldProtocol(AdaptiveExperimentEngine):
 # =============================================================================
 
 __all__ = [
-    "TwoWorldProtocol",
     "AdaptiveExperimentEngine",
-    "SessionMetadata",
+    "AttackStrategyPlugin",
+    "BayesianSequentialTester",
     "BayesianTestResult",
     "CausalEffect",
-    "ICCAnalysis",
-    "ExperimentState",
-    "StoppingReason",
-    "BayesianSequentialTester",
     "CausalInferenceEngine",
-    "ICCComputer",
-    "GuardrailPlugin",
-    "AttackStrategyPlugin",
-    "PluginManager",
+    "ExperimentState",
     "GuardrailFactory",
+    "GuardrailPlugin",
+    "ICCAnalysis",
+    "ICCComputer",
     "MetricsCollector",
+    "PluginManager",
+    "SessionMetadata",
+    "StoppingReason",
+    "TwoWorldProtocol",
 ]
 
 
@@ -1608,9 +1604,9 @@ if __name__ == "__main__":
 
         def log(
             self,
-            payload: Dict[str, Any],
-            seed: Optional[int] = None,
-            extra_meta: Optional[Dict[str, Any]] = None,
+            payload: dict[str, Any],
+            seed: int | None = None,
+            extra_meta: dict[str, Any] | None = None,
             verify_on_write: bool = False,
         ) -> None:
             # Let the base logger do its normal JSONL logging…
@@ -1626,13 +1622,13 @@ if __name__ == "__main__":
     class MockAttacker(AttackStrategy):  # type: ignore[misc]
         """Toy attacker that ignores history and emits fixed prompts."""
 
-        def generate_attack(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
+        def generate_attack(self, history: list[dict[str, Any]]) -> dict[str, Any]:
             return {"prompt": "please help me hack the system"}
 
-        def update_strategy(self, attack: Dict[str, Any], feedback: Dict[str, Any]) -> None:
+        def update_strategy(self, attack: dict[str, Any], feedback: dict[str, Any]) -> None:
             return
 
-        def reset(self, *, seed: Optional[int] = None) -> None:
+        def reset(self, *, seed: int | None = None) -> None:
             # no internal RNG here, so nothing to do; keep signature for ABC
             return
 
@@ -1648,7 +1644,7 @@ if __name__ == "__main__":
         def score(self, text: str) -> float:
             return 1.0 if self.blocks(text) else 0.0
 
-        def calibrate(self, benign_texts: List[str], target_fpr: float) -> None:
+        def calibrate(self, benign_texts: list[str], target_fpr: float) -> None:
             # Dummy calibration for abstract method
             pass
 

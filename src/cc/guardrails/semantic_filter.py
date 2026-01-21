@@ -1,8 +1,6 @@
 # src/cc/guardrails/semantic_filter.py
 """Semantic similarity based guardrail"""
 
-from typing import List, Optional
-
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -15,9 +13,9 @@ class SemanticFilter(Guardrail):
 
     def __init__(
         self,
-        harmful_templates: List[str],
+        harmful_templates: list[str],
         similarity_threshold: float = 0.8,
-        vectorizer_params: Optional[dict] = None,
+        vectorizer_params: dict | None = None,
     ):
         self.harmful_templates = harmful_templates
         self.similarity_threshold = similarity_threshold

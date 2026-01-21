@@ -42,7 +42,7 @@ def test_needed_n_bernstein_monotonicity() -> None:
     ],
 )
 def test_needed_n_bernstein_invalid_inputs(kwargs: dict) -> None:
-    params = dict(t=0.1, D=0.55, delta=0.05, I1=(0.49, 0.51), I0=(0.04, 0.05))
+    params = {"t": 0.1, "D": 0.55, "delta": 0.05, "I1": (0.49, 0.51), "I0": (0.04, 0.05)}
     params.update(kwargs)
     with pytest.raises(ValueError):
         needed_n_bernstein(**params)

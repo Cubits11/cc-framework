@@ -5,7 +5,7 @@ from cc.cartographer.bounds import cc_confint
 
 def test_fh_bernstein_coverage_on_toy_world():
     """
-    Empirical coverage for FH–Bernstein CI on a toy Bernoulli world
+    Empirical coverage for FH-Bernstein CI on a toy Bernoulli world
     where FH intervals are degenerate at the true p (sharp variance).
     """
     rng = np.random.default_rng(7)
@@ -50,7 +50,7 @@ def test_bernstein_tail_monotonicity():
     """
     from cc.cartographer.bounds import fh_var_envelope, invert_bernstein_eps
 
-    I = (0.10, 0.20)  # excludes 0.5 ⇒ v̄ < 0.25
+    I = (0.10, 0.20)  # excludes 0.5 => v̄ < 0.25
     vbar = fh_var_envelope(I)
     eps_small_n = invert_bernstein_eps(n=100, vbar=vbar, delta=0.05)
     eps_large_n = invert_bernstein_eps(n=400, vbar=vbar, delta=0.05)

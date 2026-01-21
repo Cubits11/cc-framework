@@ -8,13 +8,13 @@ Purpose: Strongly-typed, versioned, and serializable data models used across the
 Author: Pranav Bhave
 Schema versions:
   - 2025-08-31: original
-  - 2025-09-28: v3.x – validation, slots, hashing helpers, immutability
-  - 2025-11-13: v4.0 – Pydantic v2, enums, BLAKE3, basic interop hooks
-  - 2025-11-19: v4.1 – hardened invariants, unified timestamp handling,
+  - 2025-09-28: v3.x - validation, slots, hashing helpers, immutability
+  - 2025-11-13: v4.0 - Pydantic v2, enums, BLAKE3, basic interop hooks
+  - 2025-11-19: v4.1 - hardened invariants, unified timestamp handling,
                 safer hashing, stricter config normalization, lossy
                 Protobuf export explicitly documented, back-compat alias
                 for AttackStrategySpec.
-  - 2025-11-24: v4.2 – tighten migration semantics, centralize invariants,
+  - 2025-11-24: v4.2 - tighten migration semantics, centralize invariants,
                 clarify hashing surface, stabilize dynamic Protobuf
                 reflection, and normalize bootstrap cleaning semantics.
 
@@ -32,8 +32,8 @@ This module is the "data spine" for the probabilistic core:
 - Schema versioning via `schema_version` and a migration entrypoint.
 - Optional, best-effort interop helpers:
     - Avro:
-        * `to_avro_record()` – JSON-safe dict for external writers.
-        * `to_avro_bytes(schema)` – schemaless write if `fastavro` is installed.
+        * `to_avro_record()` - JSON-safe dict for external writers.
+        * `to_avro_bytes(schema)` - schemaless write if `fastavro` is installed.
     - Protobuf:
         * Either hydrate a provided Message subclass, or
         * Build a LOSSY dynamic scalar-only message type (documented below).
@@ -72,19 +72,13 @@ import time
 import unicodedata
 import uuid
 import warnings
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from enum import Enum, IntEnum
 from functools import cached_property
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
     TypeVar,
     Union,
     get_args,
@@ -127,7 +121,7 @@ from pydantic import (
 # ---------------------------------------------------------------------------
 from cc.core.schema import SCHEMA_VERSION as _SCHEMA_VERSION
 
-JsonDict = Dict[str, Any]
+JsonDict = dict[str, Any]
 FloatSeq = Sequence[float]
 TModel = TypeVar("TModel", bound="ModelBase")
 
@@ -189,7 +183,7 @@ def _normalize_unix_timestamp(
     v: Any,
     *,
     allow_none: bool = True,
-    max_ts: Optional[float] = MAX_REASONABLE_UNIX_TIMESTAMP,
+    max_ts: float | None = MAX_REASONABLE_UNIX_TIMESTAMP,
 ) -> float:
     """
     Normalize a value into a sane Unix timestamp (UTC seconds).
@@ -272,7 +266,7 @@ def _normalize_unicode_for_hash(obj: Any) -> Any:
     return obj
 
 
-def _hash_json(obj: Any, *, salt: Optional[bytes] = None) -> str:
+def _hash_json(obj: Any, *, salt: bytes | None = None) -> str:
     """
     Canonical JSON -> BLAKE3 hex digest.
 
@@ -303,7 +297,7 @@ def _hash_json(obj: Any, *, salt: Optional[bytes] = None) -> str:
     return hasher.hexdigest()
 
 
-def _hash_text(text: Union[str, bytes], *, salt: Optional[bytes] = None) -> str:
+def _hash_text(text: str | bytes, *, salt: bytes | None = None) -> str:
     """
     Hash raw transcript text/bytes with BLAKE3.
 
@@ -314,10 +308,7 @@ def _hash_text(text: Union[str, bytes], *, salt: Optional[bytes] = None) -> str:
     salt:
         Optional bytes to prepend into the hash state.
     """
-    if isinstance(text, bytes):
-        data = text
-    else:
-        data = str(text).encode("utf-8", errors="replace")
+    data = text if isinstance(text, bytes) else str(text).encode("utf-8", errors="replace")
     hasher = blake3.blake3()
     if salt is not None:
         hasher.update(salt)
@@ -362,8 +353,6 @@ if SQLALCHEMY_AVAILABLE:
     class OrmBase(DeclarativeBase):
         """Base for SQLAlchemy ORM models in the CC framework."""
 
-        pass
-
     class AuditColumnsMixin:
         """
         Audit columns mixin for SQLAlchemy ORM models.
@@ -399,12 +388,8 @@ else:  # pragma: no cover
     class OrmBase:  # type: ignore[too-many-ancestors]
         """Fallback stub when SQLAlchemy is not installed."""
 
-        pass
-
     class AuditColumnsMixin:  # type: ignore[too-many-ancestors]
         """Fallback stub when SQLAlchemy is not installed."""
-
-        pass
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +431,7 @@ class ModelBase(BaseModel):
     """
 
     schema_version: str = Field(default=_SCHEMA_VERSION, frozen=True)
-    creator_id: Optional[str] = Field(
+    creator_id: str | None = Field(
         default=None,
         description="Optional id of human/system that created this record.",
     )
@@ -472,7 +457,7 @@ class ModelBase(BaseModel):
     #    so `strict=True` behaviour is consistent across calls.
     # ------------------------------------------------------------------
     _PROTO_MESSAGE_CACHE: ClassVar[
-        Dict[Tuple[Type["ModelBase"], str], Tuple[Type["Message"], frozenset[str]]]
+        dict[tuple[type[ModelBase], str], tuple[type[Message], frozenset[str]]]
     ] = {}
     _PROTO_MESSAGE_CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
 
@@ -515,17 +500,17 @@ class ModelBase(BaseModel):
     # Hash helpers with computed-field auto-exclusion
     # ------------------------------------------------------------------
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Backward-compatible dict serialization helper."""
         return self.model_dump()
 
-    def _hash_exclude_keys(self, extra: Optional[Sequence[str]] = None) -> set[str]:
+    def _hash_exclude_keys(self, extra: Sequence[str] | None = None) -> set[str]:
         """
         Compute the full set of keys to exclude from hashing:
 
             manual HASH_EXCLUDE_FIELDS
-          ∪ names of @computed_field properties
-          ∪ any additional `extra` keys supplied by caller.
+          U names of @computed_field properties
+          U any additional `extra` keys supplied by caller.
 
         This ensures that all computed fields are always ignored by the hash,
         so adding/removing a computed field never changes hashes.
@@ -561,9 +546,9 @@ class ModelBase(BaseModel):
     def blake3_hash(
         self,
         *,
-        exclude: Optional[Sequence[str]] = None,
+        exclude: Sequence[str] | None = None,
         use_cache: bool = True,
-        salt: Optional[bytes] = None,
+        salt: bytes | None = None,
     ) -> str:
         """
         Stable BLAKE3 hash of the JSON representation.
@@ -593,7 +578,7 @@ class ModelBase(BaseModel):
             return self._default_hash
 
         # For any custom call, still union:
-        #   HASH_EXCLUDE_FIELDS ∪ model_computed_fields ∪ exclude
+        #   HASH_EXCLUDE_FIELDS U model_computed_fields U exclude
         exclude_set = self._hash_exclude_keys(exclude)
         data = self.model_dump(mode="json", exclude=exclude_set)
         return _hash_json(data, salt=salt)
@@ -630,10 +615,10 @@ class ModelBase(BaseModel):
 
     def to_protobuf(
         self,
-        proto_cls: Optional[Type["Message"]] = None,
+        proto_cls: type[Message] | None = None,
         *,
         strict: bool = False,
-    ) -> "Message":
+    ) -> Message:
         """
         Export to a protobuf message instance.
 
@@ -680,7 +665,7 @@ class ModelBase(BaseModel):
             ParseDict(data, msg, ignore_unknown_fields=True)
             return msg
 
-        cls: Type[ModelBase] = self.__class__
+        cls: type[ModelBase] = self.__class__
         cache_key = (cls, _SCHEMA_VERSION)
 
         cached = ModelBase._PROTO_MESSAGE_CACHE.get(cache_key)
@@ -688,7 +673,7 @@ class ModelBase(BaseModel):
             with ModelBase._PROTO_MESSAGE_CACHE_LOCK:
                 cached = ModelBase._PROTO_MESSAGE_CACHE.get(cache_key)
                 if cached is None:
-                    dropped_fields: List[str] = []
+                    dropped_fields: list[str] = []
 
                     fd_proto = descriptor_pb2.FileDescriptorProto()
                     fd_proto.name = f"{cls.__module__}.{cls.__name__}.dynamic.proto"
@@ -701,12 +686,12 @@ class ModelBase(BaseModel):
                         origin = get_origin(t)
                         if origin is Union:
                             args = get_args(t)
-                            non_none = [a for a in args if a is not type(None)]  # noqa: E721
+                            non_none = [a for a in args if a is not type(None)]
                             if len(non_none) == 1:
                                 return _unwrap_optional(non_none[0])
                         return t
 
-                    def _scalar_pb_type(t: Any) -> Optional[int]:
+                    def _scalar_pb_type(t: Any) -> int | None:
                         if isinstance(t, type) and issubclass(t, IntEnum):
                             return descriptor_pb2.FieldDescriptorProto.TYPE_INT32  # type: ignore[attr-defined]
                         if isinstance(t, type) and issubclass(t, Enum):
@@ -731,9 +716,9 @@ class ModelBase(BaseModel):
                         core_type = _unwrap_optional(py_type)
                         origin = get_origin(core_type)
                         label = descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL  # type: ignore[attr-defined]
-                        pb_type: Optional[int] = None
+                        pb_type: int | None = None
 
-                        if origin in (list, List, Sequence, tuple, Tuple):
+                        if origin in (list, list, Sequence, tuple, tuple):
                             args = get_args(core_type)
                             if not args:
                                 dropped_fields.append(field_name)
@@ -801,7 +786,7 @@ class ModelBase(BaseModel):
         return cls.model_json_schema()
 
     @classmethod
-    def migrate(cls: Type[TModel], old_data: Mapping[str, Any]) -> TModel:
+    def migrate(cls: type[TModel], old_data: Mapping[str, Any]) -> TModel:
         """
         Best-effort migration entrypoint for schema upgrades.
 
@@ -886,7 +871,7 @@ class AttackResult(ModelBase):
     # --- optional / metadata
     session_id: str = ""
     attack_strategy: str = ""
-    utility_score: Optional[float] = None
+    utility_score: float | None = None
     request_id: str = Field(
         default_factory=lambda: uuid.uuid4().hex[:REQUEST_ID_LENGTH],
         description=(f"Short request identifier (first {REQUEST_ID_LENGTH} hex chars of uuid4)."),
@@ -925,7 +910,7 @@ class AttackResult(ModelBase):
 
     @field_validator("utility_score", mode="before")
     @classmethod
-    def _normalize_utility(cls, v: Any) -> Optional[float]:
+    def _normalize_utility(cls, v: Any) -> float | None:
         """
         Normalize optional utility_score.
 
@@ -1034,16 +1019,16 @@ class AttackResult(ModelBase):
         world_bit: WorldBit,
         success: bool,
         attack_id: str,
-        transcript: Union[str, bytes],
+        transcript: str | bytes,
         guardrails_applied: str,
         rng_seed: int,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
         session_id: str = "",
         attack_strategy: str = "",
-        utility_score: Optional[float] = None,
-        creator_id: Optional[str] = None,
-        salt: Optional[bytes] = None,
-    ) -> "AttackResult":
+        utility_score: float | None = None,
+        creator_id: str | None = None,
+        salt: bytes | None = None,
+    ) -> AttackResult:
         """
         Convenience constructor that takes the raw transcript and hashes it.
 
@@ -1086,7 +1071,7 @@ class GuardrailSpec(ModelBase):
     """Specification for a guardrail configuration."""
 
     name: str
-    params: Dict[str, Any] = Field(default_factory=dict)
+    params: dict[str, Any] = Field(default_factory=dict)
     calibration_fpr_target: float = Field(
         default=0.05,
         ge=0.0,
@@ -1103,7 +1088,7 @@ class GuardrailSpec(ModelBase):
 
     @field_validator("params", mode="before")
     @classmethod
-    def _coerce_params(cls, v: Any) -> Dict[str, Any]:
+    def _coerce_params(cls, v: Any) -> dict[str, Any]:
         if v is None:
             return {}
         if isinstance(v, dict):
@@ -1139,8 +1124,8 @@ class WorldConfig(ModelBase):
     """Configuration for a world in the two-world protocol."""
 
     world_id: WorldBit
-    guardrail_stack: List[GuardrailSpec] = Field(default_factory=list)
-    utility_profile: Dict[str, Any] = Field(default_factory=dict)
+    guardrail_stack: list[GuardrailSpec] = Field(default_factory=list)
+    utility_profile: dict[str, Any] = Field(default_factory=dict)
     baseline_success_rate: float = Field(
         default=0.6,
         ge=0.0,
@@ -1151,7 +1136,7 @@ class WorldConfig(ModelBase):
 
     @field_validator("guardrail_stack", mode="before")
     @classmethod
-    def _normalize_stack(cls, v: Any) -> List[GuardrailSpec]:
+    def _normalize_stack(cls, v: Any) -> list[GuardrailSpec]:
         if v is None:
             return []
         if isinstance(v, str):
@@ -1160,9 +1145,7 @@ class WorldConfig(ModelBase):
                 "Provide a GuardrailSpec, a mapping, or an iterable of those."
             )
         # Accept single spec / mapping or iterable of specs
-        if isinstance(v, GuardrailSpec):
-            raw_list = [v]
-        elif isinstance(v, Mapping):
+        if isinstance(v, (GuardrailSpec, Mapping)):
             raw_list = [v]
         else:
             try:
@@ -1170,7 +1153,7 @@ class WorldConfig(ModelBase):
             except TypeError:
                 raw_list = [v]
 
-        out: List[GuardrailSpec] = []
+        out: list[GuardrailSpec] = []
         for gr in raw_list:
             if isinstance(gr, GuardrailSpec):
                 out.append(gr)
@@ -1200,8 +1183,8 @@ class ExperimentConfig(ModelBase):
 
     experiment_id: str
     n_sessions: int = Field(gt=0)
-    attack_strategies: List[str] = Field(min_length=1)
-    guardrail_configs: Dict[str, List[GuardrailSpec]] = Field(
+    attack_strategies: list[str] = Field(min_length=1)
+    guardrail_configs: dict[str, list[GuardrailSpec]] = Field(
         min_length=1,
         description="Mapping from label -> list[GuardrailSpec] composing that configuration.",
     )
@@ -1215,7 +1198,7 @@ class ExperimentConfig(ModelBase):
     def _normalize_guardrail_configs(
         cls,
         v: Any,
-    ) -> Dict[str, List[GuardrailSpec]]:
+    ) -> dict[str, list[GuardrailSpec]]:
         """
         Normalize guardrail_configs: mapping[str, list[GuardrailSpec]].
 
@@ -1236,7 +1219,7 @@ class ExperimentConfig(ModelBase):
         if not v:
             raise ValueError("guardrail_configs cannot be empty")
 
-        result: Dict[str, List[GuardrailSpec]] = {}
+        result: dict[str, list[GuardrailSpec]] = {}
         for k, raw_val in v.items():
             if not isinstance(k, str):
                 raise TypeError(f"guardrail_configs keys must be strings, got {type(k)}")
@@ -1253,9 +1236,7 @@ class ExperimentConfig(ModelBase):
                 )
 
             # Accept single spec / mapping or iterable of specs
-            if isinstance(raw_val, GuardrailSpec):
-                raw_list = [raw_val]
-            elif isinstance(raw_val, Mapping):
+            if isinstance(raw_val, (GuardrailSpec, Mapping)):
                 raw_list = [raw_val]
             else:
                 try:
@@ -1263,7 +1244,7 @@ class ExperimentConfig(ModelBase):
                 except TypeError:
                     raw_list = [raw_val]
 
-            specs: List[GuardrailSpec] = []
+            specs: list[GuardrailSpec] = []
             for gr in raw_list:
                 if isinstance(gr, GuardrailSpec):
                     specs.append(gr)
@@ -1278,7 +1259,7 @@ class ExperimentConfig(ModelBase):
 
     @field_validator("attack_strategies", mode="before")
     @classmethod
-    def _normalize_attack_strategies(cls, v: Any) -> List[str]:
+    def _normalize_attack_strategies(cls, v: Any) -> list[str]:
         if v is None:
             raise ValueError("attack_strategies cannot be empty")
         if isinstance(v, str):
@@ -1290,7 +1271,7 @@ class ExperimentConfig(ModelBase):
             raise TypeError("attack_strategies must be an iterable of strings or a single string")
         if not seq:
             raise ValueError("attack_strategies cannot be empty")
-        out: List[str] = []
+        out: list[str] = []
         for x in seq:
             s = str(x).strip()
             if s:
@@ -1348,9 +1329,9 @@ class CCResult(ModelBase):
     j_empirical: float
     cc_max: float
     delta_add: float
-    cc_multiplicative: Optional[float] = None
-    confidence_interval: Optional[Tuple[float, float]] = None
-    bootstrap_samples: Optional[FloatSeq] = None
+    cc_multiplicative: float | None = None
+    confidence_interval: tuple[float, float] | None = None
+    bootstrap_samples: FloatSeq | None = None
     n_sessions: int = 0
     ci_method: CiMethod = CiMethod.BOOTSTRAP
     ci_level: float = Field(default=0.95, gt=0.5, lt=1.0)
@@ -1381,7 +1362,7 @@ class CCResult(ModelBase):
 
     @field_validator("confidence_interval", mode="before")
     @classmethod
-    def _normalize_ci(cls, v: Any) -> Optional[Tuple[float, float]]:
+    def _normalize_ci(cls, v: Any) -> tuple[float, float] | None:
         if v is None:
             return None
         if isinstance(v, Sequence) and len(v) == 2:
@@ -1395,7 +1376,7 @@ class CCResult(ModelBase):
 
     @field_validator("bootstrap_samples", mode="before")
     @classmethod
-    def _normalize_bootstrap(cls, v: Any) -> Optional[FloatSeq]:
+    def _normalize_bootstrap(cls, v: Any) -> FloatSeq | None:
         """
         Normalize bootstrap samples.
 
@@ -1417,7 +1398,7 @@ class CCResult(ModelBase):
         else:
             seq = v
 
-        out: List[float] = []
+        out: list[float] = []
         dropped = 0
 
         try:
@@ -1443,7 +1424,7 @@ class CCResult(ModelBase):
         return out
 
     @field_serializer("bootstrap_samples")
-    def _serialize_bootstrap(self, v: Optional[FloatSeq]) -> Optional[List[float]]:
+    def _serialize_bootstrap(self, v: FloatSeq | None) -> list[float] | None:
         if v is None:
             return None
         return [float(x) for x in v]
@@ -1473,14 +1454,14 @@ class AttackStrategySpec(ModelBase):
     """
 
     name: str
-    params: Dict[str, Any] = Field(default_factory=dict)
-    vocabulary: List[str] = Field(default_factory=list)
+    params: dict[str, Any] = Field(default_factory=dict)
+    vocabulary: list[str] = Field(default_factory=list)
     success_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     description: str = ""
 
     @field_validator("params", mode="before")
     @classmethod
-    def _coerce_params(cls, v: Any) -> Dict[str, Any]:
+    def _coerce_params(cls, v: Any) -> dict[str, Any]:
         if v is None:
             return {}
         if isinstance(v, dict):
@@ -1491,7 +1472,7 @@ class AttackStrategySpec(ModelBase):
 
     @field_validator("vocabulary", mode="before")
     @classmethod
-    def _normalize_vocab(cls, v: Any) -> List[str]:
+    def _normalize_vocab(cls, v: Any) -> list[str]:
         if v is None:
             return []
         if isinstance(v, str):
@@ -1501,7 +1482,7 @@ class AttackStrategySpec(ModelBase):
             seq = list(v)
         except TypeError:
             raise TypeError("vocabulary must be an iterable of strings or a single string")
-        out: List[str] = []
+        out: list[str] = []
         for x in seq:
             s = str(x).strip()
             if s:
@@ -1510,33 +1491,33 @@ class AttackStrategySpec(ModelBase):
 
 
 __all__ = [
-    # helpers
-    "_now_unix",
-    "_normalize_unix_timestamp",
-    "_iso_from_unix",
-    "_hash_json",
-    "_hash_text",
     "AVRO_AVAILABLE",
+    "MAX_REASONABLE_UNIX_TIMESTAMP",
+    "NUMPY_AVAILABLE",
     "PROTO_AVAILABLE",
     "SQLALCHEMY_AVAILABLE",
-    "NUMPY_AVAILABLE",
-    "MAX_REASONABLE_UNIX_TIMESTAMP",
-    # enums
-    "WorldBit",
-    "CiMethod",
-    "RiskLevel",
-    # ORM
-    "OrmBase",
+    "AttackResult",
+    "AttackStrategy",
+    "AttackStrategySpec",
     "AuditColumnsMixin",
+    "CCResult",
+    "CiMethod",
+    "ExperimentConfig",
+    "GuardrailSpec",
     # models
     "ModelBase",
-    "AttackResult",
-    "GuardrailSpec",
+    # ORM
+    "OrmBase",
+    "RiskLevel",
+    # enums
+    "WorldBit",
     "WorldConfig",
-    "ExperimentConfig",
-    "CCResult",
-    "AttackStrategySpec",
-    "AttackStrategy",
+    "_hash_json",
+    "_hash_text",
+    "_iso_from_unix",
+    "_normalize_unix_timestamp",
+    # helpers
+    "_now_unix",
 ]
 
 

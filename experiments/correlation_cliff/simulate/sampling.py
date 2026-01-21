@@ -19,7 +19,7 @@ See:
 """
 
 import math
-from typing import Any, Dict, Tuple, Union
+from typing import Any
 
 import numpy as np
 
@@ -56,7 +56,7 @@ def validate_cell_probs_with_meta(
     allow_tiny_negative: bool,
     tiny_negative_eps: float,
     context: str = "",
-) -> Tuple[np.ndarray, Dict[str, float]]:
+) -> tuple[np.ndarray, dict[str, float]]:
     """
     Validate (and optionally tiny-clip) a 4-cell probability vector with diagnostics.
 
@@ -81,11 +81,10 @@ def validate_cell_probs_with_meta(
             f"prob_tol is suspiciously large (>1e-2): {prob_tol_f}. {ctx}"
         )
 
-    if allow_tiny_negative:
-        if not (math.isfinite(eps_f) and 0.0 < eps_f <= 1e-4):
-            raise ProbabilityValidationError(
-                f"tiny_negative_eps must be finite in (0, 1e-4], got {eps_f}. {ctx}"
-            )
+    if allow_tiny_negative and not (math.isfinite(eps_f) and 0.0 < eps_f <= 1e-4):
+        raise ProbabilityValidationError(
+            f"tiny_negative_eps must be finite in (0, 1e-4], got {eps_f}. {ctx}"
+        )
 
     p_arr = np.asarray(p, dtype=np.float64)
     if p_arr.shape != (4,):
@@ -204,7 +203,7 @@ def draw_joint_counts(
     tiny_negative_eps: float,
     context: str = "",
     return_meta: bool = False,
-) -> Union[Tuple[int, int, int, int], Tuple[Tuple[int, int, int, int], Dict[str, float]]]:
+) -> tuple[int, int, int, int] | tuple[tuple[int, int, int, int], dict[str, float]]:
     """
     Draw multinomial joint counts (N00, N01, N10, N11) for a 2×2 Bernoulli joint.
 
@@ -322,7 +321,7 @@ def draw_joint_counts_batch(
     tiny_negative_eps: float,
     context: str = "",
     return_meta: bool = False,
-) -> Union[np.ndarray, Tuple[np.ndarray, Dict[str, float]]]:
+) -> np.ndarray | tuple[np.ndarray, dict[str, float]]:
     """
     Vectorized multinomial draws for repeated samples at fixed joint probabilities.
     """
@@ -341,7 +340,9 @@ def draw_joint_counts_batch(
     if size_int <= 0:
         raise ValueError(f"size must be positive, got {size_int}. {ctx}".strip())
     if size_int != size:
-        raise TypeError(f"size must be an integer (no silent coercion), got {size!r}. {ctx}".strip())
+        raise TypeError(
+            f"size must be an integer (no silent coercion), got {size!r}. {ctx}".strip()
+        )
 
     if isinstance(n, bool):
         raise TypeError(f"n must be an int > 0, got bool {n}. {ctx}".strip())
@@ -434,7 +435,7 @@ def empirical_from_counts(
     n11: int,
     rule: Rule,
     context: str = "",
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute empirical probabilities from joint counts, plus dependence summaries.
     """

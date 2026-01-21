@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/core/guardrail_api.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.05, 0.5, 1.0, 'GuardrailAdapter', 'GuardrailLike', '_local_threshold', '_lock', 'blocks', 'calibrate', 'default_threshold', 'guardrail', 'score', 'threshold']

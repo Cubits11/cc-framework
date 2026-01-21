@@ -20,10 +20,11 @@ import hashlib
 import json
 import os
 import subprocess
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 from uuid import uuid4
 
 from cryptography.hazmat.primitives import serialization
@@ -47,11 +48,11 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _sha256_json(data: Dict[str, Any]) -> str:
+def _sha256_json(data: dict[str, Any]) -> str:
     return _sha256_bytes(json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
-def _git_commit() -> Optional[str]:
+def _git_commit() -> str | None:
     try:
         return (
             subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
@@ -62,8 +63,8 @@ def _git_commit() -> Optional[str]:
         return None
 
 
-def _read_text_lines(path: Path) -> List[str]:
-    lines: List[str] = []
+def _read_text_lines(path: Path) -> list[str]:
+    lines: list[str] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             stripped = line.strip()
@@ -72,12 +73,12 @@ def _read_text_lines(path: Path) -> List[str]:
     return lines
 
 
-def _load_prompts(path: Path) -> List[Dict[str, Any]]:
+def _load_prompts(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"Prompt source not found: {path}")
 
     suffix = path.suffix.lower()
-    prompts: List[Dict[str, Any]] = []
+    prompts: list[dict[str, Any]] = []
 
     if suffix in {".txt"}:
         for idx, line in enumerate(_read_text_lines(path), start=1):
@@ -119,7 +120,7 @@ def _merkle_root(lines: Iterable[str]) -> str:
         if len(hashes) % 2 == 1:
             hashes.append(hashes[-1])
         next_level = []
-        for left, right in zip(hashes[0::2], hashes[1::2]):
+        for left, right in zip(hashes[0::2], hashes[1::2], strict=False):
             next_level.append(hashlib.sha256(left + right).digest())
         hashes = next_level
     return hashes[0].hex()
@@ -142,12 +143,12 @@ def _load_private_key(path: Path) -> ed25519.Ed25519PrivateKey:
 @dataclass
 class AuditRunConfig:
     prompt_source: Path
-    guardrails: List[Dict[str, Any]]
+    guardrails: list[dict[str, Any]]
     output_dir: Path
     composition: str = "any_block"
-    benign_calibration_source: Optional[Path] = None
-    private_key_path: Optional[Path] = None
-    run_id: Optional[str] = None
+    benign_calibration_source: Path | None = None
+    private_key_path: Path | None = None
+    run_id: str | None = None
 
 
 def _compose_decision(decisions: Sequence[bool], mode: str) -> str:
@@ -163,7 +164,7 @@ def _compose_decision(decisions: Sequence[bool], mode: str) -> str:
     raise ValueError(f"Unknown composition mode: {mode}")
 
 
-def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
+def run_audit(config: AuditRunConfig) -> dict[str, Any]:
     run_id = config.run_id or f"run_{uuid4().hex[:12]}"
     output_dir = config.output_dir / run_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -179,12 +180,12 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
                 guardrail.calibrate(benign_prompts, target_fpr=0.05)
 
     results_path = output_dir / "results.jsonl"
-    results_lines: List[str] = []
+    results_lines: list[str] = []
 
     for row in prompt_rows:
         prompt = row["prompt"]
-        per_guardrail: List[Dict[str, Any]] = []
-        decisions: List[bool] = []
+        per_guardrail: list[dict[str, Any]] = []
+        decisions: list[bool] = []
         for adapter in adapters:
             blocked, score = adapter.evaluate(prompt)
             per_guardrail.append(
@@ -292,7 +293,7 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
 
 def verify_attestation(
     attestation_path: Path, manifest_path: Path, results_path: Path
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     results_lines = results_path.read_text(encoding="utf-8").splitlines()

@@ -29,7 +29,7 @@ the joint overlap:
     p11 = P(A=1, B=1)
 
 is not identifiable from (pA,pB) alone. Probability axioms imply only the
-Fréchet–Hoeffding feasibility envelope:
+Fréchet-Hoeffding feasibility envelope:
 
     L = max(0, pA + pB - 1)
     U = min(pA, pB)
@@ -107,16 +107,11 @@ from __future__ import annotations
 import contextlib
 import math
 import warnings
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import (
     Any,
-    Dict,
-    Iterator,
     Literal,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
     TypedDict,
 )
 
@@ -299,7 +294,7 @@ def _clip01(x: float) -> float:
 # =============================================================================
 
 Rule = Literal["AND", "OR", "COND_OR"]
-_RULES: Tuple[str, ...] = ("AND", "OR", "COND_OR")
+_RULES: tuple[str, ...] = ("AND", "OR", "COND_OR")
 
 
 def _require_rule(rule: Any) -> Rule:
@@ -319,7 +314,7 @@ def _require_rule(rule: Any) -> Rule:
 @dataclass(frozen=True, slots=True)
 class FHBounds:
     """
-    Fréchet–Hoeffding bounds container for p11 given (pA,pB):
+    Fréchet-Hoeffding bounds container for p11 given (pA,pB):
 
         lower = max(0, pA+pB-1)
         upper = min(pA,pB)
@@ -406,9 +401,9 @@ class JointCells(TypedDict):
 # =============================================================================
 
 
-def fh_bounds(pA: Any, pB: Any) -> Tuple[float, float]:
+def fh_bounds(pA: Any, pB: Any) -> tuple[float, float]:
     """
-    Return Fréchet–Hoeffding bounds (lower, upper) for p11 given marginals pA,pB.
+    Return Fréchet-Hoeffding bounds (lower, upper) for p11 given marginals pA,pB.
 
     Mathematical truth (for Bernoulli A,B):
         lower = max(0, pA + pB - 1)
@@ -586,7 +581,7 @@ def composed_rate(rule: Any, pA: Any, pB: Any, p11: Any) -> float:
     return _clip01(a + b - x)
 
 
-def composed_rate_bounds(rule: Any, pA: Any, pB: Any) -> Tuple[float, float]:
+def composed_rate_bounds(rule: Any, pA: Any, pB: Any) -> tuple[float, float]:
     """
     Tight bounds for pC over all feasible p11 consistent with (pA,pB).
 
@@ -621,7 +616,7 @@ def composed_rate_bounds(rule: Any, pA: Any, pB: Any) -> Tuple[float, float]:
 # =============================================================================
 
 
-def _validate_params(params: Optional[Mapping[str, Any]], allowed: Sequence[str]) -> Dict[str, Any]:
+def _validate_params(params: Mapping[str, Any] | None, allowed: Sequence[str]) -> dict[str, Any]:
     """
     Validate/whitelist path parameters.
 
@@ -648,7 +643,7 @@ def p11_from_lambda(
     lam: Any,
     pA: Any,
     pB: Any,
-    path_params: Optional[Mapping[str, Any]] = None,
+    path_params: Mapping[str, Any] | None = None,
 ) -> float:
     """
     Map lambda ∈ [0,1] to a feasible p11 along a specified *FH-envelope path*.
@@ -812,7 +807,7 @@ def p11_gaussian_copula(
     *,
     method: str = "mc",
     n_mc: int = 100_000,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     antithetic: bool = True,
 ) -> float:
     """
@@ -949,7 +944,7 @@ def avg_ignore_nan(x: float, y: float) -> float:
 # =============================================================================
 
 
-def singleton_gaps(w: TwoWorldMarginals) -> Tuple[float, float, float]:
+def singleton_gaps(w: TwoWorldMarginals) -> tuple[float, float, float]:
     """
     Singleton gaps:
         J_A = |pA1 - pA0|
@@ -961,7 +956,7 @@ def singleton_gaps(w: TwoWorldMarginals) -> Tuple[float, float, float]:
     return (float(jA), float(jB), float(max(jA, jB)))
 
 
-def _interval_gap_minmax(i0: Tuple[float, float], i1: Tuple[float, float]) -> Tuple[float, float]:
+def _interval_gap_minmax(i0: tuple[float, float], i1: tuple[float, float]) -> tuple[float, float]:
     """
     Given intervals I0=[a,b], I1=[c,d], compute:
       min gap = min_{x in I0, y in I1} |x-y|
@@ -989,7 +984,7 @@ def _interval_gap_minmax(i0: Tuple[float, float], i1: Tuple[float, float]) -> Tu
     return (float(mn), float(mx))
 
 
-def jc_bounds(w: TwoWorldMarginals, rule: Any) -> Tuple[float, float]:
+def jc_bounds(w: TwoWorldMarginals, rule: Any) -> tuple[float, float]:
     """
     JC bounds over *all feasible dependence*.
 
@@ -1011,7 +1006,7 @@ def jc_bounds(w: TwoWorldMarginals, rule: Any) -> Tuple[float, float]:
     return (float(mn), float(min(1.0, mx)))
 
 
-def cc_bounds(w: TwoWorldMarginals, rule: Any) -> Tuple[float, float]:
+def cc_bounds(w: TwoWorldMarginals, rule: Any) -> tuple[float, float]:
     """
     CC bounds = JC bounds / J_best, with degeneracy handling.
 
@@ -1034,42 +1029,42 @@ def cc_bounds(w: TwoWorldMarginals, rule: Any) -> Tuple[float, float]:
 # =============================================================================
 
 __all__ = [
-    # errors
-    "TheoryError",
-    "InputValidationError",
-    "FeasibilityError",
-    "NumericalStabilityError",
-    # config
-    "TheoryConfig",
-    "InvariantPolicy",
     "CONFIG",
-    "set_config",
-    "temporary_config",
     # data structures
     "FHBounds",
-    "TwoWorldMarginals",
+    "FeasibilityError",
+    "InputValidationError",
+    "InvariantPolicy",
     "JointCells",
+    "NumericalStabilityError",
+    # composition
+    "Rule",
+    # config
+    "TheoryConfig",
+    # errors
+    "TheoryError",
+    "TwoWorldMarginals",
+    "avg_ignore_nan",
+    "cc_bounds",
+    "composed_rate",
+    "composed_rate_bounds",
     # FH feasibility
     "fh_bounds",
     "fh_bounds_obj",
-    "validate_joint",
+    "jc_bounds",
     # joint table
     "joint_cells_from_marginals",
-    "validate_joint_cells",
-    # composition
-    "Rule",
-    "composed_rate",
-    "composed_rate_bounds",
+    "kendall_tau_a_from_cells",
+    "p11_clayton_copula",
     # dependence
     "p11_from_lambda",
-    "p11_clayton_copula",
     "p11_gaussian_copula",
     # summaries
     "phi_from_joint",
-    "kendall_tau_a_from_cells",
-    "avg_ignore_nan",
+    "set_config",
     # two-world
     "singleton_gaps",
-    "jc_bounds",
-    "cc_bounds",
+    "temporary_config",
+    "validate_joint",
+    "validate_joint_cells",
 ]

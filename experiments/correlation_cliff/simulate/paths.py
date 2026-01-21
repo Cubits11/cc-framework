@@ -10,10 +10,10 @@ PhD/enterprise-grade dependence-path primitives for Correlation Cliff experiment
 Goal
 ----
 Construct a feasible joint probability p11 = P(A=1, B=1) given marginals pA, pB and a
-dependence interpolation parameter lam ∈ [0,1], while guaranteeing Fréchet–Hoeffding
+dependence interpolation parameter lam ∈ [0,1], while guaranteeing Fréchet-Hoeffding
 feasibility:
 
-    L(pA,pB) ≤ p11 ≤ U(pA,pB)
+    L(pA,pB) <= p11 <= U(pA,pB)
 
 This module provides a small family of paths that map lam to a point inside the FH
 envelope, plus an optional Gaussian-copula path parameterized by Kendall's tau.
@@ -24,7 +24,7 @@ Design invariants (ResearchOS)
 2) required meta keys ALWAYS present for ALL paths:
        L, U, FH_width, lam, lam_eff, raw_p11, clip_amt, clipped,
        fh_violation, fh_violation_amt
-3) p11 returned ALWAYS satisfies L ≤ p11 ≤ U unless:
+3) p11 returned ALWAYS satisfies L <= p11 <= U unless:
        clip_policy="raise" and a violation exceeds clip_tol -> FeasibilityError
 4) bool-as-number is rejected (True/False are NOT accepted as numeric inputs)
 5) deterministic behavior; no global state; no hidden RNG
@@ -43,8 +43,9 @@ Notes
 - All numeric fields are float-cast at the boundary so meta remains strict.
 """
 
-from typing import Any, Dict, Mapping, Tuple
 import math
+from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 
@@ -52,10 +53,10 @@ from . import utils as U
 from .config import Path
 
 __all__ = [
-    "P11FromPathError",
-    "InputValidationError",
     "FeasibilityError",
+    "InputValidationError",
     "NumericalError",
+    "P11FromPathError",
     "p11_from_path",
 ]
 
@@ -120,13 +121,15 @@ def _finite_pos(x: Any, name: str) -> float:
 def _mapping(path_params: Any) -> Mapping[str, Any]:
     """Require mapping with string keys (OS hygiene)."""
     if isinstance(path_params, Mapping):
-        for k in path_params.keys():
+        for k in path_params:
             if not isinstance(k, str):
                 raise InputValidationError(
                     f"path_params keys must be str; got key={k!r} ({type(k).__name__})"
                 )
         return path_params
-    raise InputValidationError(f"path_params must be a mapping/dict, got {type(path_params).__name__}")
+    raise InputValidationError(
+        f"path_params must be a mapping/dict, got {type(path_params).__name__}"
+    )
 
 
 def _normalize_path(path: Path | str) -> str:
@@ -143,10 +146,7 @@ def _normalize_path(path: Path | str) -> str:
     else:
         # Prefer `.value` if it is a string-like; else fall back to `.name`.
         val = getattr(path, "value", None)
-        if isinstance(val, str) and val.strip():
-            s = val
-        else:
-            s = getattr(path, "name", str(path))
+        s = val if isinstance(val, str) and val.strip() else getattr(path, "name", str(path))
 
     s = s.strip().lower()
 
@@ -254,7 +254,7 @@ def _p11_gaussian_tau(
     tau: float,
     *,
     ppf_clip_eps: float = 1e-12,
-) -> Tuple[float, Dict[str, float]]:
+) -> tuple[float, dict[str, float]]:
     """
     Compute p11 under Gaussian copula parameterized by Kendall's tau.
 
@@ -313,7 +313,7 @@ def p11_from_path(
     *,
     path: Path | str,
     path_params: Mapping[str, Any],
-) -> Tuple[float, Dict[str, float]]:
+) -> tuple[float, dict[str, float]]:
     """
     Enterprise-grade p11 constructor with explicit invariants and audit fields.
 
@@ -338,7 +338,7 @@ def p11_from_path(
     b = U.fh_bounds(pA_f, pB_f)
     L = float(b.L)
     Uu = float(b.U)
-    if math.isfinite(L) and math.isfinite(Uu) and L > Uu and (L - Uu) <= 1e-12:
+    if math.isfinite(L) and math.isfinite(Uu) and Uu < L and (L - Uu) <= 1e-12:
         L = Uu
     if not (math.isfinite(L) and math.isfinite(Uu) and 0.0 <= L <= Uu <= 1.0):
         raise NumericalError(f"FH bounds invalid for pA={pA_f}, pB={pB_f}: L={L}, U={Uu}")
@@ -346,7 +346,7 @@ def p11_from_path(
     width = float(Uu - L)
 
     # Base meta: numeric-only, always present keys
-    meta: Dict[str, float] = {
+    meta: dict[str, float] = {
         "L": float(L),
         "U": float(Uu),
         "FH_width": float(width),
@@ -370,18 +370,20 @@ def p11_from_path(
             f"clip_tol must be >=0 and small (<=1e-6) to preserve strict feasibility, got {clip_tol!r}"
         )
 
-    def _enforce_numeric_only(d: Dict[str, float]) -> None:
+    def _enforce_numeric_only(d: dict[str, float]) -> None:
         for k, v in d.items():
             if not isinstance(k, str):
                 raise NumericalError(f"meta keys must be str; got {k!r} ({type(k).__name__})")
             # Must be Python float, not numpy scalar
             if type(v) is not float:
-                raise NumericalError(f"meta values must be Python float; got {k!r}:{type(v).__name__}")
+                raise NumericalError(
+                    f"meta values must be Python float; got {k!r}:{type(v).__name__}"
+                )
             # Do not require finite for everything: but our required keys SHOULD be finite after finalize
             if not math.isfinite(v) and k not in ("lam_eff", "raw_p11"):
                 raise NumericalError(f"meta contains non-finite value for {k!r}: {v!r}")
 
-    def _finalize(raw: float, lam_eff: float) -> Tuple[float, Dict[str, float]]:
+    def _finalize(raw: float, lam_eff: float) -> tuple[float, dict[str, float]]:
         raw_f = _as_float(raw, "raw_p11")
         lam_eff_f = _finite_in_unit(lam_eff, "lam_eff")  # stricter than before
 
@@ -397,12 +399,11 @@ def p11_from_path(
         meta["fh_violation"] = float(1.0 if viol_amt > 0.0 else 0.0)
 
         # Policy: raise if outside [L,U] beyond clip_tol
-        if raw_f < L - clip_tol or raw_f > Uu + clip_tol:
-            if clip_policy == "raise":
-                raise FeasibilityError(
-                    f"{path_s}: raw_p11 violates FH by more than clip_tol. "
-                    f"raw={raw_f}, L={L}, U={Uu}, clip_tol={clip_tol}"
-                )
+        if (raw_f < L - clip_tol or raw_f > Uu + clip_tol) and clip_policy == "raise":
+            raise FeasibilityError(
+                f"{path_s}: raw_p11 violates FH by more than clip_tol. "
+                f"raw={raw_f}, L={L}, U={Uu}, clip_tol={clip_tol}"
+            )
 
         clipped = raw_f
         if clipped < L:
@@ -410,11 +411,15 @@ def p11_from_path(
         elif clipped > Uu:
             clipped = Uu
 
-        meta["clip_amt"] = float(raw_f - clipped)  # signed: positive means clipped downward; negative clipped upward
+        meta["clip_amt"] = float(
+            raw_f - clipped
+        )  # signed: positive means clipped downward; negative clipped upward
         meta["clipped"] = float(1.0 if clipped != raw_f else 0.0)
 
         if not (L <= clipped <= Uu):
-            raise NumericalError(f"Postcondition failed: p11 not in [L,U]. p11={clipped}, L={L}, U={Uu}")
+            raise NumericalError(
+                f"Postcondition failed: p11 not in [L,U]. p11={clipped}, L={L}, U={Uu}"
+            )
 
         # Strong numeric-only enforcement
         _enforce_numeric_only(meta)
@@ -447,11 +452,11 @@ def p11_from_path(
     meta["tau"] = float(tau)
 
     if tau <= -1.0:
-        meta["rho"] = float(-1.0)
+        meta["rho"] = -1.0
         return _finalize(float(L), float(lam_f))
 
     if tau >= 1.0:
-        meta["rho"] = float(1.0)
+        meta["rho"] = 1.0
         return _finalize(float(Uu), float(lam_f))
 
     # Interior requires SciPy

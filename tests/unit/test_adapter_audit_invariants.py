@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -38,7 +38,7 @@ class _MockRails:
         return (reply, context) if return_context else reply
 
 
-def _mock_generator(prompt_text: str) -> tuple[str, float | None, Dict[str, Any]]:
+def _mock_generator(prompt_text: str) -> tuple[str, float | None, dict[str, Any]]:
     output = "safe"
     return output, 0.1, {"prompt": prompt_text, "decoded": output}
 
@@ -52,7 +52,7 @@ def adapter(request):
     return NeMoGuardrailsAdapter(rails=_MockRails())
 
 
-def _assert_no_leak(payload: Dict[str, Any], terms: list[str]) -> None:
+def _assert_no_leak(payload: dict[str, Any], terms: list[str]) -> None:
     blob = json.dumps(payload, sort_keys=True)
     for term in terms:
         assert term not in blob, f"Leak detected: '{term}'"

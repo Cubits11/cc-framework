@@ -6,7 +6,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 
@@ -27,16 +27,16 @@ class DummyAudit:
     """
 
     def __init__(self) -> None:
-        self.records_by_path: Dict[str, List[Dict[str, Any]]] = {}
-        self.shas_by_path: Dict[str, List[str]] = {}
+        self.records_by_path: dict[str, list[dict[str, Any]]] = {}
+        self.shas_by_path: dict[str, list[str]] = {}
         self.verify_should_raise: bool = False
         self.verify_calls: int = 0
 
     @staticmethod
-    def _canonical_line(rec: Dict[str, Any]) -> str:
+    def _canonical_line(rec: dict[str, Any]) -> str:
         return json.dumps(rec, sort_keys=True, separators=(",", ":"))
 
-    def append_jsonl(self, path: str, rec: Dict[str, Any]) -> str:
+    def append_jsonl(self, path: str, rec: dict[str, Any]) -> str:
         path = str(path)
         line = self._canonical_line(rec)
         sha = cclogging.hashlib.sha256(line.encode("utf-8")).hexdigest()
@@ -48,7 +48,7 @@ class DummyAudit:
             f.write(line + "\n")
         return sha
 
-    def tail_sha(self, path: str) -> Optional[str]:
+    def tail_sha(self, path: str) -> str | None:
         path = str(path)
         shas = self.shas_by_path.get(path) or []
         return shas[-1] if shas else None
@@ -286,7 +286,7 @@ def make_logger(
     )
 
 
-def read_jsonl(path: Path) -> List[Dict[str, Any]]:
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8") as f:
@@ -820,7 +820,7 @@ def test_fsync_best_effort_strict_and_non_strict(dummy_audit, log_path, monkeypa
 
 
 def test_post_log_hook_called_and_errors_respected(dummy_audit, log_path):
-    called: List[str] = []
+    called: list[str] = []
 
     def hook(sha: str) -> None:
         called.append(sha)

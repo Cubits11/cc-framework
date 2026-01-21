@@ -7,7 +7,6 @@ import json
 import os
 import random
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -28,7 +27,7 @@ def _should_run() -> bool:
     return os.getenv("CC_RUN_EXPERIMENTS") == "1"
 
 
-def _make_canaries(n: int, seed: int) -> List[str]:
+def _make_canaries(n: int, seed: int) -> list[str]:
     rng = random.Random(seed)
     return [f"canary-{i}-{rng.randint(1000, 9999)}" for i in range(n)]
 

@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/io/seeds.py
+# hypothesis_version: 6.147.0
+
+['1337', 'CC_SEED', 'PYTHONHASHSEED']

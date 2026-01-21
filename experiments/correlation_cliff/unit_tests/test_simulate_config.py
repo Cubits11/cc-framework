@@ -16,7 +16,7 @@ def test_strict_int_rejects_float_coercion():
 def test_sim_config_n_rejects_float():
     with pytest.raises(ConfigError, match="no silent coercion"):
         SimConfig(
-            marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+            marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
             rule="OR",
             lambdas=[0.5],
             n=100.0,
@@ -28,7 +28,7 @@ def test_sim_config_n_rejects_float():
 
 def test_batch_sampling_flag_validation():
     cfg = SimConfig(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
         rule="OR",
         lambdas=[0.5],
         n=100,
@@ -41,7 +41,7 @@ def test_batch_sampling_flag_validation():
 
     with pytest.raises(ConfigError, match="batch_sampling must be bool"):
         SimConfig(
-            marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+            marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
             rule="OR",
             lambdas=[0.5],
             n=100,

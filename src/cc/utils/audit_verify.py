@@ -4,12 +4,12 @@
 from __future__ import annotations
 
 import argparse
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from cc.cartographer.audit import verify_chain
 
 
-def main(argv: Optional[Iterable[str]] = None) -> None:
+def main(argv: Iterable[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Verify a guardrail audit JSONL chain.")
     parser.add_argument("path", help="Path to the audit JSONL log.")
     args = parser.parse_args(argv)

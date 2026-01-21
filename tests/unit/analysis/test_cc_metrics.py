@@ -55,7 +55,7 @@ class TestCCMetrics:
                 )
             )
 
-        j_stat, p0, p1 = compute_j_statistic(results)
+        j_stat, _p0, _p1 = compute_j_statistic(results)
         assert abs(j_stat) < 0.1  # Should be near zero
 
     def test_bootstrap_stability(self):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Compute Fréchet–Hoeffding envelopes for Week 7 point summaries."""
+"""Compute Fréchet-Hoeffding envelopes for Week 7 point summaries."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
@@ -16,23 +15,23 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from cc.analysis.week7_utils import FHEnvelope, fh_envelope
 
 
-def load_point(path: Path) -> Dict:
+def load_point(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def write_point(path: Path, payload: Dict) -> None:
+def write_point(path: Path, payload: dict) -> None:
     with path.open("w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2, sort_keys=True)
 
 
-def compute_for_point(data: Dict) -> Dict:
+def compute_for_point(data: dict) -> dict:
     topology = data.get("topology")
     rails = data.get("rails", [])
     per_rail = data.get("per_rail", {})
 
-    tprs: List[float] = []
-    fprs: List[float] = []
+    tprs: list[float] = []
+    fprs: list[float] = []
     for rail in rails:
         metrics = per_rail.get(rail)
         if not metrics:

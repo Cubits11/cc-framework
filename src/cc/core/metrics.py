@@ -16,12 +16,12 @@ toolkit for evaluating guardrails and classifiers.
 
 Key features
 ------------
-- **Youden’s J**: scalar or vectorized.
+- **Youden's J**: scalar or vectorized.
 - **Composability**: Δ_add (additive deviation), CC_max, and new metrics: CC_rel, Δ_mult.
 - **Confusion utilities**: build confusion matrices and derive rates (TPR/FPR/etc.).
 - **ROC/AUC**: threshold sweeps, monotone ROC construction, trapezoid AUC.
 - **Optimal thresholds**: maximize J (Youden) or F1.
-- **Confidence intervals**: Wilson interval for proportions; Clopper–Pearson optional.
+- **Confidence intervals**: Wilson interval for proportions; Clopper-Pearson optional.
 - **Bootstrap**: generic bootstrap CI; J-at-opt-threshold bootstrap helper.
 - **Safety & stability**: rigorous clipping/validation; NaN/inf guards.
 
@@ -30,44 +30,45 @@ Minimal deps: `numpy` (no plotting). Designed for CPU-cheap, deterministic smoke
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import sqrt
-from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Literal, Union
 
 import numpy as np
 
 ArrayLike = Union[float, int, Sequence[float], np.ndarray]
 
 __all__ = [
-    # Core legacy API (backward compatible)
-    "youden_j",
-    "delta_add",
-    "cc_max",
-    # New composability helpers
-    "cc_rel",
-    "delta_mult",
-    # Confusion & derived metrics
-    "confusion_from_labels",
-    "confusion_from_scores",
-    "rates_from_confusion",
-    "f1_score",
-    "mcc",
-    "balanced_accuracy",
-    "likelihood_ratios",
-    # ROC / AUC / thresholds
-    "roc_curve",
+    "Confusion",
+    # Data containers
+    "Rates",
     "auc_trapezoid",
-    "optimal_threshold_youden",
-    "optimal_threshold_f1",
-    # Confidence intervals
-    "wilson_ci",
+    "balanced_accuracy",
     "binomial_ci",
     # Bootstrap
     "bootstrap_ci",
     "bootstrap_ci_youden",
-    # Data containers
-    "Rates",
-    "Confusion",
+    "cc_max",
+    # New composability helpers
+    "cc_rel",
+    # Confusion & derived metrics
+    "confusion_from_labels",
+    "confusion_from_scores",
+    "delta_add",
+    "delta_mult",
+    "f1_score",
+    "likelihood_ratios",
+    "mcc",
+    "optimal_threshold_f1",
+    "optimal_threshold_youden",
+    "rates_from_confusion",
+    # ROC / AUC / thresholds
+    "roc_curve",
+    # Confidence intervals
+    "wilson_ci",
+    # Core legacy API (backward compatible)
+    "youden_j",
 ]
 
 EPS = 1e-12
@@ -78,9 +79,9 @@ EPS = 1e-12
 # =============================================================================
 
 
-def youden_j(tpr: ArrayLike, fpr: ArrayLike) -> Union[float, np.ndarray]:
+def youden_j(tpr: ArrayLike, fpr: ArrayLike) -> float | np.ndarray:
     """
-    Youden’s J = TPR − FPR, clipped to [-1, 1].
+    Youden's J = TPR - FPR, clipped to [-1, 1].
 
     Accepts scalars or array-like inputs; returns a float if both inputs are scalars,
     otherwise a NumPy array with elementwise results.
@@ -96,7 +97,7 @@ def youden_j(tpr: ArrayLike, fpr: ArrayLike) -> Union[float, np.ndarray]:
 def delta_add(j_comp: float, j_a: float, j_b: float) -> float:
     """
     Additive deviation:
-    Δ_add = J_comp − (J_A + J_B − J_A * J_B).
+    Δ_add = J_comp - (J_A + J_B - J_A * J_B).
     Positive values indicate **super-additive** composition (synergy).
     """
     j_a = float(j_a)
@@ -125,7 +126,7 @@ def cc_max(j_comp: float, j_a: float, j_b: float) -> float:
 def cc_rel(j_comp: float, j_a: float, j_b: float) -> float:
     """
     Relative composition coefficient:
-      CC_rel = J_comp / (J_A + J_B − J_A * J_B)
+      CC_rel = J_comp / (J_A + J_B - J_A * J_B)
 
     Returns +∞ if the denominator is 0 and J_comp > 0; 0 if both are 0.
     """
@@ -139,7 +140,7 @@ def cc_rel(j_comp: float, j_a: float, j_b: float) -> float:
 def delta_mult(j_comp: float, j_a: float, j_b: float) -> float:
     """
     Multiplicative deviation:
-      Δ_mult = J_comp − (1 − (1 − J_A) * (1 − J_B))
+      Δ_mult = J_comp - (1 - (1 - J_A) * (1 - J_B))
 
     Interprets composition on the complement scale (residual error mass).
     """
@@ -254,11 +255,11 @@ def balanced_accuracy(tpr: float, tnr: float) -> float:
     return 0.5 * (float(tpr) + float(tnr))
 
 
-def likelihood_ratios(tpr: float, fpr: float) -> Tuple[float, float]:
+def likelihood_ratios(tpr: float, fpr: float) -> tuple[float, float]:
     """
-    Return (LR+, LR−) where:
+    Return (LR+, LR-) where:
       LR+ = TPR / FPR
-      LR− = (1 − TPR) / (1 − FPR)
+      LR- = (1 - TPR) / (1 - FPR)
     """
     tpr = float(tpr)
     fpr = float(fpr)
@@ -278,7 +279,7 @@ def roc_curve(
     *,
     pos_label: int = 1,
     drop_intermediate: bool = True,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Compute ROC curve by sweeping thresholds from high→low.
 
@@ -352,7 +353,7 @@ def _search_best_threshold(
     labels: np.ndarray,
     objective: Literal["youden", "f1"],
     pos_label: int,
-) -> Tuple[float, Confusion, Rates, float]:
+) -> tuple[float, Confusion, Rates, float]:
     """
     Internal helper: scan all unique thresholds; return (threshold, confusion, rates, objective_value).
     """
@@ -366,16 +367,13 @@ def _search_best_threshold(
 
     best_thr = float(thr[0])
     best_val = -np.inf
-    best_cf: Optional[Confusion] = None
-    best_rates: Optional[Rates] = None
+    best_cf: Confusion | None = None
+    best_rates: Rates | None = None
 
     for t in thr:
         cf = confusion_from_scores(y, s, t, pos_label=pos)
         r = rates_from_confusion(cf)
-        if objective == "youden":
-            val = youden_j(r.tpr, r.fpr)
-        else:
-            val = f1_score(cf.tp, cf.fp, cf.fn)
+        val = youden_j(r.tpr, r.fpr) if objective == "youden" else f1_score(cf.tp, cf.fp, cf.fn)
         if val > best_val:
             best_thr, best_val, best_cf, best_rates = float(t), float(val), cf, r
 
@@ -385,7 +383,7 @@ def _search_best_threshold(
 
 def optimal_threshold_youden(
     scores: Sequence[float], labels: Sequence[int], *, pos_label: int = 1
-) -> Tuple[float, Confusion, Rates, float]:
+) -> tuple[float, Confusion, Rates, float]:
     """
     Find threshold maximizing Youden's J. Returns (threshold, confusion, rates, J*).
     """
@@ -394,7 +392,7 @@ def optimal_threshold_youden(
 
 def optimal_threshold_f1(
     scores: Sequence[float], labels: Sequence[int], *, pos_label: int = 1
-) -> Tuple[float, Confusion, Rates, float]:
+) -> tuple[float, Confusion, Rates, float]:
     """
     Find threshold maximizing F1. Returns (threshold, confusion, rates, F1*).
     """
@@ -406,7 +404,7 @@ def optimal_threshold_f1(
 # =============================================================================
 
 
-def wilson_ci(k: int, n: int, level: float = 0.95) -> Tuple[float, float]:
+def wilson_ci(k: int, n: int, level: float = 0.95) -> tuple[float, float]:
     """
     Wilson score interval for a binomial proportion with success count k and trials n.
 
@@ -436,7 +434,7 @@ def binomial_ci(
     n: int,
     level: float = 0.95,
     method: Literal["wilson", "normal"] = "wilson",
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Convenience wrapper for binomial CI. Defaults to Wilson; 'normal' uses Wald.
     """
@@ -468,8 +466,8 @@ def bootstrap_ci(
     *,
     n_boot: int = 1000,
     level: float = 0.95,
-    seed: Optional[int] = 123,
-) -> Tuple[float, float, float]:
+    seed: int | None = 123,
+) -> tuple[float, float, float]:
     """
     Generic nonparametric bootstrap CI for a statistic.
 
@@ -497,11 +495,11 @@ def bootstrap_ci_youden(
     *,
     n_boot: int = 1000,
     level: float = 0.95,
-    seed: Optional[int] = 123,
+    seed: int | None = 123,
     pos_label: int = 1,
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     """
-    Bootstrap CI for **max Youden’s J** obtained by re-selecting the optimal
+    Bootstrap CI for **max Youden's J** obtained by re-selecting the optimal
     threshold per bootstrap resample. Useful to quantify uncertainty around
     the *best achievable* J on the observed dataset.
     """

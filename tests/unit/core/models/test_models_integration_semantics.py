@@ -10,7 +10,6 @@ Scope:
 """
 
 import time
-from typing import List
 
 from cc.core.models import (
     AttackResult,
@@ -37,8 +36,8 @@ def test_integration_experiment_config_to_attack_results_workflow():
     - AttackResult timestamps are >= config.created_at (created later).
     """
     # Two guardrail configs just to exercise the mapping
-    baseline_stack: List[GuardrailSpec] = []
-    protected_stack: List[GuardrailSpec] = [GuardrailSpec(name="kw", params={"k": "v"})]
+    baseline_stack: list[GuardrailSpec] = []
+    protected_stack: list[GuardrailSpec] = [GuardrailSpec(name="kw", params={"k": "v"})]
 
     cfg = ExperimentConfig(
         experiment_id="exp-integration",
@@ -57,7 +56,7 @@ def test_integration_experiment_config_to_attack_results_workflow():
     # Small sleep to make ordering robust even on coarse timers
     time.sleep(0.001)
 
-    results: List[AttackResult] = []
+    results: list[AttackResult] = []
     for i in range(cfg.n_sessions):
         world_bit = WorldBit.BASELINE if i == 0 else WorldBit.PROTECTED
         guardrails_applied = "baseline" if world_bit is WorldBit.BASELINE else "protected"

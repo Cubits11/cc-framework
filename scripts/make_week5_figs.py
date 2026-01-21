@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 from pathlib import Path
-from typing import List, Optional
 
 import matplotlib.pyplot as plt
 
@@ -27,7 +26,7 @@ NUMERIC_FIELDS = {
 }
 
 
-def load_scan(path: Path) -> List[dict]:
+def load_scan(path: Path) -> list[dict]:
     with path.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         rows = []
@@ -45,7 +44,7 @@ def load_scan(path: Path) -> List[dict]:
         return rows
 
 
-def find_last_complete_row(rows: List[dict]) -> Optional[dict]:
+def find_last_complete_row(rows: list[dict]) -> dict | None:
     for row in reversed(rows):
         if row.get("ci_lo") is not None and row.get("ci_hi") is not None:
             return row
@@ -63,7 +62,7 @@ def figure_ci_widths(row: dict, out_path: Path) -> None:
     bars = ax.bar(labels, widths, color=["#4C72B0", "#55A868", "#C44E52"])
     ax.set_ylabel("Interval width")
     ax.set_title("Wilson vs Bootstrap CI width")
-    for rect, width in zip(bars, widths):
+    for rect, width in zip(bars, widths, strict=False):
         ax.text(
             rect.get_x() + rect.get_width() / 2,
             rect.get_height(),

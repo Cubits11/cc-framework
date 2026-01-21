@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -82,7 +82,7 @@ def _make_cfg(
     seed_policy="stable_per_cell",
     hard_fail_on_invalid=True,
     include_theory_reference=False,
-) -> "sim.SimConfig":
+) -> sim.SimConfig:
     if path_params is None:
         path_params = {}
     return sim.SimConfig(
@@ -326,7 +326,7 @@ def test_validate_cfg_accepts_good_cfg():
 
 
 def test_cfg_from_dict_legacy_schema_smoke():
-    d: Dict[str, Any] = {
+    d: dict[str, Any] = {
         "marginals": {"w0": {"pA": 0.2, "pB": 0.35}, "w1": {"pA": 0.45, "pB": 0.35}},
         "rule": "OR",
         "n": 50,
@@ -349,7 +349,7 @@ def test_cfg_from_dict_legacy_schema_smoke():
 
 
 def test_cfg_from_dict_pipeline_schema_smoke():
-    d: Dict[str, Any] = {
+    d: dict[str, Any] = {
         "marginals": {"w0": {"pA": 0.2, "pB": 0.35}, "w1": {"pA": 0.45, "pB": 0.35}},
         "composition": {"primary_rule": "OR"},
         "dependence_paths": {
@@ -431,7 +431,7 @@ def test_simulate_grid_row_count_and_sort_order():
     # Sorted by lambda then rep (mergesort stable)
     assert df["lambda"].is_monotonic_increasing
     # Within each lambda, rep should be non-decreasing
-    for lam, g in df.groupby("lambda", sort=True):
+    for _lam, g in df.groupby("lambda", sort=True):
         reps = list(pd.to_numeric(g["rep"], errors="coerce"))
         assert reps == sorted(reps)
 

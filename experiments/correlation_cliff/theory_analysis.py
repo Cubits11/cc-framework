@@ -36,8 +36,9 @@ Dependencies
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Mapping, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
 
@@ -119,10 +120,10 @@ class CurveResult:
     CC: np.ndarray
 
     # optional interpretability stats
-    phi0: Optional[np.ndarray] = None
-    phi1: Optional[np.ndarray] = None
-    tau0: Optional[np.ndarray] = None
-    tau1: Optional[np.ndarray] = None
+    phi0: np.ndarray | None = None
+    phi1: np.ndarray | None = None
+    tau0: np.ndarray | None = None
+    tau1: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         n = self.grid.values.size
@@ -201,7 +202,7 @@ class SurfaceResult:
                 raise InputValidationError(f"{name} must be finite")
             object.__setattr__(self, name, mat)
 
-    def minmax(self) -> Dict[str, Tuple[float, float]]:
+    def minmax(self) -> dict[str, tuple[float, float]]:
         return {
             "JC": (float(np.min(self.JC)), float(np.max(self.JC))),
             "CC": (float(np.min(self.CC)), float(np.max(self.CC))),
@@ -311,7 +312,7 @@ def _compute_optional_stats(
     *,
     want_phi: bool,
     want_tau: bool,
-) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+) -> tuple[np.ndarray | None, np.ndarray | None]:
     """
     Compute interpretability stats in a vectorized way.
 
@@ -323,8 +324,8 @@ def _compute_optional_stats(
     """
     p11 = np.asarray(p11_arr, dtype=float)
 
-    phi_arr: Optional[np.ndarray] = None
-    tau_arr: Optional[np.ndarray] = None
+    phi_arr: np.ndarray | None = None
+    tau_arr: np.ndarray | None = None
 
     if want_phi:
         denom = pA * (1.0 - pA) * pB * (1.0 - pB)
@@ -369,7 +370,7 @@ def _p11_vec_fh_path(
     lam_grid: np.ndarray,
     pA: float,
     pB: float,
-    path_params: Optional[Mapping[str, Any]],
+    path_params: Mapping[str, Any] | None,
 ) -> np.ndarray:
     """
     Fast scalar->vector wrapper around theory_core.p11_from_lambda.
@@ -395,13 +396,13 @@ def scan_fh_path_tied_lambda(
     rule: Any,
     *,
     path: str = "fh_linear",
-    grid: Optional[Grid1D] = None,
-    path_params: Optional[Mapping[str, Any]] = None,
+    grid: Grid1D | None = None,
+    path_params: Mapping[str, Any] | None = None,
     want_phi: bool = True,
     want_tau: bool = True,
 ) -> CurveResult:
     """
-    Scan a Fréchet–Hoeffding envelope path with a shared λ across worlds (λ0=λ1=λ).
+    Scan a Fréchet-Hoeffding envelope path with a shared λ across worlds (λ0=λ1=λ).
 
     This is an *assumption*: that the dependence rank-position in the FH envelope
     is stable across worlds.
@@ -448,9 +449,9 @@ def scan_fh_path_surface(
     rule: Any,
     *,
     path: str = "fh_linear",
-    grid0: Optional[Grid1D] = None,
-    grid1: Optional[Grid1D] = None,
-    path_params: Optional[Mapping[str, Any]] = None,
+    grid0: Grid1D | None = None,
+    grid1: Grid1D | None = None,
+    path_params: Mapping[str, Any] | None = None,
 ) -> SurfaceResult:
     """
     2D surface scan of FH paths allowing λ0 and λ1 to vary independently.
@@ -496,7 +497,7 @@ def scan_clayton_theta_tied(
     w: TwoWorldMarginals,
     rule: Any,
     *,
-    grid: Optional[Grid1D] = None,
+    grid: Grid1D | None = None,
     want_phi: bool = True,
     want_tau: bool = True,
 ) -> CurveResult:
@@ -555,10 +556,10 @@ def scan_gaussian_rho_tied(
     w: TwoWorldMarginals,
     rule: Any,
     *,
-    grid: Optional[Grid1D] = None,
+    grid: Grid1D | None = None,
     method: str = "mc",
     n_mc: int = 100_000,
-    seed: Optional[int] = 0,
+    seed: int | None = 0,
     antithetic: bool = True,
     want_phi: bool = True,
     want_tau: bool = True,
@@ -783,7 +784,7 @@ def find_lambda_for_target_p11(
     pA: float,
     pB: float,
     *,
-    path_params: Optional[Mapping[str, Any]] = None,
+    path_params: Mapping[str, Any] | None = None,
 ) -> float:
     """
     Invert p11_from_lambda for FH paths to find λ producing a desired p11.
@@ -848,7 +849,7 @@ def find_lambda_for_target_phi(
     pA: float,
     pB: float,
     *,
-    path_params: Optional[Mapping[str, Any]] = None,
+    path_params: Mapping[str, Any] | None = None,
     grid_n: int = 2001,
 ) -> float:
     """
@@ -886,10 +887,10 @@ def find_lambda_for_extreme_JC(
     rule: Any,
     *,
     path: str = "fh_linear",
-    path_params: Optional[Mapping[str, Any]] = None,
+    path_params: Mapping[str, Any] | None = None,
     grid_n: int = 2001,
     extreme: Literal["min", "max"] = "max",
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Find λ (tied across worlds) that yields extreme JC under an FH path.
 
@@ -923,7 +924,7 @@ def find_lambda_for_extreme_JC(
 # =============================================================================
 
 
-def world_interval_summary(pA: float, pB: float, rule: Any) -> Dict[str, float]:
+def world_interval_summary(pA: float, pB: float, rule: Any) -> dict[str, float]:
     """
     Provide a compact summary for one world:
       - FH bounds for p11
@@ -951,27 +952,27 @@ def world_interval_summary(pA: float, pB: float, rule: Any) -> Dict[str, float]:
 # =============================================================================
 
 __all__ = [
+    "BoundsSummary",
+    # results
+    "CurveResult",
     # grids
     "Grid1D",
+    "SurfaceResult",
+    # bounds/report
+    "bounds_summary",
     "default_lambda_grid",
     "default_rho_grid",
     "default_theta_grid",
-    # results
-    "CurveResult",
-    "SurfaceResult",
-    "BoundsSummary",
-    # scans
-    "scan_fh_path_tied_lambda",
-    "scan_fh_path_surface",
-    "scan_clayton_theta_tied",
-    "scan_gaussian_rho_tied",
-    # bounds/report
-    "bounds_summary",
-    "format_bounds_report",
+    "find_lambda_for_extreme_JC",
     # inversion/calibration
     "find_lambda_for_target_p11",
     "find_lambda_for_target_phi",
-    "find_lambda_for_extreme_JC",
+    "format_bounds_report",
+    "scan_clayton_theta_tied",
+    "scan_fh_path_surface",
+    # scans
+    "scan_fh_path_tied_lambda",
+    "scan_gaussian_rho_tied",
     # sanity
     "world_interval_summary",
 ]

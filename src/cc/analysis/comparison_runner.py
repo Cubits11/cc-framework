@@ -4,7 +4,7 @@ cc.analysis.comparison_runner
 =============================
 
 Run alternative destructive-interference metrics on a set of composability results
-(Week 6–7) and summarize agreement/disagreement statistics.
+(Week 6-7) and summarize agreement/disagreement statistics.
 
 Usage:
     python -m cc.analysis.comparison_runner \
@@ -15,15 +15,15 @@ Usage:
 
 import argparse
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, Optional
 
 from cc.analysis.alternative_metrics import analyze_disagreements, compare_all_metrics, kappa_matrix
 
 
-def load_results(path: Path) -> Dict[str, Dict]:
+def load_results(path: Path) -> dict[str, dict]:
     """Load JSONL results and map to the required metric dictionary."""
-    configs: Dict[str, Dict[str, float]] = {}
+    configs: dict[str, dict[str, float]] = {}
     with path.open() as f:
         for line in f:
             rec = json.loads(line)
@@ -42,7 +42,7 @@ def load_results(path: Path) -> Dict[str, Dict]:
     return configs
 
 
-def main(argv: Optional[Iterable[str]] = None) -> None:
+def main(argv: Iterable[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="Compare interference metrics across configurations.")
     ap.add_argument("--results", required=True)
     ap.add_argument("--out-dir", required=True)

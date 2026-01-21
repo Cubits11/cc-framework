@@ -1,13 +1,13 @@
 """
 fh_bounds.py
 
-Fréchet–Hoeffding bounds and compositional analysis utilities for multi-rail
+Fréchet-Hoeffding bounds and compositional analysis utilities for multi-rail
 detection systems.
 
 This module is designed for research-grade analysis of composable detection
 systems.  It provides:
 
-* Mathematically correct Fréchet–Hoeffding bounds for intersections and unions
+* Mathematically correct Fréchet-Hoeffding bounds for intersections and unions
   of events with known marginals.
 * Composition helpers for serial OR and parallel AND detector topologies.
 * A defensively validated representation of probability bounds (FHBounds).
@@ -33,7 +33,7 @@ from __future__ import annotations
 import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import numpy as np
 
@@ -64,8 +64,6 @@ MATHEMATICAL_TOLERANCE: float = 1e-9
 class FHBoundsError(Exception):
     """Base exception for all errors raised by the fh_bounds module."""
 
-    pass
-
 
 class FHBoundViolationError(FHBoundsError):
     """
@@ -77,8 +75,6 @@ class FHBoundViolationError(FHBoundsError):
         * structural mismatches such as k_rails inconsistency
     """
 
-    pass
-
 
 class CompositionIncoherenceError(FHBoundsError):
     """
@@ -86,14 +82,12 @@ class CompositionIncoherenceError(FHBoundsError):
 
     Semantically, ComposedJBounds must satisfy:
 
-        j_lower ≈ tpr_bounds.lower − fpr_bounds.upper
-        j_upper ≈ tpr_bounds.upper − fpr_bounds.lower
+        j_lower ≈ tpr_bounds.lower - fpr_bounds.upper
+        j_upper ≈ tpr_bounds.upper - fpr_bounds.lower
 
     If these equalities fail beyond MATHEMATICAL_TOLERANCE, this exception is
     raised.
     """
-
-    pass
 
 
 class NumericalInstabilityError(FHBoundsError):
@@ -105,8 +99,6 @@ class NumericalInstabilityError(FHBoundsError):
     mathematically sharp identity has been computed in an unstable way.
     """
 
-    pass
-
 
 class InvalidProbabilityError(FHBoundsError):
     """
@@ -116,8 +108,6 @@ class InvalidProbabilityError(FHBoundsError):
     cannot be cast to float.
     """
 
-    pass
-
 
 # ---------------------------------------------------------------------------
 # Helper utilities
@@ -125,7 +115,7 @@ class InvalidProbabilityError(FHBoundsError):
 
 
 def _approx_le(a: float, b: float, tol: float = MATHEMATICAL_TOLERANCE) -> bool:
-    """Return True if a ≤ b within a numerical tolerance."""
+    """Return True if a <= b within a numerical tolerance."""
     return a <= b + tol
 
 
@@ -175,9 +165,7 @@ def validate_probability_vector(probs: Sequence[float], name: str) -> None:
             invalid_values.append((i, p, fp))
 
     if invalid_values:
-        details = "\n  ".join(
-            f"Index {i}: {repr(p)} (as float: {fp})" for i, p, fp in invalid_values
-        )
+        details = "\n  ".join(f"Index {i}: {p!r} (as float: {fp})" for i, p, fp in invalid_values)
         raise InvalidProbabilityError(
             f"{name} contains {len(invalid_values)} invalid values:\n  {details}"
         )
@@ -191,11 +179,11 @@ def validate_probability_vector(probs: Sequence[float], name: str) -> None:
 @dataclass(frozen=True, slots=True)
 class FHBounds:
     """
-    Fréchet–Hoeffding bounds for a single composite event.
+    Fréchet-Hoeffding bounds for a single composite event.
 
     Attributes:
         lower:
-            Fréchet–Hoeffding lower bound on the event probability.
+            Fréchet-Hoeffding lower bound on the event probability.
         upper:
             Hoeffding (union/Boole) upper bound on the event probability.
         marginals:
@@ -208,10 +196,10 @@ class FHBounds:
 
     Invariants (enforced in ``__post_init__``):
         * ``len(marginals) == k_rails``: structural consistency.
-        * ``0 ≤ lower ≤ upper ≤ 1`` (up to MATHEMATICAL_TOLERANCE).
-        * Each marginal p_i satisfies 0 ≤ p_i ≤ 1 and is finite.
+        * ``0 <= lower <= upper <= 1`` (up to MATHEMATICAL_TOLERANCE).
+        * Each marginal p_i satisfies 0 <= p_i <= 1 and is finite.
         * confidence_level is in (0, 1).
-        * If ``|upper − lower| < MATHEMATICAL_TOLERANCE`` but ``upper != lower``
+        * If ``|upper - lower| < MATHEMATICAL_TOLERANCE`` but ``upper != lower``
           (raw inequality), a NumericalInstabilityError is raised.
     """
 
@@ -265,7 +253,7 @@ class FHBounds:
 
     @property
     def width(self) -> float:
-        """Return ``upper − lower``."""
+        """Return ``upper - lower``."""
         return float(self.upper) - float(self.lower)
 
 
@@ -280,12 +268,12 @@ class RailPerformance:
         fpr:
             False positive rate in [0, 1].
         j:
-            Youden's J statistic = tpr − fpr, in [-1, 1].
+            Youden's J statistic = tpr - fpr, in [-1, 1].
 
     Invariants:
         * tpr and fpr lie in [0, 1].
         * j lies in [-1, 1].
-        * j is numerically consistent with tpr − fpr.
+        * j is numerically consistent with tpr - fpr.
     """
 
     tpr: float
@@ -308,7 +296,7 @@ class RailPerformance:
 
         computed_j = tpr - fpr
         if abs(j - computed_j) > MATHEMATICAL_TOLERANCE:
-            raise ValueError(f"j={j} inconsistent with tpr − fpr={computed_j}")
+            raise ValueError(f"j={j} inconsistent with tpr - fpr={computed_j}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,7 +306,7 @@ class ComposedJBounds:
 
     Attributes:
         j_lower:
-            Lower bound on J = TPR − FPR.
+            Lower bound on J = TPR - FPR.
         j_upper:
             Upper bound on J.
         tpr_bounds:
@@ -334,13 +322,13 @@ class ComposedJBounds:
             length k_rails.
 
     Invariants (enforced in ``__post_init__``):
-        * -1 − tol ≤ j_lower ≤ j_upper ≤ 1 + tol.
+        * -1 - tol <= j_lower <= j_upper <= 1 + tol.
         * tpr_bounds.k_rails == k_rails and fpr_bounds.k_rails == k_rails.
         * len(individual_j_stats) in {0, k_rails}.
         * composition_type in {"serial_or", "parallel_and"}.
         * j_lower/j_upper are coherent with tpr_bounds/fpr_bounds:
-              j_lower ≈ tpr_bounds.lower − fpr_bounds.upper
-              j_upper ≈ tpr_bounds.upper − fpr_bounds.lower
+              j_lower ≈ tpr_bounds.lower - fpr_bounds.upper
+              j_upper ≈ tpr_bounds.upper - fpr_bounds.lower
     """
 
     j_lower: float
@@ -421,7 +409,7 @@ class ComposedJBounds:
 
 
 # ---------------------------------------------------------------------------
-# Fréchet–Hoeffding bounds for intersections and unions
+# Fréchet-Hoeffding bounds for intersections and unions
 # ---------------------------------------------------------------------------
 
 
@@ -430,13 +418,13 @@ def frechet_intersection_lower_bound(
     confidence_level: float = 0.95,
 ) -> FHBounds:
     """
-    Fréchet–Hoeffding bounds for the intersection of k events.
+    Fréchet-Hoeffding bounds for the intersection of k events.
 
     Semantics:
         Given exact marginal probabilities p_i = P(A_i), the probability of the
-        intersection A = ⋂_i A_i satisfies:
+        intersection A = n_i A_i satisfies:
 
-            max(0, Σ p_i − (k − 1)) ≤ P(A) ≤ min_i p_i
+            max(0, Σ p_i - (k - 1)) <= P(A) <= min_i p_i
 
     Args:
         marginals:
@@ -446,7 +434,7 @@ def frechet_intersection_lower_bound(
             FHBounds (purely annotational here).
 
     Returns:
-        FHBounds instance representing bounds on P(⋂ A_i).
+        FHBounds instance representing bounds on P(n A_i).
 
     Raises:
         InvalidProbabilityError:
@@ -483,13 +471,13 @@ def hoeffding_union_upper_bound(
     confidence_level: float = 0.95,
 ) -> FHBounds:
     """
-    Fréchet–Hoeffding bounds for the union of k events.
+    Fréchet-Hoeffding bounds for the union of k events.
 
     Semantics:
         Given exact marginal probabilities p_i = P(A_i), the probability of the
-        union U = ⋃_i A_i satisfies:
+        union U = U_i A_i satisfies:
 
-            max_i p_i ≤ P(U) ≤ min(1, Σ p_i)
+            max_i p_i <= P(U) <= min(1, Σ p_i)
 
     Args:
         marginals:
@@ -499,7 +487,7 @@ def hoeffding_union_upper_bound(
             FHBounds (purely annotational here).
 
     Returns:
-        FHBounds instance representing bounds on P(⋃ A_i).
+        FHBounds instance representing bounds on P(U A_i).
 
     Raises:
         InvalidProbabilityError:
@@ -536,11 +524,11 @@ def _compose_intersection_from_bounds(
     Semantics:
         Suppose each event i has probability p_i ∈ [l_i, u_i].  Among all
         choices of p_i within these intervals and all joint distributions
-        consistent with those probabilities, P(⋂ A_i) is bounded by:
+        consistent with those probabilities, P(n A_i) is bounded by:
 
-            max(0, Σ l_i − (k − 1)) ≤ P(⋂ A_i) ≤ min_i u_i
+            max(0, Σ l_i - (k - 1)) <= P(n A_i) <= min_i u_i
 
-        This follows by applying the Fréchet–Hoeffding intersection bounds
+        This follows by applying the Fréchet-Hoeffding intersection bounds
         with the "worst" admissible choice of marginals for each side.
 
     Args:
@@ -552,7 +540,7 @@ def _compose_intersection_from_bounds(
             typically inherited from the most conservative source.
 
     Returns:
-        FHBounds representing bounds on P(⋂ A_i).
+        FHBounds representing bounds on P(n A_i).
 
     Raises:
         FHBoundViolationError:
@@ -570,7 +558,7 @@ def _compose_intersection_from_bounds(
     upper = min(uppers)
 
     # Use midpoints as effective marginals; if intervals are sharp, this is exact.
-    marginals = [0.5 * (lower + upper) for lower, upper in zip(lowers, uppers)]
+    marginals = [0.5 * (lower + upper) for lower, upper in zip(lowers, uppers, strict=False)]
 
     return FHBounds(
         lower=lower,
@@ -591,11 +579,11 @@ def _compose_union_from_bounds(
     Semantics:
         Suppose each event i has probability p_i ∈ [l_i, u_i].  Among all
         choices of p_i within these intervals and all joint distributions
-        consistent with those probabilities, P(⋃ A_i) is bounded by:
+        consistent with those probabilities, P(U A_i) is bounded by:
 
-            max_i l_i ≤ P(⋃ A_i) ≤ min(1, Σ u_i)
+            max_i l_i <= P(U A_i) <= min(1, Σ u_i)
 
-        This uses the Fréchet–Hoeffding union bounds with the worst-case
+        This uses the Fréchet-Hoeffding union bounds with the worst-case
         admissible choice of marginals for each side.
 
     Args:
@@ -606,7 +594,7 @@ def _compose_union_from_bounds(
             Nominal confidence level for the resulting FHBounds.
 
     Returns:
-        FHBounds representing bounds on P(⋃ A_i).
+        FHBounds representing bounds on P(U A_i).
     """
     if not bounds:
         raise FHBoundViolationError("_compose_union_from_bounds: empty bounds")
@@ -618,7 +606,7 @@ def _compose_union_from_bounds(
     lower = max(lowers)
     upper = min(1.0, sum(uppers))
 
-    marginals = [0.5 * (lower + upper) for lower, upper in zip(lowers, uppers)]
+    marginals = [0.5 * (lower + upper) for lower, upper in zip(lowers, uppers, strict=False)]
 
     return FHBounds(
         lower=lower,
@@ -642,9 +630,9 @@ def serial_or_composition(
     Compose miss and false-alarm bounds for a serial-OR detection pipeline.
 
     Semantics:
-        * Miss event H = ⋂ F_i  (all detectors miss).
-        * False-alarm event B = ⋃ A_i  (at least one detector fires falsely).
-        * TPR = 1 − P(H).
+        * Miss event H = n F_i  (all detectors miss).
+        * False-alarm event B = U A_i  (at least one detector fires falsely).
+        * TPR = 1 - P(H).
         * FPR = P(B).
 
     Args:
@@ -675,7 +663,7 @@ def serial_or_composition(
     if k == 0:
         raise ValueError("serial_or_composition: empty rail list")
 
-    # Compose miss rates via intersection: H = ⋂ F_i
+    # Compose miss rates via intersection: H = n F_i
     h_bounds = _compose_intersection_from_bounds(miss_rate_bounds)
 
     tpr_lower = max(0.0, 1.0 - float(h_bounds.upper))
@@ -691,7 +679,7 @@ def serial_or_composition(
         confidence_level=h_bounds.confidence_level,
     )
 
-    # Compose false alarms via union: B = ⋃ A_i
+    # Compose false alarms via union: B = U A_i
     b_bounds = _compose_union_from_bounds(false_alarm_bounds)
 
     fpr_lower = max(0.0, float(b_bounds.lower))
@@ -717,7 +705,7 @@ def serial_or_composition(
         fpr_bounds=fpr_bounds,
         k_rails=k,
         composition_type="serial_or",
-        individual_j_stats=tuple(),  # can be populated by caller if desired
+        individual_j_stats=(),  # can be populated by caller if desired
     )
 
 
@@ -731,9 +719,9 @@ def parallel_and_composition(
     Semantics:
         The system fires only if all rails fire.
 
-        * Miss event H = ⋃ F_i  (at least one detector misses).
-        * False-alarm event B = ⋂ A_i  (all detectors fire falsely).
-        * TPR = 1 − P(H).
+        * Miss event H = U F_i  (at least one detector misses).
+        * False-alarm event B = n A_i  (all detectors fire falsely).
+        * TPR = 1 - P(H).
         * FPR = P(B).
 
     Args:
@@ -757,7 +745,7 @@ def parallel_and_composition(
     if k == 0:
         raise ValueError("parallel_and_composition: empty rail list")
 
-    # Miss event is a union: H = ⋃ F_i
+    # Miss event is a union: H = U F_i
     h_bounds = _compose_union_from_bounds(miss_rate_bounds)
 
     tpr_lower = max(0.0, 1.0 - float(h_bounds.upper))
@@ -772,7 +760,7 @@ def parallel_and_composition(
         confidence_level=h_bounds.confidence_level,
     )
 
-    # False alarms require all rails to fire falsely: B = ⋂ A_i
+    # False alarms require all rails to fire falsely: B = n A_i
     b_bounds = _compose_intersection_from_bounds(false_alarm_bounds)
 
     fpr_lower = max(0.0, float(b_bounds.lower))
@@ -797,7 +785,7 @@ def parallel_and_composition(
         fpr_bounds=fpr_bounds,
         k_rails=k,
         composition_type="parallel_and",
-        individual_j_stats=tuple(),
+        individual_j_stats=(),
     )
 
 
@@ -817,8 +805,8 @@ def independence_serial_or_rates(
         * Serial-OR system fires if any rail fires.
         * Under independence, with per-rail (TPR_i, FPR_i):
 
-              TPR = 1 − ∏ (1 − TPR_i)
-              FPR = 1 − ∏ (1 − FPR_i)
+              TPR = 1 - ∏ (1 - TPR_i)
+              FPR = 1 - ∏ (1 - FPR_i)
 
     Args:
         individual_tprs:
@@ -848,7 +836,7 @@ def independence_serial_or_rates(
 
     prod_one_minus_tpr = 1.0
     prod_one_minus_fpr = 1.0
-    for tpr, fpr in zip(individual_tprs, individual_fprs):
+    for tpr, fpr in zip(individual_tprs, individual_fprs, strict=False):
         prod_one_minus_tpr *= 1.0 - float(tpr)
         prod_one_minus_fpr *= 1.0 - float(fpr)
 
@@ -898,7 +886,7 @@ def independence_parallel_and_rates(
 
     tpr_sys = 1.0
     fpr_sys = 1.0
-    for tpr, fpr in zip(individual_tprs, individual_fprs):
+    for tpr, fpr in zip(individual_tprs, individual_fprs, strict=False):
         tpr_sys *= float(tpr)
         fpr_sys *= float(fpr)
 
@@ -916,7 +904,7 @@ def independence_serial_or_j(
     Youden's J for a serial-OR composition under independence.
 
     Returns:
-        J = TPR − FPR, computed from independence_serial_or_rates and clipped
+        J = TPR - FPR, computed from independence_serial_or_rates and clipped
         into [-1, 1] for numerical robustness.
     """
     tpr_sys, fpr_sys = independence_serial_or_rates(individual_tprs, individual_fprs)
@@ -932,7 +920,7 @@ def independence_parallel_and_j(
     Youden's J for a parallel-AND composition under independence.
 
     Returns:
-        J = TPR − FPR, computed from independence_parallel_and_rates and
+        J = TPR - FPR, computed from independence_parallel_and_rates and
         clipped into [-1, 1] for numerical robustness.
     """
     tpr_sys, fpr_sys = independence_parallel_and_rates(individual_tprs, individual_fprs)
@@ -950,15 +938,15 @@ def compute_composability_interference_index(
     bounds: ComposedJBounds,
     use_independence_baseline: bool = True,
     *,
-    individual_tprs: Optional[Sequence[float]] = None,
-    individual_fprs: Optional[Sequence[float]] = None,
+    individual_tprs: Sequence[float] | None = None,
+    individual_fprs: Sequence[float] | None = None,
 ) -> Dict[str, Any]:
     """
     Compute the Composability Interference Index κ for a composed system.
 
     Semantics:
         κ measures how the observed J compares to a baseline J, normalized
-        against the worst-case J within the Fréchet–Hoeffding envelope.
+        against the worst-case J within the Fréchet-Hoeffding envelope.
 
         * κ < 0: constructive interference (better than baseline).
         * κ ≈ 0: approximately independent behavior.
@@ -1045,7 +1033,7 @@ def compute_composability_interference_index(
         kappa = float("nan")
         notes.append(
             "Degenerate normalization: j_baseline ≈ j_worst. "
-            "κ is undefined; consider using raw (observed_j − baseline) instead."
+            "κ is undefined; consider using raw (observed_j - baseline) instead."
         )
     else:
         kappa = (observed_j - j_baseline) / denom
@@ -1089,7 +1077,7 @@ def robust_inverse_normal(p: float, name: str = "p") -> float:
             Name to use in error messages.
 
     Returns:
-        The z-value such that P(Z ≤ z) = p for Z ~ N(0, 1).
+        The z-value such that P(Z <= z) = p for Z ~ N(0, 1).
 
     Raises:
         ValueError:
@@ -1160,12 +1148,12 @@ def wilson_score_ci(
     Wilson score confidence interval for Youden's J.
 
     Semantics:
-        J = TPR − FPR.  We derive a conservative CI by taking Wilson intervals
+        J = TPR - FPR.  We derive a conservative CI by taking Wilson intervals
         for TPR and FPR individually (using the same n_total for each) and then
         combining via worst/best-case subtraction:
 
-            J_lower = TPR_lower − FPR_upper
-            J_upper = TPR_upper − FPR_lower
+            J_lower = TPR_lower - FPR_upper
+            J_upper = TPR_upper - FPR_lower
 
     Args:
         tpr:
@@ -1296,7 +1284,7 @@ def _extract_success_flag(r: Any, idx: int) -> bool:
             "cannot infer detection outcome. Provide a compute_j_statistic "
             "callback or ensure 'success' is populated."
         )
-    s = getattr(r, "success")
+    s = r.success
     if s is None:
         raise ValueError(
             f"AttackResult at index {idx} has success=None; cannot infer detection outcome."
@@ -1306,7 +1294,7 @@ def _extract_success_flag(r: Any, idx: int) -> bool:
 
 def empirical_j_from_attack_results(
     results: Sequence[Any],
-    compute_j_statistic: Optional[Callable[[Sequence[Any]], float]] = None,
+    compute_j_statistic: Callable[[Sequence[Any]], float] | None = None,
     confidence_level: float = 0.95,
 ) -> Tuple[float, float, float]:
     """
@@ -1314,13 +1302,13 @@ def empirical_j_from_attack_results(
 
     Semantic contract for the default behavior (compute_j_statistic is None):
         * Each result has an attribute ``world_bit``:
-            - 0 (or WorldBit.BASELINE) ⇒ benign world.
-            - 1 (or WorldBit.PROTECTED) ⇒ adversarial world.
+            - 0 (or WorldBit.BASELINE) => benign world.
+            - 1 (or WorldBit.PROTECTED) => adversarial world.
           If missing, a warning is issued and world_bit=0 is assumed.
         * Each result has a boolean-like attribute ``success`` whose meaning
           depends on the world:
-            - world_bit == 0: success=True ⇒ false positive (detector fired).
-            - world_bit == 1: success=True ⇒ true positive (detector fired).
+            - world_bit == 0: success=True => false positive (detector fired).
+            - world_bit == 1: success=True => true positive (detector fired).
 
     If your semantics differ, pass a custom ``compute_j_statistic(results)``
     that directly returns J.
@@ -1413,8 +1401,8 @@ def bootstrap_composability_bounds(
     results: Sequence[Any],
     n_boots: int = 10000,
     composition_type: str = "serial_or",
-    compute_j_statistic: Optional[Callable[[Sequence[Any]], float]] = None,
-    random_seed: Optional[int] = None,
+    compute_j_statistic: Callable[[Sequence[Any]], float] | None = None,
+    random_seed: int | None = None,
     confidence_level: float = 0.95,
 ) -> ComposedJBounds:
     """
@@ -1486,12 +1474,12 @@ def bootstrap_composability_bounds(
         boot_1_idx = np.random.randint(0, n1, size=n1)
 
         fp_count = 0
-        for j, idx0 in enumerate(boot_0_idx):
+        for _j, idx0 in enumerate(boot_0_idx):
             if _extract_success_flag(world_0_results[idx0], idx0):
                 fp_count += 1
 
         tp_count = 0
-        for j, idx1 in enumerate(boot_1_idx):
+        for _j, idx1 in enumerate(boot_1_idx):
             if _extract_success_flag(world_1_results[idx1], idx1):
                 tp_count += 1
 
@@ -1540,7 +1528,7 @@ def bootstrap_composability_bounds(
         fpr_bounds=fpr_bounds,
         k_rails=1,
         composition_type=composition_type,
-        individual_j_stats=tuple(),
+        individual_j_stats=(),
     )
 
 

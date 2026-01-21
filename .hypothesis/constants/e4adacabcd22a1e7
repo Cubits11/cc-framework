@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/evals/run_bench.py
+# hypothesis_version: 6.147.0
+
+[0.0, '%Y%m%dT%H%M%SZ', ',', '--adapter-config', '--adapters', '--audit-out', '--composition', '--dataset', '--label-field', '--out', '--prompt-field', '--response-field', '--review-policy', '--seed', '.audit.jsonl', '.csv', '.json', '.jsonl', '0', '1', 'AND', 'COND_OR', 'HEAD', 'JSONL output path.', 'OR', '__main__', 'adapter', 'adapter_metrics', 'adapter_versions', 'allow', 'audit', 'bad', 'bench_config_sha256', 'benign', 'block', 'cc_max', 'cc_rel', 'code_version', 'composed', 'composition', 'config', 'config_hash', 'confusion', 'decisions', 'delta_add', 'delta_mult', 'disagreement_rates', 'git', 'git_sha', 'good', 'harmful', 'index', 'item', 'j', 'label', 'prompt', 'r', 'rates', 'record_type', 'records', 'response', 'rev-parse', 'run_id', 'run_meta', 'runs/bench.jsonl', 'safe', 'summary', 'timestamp', 'unsafe', 'utf-8']

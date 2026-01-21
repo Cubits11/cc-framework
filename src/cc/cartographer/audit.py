@@ -3,7 +3,7 @@
 Module: audit
 Purpose:
   (A) Tamper-evident JSONL audit chain (stable JSON, SHA-256 links)
-  (B) FH-ceiling auditor for composed J against Fréchet–Hoeffding envelopes
+  (B) FH-ceiling auditor for composed J against Fréchet-Hoeffding envelopes
 
 Dependencies: hashlib, json, os, typing, datetime, numpy
 Author: Pranav Bhave
@@ -16,10 +16,10 @@ Dates:
 Design notes (A)
 ----------------
 - Each line is a complete JSON object with:
-    • sha256: SHA-256 of the line’s content excluding the sha256 field itself
-    • prev_sha256: pointer to the previous record’s sha256 (or null for the first)
+    • sha256: SHA-256 of the line's content excluding the sha256 field itself
+    • prev_sha256: pointer to the previous record's sha256 (or null for the first)
 - Serialization uses a *stable* JSON form: sorted keys + compact separators.
-- Appends are flushed and fsync’d for durability (opt-out by setting fsync=False).
+- Appends are flushed and fsync'd for durability (opt-out by setting fsync=False).
 - `verify_chain` replays the file and re-computes hashes to detect tampering.
 - We STRIP any user-supplied 'sha256'/'prev_sha256'/'record_hash'/'prev_hash'
   from input records before computing the hash, to prevent poisoning.
@@ -51,18 +51,12 @@ import hashlib
 import json
 import math
 import os
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import (
     Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Literal,
-    Mapping,
-    Optional,
-    Tuple,
     cast,
 )
 
@@ -71,18 +65,18 @@ import numpy as np
 from .bounds import ensure_anchors, envelope_over_rocs
 
 __all__ = [
+    "AuditError",
     # JSONL chain
     "append_jsonl",
-    "verify_chain",
-    "tail_sha",
-    "make_record",
-    "rehash_file",
     "append_record",  # convenience: make_record + append_jsonl
-    "truncate_to_last_valid",
-    "AuditError",
     # FH auditor
     "audit_fh_ceiling_by_index",
     "audit_fh_ceiling_by_points",
+    "make_record",
+    "rehash_file",
+    "tail_sha",
+    "truncate_to_last_valid",
+    "verify_chain",
 ]
 
 
@@ -122,9 +116,9 @@ def _ensure_parent_dir(path: str) -> None:
         os.makedirs(parent, exist_ok=True)
 
 
-def _iter_jsonl(path: str) -> Iterator[Tuple[int, Dict[str, Any]]]:
+def _iter_jsonl(path: str) -> Iterator[tuple[int, dict[str, Any]]]:
     """Yield (1-based line number, parsed JSON) for each non-empty line; strict (raises on error)."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for i, raw in enumerate(f, start=1):
             line = raw.strip()
             if not line:
@@ -135,15 +129,15 @@ def _iter_jsonl(path: str) -> Iterator[Tuple[int, Dict[str, Any]]]:
                 raise AuditError(f"Line {i}: invalid JSON ({e})")
             if not isinstance(obj, dict):
                 raise AuditError(f"Line {i}: JSON object expected")
-            yield i, cast(Dict[str, Any], obj)
+            yield i, cast(dict[str, Any], obj)
 
 
-def _iter_valid_jsonl(path: str) -> Iterator[Tuple[int, Dict[str, Any]]]:
+def _iter_valid_jsonl(path: str) -> Iterator[tuple[int, dict[str, Any]]]:
     """
     Tolerant iterator used for tail discovery/recovery:
     yields only valid JSON objects; stops quietly at the first malformed/non-object line.
     """
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for i, raw in enumerate(f, start=1):
             line = raw.strip()
             if not line:
@@ -152,7 +146,7 @@ def _iter_valid_jsonl(path: str) -> Iterator[Tuple[int, Dict[str, Any]]]:
                 obj = json.loads(line)
                 if not isinstance(obj, dict):
                     return
-                yield i, cast(Dict[str, Any], obj)
+                yield i, cast(dict[str, Any], obj)
             except json.JSONDecodeError:
                 return
 
@@ -170,12 +164,12 @@ def _compute_record_sha(rec_without_sha: Mapping[str, Any]) -> str:
 _RESERVED_KEYS = {"sha256", "prev_sha256", "record_hash", "prev_hash"}
 
 
-def _strip_reserved(d: Mapping[str, Any]) -> Dict[str, Any]:
+def _strip_reserved(d: Mapping[str, Any]) -> dict[str, Any]:
     """Remove reserved hashing keys from a user record before hashing."""
     return {k: v for k, v in d.items() if k not in _RESERVED_KEYS}
 
 
-def _normalize_legacy_keys(obj: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_legacy_keys(obj: dict[str, Any]) -> dict[str, Any]:
     """
     Map legacy {record_hash, prev_hash} to {sha256, prev_sha256} if present.
     Does not overwrite if modern keys already exist.
@@ -187,13 +181,13 @@ def _normalize_legacy_keys(obj: Dict[str, Any]) -> Dict[str, Any]:
     return obj
 
 
-def tail_sha(path: str) -> Optional[str]:
+def tail_sha(path: str) -> str | None:
     """
     Return the sha256 of the last *valid* record (ignores trailing junk/partials).
     """
     if not os.path.exists(path):
         return None
-    last: Optional[str] = None
+    last: str | None = None
     for _, obj in _iter_valid_jsonl(path):
         _normalize_legacy_keys(obj)
         val = obj.get("sha256")
@@ -220,7 +214,7 @@ def append_jsonl(path: str, rec: Mapping[str, Any], *, fsync: bool = True) -> st
     _ensure_parent_dir(path)
 
     # Build the hashable record WITHOUT reserved keys and inject the pointer
-    base: Dict[str, Any] = _strip_reserved(dict(rec))
+    base: dict[str, Any] = _strip_reserved(dict(rec))
     base["prev_sha256"] = tail_sha(path)
 
     sha = _compute_record_sha(base)
@@ -253,7 +247,7 @@ def verify_chain(path: str) -> None:
     if not os.path.exists(path):
         raise FileNotFoundError(path)
 
-    prev: Optional[str] = None
+    prev: str | None = None
     for i, obj in _iter_jsonl(path):
         _normalize_legacy_keys(obj)
 
@@ -295,8 +289,8 @@ def rehash_file(path: str) -> None:
     bak = f"{path}.bak"
     shutil.copy2(path, bak)
 
-    prev: Optional[str] = None
-    with open(path, "r", encoding="utf-8") as fin, open(tmp, "w", encoding="utf-8") as fout:
+    prev: str | None = None
+    with open(path, encoding="utf-8") as fin, open(tmp, "w", encoding="utf-8") as fout:
         for i, line in enumerate(fin, start=1):
             if not line.strip():
                 continue
@@ -317,7 +311,7 @@ def rehash_file(path: str) -> None:
     os.replace(tmp, path)
 
 
-def truncate_to_last_valid(path: str) -> Optional[int]:
+def truncate_to_last_valid(path: str) -> int | None:
     """
     Truncate a JSONL file to the last valid record (ignores trailing junk).
     Returns the new line count, or None if file did not exist.
@@ -357,7 +351,7 @@ def _now_iso_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _ci(ci: Optional[Tuple[Optional[float], Optional[float]]]) -> Optional[Tuple[float, float]]:
+def _ci(ci: tuple[float | None, float | None] | None) -> tuple[float, float] | None:
     """
     Normalize CI:
       - if None -> None
@@ -388,18 +382,18 @@ def _to_str_list(items: Iterable[Any]) -> list[str]:
 
 def make_record(
     cfg: Mapping[str, Any],
-    cfg_full: Optional[Mapping[str, Any]],
+    cfg_full: Mapping[str, Any] | None,
     j_a: float,
-    j_a_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_a_ci: tuple[float | None, float | None] | None,
     j_b: float,
-    j_b_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_b_ci: tuple[float | None, float | None] | None,
     j_comp: float,
-    j_comp_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_comp_ci: tuple[float | None, float | None] | None,
     cc_max: float,
     delta_add: float,
     decision: str,
     figures: Iterable[str],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Build a JSON-serializable audit record. CI fields are `null` if not available.
     cfg_full may include guardrail specs, attacker settings, calibration summaries,
@@ -424,7 +418,7 @@ def make_record(
         else None
     )
 
-    rec: Dict[str, Any] = {
+    rec: dict[str, Any] = {
         "meta": {
             "schema": "cartographer/audit.v1",
             "ts": _now_iso_utc(),
@@ -468,13 +462,13 @@ def make_record(
 def append_record(
     path: str,
     cfg: Mapping[str, Any],
-    cfg_full: Optional[Mapping[str, Any]],
+    cfg_full: Mapping[str, Any] | None,
     j_a: float,
-    j_a_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_a_ci: tuple[float | None, float | None] | None,
     j_b: float,
-    j_b_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_b_ci: tuple[float | None, float | None] | None,
     j_comp: float,
-    j_comp_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_comp_ci: tuple[float | None, float | None] | None,
     cc_max: float,
     delta_add: float,
     decision: str,
@@ -504,21 +498,21 @@ def append_record(
 
 
 # =============================================================================
-# Fréchet–Hoeffding (FH) ceiling auditor
+# Fréchet-Hoeffding (FH) ceiling auditor
 # =============================================================================
 
-Violation = Tuple[int, int, float, float]  # (i_a, i_b, J_obs, J_cap)
+Violation = tuple[int, int, float, float]  # (i_a, i_b, J_obs, J_cap)
 
 
 def audit_fh_ceiling_by_index(
     roc_a: np.ndarray,
     roc_b: np.ndarray,
-    pairs: Iterable[Tuple[int, int, float]],
+    pairs: Iterable[tuple[int, int, float]],
     *,
     comp: Literal["AND", "OR", "and", "or"] = "AND",
     add_anchors: bool = False,
     tol: float = 1e-12,
-) -> List[Violation]:
+) -> list[Violation]:
     """
     Given indices into roc_a/roc_b and observed J at those index pairs, flag any FH-cap violations.
     Returns list of (i_a, i_b, J_obs, J_cap) for offending points (empty if none).
@@ -545,7 +539,7 @@ def audit_fh_ceiling_by_index(
     _, Jgrid = envelope_over_rocs(A, B, comp=comp, add_anchors=False)
     H, W = Jgrid.shape
 
-    bad: List[Violation] = []
+    bad: list[Violation] = []
     for ia, ib, j_obs in pairs:
         if not (0 <= ia < H and 0 <= ib < W):
             # ignore out-of-range indices quietly
@@ -559,14 +553,14 @@ def audit_fh_ceiling_by_index(
 def audit_fh_ceiling_by_points(
     roc_a: np.ndarray,
     roc_b: np.ndarray,
-    triples: Iterable[Tuple[Tuple[float, float], Tuple[float, float], float]],
+    triples: Iterable[tuple[tuple[float, float], tuple[float, float], float]],
     *,
     comp: Literal["AND", "OR", "and", "or"] = "AND",
     add_anchors: bool = False,
     tol: float = 1e-12,
     strict: bool = False,
     point_tol: float = 1e-12,
-) -> List[Tuple[Tuple[float, float], Tuple[float, float], float, float]]:
+) -> list[tuple[tuple[float, float], tuple[float, float], float, float]]:
     """
     Like `audit_fh_ceiling_by_index`, but accepts explicit ROC points for each rail.
 
@@ -591,7 +585,7 @@ def audit_fh_ceiling_by_points(
         B = np.asarray(roc_b, dtype=float)
 
     # Map points to indices by (approximate) match
-    def idx_of(M: np.ndarray, pt: Tuple[float, float]) -> Optional[int]:
+    def idx_of(M: np.ndarray, pt: tuple[float, float]) -> int | None:
         mask = (np.isclose(M[:, 0], pt[0], atol=point_tol, rtol=0.0)) & (
             np.isclose(M[:, 1], pt[1], atol=point_tol, rtol=0.0)
         )
@@ -601,7 +595,7 @@ def audit_fh_ceiling_by_points(
     # Envelope grid
     _, Jgrid = envelope_over_rocs(A, B, comp=comp, add_anchors=False)
 
-    violations: List[Tuple[Tuple[float, float], Tuple[float, float], float, float]] = []
+    violations: list[tuple[tuple[float, float], tuple[float, float], float, float]] = []
     for pa, pb, j_obs in triples:
         ia = idx_of(A, pa)
         ib = idx_of(B, pb)

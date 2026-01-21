@@ -16,10 +16,11 @@ import hashlib
 import json
 import random
 import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any
 from uuid import uuid4
 
 from cc.adapters.base import (
@@ -49,7 +50,7 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _sha256_json(data: Dict[str, Any]) -> str:
+def _sha256_json(data: dict[str, Any]) -> str:
     payload = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return _sha256_bytes(payload)
 
@@ -66,7 +67,7 @@ def _merkle_root(lines: Iterable[str]) -> str:
         if len(hashes) % 2 == 1:
             hashes.append(hashes[-1])
         next_level = []
-        for left, right in zip(hashes[0::2], hashes[1::2]):
+        for left, right in zip(hashes[0::2], hashes[1::2], strict=False):
             next_level.append(hashlib.sha256(left + right).digest())
         hashes = next_level
     return hashes[0].hex()
@@ -89,8 +90,8 @@ def _load_private_key(path: Path):
     return key
 
 
-def _read_text_lines(path: Path) -> List[str]:
-    lines: List[str] = []
+def _read_text_lines(path: Path) -> list[str]:
+    lines: list[str] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             stripped = line.strip()
@@ -99,12 +100,12 @@ def _read_text_lines(path: Path) -> List[str]:
     return lines
 
 
-def _load_prompts(path: Path) -> List[Dict[str, Any]]:
+def _load_prompts(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"Prompt source not found: {path}")
 
     suffix = path.suffix.lower()
-    prompts: List[Dict[str, Any]] = []
+    prompts: list[dict[str, Any]] = []
 
     if suffix in {".txt"}:
         for idx, line in enumerate(_read_text_lines(path), start=1):
@@ -156,15 +157,15 @@ def _compose_decision(decisions: Sequence[bool], mode: str) -> str:
 @dataclass
 class EvidenceBundleConfig:
     prompt_source: Path
-    guardrails: List[Dict[str, Any]]
+    guardrails: list[dict[str, Any]]
     output_dir: Path
     composition: str = "any_block"
-    benign_calibration_source: Optional[Path] = None
-    private_key_path: Optional[Path] = None
-    run_id: Optional[str] = None
+    benign_calibration_source: Path | None = None
+    private_key_path: Path | None = None
+    run_id: str | None = None
     seed: int = 1337
     enable_plots: bool = True
-    env_gates: Optional[Dict[str, Any]] = None
+    env_gates: dict[str, Any] | None = None
 
 
 def _event_id(run_id: str, prompt_hash: str, guardrail_name: str, index: int) -> str:
@@ -193,7 +194,7 @@ def _render_block_rate_plot(path: Path, labels: Sequence[str], values: Sequence[
     plt.close(fig)
 
 
-def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
+def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
     run_id = config.run_id or f"bundle_{uuid4().hex[:12]}"
     output_dir = config.output_dir / run_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -211,18 +212,18 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
                 guardrail.calibrate(benign_prompts, target_fpr=0.05)
 
     results_path = output_dir / "results.jsonl"
-    results_lines: List[str] = []
-    guardrail_block_counts: Dict[str, int] = {}
-    guardrail_review_counts: Dict[str, int] = {}
-    guardrail_totals: Dict[str, int] = {}
+    results_lines: list[str] = []
+    guardrail_block_counts: dict[str, int] = {}
+    guardrail_review_counts: dict[str, int] = {}
+    guardrail_totals: dict[str, int] = {}
     composition_blocks = 0
 
-    for prompt_idx, row in enumerate(prompt_rows):
+    for _prompt_idx, row in enumerate(prompt_rows):
         prompt = row["prompt"]
         prompt_summary = summarize_value(prompt)
-        per_guardrail: List[Dict[str, Any]] = []
-        decisions: List[bool] = []
-        verdicts: List[str] = []
+        per_guardrail: list[dict[str, Any]] = []
+        decisions: list[bool] = []
+        verdicts: list[str] = []
 
         for gr_idx, adapter in enumerate(adapters):
             guardrail_name = adapter.guardrail.__class__.__name__
@@ -230,7 +231,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
             error_summary = None
             verdict = "review"
             category = None
-            score: Optional[float] = None
+            score: float | None = None
             blocked = False
 
             try:
@@ -364,7 +365,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
 
     plots_dir = output_dir / "plots"
     plots_dir.mkdir(exist_ok=True)
-    plot_paths: List[str] = []
+    plot_paths: list[str] = []
     if config.enable_plots:
         labels = list(metrics["guardrail_block_rates"].keys())
         values = [metrics["guardrail_block_rates"][label] for label in labels]
@@ -439,14 +440,14 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
     }
 
 
-def _parse_guardrail_config(path: Path) -> List[Dict[str, Any]]:
+def _parse_guardrail_config(path: Path) -> list[dict[str, Any]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
         raise ValueError("guardrail config must be a JSON list")
     return payload
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate an Assurance Evidence Bundle")

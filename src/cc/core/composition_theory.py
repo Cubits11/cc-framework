@@ -1,13 +1,13 @@
 # src/cc/core/composition_theory.py
 """
 Theoretical wrappers for guardrail composition.
-Bridges IST 496 to PhD Year 1 (Fréchet–Hoeffding (FH) style ROC/J bounds).
+Bridges IST 496 to PhD Year 1 (Fréchet-Hoeffding (FH) style ROC/J bounds).
 
 Updated: 2025-09-28
 
 What this module provides
 -------------------------
-1) Fast FH bounds on the *Youden J* statistic (J = TPR − FPR) for AND/OR composition
+1) Fast FH bounds on the *Youden J* statistic (J = TPR - FPR) for AND/OR composition
    of two guardrails represented as ROC point sets.
 2) Robust, reproducible conversion from scored examples to a discrete ROC curve,
    with monotonic cleanup, optional convexification, and sample-weight support.
@@ -25,18 +25,19 @@ Notes
 from __future__ import annotations
 
 import math
-from typing import Iterable, List, Literal, Optional, Sequence, Tuple
+from collections.abc import Iterable, Sequence
+from typing import Literal
 
 import numpy as np
 
-# Prefer project’s cartographer implementation if available.
+# Prefer project's cartographer implementation if available.
 try:
     # Expected to compute the supremum over all operating-point pairs.
     from cc.cartographer.bounds import frechet_upper as _carto_frechet_upper  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
     _carto_frechet_upper = None  # type: ignore
 
-ROCPoint = Tuple[float, float]  # (FPR, TPR)
+ROCPoint = tuple[float, float]  # (FPR, TPR)
 ROC = Sequence[ROCPoint]
 
 
@@ -75,12 +76,12 @@ def lower_bound_j_or(roc_a: ROC, roc_b: ROC) -> float:
 
 
 def discretize_scores_to_roc(
-    scores: Iterable[Tuple[float, int]],
+    scores: Iterable[tuple[float, int]],
     *,
-    sample_weight: Optional[Iterable[float]] = None,
+    sample_weight: Iterable[float] | None = None,
     drop_intermediate: bool = False,
     convexify: bool = False,
-) -> List[ROCPoint]:
+) -> list[ROCPoint]:
     """
     Convert (score, label) pairs to a discrete ROC curve (FPR, TPR) by threshold sweep.
     label: 1 for attack/positive, 0 for benign/negative.
@@ -145,7 +146,7 @@ def discretize_scores_to_roc(
     w_sorted = w[order][::-1]
 
     # Unique thresholds (at each unique score)
-    thr, idx_start = np.unique(s_sorted, return_index=True)
+    _thr, idx_start = np.unique(s_sorted, return_index=True)
     # Cumulative sums at *every* step
     tp_cum = np.cumsum(w_sorted * (y_sorted == 1))
     fp_cum = np.cumsum(w_sorted * (y_sorted == 0))
@@ -181,8 +182,8 @@ def discretize_scores_to_roc(
 # ---------------------------------------------------------------------------
 
 
-def youden_j(roc: ROC) -> Tuple[float, ROCPoint]:
-    """Return max J (TPR−FPR) over the ROC and the achieving point (FPR, TPR)."""
+def youden_j(roc: ROC) -> tuple[float, ROCPoint]:
+    """Return max J (TPR-FPR) over the ROC and the achieving point (FPR, TPR)."""
     if not roc:
         return 0.0, (0.0, 0.0)
     arr = _validate_and_array(roc)
@@ -191,7 +192,7 @@ def youden_j(roc: ROC) -> Tuple[float, ROCPoint]:
     return float(j[k]), (float(arr[k, 0]), float(arr[k, 1]))
 
 
-def ensure_roc_monotone(roc: ROC) -> List[ROCPoint]:
+def ensure_roc_monotone(roc: ROC) -> list[ROCPoint]:
     """Return a version of `roc` that is sorted by FPR and has non-decreasing TPR."""
     if not roc:
         return [(0.0, 0.0), (1.0, 1.0)]
@@ -200,7 +201,7 @@ def ensure_roc_monotone(roc: ROC) -> List[ROCPoint]:
     return [(float(x), float(y)) for (x, y) in arr]
 
 
-def roc_upper_convex_hull(roc: ROC) -> List[ROCPoint]:
+def roc_upper_convex_hull(roc: ROC) -> list[ROCPoint]:
     """Upper convex hull of an ROC (optimal frontier under threshold choice)."""
     if not roc:
         return [(0.0, 0.0), (1.0, 1.0)]
@@ -225,12 +226,12 @@ def _frechet_bound_j(
     """Compute FH bound on J for the composition over all operating-point pairs.
 
     We treat positives (TPR) and negatives (FPR) independently per FH bounds,
-    then combine to bound J = TPR − FPR.
+    then combine to bound J = TPR - FPR.
 
     AND-composition (both rails must trigger):
       Intersection bounds:
         upper: min(p1, p2)
-        lower: max(0, p1 + p2 − 1)
+        lower: max(0, p1 + p2 - 1)
 
     OR-composition (either rail triggers):
       Union bounds:
@@ -351,7 +352,7 @@ def _pareto_prune(arr: np.ndarray) -> np.ndarray:
 
 
 def _roc_upper_convex_hull(arr: np.ndarray) -> np.ndarray:
-    """Andrew’s monotone chain on (x=FPR, y=TPR) to get upper hull."""
+    """Andrew's monotone chain on (x=FPR, y=TPR) to get upper hull."""
     pts = _ensure_sorted_and_monotone(arr)
     # Remove duplicates after monotone cleanup
     pts = _merge_and_unique(pts)
@@ -361,7 +362,7 @@ def _roc_upper_convex_hull(arr: np.ndarray) -> np.ndarray:
         return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
     # We need *upper* hull: keep points making a right turn (non-positive cross)
-    hull: List[Tuple[float, float]] = []
+    hull: list[tuple[float, float]] = []
     for p in pts:
         while len(hull) >= 2 and cross(hull[-2], hull[-1], p) >= 0.0:
             hull.pop()
@@ -377,17 +378,17 @@ def _roc_upper_convex_hull(arr: np.ndarray) -> np.ndarray:
 
 
 __all__ = [
-    "ROCPoint",
     "ROC",
+    "ROCPoint",
+    # Scores → ROC
+    "discretize_scores_to_roc",
+    "ensure_roc_monotone",
+    "lower_bound_j_and",
+    "lower_bound_j_or",
+    "roc_upper_convex_hull",
     # Bounds on J
     "upper_bound_j_and",
     "upper_bound_j_or",
-    "lower_bound_j_and",
-    "lower_bound_j_or",
-    # Scores → ROC
-    "discretize_scores_to_roc",
     # ROC utilities
     "youden_j",
-    "ensure_roc_monotone",
-    "roc_upper_convex_hull",
 ]

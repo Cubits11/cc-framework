@@ -7,9 +7,10 @@ import json
 import platform
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Tuple
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -21,7 +22,7 @@ class ArtifactManifest:
     python_version: str
     platform: str
     git_commit: str | None
-    adapter_versions: Dict[str, str]
+    adapter_versions: dict[str, str]
 
 
 def ensure_artifact_dir(base_dir: Path, run_id: str) -> Path:
@@ -31,7 +32,7 @@ def ensure_artifact_dir(base_dir: Path, run_id: str) -> Path:
     return run_dir
 
 
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
+def write_json(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON deterministically with stable ordering."""
     path.write_text(
         json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False),
@@ -55,7 +56,7 @@ def detect_git_commit() -> str | None:
 
 
 def build_manifest(
-    run_id: str, rerun_command: str, adapter_versions: Dict[str, str]
+    run_id: str, rerun_command: str, adapter_versions: dict[str, str]
 ) -> ArtifactManifest:
     """Build a manifest for artifact directories."""
     return ArtifactManifest(
@@ -68,7 +69,7 @@ def build_manifest(
     )
 
 
-def manifest_to_payload(manifest: ArtifactManifest) -> Dict[str, Any]:
+def manifest_to_payload(manifest: ArtifactManifest) -> dict[str, Any]:
     return {
         "run_id": manifest.run_id,
         "rerun_command": manifest.rerun_command,
@@ -79,7 +80,7 @@ def manifest_to_payload(manifest: ArtifactManifest) -> Dict[str, Any]:
     }
 
 
-def wilson_interval(successes: int, total: int, z: float = 1.96) -> Tuple[float, float]:
+def wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
     """Wilson score interval for a binomial proportion."""
     if total <= 0:
         return 0.0, 0.0
@@ -90,7 +91,7 @@ def wilson_interval(successes: int, total: int, z: float = 1.96) -> Tuple[float,
     return max(0.0, center - margin), min(1.0, center + margin)
 
 
-def summarize_latency(samples_ms: Iterable[float]) -> Dict[str, float]:
+def summarize_latency(samples_ms: Iterable[float]) -> dict[str, float]:
     """Compute deterministic latency summary stats."""
     values = sorted(float(v) for v in samples_ms)
     if not values:
@@ -98,7 +99,7 @@ def summarize_latency(samples_ms: Iterable[float]) -> Dict[str, float]:
     mean = sum(values) / len(values)
 
     def percentile(p: float) -> float:
-        idx = int(round((p / 100) * (len(values) - 1)))
+        idx = round((p / 100) * (len(values) - 1))
         return values[idx]
 
     return {

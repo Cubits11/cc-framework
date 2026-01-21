@@ -20,9 +20,10 @@ import platform
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path as SysPath
-from typing import Any, Dict, Optional, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -34,14 +35,14 @@ from .core import simulate_grid, summarize_simulation
 LOG = logging.getLogger(__name__)
 
 
-def _load_yaml(path: str) -> Dict[str, Any]:
+def _load_yaml(path: str) -> dict[str, Any]:
     try:
         import yaml  # type: ignore
     except Exception as e:
         raise ImportError("pyyaml is required for --config usage (pip install pyyaml).") from e
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = f.read()
     except OSError as e:
         raise OSError(f"Could not read YAML config at path={path!r}: {e}") from e
@@ -62,7 +63,7 @@ def _load_yaml(path: str) -> Dict[str, Any]:
     return dict(obj)
 
 
-def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
+def _cfg_from_dict(d: dict[str, Any]) -> SimConfig:
     def _dget(obj: Any, dotted: str, default: Any = None) -> Any:
         cur = obj
         for k in dotted.split("."):
@@ -71,7 +72,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
             cur = cur[k]
         return cur
 
-    def _require_dict(x: Any, name: str) -> Dict[str, Any]:
+    def _require_dict(x: Any, name: str) -> dict[str, Any]:
         if not isinstance(x, dict):
             raise ValueError(f"Expected mapping for '{name}', got {type(x).__name__}")
         return x
@@ -111,8 +112,8 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
             raise ValueError(f"{name} must be in [0,1], got {v}")
         return v
 
-    def _parse_path_params(base: Any, *, extra: Dict[str, Any]) -> Dict[str, Any]:
-        pp: Dict[str, Any] = {}
+    def _parse_path_params(base: Any, *, extra: dict[str, Any]) -> dict[str, Any]:
+        pp: dict[str, Any] = {}
         if isinstance(base, dict):
             pp.update(dict(base))
         for k, v in extra.items():
@@ -194,7 +195,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
 
         lambdas = list(_ensure_monotone_increasing(lambdas))
 
-        n = _i(_dget(d, "sampling.n_per_world", d.get("n", None)), "sampling.n_per_world")
+        n = _i(_dget(d, "sampling.n_per_world", d.get("n")), "sampling.n_per_world")
         n_reps = _i(_dget(d, "sampling.n_reps", d.get("n_reps", 1)), "sampling.n_reps")
         seed = _i(_dget(d, "sampling.seed", d.get("seed", 0)), "sampling.seed")
         seed_policy = str(_dget(d, "sampling.seed_policy", d.get("seed_policy", "stable_per_cell")))
@@ -234,9 +235,9 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
 
         base_pp = d.get("path_params", {})
         extra_pp = {
-            "gamma": d.get("gamma", None),
-            "k": d.get("k", None),
-            "ppf_clip_eps": d.get("ppf_clip_eps", None),
+            "gamma": d.get("gamma"),
+            "k": d.get("k"),
+            "ppf_clip_eps": d.get("ppf_clip_eps"),
         }
         path_params = _parse_path_params(base_pp, extra=extra_pp)
 
@@ -289,7 +290,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
     )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     LOG = logging.getLogger("correlation_cliff.simulate")
 
     def _now_stamp() -> str:
@@ -318,7 +319,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 h.update(chunk)
         return h.hexdigest()
 
-    def _maybe_git_commit(repo_root: SysPath) -> Optional[str]:
+    def _maybe_git_commit(repo_root: SysPath) -> str | None:
         try:
             out = subprocess.check_output(
                 ["git", "rev-parse", "HEAD"],
@@ -379,9 +380,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"ERROR: config path does not exist: {str(config_path)!r}", file=sys.stderr)
         return 2
 
-    out_dir: Optional[SysPath] = SysPath(args.out_dir).expanduser() if args.out_dir else None
-    legacy_out_csv: Optional[SysPath] = SysPath(args.out_csv).expanduser() if args.out_csv else None
-    legacy_out_sum: Optional[SysPath] = (
+    out_dir: SysPath | None = SysPath(args.out_dir).expanduser() if args.out_dir else None
+    legacy_out_csv: SysPath | None = SysPath(args.out_csv).expanduser() if args.out_csv else None
+    legacy_out_sum: SysPath | None = (
         SysPath(args.out_summary_csv).expanduser() if args.out_summary_csv else None
     )
 
@@ -419,8 +420,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"ERROR: simulation failed: {e}", file=sys.stderr)
         return 1
 
-    file_hashes: Dict[str, str] = {}
-    outputs: Dict[str, str] = {}
+    file_hashes: dict[str, str] = {}
+    outputs: dict[str, str] = {}
 
     try:
         if out_dir is not None:
@@ -446,7 +447,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "seed": int(cfg.seed),
                 "n": int(cfg.n),
                 "n_reps": int(cfg.n_reps),
-                "lambda_points": int(len(cfg.lambdas)),
+                "lambda_points": len(cfg.lambdas),
                 "lambdas": [float(x) for x in cfg.lambdas],
                 "envelope_tol": float(cfg.envelope_tol),
                 "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
@@ -488,8 +489,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "run_started_utc": run_started_utc,
         "run_finished_utc": datetime.utcnow().isoformat() + "Z",
         "elapsed_seconds": float(time.time() - t0),
-        "rows": int(len(df_long)),
-        "lambda_points": int(len(set(df_long["lambda"]))) if "lambda" in df_long.columns else 0,
+        "rows": len(df_long),
+        "lambda_points": len(set(df_long["lambda"])) if "lambda" in df_long.columns else 0,
         "env_violation_rate": vio_rate,
         "seed_policy": str(cfg.seed_policy),
         "seed": int(cfg.seed),

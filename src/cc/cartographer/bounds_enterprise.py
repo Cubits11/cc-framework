@@ -1,8 +1,8 @@
 """
 Module: bounds (Enterprise-Grade Enhancement)
 Purpose:
-  (A) Fréchet–Hoeffding-style ceilings for composed Youden's J over two ROC curves
-  (B) Finite-sample FH–Bernstein utilities for CC at a fixed operating point θ
+  (A) Fréchet-Hoeffding-style ceilings for composed Youden's J over two ROC curves
+  (B) Finite-sample FH-Bernstein utilities for CC at a fixed operating point θ
   (C) Advanced statistical bounds with adaptive sampling and ML integration
   (D) Multi-objective optimization for threshold selection
   (E) Causal inference integration for treatment effect estimation
@@ -26,6 +26,7 @@ Version: 2.0 (Enterprise)
 from __future__ import annotations
 
 import warnings
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from enum import Enum
@@ -33,13 +34,7 @@ from math import exp, log, pi, sqrt
 from typing import (
     Any,
     Callable,
-    Dict,
-    Iterable,
-    List,
     Literal,
-    Optional,
-    Sequence,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -67,43 +62,43 @@ except ImportError:
     SKLEARN_AVAILABLE = False
 
 __all__ = [
+    # Enhanced API
+    "AdaptiveBounds",
+    "AdaptiveStrategy",
+    "BanditThresholdSelector",
+    "BayesianBounds",
+    "BoundType",
+    "CausalBounds",
+    "ConfidenceSequence",
+    "DistributedROCAnalyzer",
+    "GPBounds",
+    "MultiObjectiveOptimizer",
+    "OptimizationResult",
+    "PredictionInterval",
     # Original API (backward compatibility)
     "ROCArrayLike",
+    "StreamingBounds",
+    "UncertaintyQuantifier",
+    "bernstein_tail",
+    "cc_confint",
+    "cc_two_sided_bound",
+    "ensure_anchors",
+    "envelope_over_rocs",
+    "fh_and_bounds_n",
+    "fh_intervals",
+    "fh_or_bounds_n",
+    "fh_var_envelope",
     "frechet_upper",
     "frechet_upper_with_argmax",
     "frechet_upper_with_argmax_points",
-    "envelope_over_rocs",
-    "ensure_anchors",
-    "fh_and_bounds_n",
-    "fh_or_bounds_n",
-    "fh_intervals",
-    "fh_var_envelope",
-    "bernstein_tail",
     "invert_bernstein_eps",
-    "cc_two_sided_bound",
-    "cc_confint",
     "needed_n_bernstein",
     "needed_n_bernstein_int",
-    # Enhanced API
-    "AdaptiveBounds",
-    "BayesianBounds",
-    "CausalBounds",
-    "StreamingBounds",
-    "MultiObjectiveOptimizer",
-    "BanditThresholdSelector",
-    "GPBounds",
-    "DistributedROCAnalyzer",
-    "ConfidenceSequence",
-    "PredictionInterval",
-    "UncertaintyQuantifier",
-    "AdaptiveStrategy",
-    "BoundType",
-    "OptimizationResult",
 ]
 
 # ---- Enhanced Types --------------------------------------------------------
 
-ROCPoint: TypeAlias = Tuple[float, float]
+ROCPoint: TypeAlias = tuple[float, float]
 ROCArrayLike: TypeAlias = Union[
     Sequence[ROCPoint],
     Iterable[ROCPoint],
@@ -138,10 +133,10 @@ class AdaptiveStrategy(Enum):
 class OptimizationResult:
     """Result from multi-objective optimization"""
 
-    optimal_thresholds: Dict[str, float]
+    optimal_thresholds: dict[str, float]
     pareto_front: NDArray[np.float64]
-    objective_values: Dict[str, float]
-    convergence_info: Dict[str, Any]
+    objective_values: dict[str, float]
+    convergence_info: dict[str, Any]
     computational_time: float
 
 
@@ -178,7 +173,7 @@ def _to_array_roc(
     clip: Literal["silent", "warn", "error"] = "silent",
     validate_finite: bool = True,
     use_gpu: bool = False,
-) -> Union[NDArray[np.float64], "torch.Tensor"]:
+) -> NDArray[np.float64] | torch.Tensor:
     """
     Enhanced ROC array conversion with GPU support and validation
     """
@@ -195,7 +190,7 @@ def _to_array_roc(
         nan_mask = ~np.isfinite(roc)
         nan_count = nan_mask.sum()
         if nan_count > 0:
-            warnings.warn(f"Found {nan_count} non-finite values in ROC data")
+            warnings.warn(f"Found {nan_count} non-finite values in ROC data", stacklevel=2)
             if clip != "error":
                 roc = np.nan_to_num(roc, nan=0.0, posinf=1.0, neginf=0.0)
             else:
@@ -211,7 +206,9 @@ def _to_array_roc(
                 f"ROC contains {oob_count} out-of-range values at indices {bad_indices[:5]}"
             )
         elif clip == "warn":
-            warnings.warn(f"Clipping {oob_count} ROC values to [0,1].", RuntimeWarning)
+            warnings.warn(
+                f"Clipping {oob_count} ROC values to [0,1].", RuntimeWarning, stacklevel=2
+            )
         roc = np.clip(roc, 0.0, 1.0)
 
     # GPU acceleration if requested and available
@@ -228,7 +225,7 @@ def ensure_anchors(
     clip: Literal["silent", "warn", "error"] = "silent",
     use_gpu: bool = False,
     remove_duplicates: bool = False,
-) -> Union[NDArray[np.float64], "torch.Tensor"]:
+) -> NDArray[np.float64] | torch.Tensor:
     """
     Enhanced anchor ensuring with deduplication and GPU support
     """
@@ -294,7 +291,7 @@ class AdaptiveBounds:
         self.alpha = 1.0 - confidence_level
 
     def time_uniform_bound(
-        self, n: int, variance_bound: float, time_horizon: Optional[int] = None
+        self, n: int, variance_bound: float, time_horizon: int | None = None
     ) -> float:
         """
         Compute time-uniform confidence radius using law of iterated logarithm
@@ -314,7 +311,7 @@ class AdaptiveBounds:
         observations: NDArray[np.float64],
         null_value: float = 0.0,
         alternative: Literal["two-sided", "greater", "less"] = "two-sided",
-    ) -> Tuple[bool, float, ConfidenceSequence]:
+    ) -> tuple[bool, float, ConfidenceSequence]:
         """
         Sequential hypothesis test with anytime validity
         """
@@ -379,7 +376,7 @@ class BayesianBounds:
     """
 
     def __init__(
-        self, kernel: Optional[Any] = None, noise_level: float = 1e-10, credible_level: float = 0.95
+        self, kernel: Any | None = None, noise_level: float = 1e-10, credible_level: float = 0.95
     ):
         if not SKLEARN_AVAILABLE:
             raise ImportError("scikit-learn required for BayesianBounds")
@@ -401,7 +398,7 @@ class BayesianBounds:
 
     def predict_with_bounds(
         self, X_test: NDArray[np.float64]
-    ) -> Tuple[NDArray[np.float64], PredictionInterval]:
+    ) -> tuple[NDArray[np.float64], PredictionInterval]:
         """
         Predict with Bayesian credible intervals
         """
@@ -452,8 +449,8 @@ class CausalBounds:
         self,
         treated_outcomes: NDArray[np.float64],
         control_outcomes: NDArray[np.float64],
-        confounding_strength: Optional[float] = None,
-    ) -> Tuple[float, float, Dict[str, float]]:
+        confounding_strength: float | None = None,
+    ) -> tuple[float, float, dict[str, float]]:
         """
         Compute partial identification bounds for average treatment effect
         allowing for unmeasured confounding
@@ -493,9 +490,9 @@ class CausalBounds:
         self,
         treated_outcomes: NDArray[np.float64],
         control_outcomes: NDArray[np.float64],
-        gamma_range: Tuple[float, float] = (1.0, 3.0),
+        gamma_range: tuple[float, float] = (1.0, 3.0),
         n_points: int = 50,
-    ) -> Dict[str, NDArray[np.float64]]:
+    ) -> dict[str, NDArray[np.float64]]:
         """
         Perform sensitivity analysis across range of confounding strengths
         """
@@ -524,7 +521,7 @@ class StreamingBounds:
 
     def __init__(
         self,
-        window_size: Optional[int] = None,
+        window_size: int | None = None,
         decay_factor: float = 0.99,
         min_observations: int = 10,
     ):
@@ -542,7 +539,7 @@ class StreamingBounds:
         self.weighted_mean = 0.0
         self.weighted_var = 0.0
 
-    def update(self, x: float) -> Tuple[float, float]:
+    def update(self, x: float) -> tuple[float, float]:
         """
         Update with new observation and return (mean, confidence_radius)
         """
@@ -611,8 +608,8 @@ class MultiObjectiveOptimizer:
 
     def __init__(
         self,
-        objectives: List[str] = None,
-        constraints: List[Callable] = None,
+        objectives: list[str] | None = None,
+        constraints: list[Callable] | None = None,
         method: str = "nsga2",
     ):
         if objectives is None:
@@ -623,8 +620,8 @@ class MultiObjectiveOptimizer:
 
     def optimize_thresholds(
         self,
-        roc_curves: Dict[str, NDArray[np.float64]],
-        weights: Optional[Dict[str, float]] = None,
+        roc_curves: dict[str, NDArray[np.float64]],
+        weights: dict[str, float] | None = None,
         n_generations: int = 100,
         population_size: int = 50,
     ) -> OptimizationResult:
@@ -636,12 +633,12 @@ class MultiObjectiveOptimizer:
         start_time = time.time()
 
         if weights is None:
-            weights = {obj: 1.0 for obj in self.objectives}
+            weights = dict.fromkeys(self.objectives, 1.0)
 
         # Define objective function
         def evaluate_objectives(thresholds: NDArray[np.float64]) -> NDArray[np.float64]:
             scores = []
-            for i, (name, roc) in enumerate(roc_curves.items()):
+            for i, (_name, roc) in enumerate(roc_curves.items()):
                 if i < len(thresholds):
                     threshold = thresholds[i]
                     # Find closest ROC point
@@ -696,10 +693,7 @@ class MultiObjectiveOptimizer:
                 pareto_front.append(best_threshold)
 
         # Convert to array
-        if pareto_front:
-            pareto_front_array = np.array(pareto_front)
-        else:
-            pareto_front_array = np.empty((0, 2))
+        pareto_front_array = np.array(pareto_front) if pareto_front else np.empty((0, 2))
 
         end_time = time.time()
 
@@ -735,7 +729,7 @@ class BanditThresholdSelector:
         self.total_count = 0
         self.recent_rewards = {}
 
-    def select_threshold(self, available_thresholds: List[Tuple[str, float]]) -> Tuple[str, float]:
+    def select_threshold(self, available_thresholds: list[tuple[str, float]]) -> tuple[str, float]:
         """
         Select threshold using bandit strategy
         """
@@ -752,7 +746,7 @@ class BanditThresholdSelector:
             # Random fallback
             return available_thresholds[np.random.randint(len(available_thresholds))]
 
-    def _select_ucb(self, thresholds: List[Tuple[str, float]]) -> Tuple[str, float]:
+    def _select_ucb(self, thresholds: list[tuple[str, float]]) -> tuple[str, float]:
         """Upper Confidence Bound selection"""
         if self.total_count == 0:
             return thresholds[0]  # Arbitrary choice for first selection
@@ -779,7 +773,7 @@ class BanditThresholdSelector:
 
         return best_arm if best_arm else thresholds[0]
 
-    def _select_thompson(self, thresholds: List[Tuple[str, float]]) -> Tuple[str, float]:
+    def _select_thompson(self, thresholds: list[tuple[str, float]]) -> tuple[str, float]:
         """Thompson Sampling selection"""
         best_arm = None
         best_sample = -np.inf
@@ -807,8 +801,8 @@ class BanditThresholdSelector:
         return best_arm if best_arm else thresholds[0]
 
     def _select_epsilon_greedy(
-        self, thresholds: List[Tuple[str, float]], epsilon: float = 0.1
-    ) -> Tuple[str, float]:
+        self, thresholds: list[tuple[str, float]], epsilon: float = 0.1
+    ) -> tuple[str, float]:
         """Epsilon-greedy selection"""
         if np.random.random() < epsilon or self.total_count == 0:
             # Explore
@@ -828,7 +822,7 @@ class BanditThresholdSelector:
 
             return best_arm if best_arm else thresholds[0]
 
-    def update_reward(self, arm: Tuple[str, float], reward: float):
+    def update_reward(self, arm: tuple[str, float], reward: float):
         """Update bandit with observed reward"""
         key = arm
         self.total_count += 1
@@ -853,7 +847,7 @@ class GPBounds:
     """Gaussian Process-based bounds for complex ROC surfaces"""
 
     def __init__(
-        self, kernel: Optional[Any] = None, acquisition_function: str = "ucb", beta: float = 2.0
+        self, kernel: Any | None = None, acquisition_function: str = "ucb", beta: float = 2.0
     ):
         if not SKLEARN_AVAILABLE:
             raise ImportError("scikit-learn required for GPBounds")
@@ -880,7 +874,7 @@ class GPBounds:
 
     def predict_with_uncertainty(
         self, X_test: NDArray[np.float64]
-    ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """Predict J values with uncertainty bounds"""
         if self.X_observed is None:
             raise RuntimeError("Must fit model before prediction")
@@ -907,7 +901,7 @@ class GPBounds:
         return y_mean, lower_bounds, upper_bounds
 
     def suggest_next_evaluation(
-        self, bounds: Tuple[Tuple[float, float], Tuple[float, float]], n_candidates: int = 1000
+        self, bounds: tuple[tuple[float, float], tuple[float, float]], n_candidates: int = 1000
     ) -> NDArray[np.float64]:
         """Suggest next threshold pair to evaluate using acquisition function"""
         # Generate candidate points
@@ -935,16 +929,16 @@ class DistributedROCAnalyzer:
 
     def parallel_frechet_bounds(
         self,
-        roc_curves_a: List[NDArray[np.float64]],
-        roc_curves_b: List[NDArray[np.float64]],
+        roc_curves_a: list[NDArray[np.float64]],
+        roc_curves_b: list[NDArray[np.float64]],
         comp: Literal["AND", "OR"] = "AND",
-    ) -> List[float]:
+    ) -> list[float]:
         """Compute Fréchet bounds for multiple ROC curve pairs in parallel"""
         if len(roc_curves_a) != len(roc_curves_b):
             raise ValueError("Must have equal number of ROC curves")
 
         # Create work chunks
-        pairs = list(zip(roc_curves_a, roc_curves_b))
+        pairs = list(zip(roc_curves_a, roc_curves_b, strict=False))
         chunks = [pairs[i : i + self.chunk_size] for i in range(0, len(pairs), self.chunk_size)]
 
         # Submit work to thread pool
@@ -962,8 +956,8 @@ class DistributedROCAnalyzer:
         return results
 
     def _process_chunk(
-        self, roc_pairs: List[Tuple[NDArray[np.float64], NDArray[np.float64]]], comp: str
-    ) -> List[float]:
+        self, roc_pairs: list[tuple[NDArray[np.float64], NDArray[np.float64]]], comp: str
+    ) -> list[float]:
         """Process a chunk of ROC pairs"""
         results = []
         for roc_a, roc_b in roc_pairs:
@@ -990,7 +984,7 @@ class UncertaintyQuantifier:
         comp: Literal["AND", "OR"] = "AND",
         n_bootstrap: int = 1000,
         confidence_level: float = 0.95,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Quantify uncertainty in Fréchet bounds using bootstrap
         """
@@ -1013,7 +1007,7 @@ class UncertaintyQuantifier:
         comp: str,
         n_bootstrap: int,
         confidence_level: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Bootstrap uncertainty estimation"""
         bootstrap_bounds = []
 
@@ -1055,7 +1049,7 @@ class UncertaintyQuantifier:
         roc_b: NDArray[np.float64],
         comp: str,
         confidence_level: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Jackknife uncertainty estimation"""
         n_a, n_b = len(roc_a), len(roc_b)
         jackknife_bounds = []
@@ -1111,7 +1105,7 @@ def frechet_upper(
     use_gpu: bool = False,
     uncertainty: bool = False,
     n_bootstrap: int = 1000,
-) -> Union[float, Tuple[float, Dict[str, float]]]:
+) -> float | tuple[float, dict[str, float]]:
     """
     Enhanced Fréchet upper bound with optional uncertainty quantification
     """
@@ -1174,7 +1168,7 @@ def _compute_frechet_cpu(A: NDArray[np.float64], B: NDArray[np.float64], comp: s
     return float(np.clip(jmax, -1.0, 1.0))
 
 
-def _compute_frechet_gpu(A: "torch.Tensor", B: "torch.Tensor", comp: str) -> float:
+def _compute_frechet_gpu(A: torch.Tensor, B: torch.Tensor, comp: str) -> float:
     """GPU implementation of Fréchet bound computation"""
     if not GPU_AVAILABLE or torch is None:
         raise RuntimeError("GPU computation requested but not available")
@@ -1209,7 +1203,7 @@ def _compute_frechet_gpu(A: "torch.Tensor", B: "torch.Tensor", comp: str) -> flo
 
 
 # All original functions are preserved with their exact signatures
-def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+def fh_and_bounds_n(alphas: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """FH bounds for ∧_i A_i given per-rail trigger rates (original implementation)"""
     if alphas.ndim < 1:
         raise ValueError("alphas must have rail dimension on axis 0.")
@@ -1219,7 +1213,7 @@ def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], N
     return lower, upper
 
 
-def fh_or_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+def fh_or_bounds_n(alphas: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """FH bounds for ∨_i A_i given per-rail trigger rates (original implementation)"""
     if alphas.ndim < 1:
         raise ValueError("alphas must have rail dimension on axis 0.")
@@ -1234,9 +1228,9 @@ def fh_intervals(
     fpr_a: float,
     fpr_b: float,
     *,
-    alpha_cap: Optional[float] = None,
+    alpha_cap: float | None = None,
     cap_mode: Literal["error", "clip"] = "error",
-) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+) -> tuple[tuple[float, float], tuple[float, float]]:
     """Original FH intervals implementation (preserved)"""
     for nm, x in [("tpr_a", tpr_a), ("tpr_b", tpr_b), ("fpr_a", fpr_a), ("fpr_b", fpr_b)]:
         if not (0.0 <= x <= 1.0) or not np.isfinite(x):
@@ -1263,7 +1257,7 @@ def fh_intervals(
     return (L1, U1), (L0, U0)
 
 
-def fh_var_envelope(interval: Tuple[float, float]) -> float:
+def fh_var_envelope(interval: tuple[float, float]) -> float:
     """Original variance envelope implementation (preserved)"""
     a, b = interval
     if not (np.isfinite(a) and np.isfinite(b) and 0.0 <= a <= b <= 1.0):
@@ -1357,8 +1351,8 @@ def cc_two_sided_bound(
     n0: int,
     t: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     cap_at_one: bool = False,
 ) -> float:
@@ -1381,13 +1375,13 @@ def cc_confint(
     p1_hat: float,
     p0_hat: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     delta: float = 0.05,
-    split: Optional[Tuple[float, float]] = None,
+    split: tuple[float, float] | None = None,
     clamp01: bool = False,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Original CC confidence interval implementation (preserved)"""
     if D <= 0.0:
         raise ValueError("D must be > 0.")
@@ -1419,12 +1413,12 @@ def cc_confint(
 def needed_n_bernstein(
     t: float,
     D: float,
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     *,
     delta: float = 0.05,
-    split: Optional[Tuple[float, float]] = None,
-) -> Tuple[float, float]:
+    split: tuple[float, float] | None = None,
+) -> tuple[float, float]:
     """Original sample size calculation implementation (preserved)"""
     if t <= 0.0 or D <= 0.0:
         raise ValueError("t and D must be > 0.")

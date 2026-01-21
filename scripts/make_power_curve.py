@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # scripts/make_power_curve.py
-# FH–Bernstein CI half-width for CC as a function of (n1, n0)
+# FH-Bernstein CI half-width for CC as a function of (n1, n0)
 # - Robust inversion of the Bernstein tail for each class
 # - Sorted/filtered contour levels (no matplotlib errors)
 # - Optional target half-width with recommended (n1*, n0*) marker
 # - Memo-friendly text summary to STDOUT
 
 import argparse
+import contextlib
 import math
-from typing import Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -80,7 +80,7 @@ def make_levels(minv: float, maxv: float) -> np.ndarray:
     """
     Choose a reasonable set of increasing contour levels within [minv, maxv].
     """
-    # Candidate grid; we’ll keep only those that fall inside the range.
+    # Candidate grid; we'll keep only those that fall inside the range.
     candidates = np.array([0.03, 0.05, 0.08, 0.10, 0.12, 0.15, 0.20, 0.25, 0.30, 0.40])
     levels = candidates[(candidates > minv) & (candidates < maxv)]
     # Guarantee strictly increasing and at least a couple of levels:
@@ -91,15 +91,15 @@ def make_levels(minv: float, maxv: float) -> np.ndarray:
 
 
 def find_recommendation(
-    H: np.ndarray, n1_vals: np.ndarray, n0_vals: np.ndarray, target_t: Optional[float]
-) -> Optional[Tuple[int, int, float]]:
+    H: np.ndarray, n1_vals: np.ndarray, n0_vals: np.ndarray, target_t: float | None
+) -> tuple[int, int, float] | None:
     """
     If target_t is provided, find the (n1, n0) with minimal n1 + n0
     such that half-width <= target_t. Returns (n1*, n0*, t*), or None.
     """
     if target_t is None:
         return None
-    mask = H <= target_t
+    mask = target_t >= H
     if not mask.any():
         return None
     # Among feasible grid cells, minimize total samples (n1 + n0).
@@ -128,7 +128,7 @@ def find_recommendation(
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(
-        description="Power curve heatmap: FH–Bernstein CC half-width vs (n1, n0)."
+        description="Power curve heatmap: FH-Bernstein CC half-width vs (n1, n0)."
     )
     ap.add_argument("--I1", required=True, help="lo,hi for Y=1 (e.g., 0.37,0.65)")
     ap.add_argument("--I0", required=True, help="lo,hi for Y=0 (e.g., 0.05,0.05)")
@@ -211,11 +211,11 @@ def main() -> None:
             f"(n1*={n1_star}, n0*={n0_star})\n t≈{t_star:.3f}",
             fontsize=8,
             color="black",
-            bbox=dict(facecolor="white", alpha=0.6, lw=0.0),
+            bbox={"facecolor": "white", "alpha": 0.6, "lw": 0.0},
         )
         # Highlight the target contour if it exists
         if args.target_t is not None:
-            try:
+            with contextlib.suppress(Exception):
                 ax.contour(
                     n0_vals,
                     n1_vals,
@@ -225,24 +225,22 @@ def main() -> None:
                     linewidths=1.6,
                     linestyles="--",
                 )
-            except Exception:
-                pass
 
     ax.set_xlabel("n0  (Y=0 samples)")
     ax.set_ylabel("n1  (Y=1 samples)")
-    ax.set_title("FH–Bernstein half-width for CC  (smaller is better)")
+    ax.set_title("FH-Bernstein half-width for CC  (smaller is better)")
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("CI half-width  t")
 
     fig.savefig(args.out, dpi=args.dpi, bbox_inches="tight", facecolor="white")
     print(f"Wrote {args.out}")
-    print(f"I1={I1} ⇒ v̄1={v1:.4f}   I0={I0} ⇒ v̄0={v0:.4f}   D={args.D:.3f}   δ={args.delta:.3f}")
+    print(f"I1={I1} => v̄1={v1:.4f}   I0={I0} => v̄0={v0:.4f}   D={args.D:.3f}   δ={args.delta:.3f}")
     if rec is None and args.target_t is not None:
         print(f"Target t={args.target_t:.3f}: no feasible (n1,n0) in the scanned grid.")
     elif rec is not None:
         n1_star, n0_star, t_star = rec
         print(
-            f"Recommended (min n1+n0) for t ≤ {args.target_t:.3f}: "
+            f"Recommended (min n1+n0) for t <= {args.target_t:.3f}: "
             f"n1*={n1_star}, n0*={n0_star}, achieved t≈{t_star:.3f}"
         )
 

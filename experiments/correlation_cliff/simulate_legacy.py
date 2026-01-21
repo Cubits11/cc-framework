@@ -44,8 +44,9 @@ numpy, pandas. Optional:
 
 import logging
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple
+from typing import Any, Callable, Literal
 
 import numpy as np
 import pandas as pd
@@ -149,7 +150,7 @@ pC_from_joint = T.pC_from_joint
 
 # Optional: may or may not exist in the current theory façade.
 # This is treated as a *reference overlay* only (never silently assumed path-consistent).
-_compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(
+_compute_metrics_for_lambda: Callable[..., dict[str, float]] | None = getattr(
     T, "compute_metrics_for_lambda", None
 )
 
@@ -223,7 +224,7 @@ class SimConfig:
     seed: int = 0
 
     path: Path = "fh_linear"
-    path_params: Dict[str, Any] = field(default_factory=dict)
+    path_params: dict[str, Any] = field(default_factory=dict)
 
     seed_policy: SeedPolicy = "stable_per_cell"
 
@@ -237,7 +238,7 @@ class SimConfig:
     include_theory_reference: bool = True
 
     # ---- computed / normalized (do not pass at init) ----
-    lambdas_canonical: Tuple[float, ...] = field(init=False, repr=False)
+    lambdas_canonical: tuple[float, ...] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         # ---- normalize + validate rule ----
@@ -439,7 +440,7 @@ def _validate_cfg(cfg: SimConfig) -> None:
 
     # If SimConfig provides canonical lambdas, verify consistency.
     if hasattr(cfg, "lambdas_canonical"):
-        canon = list(getattr(cfg, "lambdas_canonical"))
+        canon = list(cfg.lambdas_canonical)
         if canon != sorted(lambdas):
             raise ValueError(
                 "cfg.lambdas_canonical does not match sorted(cfg.lambdas). "
@@ -449,7 +450,7 @@ def _validate_cfg(cfg: SimConfig) -> None:
     # -----------------------------
     # Probability / tolerance policies
     # -----------------------------
-    if not (isinstance(cfg.prob_tol, float) or isinstance(cfg.prob_tol, int)):
+    if not (isinstance(cfg.prob_tol, (float, int))):
         raise ValueError(f"prob_tol must be a float, got {type(cfg.prob_tol).__name__}.")
     if not math.isfinite(float(cfg.prob_tol)) or float(cfg.prob_tol) < 0.0:
         raise ValueError(f"prob_tol must be finite and >= 0, got {cfg.prob_tol!r}.")
@@ -460,7 +461,7 @@ def _validate_cfg(cfg: SimConfig) -> None:
             "Recommended: 1e-12 to 1e-9; hard max: 1e-6."
         )
 
-    if not (isinstance(cfg.envelope_tol, float) or isinstance(cfg.envelope_tol, int)):
+    if not (isinstance(cfg.envelope_tol, (float, int))):
         raise ValueError(f"envelope_tol must be a float, got {type(cfg.envelope_tol).__name__}.")
     if not math.isfinite(float(cfg.envelope_tol)) or float(cfg.envelope_tol) < 0.0:
         raise ValueError(f"envelope_tol must be finite and >= 0, got {cfg.envelope_tol!r}.")
@@ -471,7 +472,7 @@ def _validate_cfg(cfg: SimConfig) -> None:
         )
 
     if cfg.allow_tiny_negative:
-        if not (isinstance(cfg.tiny_negative_eps, float) or isinstance(cfg.tiny_negative_eps, int)):
+        if not (isinstance(cfg.tiny_negative_eps, (float, int))):
             raise ValueError(
                 f"tiny_negative_eps must be a float, got {type(cfg.tiny_negative_eps).__name__}."
             )
@@ -513,7 +514,7 @@ def _validate_cfg(cfg: SimConfig) -> None:
         U = float(b.U)
         if not (math.isfinite(L) and math.isfinite(U)):
             raise ValueError(f"FH bounds not finite for {w}: L={L}, U={U}")
-        if L > U + float(cfg.prob_tol):
+        if U + float(cfg.prob_tol) < L:
             raise ValueError(f"FH bounds inverted for {w}: L={L} > U={U} (prob_tol={cfg.prob_tol})")
 
     # Jbest must be > 0 to define CC
@@ -700,7 +701,7 @@ def _bvn_cdf_scipy(x: float, y: float, rho: float) -> float:
 
     Notes:
       - multivariate_normal.cdf uses numerical integration; it can be slow for large grids.
-        That’s acceptable here because gaussian_tau is a sensitivity path, not the default.
+        That's acceptable here because gaussian_tau is a sensitivity path, not the default.
 
     Raises
     ------
@@ -744,7 +745,7 @@ def _p11_gaussian_tau(
     tau: float,
     *,
     ppf_clip_eps: float = 1e-12,
-) -> Tuple[float, Dict[str, float]]:
+) -> tuple[float, dict[str, float]]:
     """
     Gaussian copula overlap: p11 = C(u,v) where u=pA, v=pB and concordance is set by Kendall tau.
 
@@ -830,8 +831,8 @@ def p11_from_path(
     lam: float,
     *,
     path: Path,
-    path_params: Dict[str, Any],
-) -> Tuple[float, Dict[str, float]]:
+    path_params: dict[str, Any],
+) -> tuple[float, dict[str, float]]:
     """
     V3: Research/enterprise-grade p11 constructor with explicit invariants and audit fields.
 
@@ -897,7 +898,7 @@ def p11_from_path(
         raise NumericalError(f"FH bounds invalid for pA={pA}, pB={pB}: L={L}, U={U}")
 
     width = float(U - L)
-    meta: Dict[str, float] = {
+    meta: dict[str, float] = {
         "L": L,
         "U": U,
         "FH_width": width,
@@ -922,7 +923,7 @@ def p11_from_path(
             f"clip_tol must be finite, >=0, and small (<=1e-6). got {clip_tol!r}"
         )
 
-    def _finalize(raw: float, lam_eff: float) -> Tuple[float, Dict[str, float]]:
+    def _finalize(raw: float, lam_eff: float) -> tuple[float, dict[str, float]]:
         if not math.isfinite(raw):
             raise NumericalError(f"raw_p11 is non-finite: {raw!r}")
 
@@ -930,12 +931,11 @@ def p11_from_path(
         meta["raw_p11"] = float(raw)
 
         # enforce feasibility with explicit policy
-        if raw < L - clip_tol or raw > U + clip_tol:
-            if clip_policy == "raise":
-                raise FeasibilityError(
-                    f"{path}: raw_p11 violates FH bounds by more than clip_tol. "
-                    f"raw={raw}, L={L}, U={U}, clip_tol={clip_tol}"
-                )
+        if (raw < L - clip_tol or raw > U + clip_tol) and clip_policy == "raise":
+            raise FeasibilityError(
+                f"{path}: raw_p11 violates FH bounds by more than clip_tol. "
+                f"raw={raw}, L={L}, U={U}, clip_tol={clip_tol}"
+            )
 
         clipped = raw
         if clipped < L:
@@ -1140,9 +1140,8 @@ def _validate_cell_probs(
 
     if not (math.isfinite(prob_tol_f) and prob_tol_f >= 0.0 and prob_tol_f <= 1e-3):
         raise ValueError(f"prob_tol must be finite and reasonably small, got {prob_tol_f}")
-    if allow_tiny_negative:
-        if not (math.isfinite(eps_f) and eps_f > 0.0 and eps_f <= 1e-6):
-            raise ValueError(f"tiny_negative_eps must be finite in (0, 1e-6], got {eps_f}")
+    if allow_tiny_negative and not (math.isfinite(eps_f) and eps_f > 0.0 and eps_f <= 1e-6):
+        raise ValueError(f"tiny_negative_eps must be finite in (0, 1e-6], got {eps_f}")
 
     # Normalize input type/shape without mutating caller data unless we must clip.
     p_arr = np.asarray(p, dtype=np.float64)
@@ -1226,7 +1225,7 @@ def _draw_joint_counts(
     allow_tiny_negative: bool,
     tiny_negative_eps: float,
     context: str = "",
-) -> Tuple[int, int, int, int]:
+) -> tuple[int, int, int, int]:
     """
     Draw multinomial joint counts (N00, N01, N10, N11) for a 2×2 Bernoulli joint.
 
@@ -1318,7 +1317,7 @@ def _empirical_from_counts(
     n11: int,
     rule: Rule,
     context: str = "",
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute empirical probabilities from joint counts, plus dependence summaries.
 
@@ -1450,7 +1449,7 @@ def simulate_replicate_at_lambda(
     lam_index: int,
     rep: int,
     rng: np.random.Generator,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Simulate one replicate at a given lambda.
 
@@ -1476,7 +1475,7 @@ def simulate_replicate_at_lambda(
     if rp < 0:
         raise ValueError(f"rep must be >=0, got {rep!r}")
 
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "lambda": lam_f,
         "lambda_index": li,
         "rep": rp,
@@ -1821,8 +1820,8 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
         # Base RNG is intentionally unused for per-cell RNG policy; still deterministic.
         base_rng = np.random.default_rng(0)
 
-    total = int(cfg.n_reps) * int(len(lambdas_list))
-    rows: list[Dict[str, Any]] = []
+    total = int(cfg.n_reps) * len(lambdas_list)
+    rows: list[dict[str, Any]] = []
     rows_extend = rows.append  # tiny speed win in hot loops
 
     for rep in range(int(cfg.n_reps)):
@@ -1926,14 +1925,14 @@ def summarize_simulation(
 
     def _q_label(qq: float) -> str:
         # round to avoid 0.975*1000 becoming 974 due to float representation
-        return f"q{int(round(qq * 1000.0)):04d}"
+        return f"q{round(qq * 1000.0):04d}"
 
-    def _qcols(s: pd.Series, prefix: str) -> Dict[str, float]:
+    def _qcols(s: pd.Series, prefix: str) -> dict[str, float]:
         s2 = pd.to_numeric(s, errors="coerce").dropna()
         if s2.empty:
             return {f"{prefix}_{_q_label(qq)}": float("nan") for qq in q}
         qs = s2.quantile(q)
-        out: Dict[str, float] = {}
+        out: dict[str, float] = {}
         for qq in q:
             out[f"{prefix}_{_q_label(qq)}"] = float(qs.loc[qq])
         return out
@@ -1981,15 +1980,15 @@ def summarize_simulation(
         "tau_theory_ref_avg",
     )
 
-    groups: list[Dict[str, Any]] = []
+    groups: list[dict[str, Any]] = []
     gb = df.groupby(group_keys, sort=True, dropna=False)
 
     for key, g in gb:
         # key is scalar if group_keys == ["lambda"], else tuple in group_keys order
-        row: Dict[str, Any] = {}
+        row: dict[str, Any] = {}
 
         if isinstance(key, tuple):
-            for kname, kval in zip(group_keys, key):
+            for kname, kval in zip(group_keys, key, strict=False):
                 row[kname] = (
                     float(kval) if kname == "lambda" else (None if pd.isna(kval) else str(kval))
                 )
@@ -1997,11 +1996,11 @@ def summarize_simulation(
             row["lambda"] = float(key)
 
         # Replicate accounting
-        row["n_rows"] = int(len(g))
+        row["n_rows"] = len(g)
         if "rep" in g.columns:
             row["n_reps"] = int(pd.to_numeric(g["rep"], errors="coerce").nunique(dropna=True))
         else:
-            row["n_reps"] = int(len(g))
+            row["n_reps"] = len(g)
 
         # Row-level success/failure accounting (if present)
         if "row_ok" in g.columns:
@@ -2011,7 +2010,7 @@ def summarize_simulation(
             row["n_row_fail"] = int((~ok).sum())
         else:
             row["row_ok_rate"] = float("nan")
-            row["n_row_ok"] = int(len(g))
+            row["n_row_ok"] = len(g)
             row["n_row_fail"] = 0
 
         # Core empirical metrics: mean/std + missing rate
@@ -2208,7 +2207,7 @@ def build_linear_lambda_grid(
 # -----------------------------------------------------------------------------
 # CLI config loading (enterprise-grade, schema-aware)
 # -----------------------------------------------------------------------------
-def _load_yaml(path: str) -> Dict[str, Any]:
+def _load_yaml(path: str) -> dict[str, Any]:
     """
     Load a YAML config into a plain Python dict with strong error messages.
 
@@ -2223,7 +2222,7 @@ def _load_yaml(path: str) -> Dict[str, Any]:
         raise ImportError("pyyaml is required for --config usage (pip install pyyaml).") from e
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = f.read()
     except OSError as e:
         raise OSError(f"Could not read YAML config at path={path!r}: {e}") from e
@@ -2245,7 +2244,7 @@ def _load_yaml(path: str) -> Dict[str, Any]:
     return dict(obj)
 
 
-def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
+def _cfg_from_dict(d: dict[str, Any]) -> SimConfig:
     """
     Build SimConfig from a YAML-like dict.
 
@@ -2268,7 +2267,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
       simulate.* (optional overrides: prob_tol, allow_tiny_negative, tiny_negative_eps, hard_fail_on_invalid, include_theory_reference)
       sanity.* (optional, but simulate.py only consumes prob/simplex controls)
 
-    NOTE: run_all.py is the matrix orchestrator. simulate.py’s _cfg_from_dict returns
+    NOTE: run_all.py is the matrix orchestrator. simulate.py's _cfg_from_dict returns
     one SimConfig (primary path + primary rule) for CLI and simple harness use.
     """
 
@@ -2283,7 +2282,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
             cur = cur[k]
         return cur
 
-    def _require_dict(x: Any, name: str) -> Dict[str, Any]:
+    def _require_dict(x: Any, name: str) -> dict[str, Any]:
         if not isinstance(x, dict):
             raise ValueError(f"Expected mapping for '{name}', got {type(x).__name__}")
         return x
@@ -2323,11 +2322,11 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
             raise ValueError(f"{name} must be in [0,1], got {v}")
         return v
 
-    def _parse_path_params(base: Any, *, extra: Dict[str, Any]) -> Dict[str, Any]:
-        pp: Dict[str, Any] = {}
+    def _parse_path_params(base: Any, *, extra: dict[str, Any]) -> dict[str, Any]:
+        pp: dict[str, Any] = {}
         if isinstance(base, dict):
             pp.update(dict(base))
-        # Accept convenience keys even if caller didn’t nest them under path_params
+        # Accept convenience keys even if caller didn't nest them under path_params
         for k, v in extra.items():
             if v is not None and k not in pp:
                 pp[k] = v
@@ -2423,7 +2422,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         lambdas = list(_ensure_monotone_increasing(lambdas))
 
         # Sampling
-        n = _i(_dget(d, "sampling.n_per_world", d.get("n", None)), "sampling.n_per_world")
+        n = _i(_dget(d, "sampling.n_per_world", d.get("n")), "sampling.n_per_world")
         n_reps = _i(_dget(d, "sampling.n_reps", d.get("n_reps", 1)), "sampling.n_reps")
         seed = _i(_dget(d, "sampling.seed", d.get("seed", 0)), "sampling.seed")
         seed_policy = str(_dget(d, "sampling.seed_policy", d.get("seed_policy", "stable_per_cell")))
@@ -2467,9 +2466,9 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
 
         base_pp = d.get("path_params", {})
         extra_pp = {
-            "gamma": d.get("gamma", None),
-            "k": d.get("k", None),
-            "ppf_clip_eps": d.get("ppf_clip_eps", None),
+            "gamma": d.get("gamma"),
+            "k": d.get("k"),
+            "ppf_clip_eps": d.get("ppf_clip_eps"),
         }
         path_params = _parse_path_params(base_pp, extra=extra_pp)
 
@@ -2534,7 +2533,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
     )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """
     CLI entrypoint for simulate.py.
 
@@ -2588,7 +2587,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 h.update(chunk)
         return h.hexdigest()
 
-    def _maybe_git_commit(repo_root: Path) -> Optional[str]:
+    def _maybe_git_commit(repo_root: Path) -> str | None:
         try:
             out = subprocess.check_output(
                 ["git", "rev-parse", "HEAD"],
@@ -2665,9 +2664,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     # Resolve out_dir policy
-    out_dir: Optional[Path] = Path(args.out_dir).expanduser() if args.out_dir else None
-    legacy_out_csv: Optional[Path] = Path(args.out_csv).expanduser() if args.out_csv else None
-    legacy_out_sum: Optional[Path] = (
+    out_dir: Path | None = Path(args.out_dir).expanduser() if args.out_dir else None
+    legacy_out_csv: Path | None = Path(args.out_csv).expanduser() if args.out_csv else None
+    legacy_out_sum: Path | None = (
         Path(args.out_summary_csv).expanduser() if args.out_summary_csv else None
     )
 
@@ -2715,8 +2714,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # ----------------------------
     # Write outputs (atomic)
     # ----------------------------
-    file_hashes: Dict[str, str] = {}
-    outputs: Dict[str, str] = {}
+    file_hashes: dict[str, str] = {}
+    outputs: dict[str, str] = {}
 
     try:
         if out_dir is not None:
@@ -2743,7 +2742,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "seed": int(cfg.seed),
                 "n": int(cfg.n),
                 "n_reps": int(cfg.n_reps),
-                "lambda_points": int(len(cfg.lambdas)),
+                "lambda_points": len(cfg.lambdas),
                 "lambdas": [float(x) for x in cfg.lambdas],
                 "envelope_tol": float(cfg.envelope_tol),
                 "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
@@ -2789,8 +2788,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "run_started_utc": run_started_utc,
         "run_finished_utc": datetime.utcnow().isoformat() + "Z",
         "elapsed_seconds": float(time.time() - t0),
-        "rows": int(len(df_long)),
-        "lambda_points": int(len(set(df_long["lambda"]))) if "lambda" in df_long.columns else 0,
+        "rows": len(df_long),
+        "lambda_points": len(set(df_long["lambda"])) if "lambda" in df_long.columns else 0,
         "env_violation_rate": vio_rate,
         "seed_policy": str(cfg.seed_policy),
         "seed": int(cfg.seed),

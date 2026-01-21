@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Mapping, Protocol, Sequence, Tuple
+from typing import Any, Literal, Protocol
 
 import numpy as np
 
@@ -76,7 +77,7 @@ def _strict_int(x: Any, name: str, *, min_value: int | None = None) -> int:
 
 def _canonical_lambda_keys(
     lambdas: Sequence[Any], *, decimals: int = 12
-) -> Tuple[List[float], List[float]]:
+) -> tuple[list[float], list[float]]:
     """
     Return (vals, keys) where:
       - vals are float-cast lambdas in original order
@@ -86,8 +87,8 @@ def _canonical_lambda_keys(
     if len(lambdas) == 0:
         raise ConfigError("lambdas must be a non-empty sequence")
 
-    vals: List[float] = []
-    keys: List[float] = []
+    vals: list[float] = []
+    keys: list[float] = []
     for i, lam in enumerate(lambdas):
         if isinstance(lam, bool):
             raise ConfigError(f"lambdas[{i}] must be a real number in [0,1], got bool {lam!r}")
@@ -212,16 +213,17 @@ class SimConfig:
       - Ignored for seed_policy == "stable_per_cell".
       - Set to False to preserve legacy sequential stream behavior.
     """
+
     marginals: _TwoWorldMarginals
     rule: Rule
-    lambdas: List[float]
+    lambdas: list[float]
 
     n: int
     n_reps: int
     seed: int
 
     path: Path
-    path_params: Dict[str, Any] = field(default_factory=dict)
+    path_params: dict[str, Any] = field(default_factory=dict)
 
     seed_policy: SeedPolicy = "stable_per_cell"
 
@@ -236,7 +238,7 @@ class SimConfig:
     batch_sampling: bool = True
 
     # internal cache for stable_per_cell mapping
-    _lambda_index_map: Dict[float, int] = field(default_factory=dict, init=False, repr=False)
+    _lambda_index_map: dict[float, int] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         # Normalize string enums
@@ -303,13 +305,13 @@ def validate_cfg(cfg: SimConfig) -> None:
 
     if not isinstance(cfg.allow_tiny_negative, bool):
         raise ConfigError(f"allow_tiny_negative must be bool, got {cfg.allow_tiny_negative!r}")
-    if cfg.allow_tiny_negative:
-        if not _is_finite_real(cfg.tiny_negative_eps) or not (
-            0.0 < float(cfg.tiny_negative_eps) <= 1e-6
-        ):
-            raise ConfigError(
-                f"tiny_negative_eps must be finite in (0,1e-6], got {cfg.tiny_negative_eps!r}"
-            )
+    if cfg.allow_tiny_negative and (
+        not _is_finite_real(cfg.tiny_negative_eps)
+        or not (0.0 < float(cfg.tiny_negative_eps) <= 1e-6)
+    ):
+        raise ConfigError(
+            f"tiny_negative_eps must be finite in (0,1e-6], got {cfg.tiny_negative_eps!r}"
+        )
 
     if not isinstance(cfg.hard_fail_on_invalid, bool):
         raise ConfigError(f"hard_fail_on_invalid must be bool, got {cfg.hard_fail_on_invalid!r}")
@@ -355,8 +357,8 @@ def validate_cfg(cfg: SimConfig) -> None:
 
 __all__ = [
     "ConfigError",
-    "Rule",
     "Path",
+    "Rule",
     "SeedPolicy",
     "SimConfig",
     "validate_cfg",

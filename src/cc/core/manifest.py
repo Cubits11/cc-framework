@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any
 
 from pydantic import Field
 
@@ -19,24 +20,24 @@ class RunManifest(ModelBase):
 
     run_id: str
     created_at: float = Field(default_factory=_now_unix)
-    config_hashes: Dict[str, Any] = Field(default_factory=dict)
-    dataset_ids: List[str] = Field(default_factory=list)
-    guardrail_versions: Dict[str, str] = Field(default_factory=dict)
-    git_sha: Optional[str] = None
+    config_hashes: dict[str, Any] = Field(default_factory=dict)
+    dataset_ids: list[str] = Field(default_factory=list)
+    guardrail_versions: dict[str, str] = Field(default_factory=dict)
+    git_sha: str | None = None
 
 
 def build_config_hashes(
     payload: Mapping[str, Any],
     *,
     label: str = "config_blake3",
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Hash a config payload for manifest lineage."""
     return {label: _hash_json(payload)}
 
 
-def guardrail_versions_from_instances(guardrails: Sequence[Any]) -> Dict[str, str]:
+def guardrail_versions_from_instances(guardrails: Sequence[Any]) -> dict[str, str]:
     """Resolve guardrail version metadata from instantiated guardrails."""
-    versions: Dict[str, str] = {}
+    versions: dict[str, str] = {}
     for guardrail in guardrails:
         name = guardrail.__class__.__name__
         versions[name] = _resolve_version(guardrail)
@@ -60,7 +61,7 @@ def emit_run_manifest(
     manifest: RunManifest,
     *,
     output_dir: Path = Path("runs/manifest"),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Write the manifest JSON and append it to a per-run hash chain."""
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = output_dir / f"{manifest.run_id}.json"
@@ -83,6 +84,6 @@ def emit_run_manifest(
 __all__ = [
     "RunManifest",
     "build_config_hashes",
-    "guardrail_versions_from_instances",
     "emit_run_manifest",
+    "guardrail_versions_from_instances",
 ]

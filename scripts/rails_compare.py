@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -31,7 +30,7 @@ def binarize(scores: np.ndarray, thr: float) -> np.ndarray:
     return (scores >= thr).astype(int)
 
 
-def confusion(y: np.ndarray, yhat: np.ndarray) -> Dict[str, int]:
+def confusion(y: np.ndarray, yhat: np.ndarray) -> dict[str, int]:
     tp = int(((y == 1) & (yhat == 1)).sum())
     fn = int(((y == 1) & (yhat == 0)).sum())
     tn = int(((y == 0) & (yhat == 0)).sum())
@@ -39,7 +38,7 @@ def confusion(y: np.ndarray, yhat: np.ndarray) -> Dict[str, int]:
     return {"tp": tp, "fn": fn, "tn": tn, "fp": fp}
 
 
-def rates(m: Dict[str, int]) -> Tuple[float, float, float]:
+def rates(m: dict[str, int]) -> tuple[float, float, float]:
     tp, fn, tn, fp = m["tp"], m["fn"], m["tn"], m["fp"]
     tpr = tp / (tp + fn) if (tp + fn) else 0.0
     fpr = fp / (fp + tn) if (fp + tn) else 0.0
@@ -110,7 +109,7 @@ def mutual_information(a_block: np.ndarray, b_block: np.ndarray) -> float:
 
 def overlap_ratio(a_block: np.ndarray, b_block: np.ndarray) -> float:
     """
-    Jaccard-style overlap of positive decisions: |A∩B| / |A∪B|.
+    Jaccard-style overlap of positive decisions: |AnB| / |AUB|.
     Safe when union is 0.
     """
     inter = int(((a_block == 1) & (b_block == 1)).sum())
@@ -161,8 +160,8 @@ def sweep_thr_for_fpr(
     else:
         grid = np.linspace(lo, hi, int(grid_n), dtype=float)
 
-    best_overall: Optional[SweepBest] = None
-    best_window: Optional[SweepBest] = None
+    best_overall: SweepBest | None = None
+    best_window: SweepBest | None = None
 
     for thr in grid:
         yhat = binarize(scores, float(thr))
@@ -190,7 +189,7 @@ def sweep_thr_for_fpr(
 # -----------------------------
 
 
-def _require_cols(df: pd.DataFrame, cols: Tuple[str, ...]) -> None:
+def _require_cols(df: pd.DataFrame, cols: tuple[str, ...]) -> None:
     missing = [c for c in cols if c not in df.columns]
     if missing:
         raise SystemExit(f"Missing required columns in CSV: {missing}. Found: {list(df.columns)}")
@@ -248,7 +247,7 @@ def run(csv_path: Path, out_path: Path, fpr_min: float, fpr_max: float) -> pd.Da
         "Overlap_pos_Jaccard": overlap,
         "fpr_window_min": float(fpr_min),
         "fpr_window_max": float(fpr_max),
-        "n": int(len(df)),
+        "n": len(df),
     }
 
     out_df = pd.DataFrame([row])

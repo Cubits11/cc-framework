@@ -19,7 +19,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import yaml
@@ -34,12 +34,12 @@ from cc.guardrails.toy_threshold import ToyThresholdGuardrail
 # --------------------------
 
 
-def load_config(path: Path) -> Dict[str, Any]:
+def load_config(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
-def save_config(cfg: Dict[str, Any], path: Path) -> None:
+def save_config(cfg: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
@@ -69,9 +69,9 @@ def update_threshold_in_config(path_in: Path, path_out: Path, thr: float) -> Non
 
 
 def load_benign_texts(
-    dataset: Path, synthetic_vocab: List[str], harmful_vocab: List[str], n_synthetic: int = 200
-) -> List[str]:
-    texts: List[str] = []
+    dataset: Path, synthetic_vocab: list[str], harmful_vocab: list[str], n_synthetic: int = 200
+) -> list[str]:
+    texts: list[str] = []
     if dataset.is_file():
         texts.extend([line.strip() for line in dataset.read_text().splitlines() if line.strip()])
     elif dataset.is_dir():
@@ -93,12 +93,12 @@ def load_benign_texts(
 
 
 def calibrate_guardrail_entry(
-    entry: Dict[str, Any],
-    cfg: Dict[str, Any],
-    benign_texts: List[str],
+    entry: dict[str, Any],
+    cfg: dict[str, Any],
+    benign_texts: list[str],
     window_lo: float = 0.04,
     window_hi: float = 0.06,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calibrate a ToyThresholdGuardrail to target FPR within [window_lo, window_hi] and
     <= alpha_cap if present.
@@ -137,7 +137,7 @@ def calibrate_guardrail_entry(
         max_k = min_k
     candidate_k = list(range(min_k, max_k + 1))
     if not candidate_k:
-        candidate_k = [int(round(target * n))]
+        candidate_k = [round(target * n)]
     candidate_k = [int(np.clip(k, 0, n)) for k in candidate_k]
 
     best = None
@@ -183,7 +183,7 @@ def calibrate_guardrail_entry(
     }
 
 
-def estimate_stack_fpr(cfg: Dict[str, Any], benign_texts: List[str]) -> Optional[float]:
+def estimate_stack_fpr(cfg: dict[str, Any], benign_texts: list[str]) -> float | None:
     guardrail_cfgs = cfg.get("guardrails") or []
     if not guardrail_cfgs or not benign_texts:
         return None
@@ -248,7 +248,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _pick_entry_for_calibration(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def _pick_entry_for_calibration(cfg: dict[str, Any]) -> dict[str, Any]:
     """
     Choose which guardrail entry to calibrate.
     Preference: name == 'toy_threshold' else guardrails[0].
@@ -310,7 +310,7 @@ def main() -> None:
         json.dump(flat_summary, f, indent=2)
 
     # Write-back logic
-    derived_out: Optional[Path] = None
+    derived_out: Path | None = None
     if args.write_inplace:
         tmp_out = cfg_path.with_suffix(cfg_path.suffix + ".tmp")
         update_threshold_in_config(cfg_path, tmp_out, flat_summary["threshold"])

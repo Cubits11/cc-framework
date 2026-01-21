@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 import click
 import numpy as np
@@ -24,7 +24,7 @@ def _read_binary_series(path: Path) -> np.ndarray:
     return arr
 
 
-def _maybe_counts_to_phat(k: Optional[int], n: Optional[int]) -> Optional[float]:
+def _maybe_counts_to_phat(k: int | None, n: int | None) -> float | None:
     if k is None and n is None:
         return None
     if k is None or n is None:
@@ -85,17 +85,17 @@ def methods(
     fpr_b: float,
     n1: int,
     n0: int,
-    k1: Optional[int],
-    k0: Optional[int],
-    y1_samples: Optional[str],
-    y0_samples: Optional[str],
-    alpha_cap: Optional[float],
+    k1: int | None,
+    k0: int | None,
+    y1_samples: str | None,
+    y0_samples: str | None,
+    alpha_cap: float | None,
     delta: float,
-    target_t: Optional[float],
+    target_t: float | None,
     bootstrap_B: int,
     seed: int,
-    figure_out: Optional[str],
-    json_out: Optional[str],
+    figure_out: str | None,
+    json_out: str | None,
 ):
     """
     Print FH intervals, variance envelopes, CC_hat, and three CIs (Bernstein/ Wilson/ Bootstrap),
@@ -127,7 +127,7 @@ def methods(
             "Provide either counts (k1,k0) or sample files (y1-samples,y0-samples)."
         )
 
-    # Core FH–Bernstein workflow
+    # Core FH-Bernstein workflow
     report = estimate_cc_methods_from_rates(
         p1_hat=p1_hat,
         p0_hat=p0_hat,
@@ -168,9 +168,9 @@ def methods(
         f"  I0 (FH OR , Y=0): {fmt_iv(tuple(bounds['I0']))}   v̄0: {bounds['vbar0']:.4f}   α-cap: {alpha_cap}"
     )
 
-    click.echo("\n  CIs (two-sided, δ = {:.3f}):".format(delta))
+    click.echo(f"\n  CIs (two-sided, δ = {delta:.3f}):")
     click.echo(
-        f"    FH–Bernstein: [{ci_b['lo']:.4f}, {ci_b['hi']:.4f}]  (planner target t={ci_b.get('target_t')})"
+        f"    FH-Bernstein: [{ci_b['lo']:.4f}, {ci_b['hi']:.4f}]  (planner target t={ci_b.get('target_t')})"
     )
     click.echo(f"    Wilson      : [{wil_lo:.4f}, {wil_hi:.4f}]")
     if boo_lo is not None:
@@ -181,7 +181,7 @@ def methods(
         click.echo("    Bootstrap   : (skipped — provide --y1-samples/--y0-samples)")
 
     if ci_b.get("n1_star") is not None:
-        click.echo("\n  Planner (per-class, each term ≤ δ/2):")
+        click.echo("\n  Planner (per-class, each term <= δ/2):")
         click.echo(f"    n1* ≈ {ci_b['n1_star']:.1f}   n0* ≈ {ci_b['n0_star']:.1f}")
 
     # Optional figure

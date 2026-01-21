@@ -5,7 +5,7 @@ operations that are shared by the Week 7 execution scripts.  It provides
 numerically stable implementations of
 
 * Wilson score confidence intervals for binomial proportions,
-* Fréchet–Hoeffding envelopes for OR/AND guardrail compositions,
+* Fréchet-Hoeffding envelopes for OR/AND guardrail compositions,
 * Independence baselines for multi-rail systems, and
 * BCa bootstrap intervals for derived statistics (ΔJ, J, etc.).
 
@@ -16,9 +16,10 @@ unit tests without having to execute the full experiment pipeline.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from statistics import NormalDist
-from typing import Any, Callable, Dict, List, Mapping, Sequence, Tuple
+from typing import Any, Callable
 
 import numpy as np
 
@@ -87,7 +88,7 @@ def stable_prod_one_minus(values: Sequence[float]) -> float:
     return float(min(1.0, max(0.0, math.exp(total))))
 
 
-def independence_or(tprs: Sequence[float], fprs: Sequence[float]) -> Dict[str, float]:
+def independence_or(tprs: Sequence[float], fprs: Sequence[float]) -> dict[str, float]:
     """Return the independence baseline for an OR composition."""
 
     if len(tprs) != len(fprs):
@@ -106,7 +107,7 @@ def independence_or(tprs: Sequence[float], fprs: Sequence[float]) -> Dict[str, f
     }
 
 
-def independence_and(tprs: Sequence[float], fprs: Sequence[float]) -> Dict[str, float]:
+def independence_and(tprs: Sequence[float], fprs: Sequence[float]) -> dict[str, float]:
     """Return the independence baseline for an AND composition."""
 
     if len(tprs) != len(fprs):
@@ -128,7 +129,7 @@ def independence_and(tprs: Sequence[float], fprs: Sequence[float]) -> Dict[str, 
 
 
 # ---------------------------------------------------------------------------
-# Fréchet–Hoeffding envelopes
+# Fréchet-Hoeffding envelopes
 # ---------------------------------------------------------------------------
 
 
@@ -144,7 +145,7 @@ class FHEnvelope:
     j_upper: float
 
 
-def fh_bounds_intersection(marginals: Sequence[float]) -> Tuple[float, float]:
+def fh_bounds_intersection(marginals: Sequence[float]) -> tuple[float, float]:
     """Bounds for intersection probability with the FH inequalities."""
 
     if not marginals:
@@ -161,7 +162,7 @@ def fh_bounds_intersection(marginals: Sequence[float]) -> Tuple[float, float]:
     return lower, upper
 
 
-def fh_bounds_union(marginals: Sequence[float]) -> Tuple[float, float]:
+def fh_bounds_union(marginals: Sequence[float]) -> tuple[float, float]:
     """Bounds for union probability with the FH inequalities."""
 
     if not marginals:
@@ -248,7 +249,7 @@ class BCaInterval:
 def _jackknife_statistics(
     samples: Sequence[np.ndarray], stat_fn: Callable[[Sequence[np.ndarray]], float]
 ) -> np.ndarray:
-    parts: List[float] = []
+    parts: list[float] = []
     for idx, arr in enumerate(samples):
         if arr.size == 0:
             raise ValueError("Cannot jackknife empty sample")
@@ -282,7 +283,7 @@ def bca_bootstrap(
     stat_fn:
         Callable returning a scalar statistic when fed the resampled arrays.
     alpha:
-        Two-sided error rate (default 0.05 ⇒ 95% interval).
+        Two-sided error rate (default 0.05 => 95% interval).
     n_bootstrap:
         Number of bootstrap replicates.
     rng:
@@ -302,10 +303,7 @@ def bca_bootstrap(
         if arr.size == 0:
             raise ValueError("Bootstrap arrays must be non-empty")
 
-    if isinstance(rng, np.random.Generator):
-        gen = rng
-    else:
-        gen = np.random.default_rng(rng)
+    gen = rng if isinstance(rng, np.random.Generator) else np.random.default_rng(rng)
 
     theta_hat = stat_fn(arrays)
 
@@ -355,7 +353,7 @@ class PointRecord:
     """Minimal schema used by the downstream scripts."""
 
     topology: str
-    rails: Tuple[str, ...]
+    rails: tuple[str, ...]
     thresholds: Mapping[str, float]
     seed: int
     episodes: int
@@ -387,8 +385,8 @@ class PointRecord:
         return f"{self.topology}:{rails}@{th}"
 
 
-def aggregate_by_group(points: Sequence[PointRecord]) -> Dict[str, Dict[str, Any]]:
-    grouped: Dict[str, Dict[str, Any]] = {}
+def aggregate_by_group(points: Sequence[PointRecord]) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
     for p in points:
         entry = grouped.setdefault(
             p.group_key,
@@ -444,8 +442,8 @@ def aggregate_by_group(points: Sequence[PointRecord]) -> Dict[str, Dict[str, Any
     return grouped
 
 
-def summarise_group(entry: Dict[str, Any]) -> Dict[str, Any]:
-    summary: Dict[str, Any] = {
+def summarise_group(entry: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {
         "topology": entry["topology"],
         "rails": entry["rails"],
         "thresholds": entry["thresholds"],
@@ -490,7 +488,7 @@ def summarise_group(entry: Dict[str, Any]) -> Dict[str, Any]:
     return summary
 
 
-def compute_regime_counts(points: Sequence[PointRecord]) -> Dict[str, int]:
+def compute_regime_counts(points: Sequence[PointRecord]) -> dict[str, int]:
     counts = {"constructive": 0, "independent": 0, "destructive": 0}
     for p in points:
         if p.classification not in counts:

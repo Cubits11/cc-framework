@@ -32,10 +32,11 @@ Notes
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import RLock
-from typing import Any, Iterable, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 # -----------------------------------------------------------------------------
 # Lightweight structural typing for guardrails (duck typing > inheritance)
@@ -83,7 +84,7 @@ class GuardrailAdapter:
 
     # Internal state
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
-    _local_threshold: Optional[float] = field(default=None, init=False, repr=False)
+    _local_threshold: float | None = field(default=None, init=False, repr=False)
 
     # ------------------------------------------------------------------
     # Capability checks
@@ -100,7 +101,7 @@ class GuardrailAdapter:
         """Proxy threshold; falls back to adapter-local value or default."""
         if hasattr(self.guardrail, "threshold"):
             try:
-                return float(getattr(self.guardrail, "threshold"))
+                return float(self.guardrail.threshold)
             except Exception:
                 pass
         if self._local_threshold is None:
@@ -114,7 +115,7 @@ class GuardrailAdapter:
             raise ValueError("threshold must be a finite float")
         if hasattr(self.guardrail, "threshold"):
             try:
-                setattr(self.guardrail, "threshold", v)
+                self.guardrail.threshold = v
                 return
             except Exception:
                 # fall back to local storage
@@ -143,7 +144,7 @@ class GuardrailAdapter:
             return self.guardrail.calibrate(benign_texts, target_fpr)  # type: ignore[misc]
         raise NotImplementedError("wrapped guardrail lacks calibrate()")
 
-    def evaluate(self, text: str) -> Tuple[bool, float]:
+    def evaluate(self, text: str) -> tuple[bool, float]:
         """Return ``(blocked, score)`` pair for ``text`` without double work.
 
         The method computes the score exactly once. If the wrapped guardrail's
@@ -164,26 +165,26 @@ class GuardrailAdapter:
     # ------------------------------------------------------------------
     # Batch helpers (quality-of-life; deterministic order preserved)
     # ------------------------------------------------------------------
-    def batch_score(self, texts: Iterable[str]) -> List[float]:
+    def batch_score(self, texts: Iterable[str]) -> list[float]:
         """Score a batch of texts."""
         return [self.score(t) for t in texts]
 
-    def batch_evaluate(self, texts: Iterable[str]) -> List[Tuple[bool, float]]:
+    def batch_evaluate(self, texts: Iterable[str]) -> list[tuple[bool, float]]:
         """Evaluate a batch of texts, returning ``[(blocked, score), ...]``."""
         # Compute all scores first (single pass), then reuse during blocks()
         texts_list = list(texts)
         scores = [self.score(t) for t in texts_list]
-        results: List[Tuple[bool, float]] = []
+        results: list[tuple[bool, float]] = []
         if hasattr(self.guardrail, "blocks") and hasattr(self.guardrail, "score"):
             # One patch per call to keep the shim scope tight and thread-safe
-            for t, s in zip(texts_list, scores):
+            for t, s in zip(texts_list, scores, strict=False):
                 with self._memoised_score(s):
                     blocked = bool(self.guardrail.blocks(t))  # type: ignore[no-any-return]
                 results.append((blocked, float(s)))
             return results
 
         # Fallback path uses blocks() directly or threshold rule
-        for t, s in zip(texts_list, scores):
+        for t, s in zip(texts_list, scores, strict=False):
             if hasattr(self.guardrail, "blocks"):
                 blocked = bool(self.guardrail.blocks(t))  # type: ignore[no-any-return]
             else:

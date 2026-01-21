@@ -102,14 +102,14 @@ import json
 import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from scipy import stats as scipy_stats
 
 # Type aliases for clarity
-AttackResults = List["AttackResult"]
-ConfidenceInterval = Tuple[float, float]
+AttackResults = list["AttackResult"]
+ConfidenceInterval = tuple[float, float]
 
 
 # =============================================================================
@@ -142,7 +142,7 @@ class BootstrapResult:
     # Composability metrics
     cc_max: float
     delta_add: float
-    cc_multiplicative: Optional[float] = None
+    cc_multiplicative: float | None = None
 
     # Confidence intervals
     ci_j: ConfidenceInterval = (math.nan, math.nan)
@@ -151,7 +151,7 @@ class BootstrapResult:
     ci_width: float = math.nan
 
     # Bootstrap diagnostics
-    bootstrap_samples: Optional[np.ndarray] = None  # J bootstrap samples (optional)
+    bootstrap_samples: np.ndarray | None = None  # J bootstrap samples (optional)
     n_sessions: int = 0
     n_bootstrap: int = 0
     convergence_diagnostic: float = math.nan  # CV of bootstrap statistic
@@ -161,20 +161,20 @@ class BootstrapResult:
     n_valid: int = 0
     n_failed: int = 0
     failure_rate: float = 0.0
-    failure_reasons: Dict[str, int] = field(default_factory=dict)
+    failure_reasons: dict[str, int] = field(default_factory=dict)
     valid: bool = True
 
     # NEW: dependence diagnostics (if applicable)
     resample: str = "iid"  # iid|block|cluster|pair
-    ordered: Optional[bool] = None
-    block_size: Optional[int] = None
-    cluster_key: Optional[str] = None
-    n_clusters_world0: Optional[int] = None
-    n_clusters_world1: Optional[int] = None
-    icc_world0: Optional[float] = None
-    icc_world1: Optional[float] = None
-    ess_world0: Optional[float] = None
-    ess_world1: Optional[float] = None
+    ordered: bool | None = None
+    block_size: int | None = None
+    cluster_key: str | None = None
+    n_clusters_world0: int | None = None
+    n_clusters_world1: int | None = None
+    icc_world0: float | None = None
+    icc_world1: float | None = None
+    ess_world0: float | None = None
+    ess_world1: float | None = None
 
     # Metadata
     method: str = "percentile"  # percentile|basic|bca
@@ -183,9 +183,9 @@ class BootstrapResult:
     order_hash: str = ""
 
     # Statistical tests
-    hypothesis_tests: Dict[str, Any] = field(default_factory=dict)
+    hypothesis_tests: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization (backward-compatible + extended)."""
         return {
             "j_statistic": float(self.j_statistic),
@@ -240,7 +240,7 @@ class CCInterpretation:
     regime: str  # "constructive", "independent", "destructive"
     confidence: float
     recommendation: str
-    evidence: Dict[str, Any]
+    evidence: dict[str, Any]
 
 
 # =============================================================================
@@ -285,7 +285,7 @@ def bootstrap_ci_j_statistic(
 
     boot = np.empty(B, dtype=float)
     n_failed = 0
-    reasons: Dict[str, int] = {}
+    reasons: dict[str, int] = {}
 
     for b in range(B):
         try:
@@ -306,7 +306,8 @@ def bootstrap_ci_j_statistic(
     if not valid:
         warnings.warn(
             f"bootstrap_ci_j_statistic: insufficient valid replicates "
-            f"(valid={n_valid}/{B}, failure_rate={failure_rate:.2%}). Returning NaN CI."
+            f"(valid={n_valid}/{B}, failure_rate={failure_rate:.2%}). Returning NaN CI.",
+            stacklevel=2,
         )
         return JBootstrapCI(
             ci_lower=math.nan,
@@ -331,7 +332,7 @@ def bootstrap_ci_j_statistic(
     )
 
 
-def compute_j_statistic(results: AttackResults) -> Tuple[float, float, float]:
+def compute_j_statistic(results: AttackResults) -> tuple[float, float, float]:
     """
     Compute J-statistic (p0 - p1) from two-world AttackResult list.
 
@@ -362,8 +363,8 @@ def compute_j_statistic(results: AttackResults) -> Tuple[float, float, float]:
 
 
 def compute_composability_coefficients(
-    j_composed: float, j_individual: Dict[str, float], p0: float
-) -> Dict[str, float]:
+    j_composed: float, j_individual: dict[str, float], p0: float
+) -> dict[str, float]:
     """
     Compute composability coefficient variants.
 
@@ -417,10 +418,7 @@ def compute_composability_coefficients(
         heuristic_add = float(j_vals[0])
         j_mult = float(j_vals[0])
 
-    if j_mult > 0:
-        cc_mult = float(j_composed / j_mult)
-    else:
-        cc_mult = None
+    cc_mult = float(j_composed / j_mult) if j_mult > 0 else None
 
     efficiency_ratio = float(j_composed / heuristic_max) if heuristic_max != 0 else float("nan")
 
@@ -440,19 +438,19 @@ def compute_composability_coefficients(
 
 def bootstrap_ci_with_cc(
     results: AttackResults,
-    j_individual: Optional[Dict[str, float]] = None,
+    j_individual: dict[str, float] | None = None,
     B: int = 2000,
     alpha: float = 0.05,
-    block_size: Optional[int] = None,
+    block_size: int | None = None,
     method: str = "percentile",
     compute_cc: bool = True,
     random_seed: int = 42,
     # --- Enterprise additions (all optional; keep old signature behavior) ---
-    cluster_ids: Optional[np.ndarray] = None,
-    cluster_key: Optional[str] = None,
-    pair_key: Optional[str] = None,
+    cluster_ids: np.ndarray | None = None,
+    cluster_key: str | None = None,
+    pair_key: str | None = None,
     resample: str = "auto",  # auto|iid|block|cluster|pair
-    ordered: Optional[bool] = None,
+    ordered: bool | None = None,
     min_valid_frac: float = 0.90,
     n_permutations: int = 0,
     tier: str = "auto",
@@ -494,7 +492,8 @@ def bootstrap_ci_with_cc(
     n_total = len(results)
     if n_total < 50:
         warnings.warn(
-            f"bootstrap_ci_with_cc: small sample size (n={n_total}). Inference may be unstable."
+            f"bootstrap_ci_with_cc: small sample size (n={n_total}). Inference may be unstable.",
+            stacklevel=2,
         )
 
     # --------- Extract arrays / metadata ---------
@@ -506,8 +505,8 @@ def bootstrap_ci_with_cc(
     ordered_final = inferred_ordered if ordered is None else bool(ordered)
 
     # cluster ids
-    cluster_vec: Optional[np.ndarray] = None
-    cluster_key_used: Optional[str] = None
+    cluster_vec: np.ndarray | None = None
+    cluster_key_used: str | None = None
     if cluster_ids is not None:
         cluster_vec = np.asarray(cluster_ids)
         if cluster_vec.shape[0] != n_total:
@@ -520,7 +519,7 @@ def bootstrap_ci_with_cc(
         cluster_key_used = cluster_key
 
     # pairing ids
-    pair_vec: Optional[np.ndarray] = None
+    pair_vec: np.ndarray | None = None
     if pair_key is not None:
         pair_vec = np.array(
             [_safe_to_str(getattr(r, pair_key, None)) for r in results], dtype=object
@@ -588,11 +587,12 @@ def bootstrap_ci_with_cc(
     )
 
     # block size handling (kept for compatibility)
-    block_size_used: Optional[int] = None
+    block_size_used: int | None = None
     if resample_mode == "block":
         if not ordered_final:
             warnings.warn(
-                "Requested/selected block bootstrap but ordered=False; falling back to iid."
+                "Requested/selected block bootstrap but ordered=False; falling back to iid.",
+                stacklevel=2,
             )
             resample_mode = "iid"
         else:
@@ -615,11 +615,11 @@ def bootstrap_ci_with_cc(
     ss = np.random.SeedSequence(random_seed)
     rng = np.random.default_rng(ss)
 
-    boot_j: List[float] = []
-    boot_cc: List[float] = []
-    boot_delta: List[float] = []
+    boot_j: list[float] = []
+    boot_cc: list[float] = []
+    boot_delta: list[float] = []
     n_failed = 0
-    reasons: Dict[str, int] = {}
+    reasons: dict[str, int] = {}
 
     # Precompute structures for faster resampling
     # (pair bootstrap uses pairs as unit)
@@ -628,7 +628,8 @@ def bootstrap_ci_with_cc(
         pair_struct = _build_pairs(idx0, idx1, y, pair_vec)
         if pair_struct is None:
             warnings.warn(
-                "pair bootstrap requested/selected but pairs are invalid; falling back to iid."
+                "pair bootstrap requested/selected but pairs are invalid; falling back to iid.",
+                stacklevel=2,
             )
             resample_mode = "iid"
 
@@ -639,7 +640,8 @@ def bootstrap_ci_with_cc(
         cluster_struct1 = _build_clusters(idx1, cluster_vec)
         if cluster_struct0 is None or cluster_struct1 is None:
             warnings.warn(
-                "cluster bootstrap requested/selected but clusters are invalid; falling back to iid."
+                "cluster bootstrap requested/selected but clusters are invalid; falling back to iid.",
+                stacklevel=2,
             )
             resample_mode = "iid"
 
@@ -651,7 +653,7 @@ def bootstrap_ci_with_cc(
         ordered_idx0 = idx0
         ordered_idx1 = idx1
 
-    for b in range(B):
+    for _b in range(B):
         try:
             if resample_mode == "pair":
                 assert pair_struct is not None
@@ -720,7 +722,8 @@ def bootstrap_ci_with_cc(
     if not valid:
         warnings.warn(
             f"bootstrap_ci_with_cc: insufficient valid bootstrap replicates "
-            f"(valid={n_valid}/{B}, failure_rate={failure_rate:.2%}). Returning NaN CIs."
+            f"(valid={n_valid}/{B}, failure_rate={failure_rate:.2%}). Returning NaN CIs.",
+            stacklevel=2,
         )
 
     # --------- CI computation ---------
@@ -865,7 +868,7 @@ def dkw_confidence_bound(n: int, alpha: float = 0.05) -> float:
 
 def analytical_j_ci(
     results: AttackResults, alpha: float = 0.05
-) -> Tuple[float, ConfidenceInterval]:
+) -> tuple[float, ConfidenceInterval]:
     """
     Analytical CI for J via normal approximation (unpaired, iid-ish).
 
@@ -891,7 +894,7 @@ def analytical_j_ci(
     return float(j), ci
 
 
-def sanity_check_j_statistic(results: AttackResults) -> Dict[str, bool]:
+def sanity_check_j_statistic(results: AttackResults) -> dict[str, bool]:
     """
     Sanity checks for J-statistic validity.
 
@@ -1091,29 +1094,33 @@ def _infer_ordering(results: AttackResults) -> bool:
 
 def _estimate_block_size(n: int) -> int:
     # rule of thumb: n^(1/3)
-    return max(1, int(round(n ** (1.0 / 3.0))))
+    return max(1, round(n ** (1.0 / 3.0)))
 
 
 def _choose_resample_mode(
     requested: str,
-    pair_vec: Optional[np.ndarray],
-    cluster_vec: Optional[np.ndarray],
-    block_size: Optional[int],
+    pair_vec: np.ndarray | None,
+    cluster_vec: np.ndarray | None,
+    block_size: int | None,
     ordered: bool,
 ) -> str:
     req = (requested or "auto").lower()
     if req in ("iid", "block", "cluster", "pair"):
         if req == "block" and not ordered:
-            warnings.warn("block resampling requested but ordered=False; will fall back to iid.")
+            warnings.warn(
+                "block resampling requested but ordered=False; will fall back to iid.", stacklevel=2
+            )
             return "iid"
         if req == "cluster" and cluster_vec is None:
             warnings.warn(
-                "cluster resampling requested but no cluster labels provided; falling back to iid."
+                "cluster resampling requested but no cluster labels provided; falling back to iid.",
+                stacklevel=2,
             )
             return "iid"
         if req == "pair" and pair_vec is None:
             warnings.warn(
-                "pair resampling requested but no pair_key provided; falling back to iid."
+                "pair resampling requested but no pair_key provided; falling back to iid.",
+                stacklevel=2,
             )
             return "iid"
         return req
@@ -1129,7 +1136,7 @@ def _choose_resample_mode(
 
 
 def _infer_tier_label(
-    tier: str, cluster_vec: Optional[np.ndarray], pair_vec: Optional[np.ndarray]
+    tier: str, cluster_vec: np.ndarray | None, pair_vec: np.ndarray | None
 ) -> str:
     if tier and tier != "auto":
         return str(tier)
@@ -1138,7 +1145,7 @@ def _infer_tier_label(
     return "Tier 0"
 
 
-def _compute_provenance_hashes(results: AttackResults, config: Dict[str, Any]) -> Tuple[str, str]:
+def _compute_provenance_hashes(results: AttackResults, config: dict[str, Any]) -> tuple[str, str]:
     """
     Produce both:
       - input_hash (order-insensitive multiset + config)
@@ -1159,7 +1166,7 @@ def _compute_provenance_hashes(results: AttackResults, config: Dict[str, Any]) -
     order_hash = hashlib.sha256(order_bytes).hexdigest()[:16]
 
     # order-insensitive (multiset): sort rows by stable tuple (attack_id, world_bit, timestamp, index)
-    def sort_key(d: Dict[str, Any]) -> Tuple[str, str, str, int]:
+    def sort_key(d: dict[str, Any]) -> tuple[str, str, str, int]:
         return (
             d.get("attack_id", ""),
             d.get("world_bit", ""),
@@ -1185,7 +1192,7 @@ def _resample_blocks(indices: np.ndarray, block_size: int, rng: np.random.Genera
     if n == 0:
         return indices.copy()
     bs = max(1, int(block_size))
-    n_blocks = int(math.ceil(n / bs))
+    n_blocks = math.ceil(n / bs)
     starts = rng.integers(0, n, size=n_blocks)
     out = []
     for s in starts:
@@ -1199,9 +1206,7 @@ def _resample_blocks(indices: np.ndarray, block_size: int, rng: np.random.Genera
     return np.array(out, dtype=int)
 
 
-def _build_clusters(
-    world_indices: np.ndarray, cluster_vec: np.ndarray
-) -> Optional[List[np.ndarray]]:
+def _build_clusters(world_indices: np.ndarray, cluster_vec: np.ndarray) -> list[np.ndarray] | None:
     """
     Build list of arrays, each containing indices belonging to a cluster.
     Returns None if clusters degenerate.
@@ -1212,7 +1217,7 @@ def _build_clusters(
     uniq = np.unique(labels)
     if uniq.size < 2:
         return None
-    clusters: List[np.ndarray] = []
+    clusters: list[np.ndarray] = []
     for c in uniq:
         members = world_indices[labels == c]
         if members.size > 0:
@@ -1222,7 +1227,7 @@ def _build_clusters(
     return clusters
 
 
-def _resample_clusters(clusters: List[np.ndarray], rng: np.random.Generator) -> np.ndarray:
+def _resample_clusters(clusters: list[np.ndarray], rng: np.random.Generator) -> np.ndarray:
     """
     Resample clusters with replacement, include all members of selected clusters.
     Number of clusters drawn equals number of unique clusters.
@@ -1236,13 +1241,13 @@ def _resample_clusters(clusters: List[np.ndarray], rng: np.random.Generator) -> 
 
 def _build_pairs(
     idx0: np.ndarray, idx1: np.ndarray, y: np.ndarray, pair_vec: np.ndarray
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """
     Build array of shape (n_pairs, 2): [y0, y1] aligned by pair_id.
     Requires complete pairs (one obs per world per pair).
     """
     # map pair_id -> (y0?, y1?)
-    m: Dict[str, List[Optional[int]]] = {}
+    m: dict[str, list[int | None]] = {}
     for i in idx0:
         pid = pair_vec[i]
         if pid == "":
@@ -1273,7 +1278,7 @@ def _bootstrap_stat_pair(
     rng: np.random.Generator,
     compute_cc: bool,
     j_max_individual: float,
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     """
     Bootstrap over pairs (rows), resampling rows with replacement.
     """
@@ -1306,12 +1311,12 @@ def _jackknife_data_for_mode(
     y: np.ndarray,
     idx0: np.ndarray,
     idx1: np.ndarray,
-    pair_struct: Optional[np.ndarray],
-    cluster_struct0: Optional[List[np.ndarray]],
-    cluster_struct1: Optional[List[np.ndarray]],
+    pair_struct: np.ndarray | None,
+    cluster_struct0: list[np.ndarray] | None,
+    cluster_struct1: list[np.ndarray] | None,
     stat_kind: str = "j",
-    j_max_individual: Optional[float] = None,
-) -> Dict[str, Any]:
+    j_max_individual: float | None = None,
+) -> dict[str, Any]:
     """
     Provide enough information for jackknife statistic recomputation.
     stat_kind: "j" | "cc" | "delta"
@@ -1335,7 +1340,7 @@ def _compute_ci(
     alpha: float,
     method: str,
     jackknife_unit: str,
-    jackknife_data: Dict[str, Any],
+    jackknife_data: dict[str, Any],
 ) -> ConfidenceInterval:
     m = (method or "percentile").lower()
     if samples.size == 0 or not np.isfinite(theta_hat):
@@ -1371,7 +1376,7 @@ def _bca_ci_full(
     theta_hat: float,
     alpha: float,
     jackknife_unit: str,
-    jackknife_data: Dict[str, Any],
+    jackknife_data: dict[str, Any],
 ) -> ConfidenceInterval:
     """
     Full BCa interval:
@@ -1396,13 +1401,15 @@ def _bca_ci_full(
     jk = _jackknife_estimates(jackknife_unit, jackknife_data)
     a = 0.0
     if jk is None or jk.size < 3 or not np.isfinite(jk).all():
-        warnings.warn("BCa acceleration unavailable (degenerate jackknife); using a=0 fallback.")
+        warnings.warn(
+            "BCa acceleration unavailable (degenerate jackknife); using a=0 fallback.", stacklevel=2
+        )
     else:
         jk_mean = float(np.mean(jk))
         num = float(np.sum((jk_mean - jk) ** 3))
         den = float(6.0 * (np.sum((jk_mean - jk) ** 2) ** 1.5))
         if den <= 0 or not np.isfinite(num) or not np.isfinite(den):
-            warnings.warn("BCa acceleration ill-conditioned; using a=0 fallback.")
+            warnings.warn("BCa acceleration ill-conditioned; using a=0 fallback.", stacklevel=2)
         else:
             a = num / den
 
@@ -1432,7 +1439,7 @@ def _bca_alpha(z0: float, a: float, z_alpha: float) -> float:
     return float(scipy_stats.norm.cdf(adj))
 
 
-def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[np.ndarray]:
+def _jackknife_estimates(jackknife_unit: str, data: dict[str, Any]) -> np.ndarray | None:
     """
     Compute jackknife leave-one-unit-out estimates of the requested statistic.
     """
@@ -1441,7 +1448,7 @@ def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[
     y = data["y"]
     idx0 = data["idx0"]
     idx1 = data["idx1"]
-    j_max = data.get("j_max_individual", None)
+    j_max = data.get("j_max_individual")
 
     def stat_from_masks(m0: np.ndarray, m1: np.ndarray) -> float:
         if m0.size == 0 or m1.size == 0:
@@ -1462,7 +1469,7 @@ def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[
         return float("nan")
 
     if jackknife_unit == "pair":
-        pair_struct = data.get("pair_struct", None)
+        pair_struct = data.get("pair_struct")
         if pair_struct is None or pair_struct.shape[0] < 3:
             return None
         n_pairs = int(pair_struct.shape[0])
@@ -1493,14 +1500,14 @@ def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[
         return out
 
     if jackknife_unit == "cluster":
-        c0 = data.get("cluster_struct0", None)
-        c1 = data.get("cluster_struct1", None)
+        c0 = data.get("cluster_struct0")
+        c1 = data.get("cluster_struct1")
         if not c0 or not c1:
             return None
         # leave-one-cluster-out jackknife: remove cluster k from world 0 and cluster k from world 1 separately
         # We do *two* jackknives and combine by concatenation (conservative; many units).
         outs = []
-        for clusters, widx_other in ((c0, idx1), (c1, idx0)):
+        for clusters, _widx_other in ((c0, idx1), (c1, idx0)):
             k = len(clusters)
             if k < 2:
                 continue
@@ -1549,7 +1556,7 @@ def _compute_convergence_diagnostic(samples: np.ndarray) -> float:
 
 def _icc_and_ess(
     y: np.ndarray, clusters: np.ndarray
-) -> Tuple[Optional[float], Optional[int], Optional[float]]:
+) -> tuple[float | None, int | None, float | None]:
     """
     One-way random-effects ICC (ANOVA-style) + Kish ESS for clustered samples.
 
@@ -1587,7 +1594,7 @@ def _icc_and_ess(
         return 0.0, k, float(n)
 
     grand = float(np.average(means, weights=sizes))
-    ss_between = float(np.sum([sz * (m - grand) ** 2 for sz, m in zip(sizes, means)]))
+    ss_between = float(np.sum([sz * (m - grand) ** 2 for sz, m in zip(sizes, means, strict=False)]))
 
     dfb = k - 1
     dfw = n - k
@@ -1599,10 +1606,7 @@ def _icc_and_ess(
     m_eff = (sum_sq / n) if n > 0 else 1.0
 
     denom = msb + (m_eff - 1.0) * msw
-    if denom <= 0:
-        icc = 0.0
-    else:
-        icc = max(0.0, min(1.0, (msb - msw) / denom))
+    icc = 0.0 if denom <= 0 else max(0.0, min(1.0, (msb - msw) / denom))
 
     # Kish ESS for cluster sampling: (sum w)^2 / sum w^2 with w=cluster size
     ess = float((n**2) / sum_sq) if sum_sq > 0 else float(n)
@@ -1613,9 +1617,9 @@ def _global_ess(
     mode: str,
     n0: int,
     n1: int,
-    ess0: Optional[float],
-    ess1: Optional[float],
-    block_size: Optional[int],
+    ess0: float | None,
+    ess1: float | None,
+    block_size: int | None,
     ordered: bool,
 ) -> float:
     """
@@ -1639,11 +1643,11 @@ def _run_hypothesis_tests_enterprise(
     j_emp: float,
     cc_emp: float,
     cc_defined: bool,
-    pair_struct: Optional[np.ndarray],
+    pair_struct: np.ndarray | None,
     rng: np.random.Generator,
     n_permutations: int,
     alpha: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Produce coherent tests (p-values + notes). Avoid misleading bootstrap p-values.
 
@@ -1656,7 +1660,7 @@ def _run_hypothesis_tests_enterprise(
       - McNemar exact
       - optional paired-swap permutation
     """
-    tests: Dict[str, Any] = {}
+    tests: dict[str, Any] = {}
 
     # contingency table
     s0 = int(y0.sum())
@@ -1776,12 +1780,12 @@ __all__ = [
     "BootstrapResult",
     "CCInterpretation",
     "JBootstrapCI",
-    "compute_j_statistic",
-    "compute_composability_coefficients",
-    "bootstrap_ci_with_cc",
-    "bootstrap_ci_j_statistic",
-    "dkw_confidence_bound",
     "analytical_j_ci",
-    "sanity_check_j_statistic",
+    "bootstrap_ci_j_statistic",
+    "bootstrap_ci_with_cc",
+    "compute_composability_coefficients",
+    "compute_j_statistic",
+    "dkw_confidence_bound",
     "interpret_cc_results",
+    "sanity_check_j_statistic",
 ]

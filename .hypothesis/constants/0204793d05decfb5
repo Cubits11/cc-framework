@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/experiments/correlation_cliff/simulate/sampling.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.0001, 0.01, 1.0, 64.0, 'AND', 'OR', 'clipped_any', 'clipped_high', 'clipped_low', 'degenerate_A', 'degenerate_B', 'n', 'n00', 'n01', 'n10', 'n11', 'nan', 'p00', 'p00_hat', 'p00_used', 'p01', 'p01_hat', 'p01_used', 'p10', 'p10_hat', 'p10_used', 'p11', 'p11_hat', 'p11_mismatch', 'p11_mismatch_tol', 'p11_provided', 'p11_used', 'pA_hat', 'pB_hat', 'pC_hat', 'phi_finite', 'phi_hat', 'pmax', 'pmin', 'prob_tol', 'remainder', 'sum_error', 'sum_p', 'tau_finite', 'tau_hat', 'tiny_negative_eps']

@@ -2,6 +2,7 @@ import math
 from typing import Any, List, Sequence, Tuple
 
 import pytest
+
 from cc.theory import fh_bounds as fh
 
 # ---------------------------------------------------------------------
@@ -23,7 +24,7 @@ def _make_composed_j_bounds_for_cc(
     We set TPR ≡ 1 and FPR interval so that:
         j_lower = 1 - fpr_upper
         j_upper = 1 - fpr_lower
-    with 0 ≤ fpr_lower ≤ fpr_upper ≤ 1.
+    with 0 <= fpr_lower <= fpr_upper <= 1.
 
     We use dummy miss/alarm bounds that satisfy FHBounds invariants but
     do not attempt to encode a real joint model; ComposedJBounds does
@@ -54,7 +55,7 @@ def _make_composed_j_bounds_for_cc(
         k_rails=k_rails,
     )
 
-    # Dummy miss/alarm bounds – only need to be valid FHBounds.
+    # Dummy miss/alarm bounds - only need to be valid FHBounds.
     miss_bounds = fh.FHBounds(
         lower=0.0,
         upper=0.1,
@@ -152,7 +153,7 @@ def test_union_vs_intersection_ordering() -> None:
     marginals = [0.3, 0.4, 0.5]
     int_b = fh.intersection_bounds(marginals)
     uni_b = fh.union_bounds(marginals)
-    # Any feasible joint law must satisfy P(∩) ≤ P(∪),
+    # Any feasible joint law must satisfy P(n) <= P(U),
     # so the bounds must allow that partial ordering.
     assert uni_b.lower >= int_b.lower - fh.MATHEMATICAL_TOLERANCE
     assert uni_b.upper >= int_b.upper - fh.MATHEMATICAL_TOLERANCE
@@ -224,9 +225,9 @@ def test_serial_or_composition_two_rails_bounds_are_sane() -> None:
     assert 0.0 <= bounds.fpr_bounds.lower <= bounds.fpr_bounds.upper <= 1.0
 
     # Individual J stats exist and match the per-rail formula
-    expected_individual = [(1.0 - m) - f for m, f in zip(miss_rates, fpr_rates)]
+    expected_individual = [(1.0 - m) - f for m, f in zip(miss_rates, fpr_rates, strict=False)]
     assert len(bounds.individual_j_stats) == 2
-    for j_ind, j_exp in zip(bounds.individual_j_stats, expected_individual):
+    for j_ind, j_exp in zip(bounds.individual_j_stats, expected_individual, strict=False):
         assert j_ind == pytest.approx(j_exp)
 
 
@@ -280,7 +281,7 @@ def test_independence_parallel_and_j_matches_manual_formula() -> None:
 
 
 def test_classify_regime_constructive() -> None:
-    # CC interval [0.5, 0.7] < threshold_constructive (0.95) ⇒ constructive
+    # CC interval [0.5, 0.7] < threshold_constructive (0.95) => constructive
     bounds = _make_composed_j_bounds_for_cc(
         j_lower=0.5,
         j_upper=0.7,
@@ -292,7 +293,7 @@ def test_classify_regime_constructive() -> None:
 
 
 def test_classify_regime_destructive() -> None:
-    # j_lower = 0.6, max_individual_j = 0.4 ⇒ cc_lower = 1.5 > 1.05 ⇒ destructive
+    # j_lower = 0.6, max_individual_j = 0.4 => cc_lower = 1.5 > 1.05 => destructive
     bounds = _make_composed_j_bounds_for_cc(
         j_lower=0.6,
         j_upper=0.8,
@@ -304,7 +305,7 @@ def test_classify_regime_destructive() -> None:
 
 
 def test_classify_regime_independent_band() -> None:
-    # CC interval [0.95, 1.0] ⊆ [0.95, 1.05] ⇒ independent
+    # CC interval [0.95, 1.0] ⊆ [0.95, 1.05] => independent
     bounds = _make_composed_j_bounds_for_cc(
         j_lower=0.95,
         j_upper=1.0,
@@ -316,7 +317,7 @@ def test_classify_regime_independent_band() -> None:
 
 
 def test_classify_regime_uncertain_span() -> None:
-    # CC interval spans constructive + destructive thresholds ⇒ uncertain
+    # CC interval spans constructive + destructive thresholds => uncertain
     bounds = _make_composed_j_bounds_for_cc(
         j_lower=0.8,
         j_upper=1.0,
@@ -361,7 +362,7 @@ def test_cii_fh_midpoint_baseline_when_no_individual_rates() -> None:
     fpr_rates = [0.05, 0.08]
     bounds = fh.serial_or_composition_bounds(miss_rates, fpr_rates)
 
-    # No individual_tprs/fprs ⇒ fh_midpoint baseline
+    # No individual_tprs/fprs => fh_midpoint baseline
     res = fh.compute_composability_interference_index(
         observed_j=bounds.j_upper,
         bounds=bounds,

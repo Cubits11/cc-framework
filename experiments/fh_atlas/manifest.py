@@ -4,7 +4,6 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -27,8 +26,8 @@ def build_manifest(
     run_id: str,
     output_dir: Path,
     config_hash: str,
-    entries: List[ManifestEntry],
-) -> Dict[str, object]:
+    entries: list[ManifestEntry],
+) -> dict[str, object]:
     manifest = {
         "run_id": run_id,
         "output_dir": str(output_dir),
@@ -38,5 +37,5 @@ def build_manifest(
     return manifest
 
 
-def write_manifest(path: Path, manifest: Dict[str, object]) -> None:
+def write_manifest(path: Path, manifest: dict[str, object]) -> None:
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

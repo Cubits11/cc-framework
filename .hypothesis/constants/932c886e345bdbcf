@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/core/manifest.py
+# hypothesis_version: 6.147.0
+
+['RunManifest', 'VERSION', '__version__', 'build_config_hashes', 'chain_head', 'chain_path', 'config_blake3', 'emit_run_manifest', 'json', 'manifest_path', 'runs/manifest', 'unknown', 'utf-8', 'version']

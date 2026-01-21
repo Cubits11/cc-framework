@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Tuple
 
 import numpy as np
 
@@ -14,10 +13,10 @@ class SimulationResult:
     observed_j: float
     observed_tpr: float
     observed_fpr: float
-    tp_counts: List[int]
-    fn_counts: List[int]
-    fp_counts: List[int]
-    tn_counts: List[int]
+    tp_counts: list[int]
+    fn_counts: list[int]
+    fp_counts: list[int]
+    tn_counts: list[int]
 
 
 def _sample_positive_stable(alpha: float, size: int, rng: np.random.Generator) -> np.ndarray:
@@ -37,7 +36,7 @@ def _sample_bivariate_copula(
     theta: float,
     n: int,
     rng: np.random.Generator,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     if family == "independence":
         u = rng.random(n)
         v = rng.random(n)
@@ -78,7 +77,7 @@ def _sample_bivariate_copula(
         w = rng.random(n)
         v = np.empty_like(u)
         d = math.expm1(-theta)
-        for idx, (u_val, w_val) in enumerate(zip(u, w)):
+        for idx, (u_val, w_val) in enumerate(zip(u, w, strict=False)):
             lower, upper = 0.0, 1.0
             for _ in range(60):
                 mid = 0.5 * (lower + upper)
@@ -96,7 +95,7 @@ def _sample_bivariate_copula(
 
 
 def _simulate_latent_factor(
-    probs: List[float],
+    probs: list[float],
     rho: float,
     n: int,
     rng: np.random.Generator,
@@ -111,8 +110,8 @@ def _simulate_latent_factor(
 
 
 def simulate_dependence(
-    tprs: List[float],
-    fprs: List[float],
+    tprs: list[float],
+    fprs: list[float],
     composition_type: str,
     family: str,
     theta: float,

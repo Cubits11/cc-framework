@@ -8,7 +8,7 @@ import os
 import random
 import sys
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 
 def clamp01(x: float) -> float:
@@ -31,7 +31,7 @@ class TwoWorldGame:
     def __init__(
         self,
         n_queries: int = 20,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         difficulty: str = "normal",
         leaky_timing: bool = False,
         bot: bool = False,
@@ -39,7 +39,7 @@ class TwoWorldGame:
         strategy: str = "info",
         sprt_alpha: float = 0.05,
         sprt_beta: float = 0.05,
-        log_path: Optional[str] = None,
+        log_path: str | None = None,
     ) -> None:
         self.n_queries = max(1, int(n_queries))
         self.bot = bool(bot)
@@ -72,7 +72,7 @@ class TwoWorldGame:
             {"A": 0, "B": 1} if random.choice([True, False]) else {"A": 1, "B": 0}
         )
 
-        # Wald’s SPRT thresholds
+        # Wald's SPRT thresholds
         sprt_alpha = clamp01(sprt_alpha)
         sprt_beta = clamp01(sprt_beta)
         # guard against degenerate logs
@@ -101,7 +101,7 @@ class TwoWorldGame:
         mu = cfg.mean_latency_ms + cfg.extra_delay_ms
         sigma = max(0.1, cfg.std_latency_ms)
         val = max(1.0, random.gauss(mu, sigma))
-        return int(round(val))
+        return round(val)
 
     def _query(self, world_idx: int, qtype: str) -> Tuple[str, int]:
         cfg = self.world_configs[world_idx]
@@ -287,7 +287,7 @@ class TwoWorldGame:
             rA = ca["b_block"] / ca["benign"] if ca["benign"] else 0.0
             rB = cb["b_block"] / cb["benign"] if cb["benign"] else 0.0
             print(f"  A benign block rate: {rA:.2f}")
-            print(f"  B benign block rate: {rB:.2f}  (parity ⇒ utility matched)")
+            print(f"  B benign block rate: {rB:.2f}  (parity => utility matched)")
 
         print(f"Attack queries: total={total_attack}")
         if total_attack:
@@ -300,10 +300,10 @@ class TwoWorldGame:
             print("\nDistinguishability (attack success):")
             print(f"  p0 = P(Allowed | W0) = {p0:.3f}")
             print(f"  p1 = P(Allowed | W1) = {p1:.3f}")
-            print(f"  Ĵ = p0 − p1 = {j:.3f}  (95% CI: {lo:.3f}, {hi:.3f})")
+            print(f"  Ĵ = p0 - p1 = {j:.3f}  (95% CI: {lo:.3f}, {hi:.3f})")
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Two-world attack game)")
     p.add_argument("-n", "--rounds", type=int, default=20)
     p.add_argument("--seed", type=int, default=None)
@@ -319,7 +319,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     a = parse_args(argv)
     game = TwoWorldGame(
         n_queries=a.rounds,

@@ -19,13 +19,13 @@ import argparse
 import csv
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 
-def load_final_results(path: Path) -> List[Dict[str, Any]]:
+def load_final_results(path: Path) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
     if isinstance(data, dict) and "episodes" in data:
@@ -35,15 +35,15 @@ def load_final_results(path: Path) -> List[Dict[str, Any]]:
     raise ValueError("Unsupported final_results.json structure")
 
 
-def compute_stats(records: List[Dict[str, Any]]) -> Dict[int, Dict[str, float]]:
-    world_bins: Dict[int, List[float]] = {0: [], 1: []}
+def compute_stats(records: list[dict[str, Any]]) -> dict[int, dict[str, float]]:
+    world_bins: dict[int, list[float]] = {0: [], 1: []}
     for r in records:
         wb = int(r.get("world_bit", -1))
         if wb not in (0, 1):
             continue
         if "utility_score" in r and r["utility_score"] is not None:
             world_bins[wb].append(float(r["utility_score"]))
-    stats: Dict[int, Dict[str, float]] = {}
+    stats: dict[int, dict[str, float]] = {}
     for wb, xs in world_bins.items():
         if xs:
             arr = np.array(xs, dtype=float)
@@ -57,7 +57,7 @@ def compute_stats(records: List[Dict[str, Any]]) -> Dict[int, Dict[str, float]]:
     return stats
 
 
-def write_csv(stats: Dict[int, Dict[str, float]], out_csv: Path) -> None:
+def write_csv(stats: dict[int, dict[str, float]], out_csv: Path) -> None:
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
@@ -68,7 +68,7 @@ def write_csv(stats: Dict[int, Dict[str, float]], out_csv: Path) -> None:
 
 
 def make_histogram(
-    stats: Dict[int, Dict[str, float]], records: List[Dict[str, Any]], out_png: Path
+    stats: dict[int, dict[str, float]], records: list[dict[str, Any]], out_png: Path
 ) -> None:
     x0 = [
         float(r["utility_score"])

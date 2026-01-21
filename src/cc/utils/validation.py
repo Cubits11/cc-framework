@@ -3,7 +3,7 @@
 Validation utilities for experiments
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import jsonschema
 
@@ -44,7 +44,7 @@ EXPERIMENT_SCHEMA = {
 }
 
 
-def validate_config(config: Dict[str, Any]) -> None:
+def validate_config(config: dict[str, Any]) -> None:
     """Validate experiment configuration"""
     jsonschema.validate(instance=config, schema=EXPERIMENT_SCHEMA)
 
@@ -57,7 +57,7 @@ def run_invariant_suite() -> bool:
     from cc.core.stats import compute_j_statistic
 
     dummy_results = [...]  # Create test data
-    j, p0, p1 = compute_j_statistic(dummy_results)
+    j, _p0, _p1 = compute_j_statistic(dummy_results)
     checks.append(0 <= j <= 1)
 
     # Check 2: Bootstrap convergence

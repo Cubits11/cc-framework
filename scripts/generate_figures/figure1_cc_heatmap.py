@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +19,7 @@ def _build_matrix(df: pd.DataFrame) -> tuple[list[str], np.ndarray]:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
 
     guardrails = sorted(set(df["guardrail_a"]).union(df["guardrail_b"]))
-    index: Dict[str, int] = {name: i for i, name in enumerate(guardrails)}
+    index: dict[str, int] = {name: i for i, name in enumerate(guardrails)}
     matrix = np.full((len(guardrails), len(guardrails)), np.nan)
 
     for _, row in df.iterrows():
@@ -33,7 +32,7 @@ def _build_matrix(df: pd.DataFrame) -> tuple[list[str], np.ndarray]:
     return guardrails, matrix
 
 
-def generate_cc_heatmap(guardrails: List[str], cc_matrix: np.ndarray, output_path: Path) -> None:
+def generate_cc_heatmap(guardrails: list[str], cc_matrix: np.ndarray, output_path: Path) -> None:
     n = len(guardrails)
     regime_matrix = np.empty((n, n), dtype=object)
     for i in range(n):

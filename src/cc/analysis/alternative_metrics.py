@@ -6,7 +6,7 @@ composition of guardrails (e.g., AND/OR stacking) improves or degrades overall
 detection performance relative to an **independence baseline**.
 
 It is designed to run light-weight (NumPy / Pandas / scikit-learn only) and to
-plug directly into the cc-framework results pipeline (Week 6–7 JSONL → fixed
+plug directly into the cc-framework results pipeline (Week 6-7 JSONL → fixed
 metrics). It does **not** require R or heavy ML libraries.
 
 -------------------------------------------------------------------------------
@@ -22,13 +22,13 @@ WHAT THIS FILE PROVIDES
    - Decision/ops-based:  cost = c_FP * FPR + c_FN * (1 - TPR), lower is better.
    - Compares observed composition vs. independence baseline cost.
 
-3) ΔJ against Independence (Youden’s J)
-   - Statistics-based:  ΔJ = J_obs − J_indep with a practical significance band.
+3) ΔJ against Independence (Youden's J)
+   - Statistics-based:  ΔJ = J_obs - J_indep with a practical significance band.
    - 3-way classification: constructive | destructive | independent.
 
 4) FH Envelope Percentile
    - Information-theoretic / model-free: position of J_obs within the
-     Fréchet–Hoeffding envelope [FH_lower, FH_upper]; returns y in [0, 1].
+     Fréchet-Hoeffding envelope [FH_lower, FH_upper]; returns y in [0, 1].
    - 3-way classification via a neutral band centered at 0.5.
 
 All four yield per-configuration classifications that you can compare
@@ -59,13 +59,13 @@ We also require consistency for the observed point:
     |(tpr - fpr) - j_obs| <= 1e-6
 
 -------------------------------------------------------------------------------
-WHEN YOUDEN’S J OUTPERFORMS ALTERNATIVES (for the paper)
+WHEN YOUDEN'S J OUTPERFORMS ALTERNATIVES (for the paper)
 -------------------------------------------------------------------------------
 
-- Deployment typically constrains FPR to a narrow policy band (e.g., ≤ 0.06).
+- Deployment typically constrains FPR to a narrow policy band (e.g., <= 0.06).
   Euclidean Distance treats TPR and FPR symmetrically over the full ROC
   geometry, which can over-reward TPR gains that slightly violate policy FPR.
-  J = TPR − FPR is a *linear* trade-off directly interpretable at a single
+  J = TPR - FPR is a *linear* trade-off directly interpretable at a single
   operating point and respects such policy windows more transparently.
 
 - Cost-Weighted Error needs accurate (c_FP, c_FN). If these are unknown or
@@ -160,8 +160,9 @@ EXAMPLE
 from __future__ import annotations
 
 import typing
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -172,10 +173,10 @@ from sklearn.metrics import cohen_kappa_score
 # ---------------------------------------------------------------------------
 
 ClassificationLabel = Literal["constructive", "destructive", "independent"]
-_ALLOWED_CLASS_TUPLE: Tuple[str, ...] = typing.get_args(ClassificationLabel)
+_ALLOWED_CLASS_TUPLE: tuple[str, ...] = typing.get_args(ClassificationLabel)
 _ALLOWED_CLASS_SET = set(_ALLOWED_CLASS_TUPLE)
 
-_DATAFRAME_COLUMNS: List[str] = [
+_DATAFRAME_COLUMNS: list[str] = [
     "config_name",
     "tpr",
     "fpr",
@@ -237,11 +238,11 @@ class MetricResult:
 
     metric_name: str
     score: float
-    baseline_score: Optional[float]
-    delta: Optional[float]
+    baseline_score: float | None
+    delta: float | None
     classification: ClassificationLabel
-    confidence_interval: Optional[Tuple[float, float]] = None
-    notes: Optional[str] = None
+    confidence_interval: tuple[float, float] | None = None
+    notes: str | None = None
 
     def __post_init__(self) -> None:
         if self.classification not in _ALLOWED_CLASS_SET:
@@ -361,14 +362,14 @@ def independence_delta_j(
     j_independent: float,
 ) -> float:
     """
-    Compute ΔJ = J_obs − J_indep (no classification here).
+    Compute ΔJ = J_obs - J_indep (no classification here).
 
     Parameters
     ----------
     j_observed : float
-        Observed Youden’s J at the composition operating point.
+        Observed Youden's J at the composition operating point.
     j_independent : float
-        Independence-baseline Youden’s J.
+        Independence-baseline Youden's J.
 
     Returns
     -------
@@ -386,9 +387,9 @@ def fh_envelope_percentile(
     fh_upper: float,
     *,
     clip_outside: bool = True,
-) -> Tuple[float, Optional[str]]:
+) -> tuple[float, str | None]:
     """
-    Position of J_obs within FH envelope: y = (J_obs − FH_lo) / (FH_hi − FH_lo).
+    Position of J_obs within FH envelope: y = (J_obs - FH_lo) / (FH_hi - FH_lo).
 
     Handles degenerate/invalid envelopes and out-of-envelope observations.
 
@@ -429,7 +430,7 @@ def fh_envelope_percentile(
         return 0.5, "fh_degenerate"
 
     y = (j_obs_f - fh_lo) / (fh_hi - fh_lo)
-    note: Optional[str] = None
+    note: str | None = None
 
     if y < 0.0:
         if clip_outside:
@@ -505,7 +506,7 @@ def _apply_multiple_comparison_correction(
     fh_bound: float,
     method_count: int,
     correction: str = "none",
-) -> Tuple[float, float, float, float]:
+) -> tuple[float, float, float, float]:
     """
     Apply a conservative Bonferroni-style adjustment to decision thresholds.
 
@@ -560,7 +561,7 @@ def _apply_multiple_comparison_correction(
     return thr_j, thr_e, thr_c, fh_bound_corrected
 
 
-def _validate_record(cfg: str, rec: Mapping[str, Any]) -> Dict[str, float]:
+def _validate_record(cfg: str, rec: Mapping[str, Any]) -> dict[str, float]:
     """
     Sanity checks and normalization for a single configuration record.
 
@@ -651,7 +652,7 @@ def _iter_config_metrics(
     cost_fn: float,
     multiple_comparison_correction: str,
     include_delta_j_as_method: bool,
-) -> Iterable[Tuple[str, Dict[str, float], List[MetricResult]]]:
+) -> Iterable[tuple[str, dict[str, float], list[MetricResult]]]:
     """
     Core iterator that validates inputs, applies thresholds/corrections, and
     yields per-configuration metric results.
@@ -698,7 +699,7 @@ def _iter_config_metrics(
         fh_lower = vals["fh_lower"]
         fh_upper = vals["fh_upper"]
 
-        metrics: List[MetricResult] = []
+        metrics: list[MetricResult] = []
 
         # 1) ΔJ (higher is better)
         delta_j = independence_delta_j(j_obs, j_indep)
@@ -786,7 +787,7 @@ def _iter_config_metrics(
 
 
 # ---------------------------------------------------------------------------
-# Public API – structured and DataFrame versions
+# Public API - structured and DataFrame versions
 # ---------------------------------------------------------------------------
 
 
@@ -801,7 +802,7 @@ def compare_all_metrics_structured(
     cost_fn: float = 1.0,
     multiple_comparison_correction: str = "none",
     include_delta_j_as_method: bool = False,
-) -> Dict[str, List[MetricResult]]:
+) -> dict[str, list[MetricResult]]:
     """
     Structured version of compare_all_metrics.
 
@@ -835,9 +836,9 @@ def compare_all_metrics_structured(
     if not config_results:
         return {}
 
-    out: Dict[str, List[MetricResult]] = {}
+    out: dict[str, list[MetricResult]] = {}
 
-    for cfg_name, vals, metrics in _iter_config_metrics(
+    for cfg_name, _vals, metrics in _iter_config_metrics(
         config_results=config_results,
         threshold_j=threshold_j,
         threshold_euclid=threshold_euclid,
@@ -906,7 +907,7 @@ def compare_all_metrics(
     if not config_results:
         return pd.DataFrame(columns=_DATAFRAME_COLUMNS)
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
 
     for cfg_name, vals, metrics in _iter_config_metrics(
         config_results=config_results,
@@ -919,7 +920,7 @@ def compare_all_metrics(
         multiple_comparison_correction=multiple_comparison_correction,
         include_delta_j_as_method=include_delta_j_as_method,
     ):
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "config_name": cfg_name,
             "tpr": vals["tpr"],
             "fpr": vals["fpr"],
@@ -981,7 +982,7 @@ def cohen_kappa(
     method2_classes: Iterable[str],
 ) -> float:
     """
-    Cohen’s κ agreement between two classification arrays.
+    Cohen's κ agreement between two classification arrays.
 
     Parameters
     ----------
@@ -993,7 +994,7 @@ def cohen_kappa(
     Returns
     -------
     float
-        κ in [−1, 1].  1.0 = perfect agreement; 0.0 = chance-level.
+        κ in [-1, 1].  1.0 = perfect agreement; 0.0 = chance-level.
     """
     m1 = list(method1_classes)
     m2 = list(method2_classes)
@@ -1005,7 +1006,7 @@ def cohen_kappa(
     return float(cohen_kappa_score(m1, m2))
 
 
-def kappa_matrix(df: pd.DataFrame, class_cols: List[str]) -> pd.DataFrame:
+def kappa_matrix(df: pd.DataFrame, class_cols: list[str]) -> pd.DataFrame:
     """
     Pairwise κ matrix over multiple method classification columns.
 
@@ -1100,7 +1101,7 @@ def analyze_disagreements(df: pd.DataFrame) -> pd.DataFrame:
     if sub.empty:
         return sub
 
-    patterns: List[str] = []
+    patterns: list[str] = []
     for _, r in sub.iterrows():
         parts = [
             f"ΔJ:{r['youden_class'][0].upper()}",

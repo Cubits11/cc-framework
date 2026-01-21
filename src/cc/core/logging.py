@@ -44,7 +44,7 @@ Notes
     * **Strict mode** to raise on soft failures.
     * **Encryption option** for backups (AES-Fernet), requires stable key via param/env.
     * **Levels** support (debug/info/warning/error) for log calls, recorded under meta.extra["level"].
-- Use `cc.cartographer.audit` directly for new code if you don’t need the compatibility layer.
+- Use `cc.cartographer.audit` directly for new code if you don't need the compatibility layer.
 - Environment config: LOG_STRICT_MODE=1, LOG_PROMETHEUS=1, LOG_ENC_KEY=base64key, etc.
 - Research insights: Tamper-proof via external alerts (hook), encryption (new), levels for filtering (new), fail-soft defaults (adjusted).
 
@@ -90,10 +90,11 @@ import sys
 import threading
 import time
 from collections import deque
-from contextlib import asynccontextmanager, contextmanager
+from collections.abc import Iterable, Sequence
+from contextlib import asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable
 
 try:
     from prometheus_client import Counter, Gauge  # Optional metrics
@@ -114,10 +115,10 @@ from cc.cartographer import audit
 
 __all__ = [
     "ChainedJSONLLogger",
-    "audit_context",
-    "aaudit_context",
-    "aaudit_context",
     "LoggingError",
+    "aaudit_context",
+    "aaudit_context",
+    "audit_context",
 ]
 
 SCHEMA_ID_DEFAULT = "core/logging.v5"  # Upgraded for changes
@@ -142,7 +143,7 @@ if PROMETHEUS_AVAILABLE:
 # A stable per-process session id (pid + monotonic start + randomness hashed)
 _session_start_perf = time.perf_counter()
 _session_id = hashlib.sha256(
-    f"{os.getpid()}:{_session_start_perf:.9f}:{secrets.token_hex(8)}".encode("utf-8")
+    f"{os.getpid()}:{_session_start_perf:.9f}:{secrets.token_hex(8)}".encode()
 ).hexdigest()[:16]
 
 
@@ -155,7 +156,7 @@ def _now_unix() -> float:
     return float(time.time())
 
 
-def _now_iso(ts: Optional[float] = None) -> str:
+def _now_iso(ts: float | None = None) -> str:
     """ISO-8601 in UTC with 'Z' suffix; millisecond precision."""
     if ts is None:
         ts = _now_unix()
@@ -167,14 +168,14 @@ def _now_iso(ts: Optional[float] = None) -> str:
     )
 
 
-_git_sha_cache: Optional[str] = None
+_git_sha_cache: str | None = None
 
 
 def _is_valid_short_sha(s: str) -> bool:
     return bool(re.fullmatch(r"[0-9a-fA-F]{12}", s))
 
 
-def _detect_git_sha(cwd: Optional[Path] = None) -> Optional[str]:
+def _detect_git_sha(cwd: Path | None = None) -> str | None:
     """Resolve git SHA once (env `GIT_SHA` wins if valid), else `git rev-parse --short=12 HEAD`."""
     global _git_sha_cache
     if _git_sha_cache is not None:
@@ -196,10 +197,7 @@ def _detect_git_sha(cwd: Optional[Path] = None) -> Optional[str]:
             timeout=1.0,
         )
         stripped = out.strip()
-        if _is_valid_short_sha(stripped):
-            _git_sha_cache = stripped.lower()
-        else:
-            _git_sha_cache = None
+        _git_sha_cache = stripped.lower() if _is_valid_short_sha(stripped) else None
     except Exception:
         _git_sha_cache = None
     return _git_sha_cache
@@ -293,7 +291,7 @@ def _ensure_json(obj: Any, auto_sanitize: bool) -> Any:
     return obj
 
 
-def _canonical_dumps(obj: Dict[str, Any], auto_sanitize: bool) -> str:
+def _canonical_dumps(obj: dict[str, Any], auto_sanitize: bool) -> str:
     """
     Return a canonical JSON string (sorted keys, compact separators, no NaN/Inf).
 
@@ -404,7 +402,7 @@ def _deep_redact(
         return s
 
     if isinstance(obj, dict):
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for k, v in obj.items():
             sk = str(k)
             if _should_redact_key(sk):
@@ -438,8 +436,8 @@ def _deep_redact(
     return obj
 
 
-def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[re.Pattern]:
-    out: List[re.Pattern] = []
+def _compile_patterns(pats: Sequence[str] | None, strict_mode: bool) -> list[re.Pattern]:
+    out: list[re.Pattern] = []
     if not pats:
         return out
     for p in pats:
@@ -458,7 +456,7 @@ def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[
 # ---------------------------------------------------------------------------
 
 
-def _safe_pip_freeze() -> List[str]:
+def _safe_pip_freeze() -> list[str]:
     """
     Best-effort 'pip freeze'.
 
@@ -481,7 +479,7 @@ def _safe_pip_freeze() -> List[str]:
         return []
 
 
-def _capture_env_snapshot() -> Dict[str, Any]:
+def _capture_env_snapshot() -> dict[str, Any]:
     """
     Capture a lightweight, JSON-serializable environment snapshot.
 
@@ -509,11 +507,11 @@ class EnvelopeMeta:
     ts_iso: str
     host: str
     pid: int
-    git_sha: Optional[str]
+    git_sha: str | None
     session_id: str
-    seed: Optional[int]
-    env: Optional[Dict[str, Any]]
-    extra: Dict[str, Any]
+    seed: int | None
+    env: dict[str, Any] | None
+    extra: dict[str, Any]
 
 
 class ChainedJSONLLogger:
@@ -596,7 +594,7 @@ class ChainedJSONLLogger:
     def __init__(
         self,
         path: str | Path,
-        default_seed: Optional[int] = None,
+        default_seed: int | None = None,
         enable_lock: bool = True,
         verify_on_write: bool = False,
         auto_sanitize: bool = False,
@@ -604,17 +602,17 @@ class ChainedJSONLLogger:
         schema_id: str = SCHEMA_ID_DEFAULT,
         capture_env: bool = False,
         fsync_on_write: bool = False,
-        max_bytes: Optional[int] = None,
+        max_bytes: int | None = None,
         backup_count: int = 5,
         compress_backups: bool = False,
         encrypt_backups: bool = False,
-        encryption_key: Optional[bytes] = None,
-        redact_keys: Optional[Sequence[str]] = None,
-        redact_patterns: Optional[Sequence[str]] = None,
-        redact_exclude_keys: Optional[Sequence[str]] = None,
+        encryption_key: bytes | None = None,
+        redact_keys: Sequence[str] | None = None,
+        redact_patterns: Sequence[str] | None = None,
+        redact_exclude_keys: Sequence[str] | None = None,
         redact_mask: str = "***",
         enable_prometheus: bool = False,
-        post_log_hook: Optional[Callable[[str], None]] = None,
+        post_log_hook: Callable[[str], None] | None = None,
         strict_mode: bool = False,
         lock_timeout: float = 5.0,
         lock_retry_delay: float = 0.1,
@@ -677,12 +675,11 @@ class ChainedJSONLLogger:
                 # In non-strict mode, silently disable env key
                 encryption_key = None
 
-        if encrypt_backups and ENCRYPTION_AVAILABLE:
-            if encryption_key is None:
-                if self.strict_mode:
-                    raise LoggingError("encrypt_backups=True but no encryption_key provided")
-                # soft-disable encryption if key missing and not strict
-                encrypt_backups = False
+        if encrypt_backups and ENCRYPTION_AVAILABLE and encryption_key is None:
+            if self.strict_mode:
+                raise LoggingError("encrypt_backups=True but no encryption_key provided")
+            # soft-disable encryption if key missing and not strict
+            encrypt_backups = False
 
         self.encrypt_backups = bool(encrypt_backups and ENCRYPTION_AVAILABLE)
         self.enc_key = encryption_key if self.encrypt_backups else None
@@ -696,7 +693,7 @@ class ChainedJSONLLogger:
         # User-supplied patterns (may be None) + built-in PII patterns
         compiled_user = _compile_patterns(redact_patterns, self.strict_mode)
         compiled_builtin = [re.compile(p, re.IGNORECASE) for p in PII_PATTERNS_DEFAULT]
-        self.redact_patterns: List[re.Pattern] = compiled_user + compiled_builtin
+        self.redact_patterns: list[re.Pattern] = compiled_user + compiled_builtin
         self.redact_mask = redact_mask
 
         # ------------------------------------------------------------------
@@ -705,7 +702,7 @@ class ChainedJSONLLogger:
         self.enable_prometheus = bool(enable_prometheus and PROMETHEUS_AVAILABLE)
         if self.enable_prometheus:
             # Metrics init must be best-effort: never break logger construction,
-            # even in strict_mode. If metrics are misconfigured, we’ll surface it
+            # even in strict_mode. If metrics are misconfigured, we'll surface it
             # on actual updates in log() / _maybe_rotate().
             try:
                 LOG_SIZE.set(0)  # Init size gauge
@@ -727,13 +724,11 @@ class ChainedJSONLLogger:
         self._process_lock_depth: int = 0
 
         # Head SHA (chain tip), if any previous records exist
-        self.last_sha: Optional[str] = audit.tail_sha(str(self.path))
+        self.last_sha: str | None = audit.tail_sha(str(self.path))
 
         # Async semaphore for async API
         if async_concurrency_limit > 0:
-            self._async_sem: Optional[asyncio.Semaphore] = asyncio.Semaphore(
-                async_concurrency_limit
-            )
+            self._async_sem: asyncio.Semaphore | None = asyncio.Semaphore(async_concurrency_limit)
         else:
             self._async_sem = None
 
@@ -746,8 +741,8 @@ class ChainedJSONLLogger:
 
     def _build_meta(
         self,
-        extra_meta: Optional[Dict[str, Any]],
-        seed: Optional[int],
+        extra_meta: dict[str, Any] | None,
+        seed: int | None,
     ) -> EnvelopeMeta:
         ts = _now_unix()
         return EnvelopeMeta(
@@ -763,7 +758,7 @@ class ChainedJSONLLogger:
             extra=(extra_meta or {}),
         )
 
-    def _maybe_rotate(self) -> Optional[str]:
+    def _maybe_rotate(self) -> str | None:
         """Rotate the underlying file if size >= max_bytes. Returns rotated filename (or None)."""
         if self.max_bytes is None:
             return None
@@ -847,9 +842,9 @@ class ChainedJSONLLogger:
 
     def _redact(
         self,
-        payload: Dict[str, Any],
-        extra: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        payload: dict[str, Any],
+        extra: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         if not self.redact_keys and not self.redact_patterns:
             return payload, extra
         pay = _deep_redact(
@@ -868,7 +863,7 @@ class ChainedJSONLLogger:
         )
         return pay, ext
 
-    def _make_record(self, payload: Dict[str, Any], meta: EnvelopeMeta) -> Dict[str, Any]:
+    def _make_record(self, payload: dict[str, Any], meta: EnvelopeMeta) -> dict[str, Any]:
         """
         Construct the canonical envelope around `payload`.
 
@@ -895,7 +890,7 @@ class ChainedJSONLLogger:
         redacted_extra = _ensure_json(redacted_extra, self.auto_sanitize)
 
         # 3) Build the envelope using sanitized copies
-        rec: Dict[str, Any] = {
+        rec: dict[str, Any] = {
             "meta": {
                 "schema": meta.schema,
                 "ts_unix": meta.ts_unix,
@@ -991,12 +986,12 @@ class ChainedJSONLLogger:
 
     def log(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         *,
         level: str = "info",
-        seed: Optional[int] = None,
-        extra_meta: Optional[Dict[str, Any]] = None,
-        verify_on_write: Optional[bool] = None,
+        seed: int | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        verify_on_write: bool | None = None,
     ) -> str:
         """
         Append a record to the audit chain.
@@ -1069,10 +1064,8 @@ class ChainedJSONLLogger:
                         )
                     except Exception as e:
                         if self.enable_prometheus:
-                            try:
+                            with suppress(Exception):
                                 LOG_ERRORS.labels(type="rotation_marker").inc()
-                            except Exception:
-                                pass
                         if self.strict_mode:
                             raise LoggingError(f"Rotation marker failed: {e}") from e
                         # non-strict: swallow marker failure and continue
@@ -1080,7 +1073,7 @@ class ChainedJSONLLogger:
                 # ----------------------------------------------------------
                 # 2) Build envelope meta (level is defaulted, never overwritten)
                 # ----------------------------------------------------------
-                meta_extra: Dict[str, Any] = dict(extra_meta) if extra_meta else {}
+                meta_extra: dict[str, Any] = dict(extra_meta) if extra_meta else {}
                 meta_extra.setdefault("level", level)
                 meta = self._build_meta(meta_extra, seed)
 
@@ -1107,10 +1100,8 @@ class ChainedJSONLLogger:
                         audit.verify_chain(str(self.path))
                     except Exception as e:
                         if self.enable_prometheus:
-                            try:
+                            with suppress(Exception):
                                 LOG_ERRORS.labels(type="verify").inc()
-                            except Exception:
-                                pass
                         raise LoggingError(
                             f"Audit chain verification failed post-append: {e}"
                         ) from e
@@ -1127,10 +1118,8 @@ class ChainedJSONLLogger:
                             size = 0
                         LOG_SIZE.set(size)
                     except Exception as e:
-                        try:
+                        with suppress(Exception):
                             LOG_ERRORS.labels(type="metrics").inc()
-                        except Exception:
-                            pass
                         if self.strict_mode:
                             raise LoggingError(f"Prometheus metrics update failed: {e}") from e
                         # non-strict: swallow metrics failure
@@ -1148,14 +1137,14 @@ class ChainedJSONLLogger:
         self,
         event: str,
         *,
-        fields: Optional[Dict[str, Any]] = None,
+        fields: dict[str, Any] | None = None,
         level: str = "info",
-        seed: Optional[int] = None,
-        extra_meta: Optional[Dict[str, Any]] = None,
-        verify_on_write: Optional[bool] = None,
+        seed: int | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        verify_on_write: bool | None = None,
     ) -> str:
         """Convenience: wrap an 'event' with arbitrary fields into payload."""
-        payload: Dict[str, Any] = {"event": event}
+        payload: dict[str, Any] = {"event": event}
         if fields:
             payload.update(fields)
         return self.log(
@@ -1168,20 +1157,20 @@ class ChainedJSONLLogger:
 
     def log_many(
         self,
-        payloads: Iterable[Dict[str, Any]],
+        payloads: Iterable[dict[str, Any]],
         *,
         level: str = "info",
-        seed: Optional[int] = None,
-        extra_meta: Optional[Dict[str, Any]] = None,
-        verify_on_write: Optional[bool] = None,
-    ) -> List[str]:
+        seed: int | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        verify_on_write: bool | None = None,
+    ) -> list[str]:
         """
         Append many payloads; convenience wrapper over `log`.
 
         This does *not* provide transactional semantics: each call to `log` is
         independent, with its own locking/rotation/verification.
         """
-        shas: List[str] = []
+        shas: list[str] = []
         for p in payloads:
             shas.append(
                 self.log(
@@ -1194,7 +1183,7 @@ class ChainedJSONLLogger:
             )
         return shas
 
-    def verify_chain_integrity(self) -> Tuple[bool, Optional[str]]:
+    def verify_chain_integrity(self) -> tuple[bool, str | None]:
         """
         Verify the entire chain for tampering.
 
@@ -1208,7 +1197,7 @@ class ChainedJSONLLogger:
         except Exception as e:
             return False, str(e)
 
-    def current_head(self) -> Optional[str]:
+    def current_head(self) -> str | None:
         """Return the current chain head SHA (None if file empty)."""
         try:
             self.last_sha = audit.tail_sha(str(self.path))
@@ -1216,7 +1205,7 @@ class ChainedJSONLLogger:
         except Exception:
             return self.last_sha
 
-    def tail(self, n: int = 10) -> List[Dict[str, Any]]:
+    def tail(self, n: int = 10) -> list[dict[str, Any]]:
         """
         Return the last `n` JSONL records as dicts (best-effort; reads file normally).
 
@@ -1226,7 +1215,7 @@ class ChainedJSONLLogger:
         try:
             with self.path.open("r", encoding="utf-8") as f:
                 dq = deque(f, maxlen=n)
-            out: List[Dict[str, Any]] = []
+            out: list[dict[str, Any]] = []
             for line in dq:
                 line = line.strip()
                 if not line:
@@ -1244,12 +1233,12 @@ class ChainedJSONLLogger:
 
     async def alog(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         *,
         level: str = "info",
-        seed: Optional[int] = None,
-        extra_meta: Optional[Dict[str, Any]] = None,
-        verify_on_write: Optional[bool] = None,
+        seed: int | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        verify_on_write: bool | None = None,
     ) -> str:
         """Async wrapper for `log`, using an executor and optional concurrency limit."""
         if self._async_sem:
@@ -1280,11 +1269,11 @@ class ChainedJSONLLogger:
         self,
         event: str,
         *,
-        fields: Optional[Dict[str, Any]] = None,
+        fields: dict[str, Any] | None = None,
         level: str = "info",
-        seed: Optional[int] = None,
-        extra_meta: Optional[Dict[str, Any]] = None,
-        verify_on_write: Optional[bool] = None,
+        seed: int | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        verify_on_write: bool | None = None,
     ) -> str:
         """Async wrapper for `log_event`."""
         if self._async_sem:
@@ -1315,13 +1304,13 @@ class ChainedJSONLLogger:
 
     async def alog_many(
         self,
-        payloads: Iterable[Dict[str, Any]],
+        payloads: Iterable[dict[str, Any]],
         *,
         level: str = "info",
-        seed: Optional[int] = None,
-        extra_meta: Optional[Dict[str, Any]] = None,
-        verify_on_write: Optional[bool] = None,
-    ) -> List[str]:
+        seed: int | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        verify_on_write: bool | None = None,
+    ) -> list[str]:
         """Async wrapper for `log_many`."""
         if self._async_sem:
             async with self._async_sem:
@@ -1384,7 +1373,7 @@ def audit_context(
     start_wall = _now_unix()
     start_perf = time.perf_counter()
     op_id = hashlib.sha256(
-        f"{operation}:{start_wall:.6f}:{os.getpid()}:{_session_id}".encode("utf-8")
+        f"{operation}:{start_wall:.6f}:{os.getpid()}:{_session_id}".encode()
     ).hexdigest()[:16]
 
     logger.log_event(
@@ -1440,7 +1429,7 @@ async def aaudit_context(
     start_wall = _now_unix()
     start_perf = time.perf_counter()
     op_id = hashlib.sha256(
-        f"{operation}:{start_wall:.6f}:{os.getpid()}:{_session_id}".encode("utf-8")
+        f"{operation}:{start_wall:.6f}:{os.getpid()}:{_session_id}".encode()
     ).hexdigest()[:16]
 
     await logger.alog_event(

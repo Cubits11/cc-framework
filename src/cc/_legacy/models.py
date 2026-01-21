@@ -10,7 +10,7 @@ Date: 2025-08-27
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -28,7 +28,7 @@ class AttackResult:
     timestamp: float
     session_id: str = ""
     attack_strategy: str = ""
-    utility_score: Optional[float] = None
+    utility_score: float | None = None
 
 
 @dataclass
@@ -36,7 +36,7 @@ class GuardrailSpec:
     """Specification for a guardrail configuration"""
 
     name: str
-    params: Dict[str, Any]
+    params: dict[str, Any]
     calibration_fpr_target: float = 0.05
     calibration_data_hash: str = ""
     version: str = "1.0"
@@ -47,8 +47,8 @@ class WorldConfig:
     """Configuration for a world in two-world protocol"""
 
     world_id: int  # 0 or 1
-    guardrail_stack: List[GuardrailSpec]
-    utility_profile: Dict[str, Any]
+    guardrail_stack: list[GuardrailSpec]
+    utility_profile: dict[str, Any]
     env_hash: str = ""
     baseline_success_rate: float = 0.6
 
@@ -59,8 +59,8 @@ class ExperimentConfig:
 
     experiment_id: str
     n_sessions: int
-    attack_strategies: List[str]
-    guardrail_configs: Dict[str, List[GuardrailSpec]]
+    attack_strategies: list[str]
+    guardrail_configs: dict[str, list[GuardrailSpec]]
     utility_target: float = 0.9
     utility_tolerance: float = 0.02
     random_seed: int = 42
@@ -73,9 +73,9 @@ class CCResult:
     j_empirical: float
     cc_max: float
     delta_add: float
-    cc_multiplicative: Optional[float] = None
-    confidence_interval: Optional[tuple] = None
-    bootstrap_samples: Optional[np.ndarray] = None
+    cc_multiplicative: float | None = None
+    confidence_interval: tuple | None = None
+    bootstrap_samples: np.ndarray | None = None
     n_sessions: int = 0
 
 
@@ -84,6 +84,6 @@ class AttackStrategy:
     """Configuration for attack strategy"""
 
     name: str
-    params: Dict[str, Any]
-    vocabulary: List[str] = field(default_factory=list)
+    params: dict[str, Any]
+    vocabulary: list[str] = field(default_factory=list)
     success_threshold: float = 0.5

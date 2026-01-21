@@ -7,10 +7,11 @@ import argparse
 import hashlib
 import json
 import subprocess
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -35,15 +36,15 @@ class BenchConfig:
     dataset: str
     adapters: Sequence[str]
     composition: str
-    composition_parameter: Optional[float]
+    composition_parameter: float | None
     prompt_field: str
-    response_field: Optional[str]
+    response_field: str | None
     label_field: str
     review_policy: str
     seed: int
 
 
-def main(argv: Optional[Iterable[str]] = None) -> None:
+def main(argv: Iterable[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="Run CC guardrail adapter benchmark.")
     ap.add_argument("--dataset", required=True, help="Dataset path (CSV or JSONL).")
     ap.add_argument("--adapters", required=True, help="Comma-separated adapter names.")
@@ -125,12 +126,12 @@ def _hash_config(cfg: BenchConfig) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _hash_adapter_config(config: Dict[str, Any]) -> str:
+def _hash_adapter_config(config: dict[str, Any]) -> str:
     payload = json.dumps(config, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
-def _git_sha() -> Optional[str]:
+def _git_sha() -> str | None:
     try:
         return (
             subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
@@ -143,14 +144,14 @@ def _git_sha() -> Optional[str]:
 
 def _init_adapters(
     adapters_arg: str,
-    config_path: Optional[str],
-) -> Tuple[List[GuardrailAdapter], Dict[str, Dict[str, Any]]]:
+    config_path: str | None,
+) -> tuple[list[GuardrailAdapter], dict[str, dict[str, Any]]]:
     config = {}
     if config_path:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
     adapters = []
-    adapter_configs: Dict[str, Dict[str, Any]] = {}
+    adapter_configs: dict[str, dict[str, Any]] = {}
     for name in [a.strip() for a in adapters_arg.split(",") if a.strip()]:
         cls = ADAPTER_REGISTRY.get(name)
         if cls is None:
@@ -161,7 +162,7 @@ def _init_adapters(
     return adapters, adapter_configs
 
 
-def load_dataset(path: Path) -> List[Dict[str, Any]]:
+def load_dataset(path: Path) -> list[dict[str, Any]]:
     if path.suffix.lower() == ".csv":
         return pd.read_csv(path).to_dict(orient="records")
     if path.suffix.lower() in {".jsonl", ".json"}:
@@ -177,20 +178,20 @@ def load_dataset(path: Path) -> List[Dict[str, Any]]:
 
 
 def run_benchmark(
-    dataset: Sequence[Dict[str, Any]],
+    dataset: Sequence[dict[str, Any]],
     adapters: Sequence[GuardrailAdapter],
     composition: str,
     prompt_field: str,
-    response_field: Optional[str],
+    response_field: str | None,
     label_field: str,
     review_policy: str,
-    run_meta: Dict[str, Any],
+    run_meta: dict[str, Any],
     out_path: Path,
-    audit_out_path: Optional[Path] = None,
-) -> Dict[str, Any]:
-    y_true: List[int] = []
-    per_adapter_preds: Dict[str, List[int]] = {a.name: [] for a in adapters}
-    composed_preds: List[int] = []
+    audit_out_path: Path | None = None,
+) -> dict[str, Any]:
+    y_true: list[int] = []
+    per_adapter_preds: dict[str, list[int]] = {a.name: [] for a in adapters}
+    composed_preds: list[int] = []
 
     for idx, item in enumerate(dataset):
         prompt = str(item.get(prompt_field, ""))
@@ -202,8 +203,8 @@ def run_benchmark(
         label = _normalize_label(item.get(label_field))
         y_true.append(label)
 
-        decisions: Dict[str, Decision] = {}
-        blocked_flags: List[bool] = []
+        decisions: dict[str, Decision] = {}
+        blocked_flags: list[bool] = []
         for adapter in adapters:
             decision = adapter.check(prompt, response, metadata=item)
             decisions[adapter.name] = decision
@@ -285,11 +286,11 @@ def _compose(flags: Sequence[bool], composition: str) -> bool:
 
 def _summarize(
     y_true: Sequence[int],
-    per_adapter_preds: Dict[str, Sequence[int]],
+    per_adapter_preds: dict[str, Sequence[int]],
     composed_preds: Sequence[int],
     composition: str,
-) -> Dict[str, Any]:
-    adapter_metrics: Dict[str, Any] = {}
+) -> dict[str, Any]:
+    adapter_metrics: dict[str, Any] = {}
     for name, preds in per_adapter_preds.items():
         conf = confusion_from_labels(y_true, preds, pos_label=1)
         rates = rates_from_confusion(conf)
@@ -324,9 +325,9 @@ def _summarize(
     return metrics
 
 
-def _disagreement_rates(per_adapter_preds: Dict[str, Sequence[int]]) -> Dict[str, float]:
+def _disagreement_rates(per_adapter_preds: dict[str, Sequence[int]]) -> dict[str, float]:
     names = list(per_adapter_preds.keys())
-    rates: Dict[str, float] = {}
+    rates: dict[str, float] = {}
     for i in range(len(names)):
         for j in range(i + 1, len(names)):
             a, b = names[i], names[j]
@@ -335,7 +336,7 @@ def _disagreement_rates(per_adapter_preds: Dict[str, Sequence[int]]) -> Dict[str
             if not preds_a:
                 rates[f"{a}__{b}"] = 0.0
                 continue
-            diff = sum(int(pa != pb) for pa, pb in zip(preds_a, preds_b))
+            diff = sum(int(pa != pb) for pa, pb in zip(preds_a, preds_b, strict=False))
             rates[f"{a}__{b}"] = diff / len(preds_a)
     return rates
 

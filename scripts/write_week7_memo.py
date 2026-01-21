@@ -7,7 +7,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
@@ -21,17 +20,17 @@ from cc.analysis.week7_utils import (
 )
 
 
-def load_point(path: Path) -> Dict:
+def load_point(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def load_points(directory: Path) -> List[Dict]:
+def load_points(directory: Path) -> list[dict]:
     return [load_point(p) for p in sorted(directory.glob("point_*.json"))]
 
 
-def build_summary(points: List[Dict]) -> Dict:
-    point_records: List[PointRecord] = []
+def build_summary(points: list[dict]) -> dict:
+    point_records: list[PointRecord] = []
     for raw in points:
         fh_env = raw.get("fh_envelope", {})
         independence = raw.get("independence", {})
@@ -134,16 +133,16 @@ def build_summary(points: List[Dict]) -> Dict:
     return summary_payload, point_records
 
 
-def format_thresholds(thresholds: Dict[str, float]) -> str:
+def format_thresholds(thresholds: dict[str, float]) -> str:
     return ", ".join(f"{k}={v:.2f}" for k, v in thresholds.items())
 
 
-def write_summary_json(summary: Dict, path: Path) -> None:
+def write_summary_json(summary: dict, path: Path) -> None:
     with path.open("w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2, sort_keys=True)
 
 
-def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None:
+def write_memo(summary: dict, points: list[PointRecord], out_path: Path) -> None:
     regime_counts = summary["regime_counts"]
     ci_table = summary["ci_table"]
 
@@ -177,7 +176,7 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         )
 
     memo_lines = [
-        "# Weeks 6–7 Memo — Scaling, Independence Baselines, and FH Envelope Validation",
+        "# Weeks 6-7 Memo — Scaling, Independence Baselines, and FH Envelope Validation",
         "",
         "## Executive Snapshot",
         "",
@@ -185,7 +184,7 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "",
         "## Abstract",
         "",
-        "This memo documents the scaling of the Week 6 pilot into the Week 7 reproducibility checkpoint. We executed at least 500 episodes per configuration across five seeds, introduced independence baselines, and validated Fréchet–Hoeffding envelopes while propagating Wilson and BCa uncertainty. Calibration remained within the 0.04–0.06 false-positive window, enabling a reproducible pipeline ahead of Gate 2.",
+        "This memo documents the scaling of the Week 6 pilot into the Week 7 reproducibility checkpoint. We executed at least 500 episodes per configuration across five seeds, introduced independence baselines, and validated Fréchet-Hoeffding envelopes while propagating Wilson and BCa uncertainty. Calibration remained within the 0.04-0.06 false-positive window, enabling a reproducible pipeline ahead of Gate 2.",
         "",
         "## Week-6 Results Summary",
         "",
@@ -200,7 +199,7 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "- FH containment: {rate:.1f}% of empirical points inside envelopes.".format(
             rate=summary["fh_containment_rate"] * 100
         ),
-        "- Zero-FP runs: {count} (binomial acceptance via (1−α)^n applies when encountered).".format(
+        "- Zero-FP runs: {count} (binomial acceptance via (1-α)^n applies when encountered).".format(
             count=summary["zero_fp_runs"]
         ),
         "- Constructive examples observed: {c}; independent: {i}; destructive: {d}.".format(
@@ -220,12 +219,12 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "- `write_week7_memo.py`: compiles JSON summaries into the present memo.",
         "",
         "Baselines:",
-        "- OR: 1−∏(1−TPR_i) / 1−∏(1−FPR_i) with stable `log1p`.",
+        "- OR: 1-∏(1-TPR_i) / 1-∏(1-FPR_i) with stable `log1p`.",
         "- AND: ∏TPR_i / ∏FPR_i with direct products guarded for [0,1] bounds.",
         "",
         "FH Envelope:",
-        "- Bounds follow P(∩)∈[max(0,Σm_i-(k−1)),min m_i] and P(∪)∈[max a_i, min(1,Σ a_i)].",
-        "- Mapping to TPR/FPR bands yields J ∈ [TPR_L−FPR_U, TPR_U−FPR_L] with 100% containment. Reference Mini-Paper A Theorem 1 (`theory/fh_bounds.py`).",
+        "- Bounds follow P(n)∈[max(0,Σm_i-(k-1)),min m_i] and P(U)∈[max a_i, min(1,Σ a_i)].",
+        "- Mapping to TPR/FPR bands yields J ∈ [TPR_L-FPR_U, TPR_U-FPR_L] with 100% containment. Reference Mini-Paper A Theorem 1 (`theory/fh_bounds.py`).",
         "",
         "Uncertainty:",
         "- Wilson score for per-world rates; BCa bootstrap for Δ and J selected over percentile to correct bias/skew.",
@@ -247,7 +246,7 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "- Independence containment = {rate:.1f}% (target 100%).".format(
             rate=summary["independence_containment_rate"] * 100
         ),
-        "- 25/25 pytest checks (categories A–E) cover FH sharpness, independence, uncertainty, regimes, and robustness.",
+        "- 25/25 pytest checks (categories A-E) cover FH sharpness, independence, uncertainty, regimes, and robustness.",
         "",
         "## Interpretation & Regime Classification",
         "",
@@ -256,11 +255,7 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
             i=regime_counts["independent"],
             d=regime_counts["destructive"],
         ),
-        "- Mean ΔJ spans [{mn:.3f}, {mx:.3f}] with CC_L reported when denominators ≥0.10 (D-lamp suppresses {count} cases).".format(
-            mn=min(p.delta_j for p in points),
-            mx=max(p.delta_j for p in points),
-            count=sum(1 for p in points if p.d_lamp),
-        ),
+        f"- Mean ΔJ spans [{min(p.delta_j for p in points):.3f}, {max(p.delta_j for p in points):.3f}] with CC_L reported when denominators ≥0.10 (D-lamp suppresses {sum(1 for p in points if p.d_lamp)} cases).",
         "- Empirical J remains within the independence envelopes for every grid point.",
         "",
         "## Reproducibility Notes (Checkpoint Preview)",
@@ -268,11 +263,11 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "- Runtime: <24h projected for 5k episodes; current synthetic run completes in under 10 minutes on dev hardware.",
         "- Deterministic seeds recorded: {seeds}.".format(seeds=summary["seeds"]),
         "- `make week7-run` executes the full pipeline end-to-end.",
-        "- Planned Week 8–9 tasks: merge summaries → `week7_summary.json`, validate memo autofill, begin Gate 2 reproducibility report.",
+        "- Planned Week 8-9 tasks: merge summaries → `week7_summary.json`, validate memo autofill, begin Gate 2 reproducibility report.",
         "",
         "## Limitations & Forward Plan",
         "",
-        "- Grid vs. episode scaling trade-off: current grid fixed to maintain runtime; plan to extend to 5k–10k episodes while overlaying FH bands directly on regime maps.",
+        "- Grid vs. episode scaling trade-off: current grid fixed to maintain runtime; plan to extend to 5k-10k episodes while overlaying FH bands directly on regime maps.",
         "- Additional theoretical validation will leverage Theorem 1 Part 2 from the extended FH proof set.",
         "",
         "## Acceptance Gates Summary",

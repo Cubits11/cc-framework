@@ -9,9 +9,9 @@ This module aligns with the existing CC-Framework implementation:
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -36,8 +36,8 @@ class CCAnalysis:
     """Results of a CC analysis for a guardrail pair."""
 
     cc_max: float
-    cc_lower: Optional[float]
-    cc_upper: Optional[float]
+    cc_lower: float | None
+    cc_upper: float | None
     regime: Regime
     confidence: float
 
@@ -94,7 +94,7 @@ def compute_fh_cc_bounds(
     tpr: Sequence[float],
     fpr: Sequence[float],
     composition: str,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Compute FH CC bounds for a composition given per-rail TPR/FPR.
 
@@ -132,8 +132,8 @@ def classify_regime(
     cc_max_value: float,
     j_a: float,
     j_b: float,
-    cc_lower: Optional[float] = None,
-    cc_upper: Optional[float] = None,
+    cc_lower: float | None = None,
+    cc_upper: float | None = None,
     threshold_low: float = 0.95,
     threshold_high: float = 1.05,
 ) -> Regime:

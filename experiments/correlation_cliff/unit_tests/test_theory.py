@@ -4,7 +4,7 @@ test_theory.py
 
 A maximal, research-grade pytest suite for theory.py.
 
-What’s included (a LOT):
+What's included (a LOT):
 - Analytic/golden tests for FH + composition rules
 - Feasibility and boundary clipping tests
 - Metamorphic tests (symmetries, monotonicity, invariance under transformations)
@@ -13,7 +13,7 @@ What’s included (a LOT):
 - Deterministic Gaussian copula MC tests
 - Optional SciPy deterministic Gaussian copula tests
 - Optional Hypothesis property-based tests (skip if Hypothesis not installed)
-- “Slow” performance tests gated behind env or marker (won’t ruin CI)
+- “Slow” performance tests gated behind env or marker (won't ruin CI)
 
 Note: This suite assumes theory.py is importable as `import theory as th`.
 If your project uses a package layout, change the import accordingly.
@@ -32,7 +32,6 @@ import sys
 import time
 import warnings
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 import pytest
@@ -66,7 +65,7 @@ def rng():
 # ---------------------------------------------------------------------
 
 
-def rand_marginals(rng: np.random.Generator, n: int) -> Tuple[np.ndarray, np.ndarray]:
+def rand_marginals(rng: np.random.Generator, n: int) -> tuple[np.ndarray, np.ndarray]:
     pA = rng.uniform(1e-6, 1 - 1e-6, size=n)
     pB = rng.uniform(1e-6, 1 - 1e-6, size=n)
     return pA, pB
@@ -81,9 +80,7 @@ def _tw(pA0: float, pB0: float, pA1: float, pB1: float) -> th.TwoWorldMarginals:
     return th.TwoWorldMarginals(pA0=pA0, pB0=pB0, pA1=pA1, pB1=pB1)
 
 
-def _tw_analysis(
-    pA0: float, pB0: float, pA1: float, pB1: float
-) -> th_analysis.TwoWorldMarginals:
+def _tw_analysis(pA0: float, pB0: float, pA1: float, pB1: float) -> th_analysis.TwoWorldMarginals:
     return th_analysis.TwoWorldMarginals(
         w0=th_analysis.WorldMarginals(pA=pA0, pB=pB0),
         w1=th_analysis.WorldMarginals(pA=pA1, pB=pB1),
@@ -91,8 +88,8 @@ def _tw_analysis(
 
 
 def interval_gap_bruteforce(
-    i0: Tuple[float, float], i1: Tuple[float, float], grid: int = 4001
-) -> Tuple[float, float]:
+    i0: tuple[float, float], i1: tuple[float, float], grid: int = 4001
+) -> tuple[float, float]:
     a, b = i0
     c, d = i1
     xs = np.linspace(a, b, grid)
@@ -371,23 +368,15 @@ def test_gaussian_mc_deterministic_given_seed():
 
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.33, 0.77), (0.5, 0.5)])
 def test_gaussian_mc_rho0_approx_independence(pA, pB):
-    got = th.p11_gaussian_copula(
-        pA, pB, rho=0.0, method="mc", n_mc=40000, seed=0, antithetic=True
-    )
+    got = th.p11_gaussian_copula(pA, pB, rho=0.0, method="mc", n_mc=40000, seed=0, antithetic=True)
     assert got == pytest.approx(pA * pB, abs=0.02)
 
 
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.33, 0.77), (0.5, 0.5)])
 def test_gaussian_mc_monotone_in_rho(pA, pB):
-    low = th.p11_gaussian_copula(
-        pA, pB, rho=-0.6, method="mc", n_mc=50000, seed=1, antithetic=True
-    )
-    mid = th.p11_gaussian_copula(
-        pA, pB, rho=0.0, method="mc", n_mc=50000, seed=1, antithetic=True
-    )
-    high = th.p11_gaussian_copula(
-        pA, pB, rho=0.6, method="mc", n_mc=50000, seed=1, antithetic=True
-    )
+    low = th.p11_gaussian_copula(pA, pB, rho=-0.6, method="mc", n_mc=50000, seed=1, antithetic=True)
+    mid = th.p11_gaussian_copula(pA, pB, rho=0.0, method="mc", n_mc=50000, seed=1, antithetic=True)
+    high = th.p11_gaussian_copula(pA, pB, rho=0.6, method="mc", n_mc=50000, seed=1, antithetic=True)
 
     assert low <= mid + 0.03
     assert mid <= high + 0.03
@@ -449,7 +438,7 @@ def test_jc_bounds_are_valid(rule):
 @pytest.mark.parametrize("rule", ["AND", "OR", "COND_OR"])
 def test_cc_bounds_match_jc_bounds_divided(rule):
     w = _tw(0.2, 0.3, 0.6, 0.1)
-    jA, jB, jbest = th.singleton_gaps(w)
+    _jA, _jB, jbest = th.singleton_gaps(w)
     jc_lo, jc_hi = th.jc_bounds(w, rule)
     cc_lo, cc_hi = th.cc_bounds(w, rule)
     if jbest == 0:

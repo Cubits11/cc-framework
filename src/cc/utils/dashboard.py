@@ -5,7 +5,7 @@ Real-time metrics dashboard for experiments
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 
 class ExperimentDashboard:
@@ -13,7 +13,7 @@ class ExperimentDashboard:
         self.results_dir = Path(results_dir)
         self.metrics_file = self.results_dir / "metrics.json"
 
-    def update(self, metrics: Dict[str, Any]):
+    def update(self, metrics: dict[str, Any]):
         """Update dashboard with latest metrics"""
         metrics["updated_at"] = datetime.now().isoformat()
 

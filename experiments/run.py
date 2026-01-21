@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 
@@ -15,7 +15,7 @@ from cc.io.storage import LocalStorageBackend, dataset_hash_from_config
 REQUIRED_SECTIONS = ["experiment", "protocol", "worlds", "attacker"]
 
 
-def validate_config(config: Dict[str, Any]) -> None:
+def validate_config(config: dict[str, Any]) -> None:
     """Validate configuration has required fields and two worlds."""
     if not isinstance(config, dict):
         raise ValueError("Top-level YAML must be a mapping (dictionary).")
@@ -40,10 +40,10 @@ def validate_config(config: Dict[str, Any]) -> None:
     proto.setdefault("seed", exp["seed"])
 
 
-def load_config(path: str) -> Dict[str, Any]:
+def load_config(path: str) -> dict[str, Any]:
     """Load and validate YAML config."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
     except FileNotFoundError as e:
         raise FileNotFoundError(f"Config file not found: {path}") from e
@@ -106,7 +106,7 @@ def main() -> int:
         # Friendly guidance for Week-2 demo if heavy deps bite
         print(
             "ERROR: Could not import cc.exp.run_two_world. "
-            "For today’s demo, run the lightweight console games:\n"
+            "For today's demo, run the lightweight console games:\n"
             "  python tools/two_world_game_pro.py -n 20 --bot\n"
             "  python tools/two_world_game_phd.py -n 20 --bot --online\n\n"
             f"Import error: {e}",

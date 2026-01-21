@@ -13,13 +13,12 @@ Notes:
   * Wilson CI is preferred over Wald for small n.
   * CC CI propagation: if D = [L_D, U_D] for Δ := p1 - p0,
       then CC = (1 - Δ)/D (linear, decreasing), so
-        Δ ∈ [L_D, U_D]  ⇒  CC ∈ [ (1-U_D)/D , (1-L_D)/D ].
+        Δ ∈ [L_D, U_D]  =>  CC ∈ [ (1-U_D)/D , (1-L_D)/D ].
 """
 
 from __future__ import annotations
 
 from math import log, sqrt
-from typing import Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -41,7 +40,7 @@ def _clip01(x: float) -> float:
     return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
 
 
-# Acklam’s rational approximation to the standard normal inverse CDF (double precision).
+# Acklam's rational approximation to the standard normal inverse CDF (double precision).
 # Source: https://web.archive.org/web/20150910044759/http://home.online.no/~pjacklam/notes/invnorm/
 def _norm_ppf(p: float) -> float:
     if not (0.0 < p < 1.0):
@@ -95,7 +94,7 @@ def _norm_ppf(p: float) -> float:
 # ---------- Wilson CI for a Bernoulli proportion ----------
 
 
-def wilson_ci_from_counts(k: int, n: int, delta: float = 0.05) -> Tuple[float, float]:
+def wilson_ci_from_counts(k: int, n: int, delta: float = 0.05) -> tuple[float, float]:
     """Two-sided Wilson score interval for a proportion with success count k.
 
     Args:
@@ -122,10 +121,10 @@ def wilson_ci_from_counts(k: int, n: int, delta: float = 0.05) -> Tuple[float, f
     return lo, hi
 
 
-def wilson_ci(phat: float, n: int, delta: float = 0.05) -> Tuple[float, float]:
+def wilson_ci(phat: float, n: int, delta: float = 0.05) -> tuple[float, float]:
     """Wilson score interval from phat and n."""
     _validate_prob("phat", phat)
-    k = int(round(phat * n))
+    k = round(phat * n)
     return wilson_ci_from_counts(k, n, delta)
 
 
@@ -137,8 +136,8 @@ def bootstrap_proportion_ci(
     delta: float = 0.05,
     *,
     B: int = 2000,
-    seed: Optional[int] = None,
-) -> Tuple[float, float]:
+    seed: int | None = None,
+) -> tuple[float, float]:
     """Percentile bootstrap CI for a Bernoulli proportion from {0,1} samples."""
     if samples.ndim != 1:
         samples = samples.ravel()
@@ -164,12 +163,12 @@ def bootstrap_proportion_ci(
 # ---------- CC CIs via Wilson and Bootstrap ----------
 
 
-def _diff_interval(p1_lo: float, p1_hi: float, p0_lo: float, p0_hi: float) -> Tuple[float, float]:
+def _diff_interval(p1_lo: float, p1_hi: float, p0_lo: float, p0_hi: float) -> tuple[float, float]:
     """Interval arithmetic for Δ = p1 - p0 given [p1_lo, p1_hi], [p0_lo, p0_hi]."""
     return p1_lo - p0_hi, p1_hi - p0_lo
 
 
-def cc_ci_from_diff_interval(D: float, delta_lo: float, delta_hi: float) -> Tuple[float, float]:
+def cc_ci_from_diff_interval(D: float, delta_lo: float, delta_hi: float) -> tuple[float, float]:
     """
     Map Δ-interval to CC-interval via CC = (1 - Δ) / D (monotone decreasing in Δ).
     """
@@ -187,7 +186,7 @@ def cc_ci_wilson(
     n0: int,
     D: float,
     delta: float = 0.05,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Two-sided CC CI by Wilson intervals on p1 and p0 and interval propagation."""
     p1_lo, p1_hi = wilson_ci(p1_hat, n1, delta)
     p0_lo, p0_hi = wilson_ci(p0_hat, n0, delta)
@@ -202,8 +201,8 @@ def cc_ci_bootstrap(
     delta: float = 0.05,
     *,
     B: int = 2000,
-    seed: Optional[int] = None,
-) -> Tuple[float, float]:
+    seed: int | None = None,
+) -> tuple[float, float]:
     """
     Two-sided CC CI via independent percentile bootstrap of p1 and p0.
 

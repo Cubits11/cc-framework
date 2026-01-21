@@ -42,7 +42,7 @@ Outputs
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import matplotlib
 import numpy as np
@@ -72,7 +72,7 @@ def _pick_ci_cols(
     *,
     base: str,
     prefer_bca: bool = True,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     """
     Choose CI columns for a metric (e.g., base="CC" or base="JC").
 
@@ -106,7 +106,7 @@ def _savefig(fig: plt.Figure, out_path: Path, dpi: int = 250) -> None:
     plt.close(fig)
 
 
-def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> Optional[float]:
+def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> float | None:
     """
     Linear interpolation root finder on a grid (x must be increasing).
     Returns first crossing root if bracket exists; else None.
@@ -141,12 +141,12 @@ class FigureStyle:
 # Core plots
 # ----------------------------
 def plot_cc_vs_dependence(
-    df_pop: Optional[pd.DataFrame],
+    df_pop: pd.DataFrame | None,
     df_sum: pd.DataFrame,
     *,
     out_path_pdf: Path,
-    out_path_png: Optional[Path] = None,
-    thresholds: Optional[Dict[str, Any]] = None,
+    out_path_png: Path | None = None,
+    thresholds: dict[str, Any] | None = None,
     dependence_x: str = "lambda",
     style: FigureStyle = FigureStyle(),
 ) -> None:
@@ -246,11 +246,11 @@ def plot_cc_vs_dependence(
 
 
 def plot_jc_fh_envelope(
-    df_pop: Optional[pd.DataFrame],
+    df_pop: pd.DataFrame | None,
     df_sum: pd.DataFrame,
     *,
     out_path_pdf: Path,
-    out_path_png: Optional[Path] = None,
+    out_path_png: Path | None = None,
     dependence_x: str = "lambda",
     style: FigureStyle = FigureStyle(),
 ) -> None:
@@ -311,11 +311,11 @@ def plot_jc_fh_envelope(
 
 
 def plot_theory_vs_empirical(
-    df_pop: Optional[pd.DataFrame],
+    df_pop: pd.DataFrame | None,
     df_sum: pd.DataFrame,
     *,
     out_path_pdf: Path,
-    out_path_png: Optional[Path] = None,
+    out_path_png: Path | None = None,
     dependence_x: str = "lambda",
     style: FigureStyle = FigureStyle(),
 ) -> None:
@@ -385,11 +385,11 @@ def plot_theory_vs_empirical(
 
 
 def plot_dependence_mapping(
-    df_pop: Optional[pd.DataFrame],
+    df_pop: pd.DataFrame | None,
     df_sum: pd.DataFrame,
     *,
     out_path_pdf: Path,
-    out_path_png: Optional[Path] = None,
+    out_path_png: Path | None = None,
     style: FigureStyle = FigureStyle(),
 ) -> None:
     """
@@ -450,13 +450,13 @@ def plot_dependence_mapping(
 def make_all_figures(
     *,
     out_dir: Path,
-    df_pop: Optional[pd.DataFrame],
+    df_pop: pd.DataFrame | None,
     df_sum: pd.DataFrame,
-    thresholds: Optional[Dict[str, Any]] = None,
+    thresholds: dict[str, Any] | None = None,
     dependence_x: str = "lambda",
     style: FigureStyle = FigureStyle(),
     also_png: bool = True,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Generate the full figure set into out_dir/figures.
 
@@ -466,7 +466,7 @@ def make_all_figures(
     fig_dir = out_dir / "figures"
     _ensure_dir(fig_dir)
 
-    saved: Dict[str, str] = {}
+    saved: dict[str, str] = {}
 
     def p(name: str) -> Path:
         return fig_dir / name

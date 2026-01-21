@@ -146,7 +146,7 @@ filterwarnings = [
 # mypy
 # -----------------------
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 mypy_path = ["src"]
 packages = ["cc"]
 warn_unused_configs = true
@@ -173,21 +173,34 @@ exclude = [
 # -----------------------
 [tool.ruff]
 line-length = 100
-target-version = "py39"
-exclude = ["build", "dist", ".venv"]
+target-version = "py310"
+exclude = ["build", "dist", ".venv", ".git", ".hypothesis", ".pytest_cache"]
 
 [tool.ruff.lint]
 # Strong but sane default set for a scientific/security codebase.
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "PIE", "RUF"]
+
+# We are explicitly not spending cycles on typing deprecation churn.
+# (Your codebase can modernize these in a dedicated refactor PR later.)
 ignore = [
-  "E501", # handled by formatter/line-length policy
+  "E501",  # handled by formatter/line-length policy
+  "UP035", # typing.List/Dict/Tuple/Type/Set deprecation warnings (PEP 585 churn)
+  "UP006", # dict/list/tuple builtins vs typing.* generics (paired with UP035)
+  "UP007", # X | Y vs Union[X, Y] (paired with UP035)
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["cc"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**.py" = ["B011", "SIM117"]
+"tests/**.py" = [
+  "B011",
+  "SIM117",
+]
+"experiments/**.py" = [
+  "B011",
+  "SIM117",
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -197,13 +210,16 @@ quote-style = "double"
 # -----------------------
 [tool.black]
 line-length = 100
-target-version = ["py39"]
+target-version = ["py310"]
 exclude = '''
 (
   /(
       \.venv
     | build
     | dist
+    | \.git
+    | \.hypothesis
+    | \.pytest_cache
   )/
 )
 '''
@@ -214,7 +230,7 @@ exclude = '''
 [tool.isort]
 profile = "black"
 line_length = 100
-src_paths = ["src", "tests"]
+src_paths = ["src", "tests", "experiments"]
 
 # -----------------------
 # coverage

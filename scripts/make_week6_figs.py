@@ -26,7 +26,7 @@ import csv
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import matplotlib.pyplot as plt
 
@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 # ---------------------------
 
 
-def _safe_get(d: Dict[str, Any], path: List[str], default: Any = None) -> Any:
+def _safe_get(d: dict[str, Any], path: list[str], default: Any = None) -> Any:
     cur: Any = d
     try:
         for k in path:
@@ -45,12 +45,12 @@ def _safe_get(d: Dict[str, Any], path: List[str], default: Any = None) -> Any:
         return default
 
 
-def load_analysis(path: Path) -> Dict[str, Any]:
+def load_analysis(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def rail_name_from_analysis(data: Dict[str, Any], fallback: str) -> str:
+def rail_name_from_analysis(data: dict[str, Any], fallback: str) -> str:
     # prefer explicit memo tag if set in experiment config
     memo_tag = _safe_get(data, ["metadata", "configuration", "experiment", "memo_tag"])
     if memo_tag:
@@ -66,8 +66,8 @@ def rail_name_from_analysis(data: Dict[str, Any], fallback: str) -> str:
 
 
 def extract_metrics(
-    data: Dict[str, Any],
-) -> Tuple[float, float, float, Tuple[float, float], float, Optional[float]]:
+    data: dict[str, Any],
+) -> tuple[float, float, float, tuple[float, float], float, float | None]:
     """
     Returns: tpr, fpr, delta_empirical, (ci_lo, ci_hi), cc_max, alpha_cap
     """
@@ -100,9 +100,9 @@ def extract_metrics(
 
 
 def make_delta_bar(
-    rows: List[Tuple[str, float, Tuple[float, float]]],
+    rows: list[tuple[str, float, tuple[float, float]]],
     out_png: Path,
-    out_svg: Optional[Path] = None,
+    out_svg: Path | None = None,
     title: str = "Guardrail Δ with 95% CI",
 ) -> None:
     if not rows:
@@ -144,10 +144,10 @@ def make_delta_bar(
 
 
 def make_roc_grid(
-    rows: List[Tuple[str, float, float]],
+    rows: list[tuple[str, float, float]],
     out_png: Path,
-    out_svg: Optional[Path] = None,
-    alpha_cap: Optional[float] = 0.05,
+    out_svg: Path | None = None,
+    alpha_cap: float | None = 0.05,
     annotate: bool = False,
 ) -> None:
     if not rows:
@@ -223,8 +223,8 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Collect rows
-    summary_rows: List[
-        Tuple[str, float, float, float, Tuple[float, float], float, Optional[float]]
+    summary_rows: list[
+        tuple[str, float, float, float, tuple[float, float], float, float | None]
     ] = []
     for p in args.inputs:
         pth = Path(p)

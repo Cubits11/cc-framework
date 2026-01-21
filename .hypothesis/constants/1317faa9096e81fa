@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/adapters/llama_guard.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.5, 'adapter_error', 'allow', 'auto', 'block', 'content', 'decoded', 'device_map', 'error', 'generated_summary', 'input_ids', 'llama_guard', 'llama_guard.generate', 'logprob', 'max_new_tokens', 'metadata', 'model_name', 'pt', 'raw', 'review', 'role', 'safe', 'score_mode', 'system', 'temperature', 'threshold', 'unknown', 'unsafe', 'user']

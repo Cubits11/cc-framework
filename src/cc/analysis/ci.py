@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from statistics import NormalDist
-from typing import Iterable, Tuple
 
 import numpy as np
 
 
-def wilson_ci(successes: int, n: int, alpha: float = 0.05) -> Tuple[float, float]:
+def wilson_ci(successes: int, n: int, alpha: float = 0.05) -> tuple[float, float]:
     """Wilson score interval for a binomial proportion."""
     if n <= 0:
         return (0.0, 1.0)
@@ -25,10 +25,10 @@ def wilson_ci(successes: int, n: int, alpha: float = 0.05) -> Tuple[float, float
 
 def bootstrap_ci(
     samples: Iterable[float], n_resamples: int = 200, alpha: float = 0.05, random_state: int = 42
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Percentile bootstrap interval for a scalar statistic.
 
-    If ``n_resamples`` ≤ 0 the function simply returns the alpha/2 and (1-alpha/2)
+    If ``n_resamples`` <= 0 the function simply returns the alpha/2 and (1-alpha/2)
     quantiles of the provided samples (useful when caller already generated
     bootstrap replicates).
     """

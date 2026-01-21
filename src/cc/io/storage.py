@@ -7,9 +7,10 @@ import hashlib
 import json
 import shutil
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 
 def _stable_json(obj: Any) -> str:
@@ -161,7 +162,7 @@ class LocalStorageBackend(StorageBackend):
         filename: str = "results.csv",
         header: Sequence[str] | None = None,
     ) -> Path:
-        header_list = list(header) if header else sorted({k for row in rows for k in row.keys()})
+        header_list = list(header) if header else sorted({k for row in rows for k in row})
         content_hash = _hash_text(_stable_json({"header": header_list, "rows": list(rows)}))
         path = self.resolve_path(category, content_hash, filename)
         with path.open("w", encoding="utf-8", newline="") as handle:

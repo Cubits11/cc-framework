@@ -85,7 +85,7 @@ def test_attack_result_valid_and_iso_time_shape(
         downstream analysis would break.
     """
     if timestamp <= 0:
-        # Normalize negative/zero timestamps to "now" – mirrors model logic.
+        # Normalize negative/zero timestamps to "now" - mirrors model logic.
         timestamp = time.time()
 
     ar = mk_attack_result(
@@ -159,15 +159,15 @@ def test_attack_result_invalid_utility_nan_and_inf():
         guardrails_applied="ga",
         rng_seed=42,
     )
-    common_kwargs = dict(
-        world_bit=WorldBit.BASELINE,
-        success=True,
-        attack_id="id",
-        transcript_hash=base.transcript_hash,
-        guardrails_applied="ga",
-        rng_seed=42,
-        timestamp=base.timestamp,
-    )
+    common_kwargs = {
+        "world_bit": WorldBit.BASELINE,
+        "success": True,
+        "attack_id": "id",
+        "transcript_hash": base.transcript_hash,
+        "guardrails_applied": "ga",
+        "rng_seed": 42,
+        "timestamp": base.timestamp,
+    }
     with pytest.raises(ValidationError):
         AttackResult(**common_kwargs, utility_score=math.nan)
     with pytest.raises(ValidationError):
@@ -253,13 +253,13 @@ def test_attack_result_semantic_hash_excludes_metadata_fields():
         Deduplication and semantic caching should depend on the "core"
         experimental content, not when/where the result was created.
     """
-    base_kwargs = dict(
-        world_bit=WorldBit.BASELINE,
-        success=True,
-        attack_id="attack-1",
-        guardrails_applied="ga",
-        rng_seed=123,
-    )
+    base_kwargs = {
+        "world_bit": WorldBit.BASELINE,
+        "success": True,
+        "attack_id": "attack-1",
+        "guardrails_applied": "ga",
+        "rng_seed": 123,
+    }
 
     ar1 = mk_attack_result(**base_kwargs, timestamp=0.0)
     ar2 = mk_attack_result(**base_kwargs, timestamp=1.0)

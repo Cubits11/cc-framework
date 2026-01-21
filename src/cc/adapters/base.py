@@ -14,8 +14,9 @@ import json
 import re
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Dict, Literal, Mapping, Optional, Sequence, TypedDict, Union
+from typing import Any, Literal, TypedDict, Union
 
 # ----------------------------
 # Public contract
@@ -64,24 +65,24 @@ _PII_PATTERNS = (
 
 
 JsonScalar = Union[str, int, float, bool, None]
-JsonValue = Union[JsonScalar, Dict[str, "JsonValue"], list["JsonValue"]]
+JsonValue = Union[JsonScalar, dict[str, "JsonValue"], list["JsonValue"]]
 
 
 class AuditPayloadV1(TypedDict):
     schema: str
     prompt_hash: str
-    response_hash: Optional[str]
+    response_hash: str | None
     adapter_name: str
     adapter_version: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     decision: Verdict
-    category: Optional[str]
-    rationale: Optional[str]
+    category: str | None
+    rationale: str | None
     started_at: float
     completed_at: float
     duration_ms: float
-    vendor_request_id: Optional[str]
-    config_fingerprint: Optional[str]
+    vendor_request_id: str | None
+    config_fingerprint: str | None
 
 
 class AuditPayload(AuditPayloadV1, total=False):
@@ -96,14 +97,14 @@ class AuditPayload(AuditPayloadV1, total=False):
     response_chars: int
 
     # Sanitized view for reproducibility without secrets
-    metadata_summary: Dict[str, Any]
+    metadata_summary: dict[str, Any]
     parameters_fingerprint: str
     metadata_fingerprint: str
-    error_summary: Dict[str, Any]
+    error_summary: dict[str, Any]
 
     # Optional link hooks for external ledger / chain layers
-    chain_prev_hash: Optional[str]
-    chain_seq: Optional[int]
+    chain_prev_hash: str | None
+    chain_seq: int | None
 
 
 # ----------------------------
@@ -111,7 +112,7 @@ class AuditPayload(AuditPayloadV1, total=False):
 # ----------------------------
 
 
-def hash_text(text: Optional[str]) -> Optional[str]:
+def hash_text(text: str | None) -> str | None:
     """SHA256 over UTF-8 bytes. Never returns empty string unless text is empty."""
     if text is None:
         return None
@@ -135,7 +136,7 @@ def _looks_like_pii(text: str) -> bool:
 def _redact(obj: Any) -> Any:
     """Deep-redact sensitive keys in mappings, recursively."""
     if isinstance(obj, Mapping):
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for k, v in obj.items():
             ks = str(k)
             if _looks_sensitive_key(ks):
@@ -158,7 +159,7 @@ class SanitizationPolicy:
     allow_preview: bool = False
 
 
-def _safe_preview(text: str, policy: SanitizationPolicy) -> Optional[str]:
+def _safe_preview(text: str, policy: SanitizationPolicy) -> str | None:
     if not policy.allow_preview:
         return None
     if len(text) > 32:
@@ -170,7 +171,7 @@ def _safe_preview(text: str, policy: SanitizationPolicy) -> Optional[str]:
     return text
 
 
-def _hash_summary(text: str, policy: SanitizationPolicy) -> Dict[str, Any]:
+def _hash_summary(text: str, policy: SanitizationPolicy) -> dict[str, Any]:
     return {
         "sha256": hash_text(text) or "",
         "len": len(text),
@@ -181,9 +182,9 @@ def _hash_summary(text: str, policy: SanitizationPolicy) -> Dict[str, Any]:
 
 def sanitize_value(
     value: Any,
-    policy: Optional[SanitizationPolicy] = None,
+    policy: SanitizationPolicy | None = None,
     *,
-    key: Optional[str] = None,
+    key: str | None = None,
     depth: int = 0,
 ) -> JsonValue:
     """Sanitize a value deterministically to prevent leaks.
@@ -214,7 +215,7 @@ def sanitize_value(
         return sanitize_value(asdict(value), policy, key=key, depth=depth + 1)
 
     if isinstance(value, Mapping):
-        out: Dict[str, JsonValue] = {}
+        out: dict[str, JsonValue] = {}
         for k in sorted(value.keys(), key=lambda x: str(x)):
             ks = str(k)
             out[ks] = sanitize_value(value[k], policy, key=ks, depth=depth + 1)
@@ -235,7 +236,7 @@ def sanitize_value(
     return {"__nonserializable__": type(value).__name__}
 
 
-def summarize_value(value: Any, policy: Optional[SanitizationPolicy] = None) -> Dict[str, Any]:
+def summarize_value(value: Any, policy: SanitizationPolicy | None = None) -> dict[str, Any]:
     """Summarize a value with hash/length/type only (no raw content)."""
     policy = policy or SanitizationPolicy()
     if isinstance(value, str):
@@ -252,7 +253,7 @@ def summarize_value(value: Any, policy: Optional[SanitizationPolicy] = None) -> 
     }
 
 
-def sanitize_metadata(metadata: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+def sanitize_metadata(metadata: Mapping[str, Any] | None) -> dict[str, Any]:
     """Summarize metadata with hash/length/type only."""
     if not metadata:
         return {}
@@ -294,7 +295,7 @@ def _to_jsonable(obj: Any, *, strict: bool) -> JsonValue:
 
     # mappings -> dict with string keys
     if isinstance(obj, Mapping):
-        out: Dict[str, JsonValue] = {}
+        out: dict[str, JsonValue] = {}
         for k, v in obj.items():
             out[str(k)] = _to_jsonable(v, strict=strict)
         return out
@@ -321,7 +322,7 @@ def canonical_json(obj: Any, *, strict: bool = False) -> str:
     )
 
 
-def fingerprint_payload(payload: Dict[str, Any], *, strict: bool = False) -> str:
+def fingerprint_payload(payload: dict[str, Any], *, strict: bool = False) -> str:
     """Stable fingerprint of a payload for config/audit integrity."""
     canonical = canonical_json(payload, strict=strict)
     return hashlib.sha256(canonical.encode("utf-8", errors="surrogatepass")).hexdigest()
@@ -335,24 +336,24 @@ def fingerprint_payload(payload: Dict[str, Any], *, strict: bool = False) -> str
 def build_audit_payload(
     *,
     prompt: str,
-    response: Optional[str],
+    response: str | None,
     adapter_name: str,
     adapter_version: str,
-    parameters: Dict[str, Any],
+    parameters: dict[str, Any],
     decision: Verdict,
-    category: Optional[str],
-    rationale: Optional[str],
+    category: str | None,
+    rationale: str | None,
     started_at: float,
     completed_at: float,
-    metadata: Optional[Dict[str, Any]] = None,
-    vendor_request_id: Optional[str] = None,
-    config_fingerprint: Optional[str] = None,
-    error_summary: Optional[Dict[str, Any]] = None,
-    event_id: Optional[str] = None,
-    created_at: Optional[float] = None,
+    metadata: dict[str, Any] | None = None,
+    vendor_request_id: str | None = None,
+    config_fingerprint: str | None = None,
+    error_summary: dict[str, Any] | None = None,
+    event_id: str | None = None,
+    created_at: float | None = None,
     # Ledger hooks (optional)
-    chain_prev_hash: Optional[str] = None,
-    chain_seq: Optional[int] = None,
+    chain_prev_hash: str | None = None,
+    chain_seq: int | None = None,
 ) -> AuditPayload:
     """Build a deterministic, secret-safe audit payload.
 
@@ -457,13 +458,13 @@ class Decision:
     """Normalized guardrail decision returned by adapter checks."""
 
     verdict: Verdict
-    category: Optional[str]
-    score: Optional[float]
-    rationale: Optional[str]
-    raw: Dict[str, Any] | str
+    category: str | None
+    score: float | None
+    rationale: str | None
+    raw: dict[str, Any] | str
     adapter_name: str
     adapter_version: str
-    audit: Optional[Dict[str, Any]] = None
+    audit: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.verdict not in {"allow", "block", "review"}:
@@ -475,7 +476,7 @@ class Decision:
         if self.audit is not None and not isinstance(self.audit, dict):
             raise TypeError("Decision.audit must be a dict when provided")
 
-    def with_audit(self, audit_payload: Dict[str, Any]) -> "Decision":
+    def with_audit(self, audit_payload: dict[str, Any]) -> Decision:
         """Return a copy of this Decision with audit attached."""
         return Decision(
             verdict=self.verdict,
@@ -509,7 +510,7 @@ class AdapterPermanentError(AdapterError):
     """Raised for non-retryable vendor failures (bad request, policy violation, etc.)."""
 
 
-def error_summary_from_exception(exc: Exception, *, where: str) -> Dict[str, Any]:
+def error_summary_from_exception(exc: Exception, *, where: str) -> dict[str, Any]:
     """Build a safe error summary for audit payloads."""
     retryable = isinstance(exc, (AdapterTransientError, TimeoutError))
     message_hash = hash_text(str(exc)) or ""
@@ -555,19 +556,19 @@ class GuardrailAdapter(ABC):
             strict=False,
         )
 
-    def check_input(self, prompt: str, metadata: Dict[str, Any]) -> Decision:
+    def check_input(self, prompt: str, metadata: dict[str, Any]) -> Decision:
         """Default input-only check via check(prompt, None, ...)."""
         if not self.supports_input_check:
             raise AdapterMisconfigured(f"{self.name} does not support input checks")
         return self.check(prompt=prompt, response=None, metadata=metadata)
 
-    def check_output(self, prompt: str, response: str, metadata: Dict[str, Any]) -> Decision:
+    def check_output(self, prompt: str, response: str, metadata: dict[str, Any]) -> Decision:
         """Default output check via check(prompt, response, ...)."""
         if not self.supports_output_check:
             raise AdapterMisconfigured(f"{self.name} does not support output checks")
         return self.check(prompt=prompt, response=response, metadata=metadata)
 
     @abstractmethod
-    def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
+    def check(self, prompt: str, response: str | None, metadata: dict[str, Any]) -> Decision:
         """Check a prompt/response pair and return a Decision."""
         raise NotImplementedError

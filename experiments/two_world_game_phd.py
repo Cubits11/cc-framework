@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Two-World Attack Game — PhD Edition
 ==================================
@@ -16,7 +15,7 @@ Specifically, it implements:
   * An information-gain policy that chooses the next query type to
     maximise expected log-likelihood ratio gain, contrasting with
     simple ε-greedy exploration.
-  * End-of-game summary including Youden’s Ĵ statistic and a 95 %
+  * End-of-game summary including Youden's Ĵ statistic and a 95 %
     bootstrap confidence interval for attack success rates.
 """
 
@@ -28,8 +27,8 @@ import math
 import os
 import random
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
 
 
 def clamp01(x: float) -> float:
@@ -52,7 +51,7 @@ class TwoWorldGamePhD:
     def __init__(
         self,
         n_queries: int = 20,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         difficulty: str = "normal",
         leaky_timing: bool = False,
         bot: bool = False,
@@ -60,7 +59,7 @@ class TwoWorldGamePhD:
         strategy: str = "info",
         sprt_alpha: float = 0.05,
         sprt_beta: float = 0.05,
-        log_path: Optional[str] = None,
+        log_path: str | None = None,
     ) -> None:
         self.n_queries = max(1, n_queries)
         self.bot = bot
@@ -80,7 +79,7 @@ class TwoWorldGamePhD:
             raise ValueError("Unknown difficulty level. Choose easy, normal, or hard.")
 
         p_block_benign = 0.08
-        self.world_configs: Dict[int, WorldConfig] = {
+        self.world_configs: dict[int, WorldConfig] = {
             0: WorldConfig(p_block_benign=p_block_benign, p_block_attack=p_block_attack_0),
             1: WorldConfig(p_block_benign=p_block_benign, p_block_attack=p_block_attack_1),
         }
@@ -88,14 +87,14 @@ class TwoWorldGamePhD:
             self.world_configs[1].extra_delay_ms = 12.0
 
         self.secret_world = random.choice([0, 1])
-        self.label_map: Dict[str, int] = (
+        self.label_map: dict[str, int] = (
             {"A": 0, "B": 1} if random.choice([True, False]) else {"A": 1, "B": 0}
         )
 
         self.sprt_A = math.log((1.0 - sprt_beta) / sprt_alpha)
         self.sprt_B = math.log(sprt_beta / (1.0 - sprt_alpha))
         self.log_lr = 0.0
-        self.history: List[Tuple[int, str, str, str]] = []
+        self.history: list[tuple[int, str, str, str]] = []
         self.counts = {
             "A": {"benign": 0, "attack": 0, "b_block": 0, "a_block": 0},
             "B": {"benign": 0, "attack": 0, "b_block": 0, "a_block": 0},
@@ -116,7 +115,7 @@ class TwoWorldGamePhD:
         sigma = max(0.1, cfg.std_latency_ms)
         return int(max(1.0, random.gauss(mu, sigma)))
 
-    def _query(self, world_idx: int, qtype: str) -> Tuple[str, int]:
+    def _query(self, world_idx: int, qtype: str) -> tuple[str, int]:
         cfg = self.world_configs[world_idx]
         blocked = random.random() < cfg.p_block(qtype)
         latency = self._latency_ms(cfg)
@@ -257,8 +256,8 @@ class TwoWorldGamePhD:
 
         self.print_summary()
 
-    def _attack_pairs(self) -> List[Tuple[int, int]]:
-        pairs: List[Tuple[int, int]] = []
+    def _attack_pairs(self) -> list[tuple[int, int]]:
+        pairs: list[tuple[int, int]] = []
         for _i, qtype, respA, respB in self.history:
             if qtype != "attack":
                 continue
@@ -271,15 +270,15 @@ class TwoWorldGamePhD:
         return pairs
 
     def _bootstrap_ci(
-        self, pairs: Sequence[Tuple[int, int]], level: float = 0.95, n: int = 1000
-    ) -> Tuple[float, float, float, float, float]:
+        self, pairs: Sequence[tuple[int, int]], level: float = 0.95, n: int = 1000
+    ) -> tuple[float, float, float, float, float]:
         if not pairs:
             return 0.0, 0.0, 0.0, 0.0, 0.0
         n_pairs = len(pairs)
         p0 = sum(p[0] for p in pairs) / n_pairs
         p1 = sum(p[1] for p in pairs) / n_pairs
         j_hat = p0 - p1
-        diffs: List[float] = []
+        diffs: list[float] = []
         for _ in range(n):
             s0 = s1 = 0
             for _ in range(n_pairs):
@@ -319,12 +318,12 @@ class TwoWorldGamePhD:
             print("\nDistinguishability analysis (attack success):")
             print(f"  p₀ = P(Allowed | W0) = {p0:.3f}")
             print(f"  p₁ = P(Allowed | W1) = {p1:.3f}")
-            print(f"  Ĵ = p₀ − p₁ = {j_hat:.3f}")
+            print(f"  Ĵ = p₀ - p₁ = {j_hat:.3f}")
             print(f"  95 % bootstrap CI: ({lo:.3f}, {hi:.3f})")
-            print("  (Positive Ĵ ⇒ safe world allows more attacks; CI quantifies uncertainty.)")
+            print("  (Positive Ĵ => safe world allows more attacks; CI quantifies uncertainty.)")
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Play the PhD-level two-world attack game with SPRT and information design"
     )
@@ -357,7 +356,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     game = TwoWorldGamePhD(
         n_queries=args.rounds,

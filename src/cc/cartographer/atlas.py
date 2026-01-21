@@ -19,11 +19,12 @@ Notes
 from __future__ import annotations
 
 import os
-from typing import Any, Final, Mapping, Optional, Tuple
+from collections.abc import Mapping
+from typing import Any, Final
 
 import matplotlib.pyplot as plt
 
-__all__ = ["plot_phase_point", "compose_entry"]
+__all__ = ["compose_entry", "plot_phase_point"]
 
 # Thresholds for interpreting CC_max (hard invariants for CLI policy)
 _CC_CONSTRUCTIVE_MAX: Final[float] = 0.95
@@ -72,22 +73,22 @@ def plot_phase_point(cfg: Mapping[str, Any], cc_max: float, outfile: str) -> str
 def compose_entry(
     cfg: Mapping[str, Any],
     j_a: float,
-    j_a_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_a_ci: tuple[float | None, float | None] | None,
     j_b: float,
-    j_b_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_b_ci: tuple[float | None, float | None] | None,
     j_comp: float,
-    j_comp_ci: Optional[Tuple[Optional[float], Optional[float]]],
+    j_comp_ci: tuple[float | None, float | None] | None,
     cc_max: float,
     delta_add: float,
     comp_label: str,
     fig_path: str,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Compose a human-readable log entry and a decision line for CLI output.
 
     Args:
         cfg: experiment configuration mapping (expects keys 'epsilon','T','A','B','comp')
-        j_a, j_b, j_comp: Youden’s J statistics for A, B, and composition (or bound)
+        j_a, j_b, j_comp: Youden's J statistics for A, B, and composition (or bound)
         j_a_ci, j_b_ci, j_comp_ci: optional (lo, hi) confidence intervals
         cc_max: J_comp / max(J_A, J_B) (reporting normalization)
         delta_add: J_comp - (J_A + J_B - J_A*J_B) (heuristic additive delta)
@@ -103,7 +104,7 @@ def compose_entry(
     name_b = str(cfg.get("B", "B"))
     comp = str(cfg.get("comp", "AND"))
 
-    def _fmt_ci(ci: Optional[Tuple[Optional[float], Optional[float]]]) -> str:
+    def _fmt_ci(ci: tuple[float | None, float | None] | None) -> str:
         # Show CI only when both bounds are present
         if ci is None:
             return ""
@@ -116,7 +117,7 @@ def compose_entry(
         f"ε={eps}, T={T}; {name_a} ⊕ {name_b} ({comp}) — "
         f"J_A={j_a:.2f}{_fmt_ci(j_a_ci)}, "
         f"J_B={j_b:.2f}{_fmt_ci(j_b_ci)}, "
-        f"J_comp({comp_label})={j_comp:.2f}{_fmt_ci(j_comp_ci)} ⇒ "
+        f"J_comp({comp_label})={j_comp:.2f}{_fmt_ci(j_comp_ci)} => "
         f"CC_max={cc_max:.2f}, Δ_add={delta_add:+.2f}. "
         f"{_region(cc_max)}. Next: probe nearby (ε,T)."
     )

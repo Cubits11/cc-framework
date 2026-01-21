@@ -9,7 +9,7 @@ Policy:
 - Read the last valid record from the tamper-evident audit chain.
 - Classify the regime via CC_max:
     < 0.95  → "constructive"  (A∧B beats best single rail; exploit locally)
-    ≤ 1.05  → "independent"   (A∧B ≈ best; probe lightly)
+    <= 1.05  → "independent"   (A∧B ≈ best; probe lightly)
     > 1.05  → "destructive"   (A∧B underperforms; retreat + flip rule)
 - Propose a small, deduplicated grid around (epsilon, T, comp) with bounded steps.
 
@@ -22,8 +22,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 from .audit import _iter_jsonl  # reuse the stable JSONL reader
 
@@ -55,7 +56,7 @@ CC_NEUTRAL_LO = 0.95
 CC_NEUTRAL_HI = 1.05
 
 
-def _region(cc_max: float, cc_max_ci: Optional[Tuple[float, float]] = None) -> Tuple[str, bool]:
+def _region(cc_max: float, cc_max_ci: tuple[float, float] | None = None) -> tuple[str, bool]:
     """Classify composition regime by CC_max (conservative normalization)."""
     if cc_max < CC_NEUTRAL_LO:
         zone = "constructive"
@@ -72,7 +73,7 @@ def _region(cc_max: float, cc_max_ci: Optional[Tuple[float, float]] = None) -> T
     return zone, uncertain
 
 
-def _parse_ci(value: Any) -> Optional[Tuple[float, float]]:
+def _parse_ci(value: Any) -> tuple[float, float] | None:
     if not isinstance(value, (list, tuple)) or len(value) != 2:
         return None
     try:
@@ -85,7 +86,7 @@ def _parse_ci(value: Any) -> Optional[Tuple[float, float]]:
     return (lo, hi)
 
 
-def _maybe_float(value: Any) -> Optional[float]:
+def _maybe_float(value: Any) -> float | None:
     try:
         out = float(value)
     except (TypeError, ValueError):
@@ -95,10 +96,10 @@ def _maybe_float(value: Any) -> Optional[float]:
     return out
 
 
-def _neighbors(x: float, steps: Sequence[float], lo: float, hi: float) -> List[float]:
+def _neighbors(x: float, steps: Sequence[float], lo: float, hi: float) -> list[float]:
     """Generate deduped neighbor candidates x + step clamped to [lo, hi]."""
     seen = set()
-    out: List[float] = []
+    out: list[float] = []
     for s in steps:
         v = _clamp(float(x) + float(s), lo, hi)
         if v not in seen:
@@ -107,12 +108,12 @@ def _neighbors(x: float, steps: Sequence[float], lo: float, hi: float) -> List[f
     return out
 
 
-def _last_valid(path: str) -> Optional[Dict[str, Any]]:
+def _last_valid(path: str) -> dict[str, Any] | None:
     """
     Return the last record that has both 'cfg' and 'metrics' dicts.
     If none found, return None.
     """
-    last: Optional[Dict[str, Any]] = None
+    last: dict[str, Any] | None = None
     for _, obj in _iter_jsonl(path):
         cfg = obj.get("cfg")
         mets = obj.get("metrics")
@@ -121,12 +122,12 @@ def _last_valid(path: str) -> Optional[Dict[str, Any]]:
     return last
 
 
-def _cold_start(k: int) -> List[Dict[str, Any]]:
+def _cold_start(k: int) -> list[dict[str, Any]]:
     """Canonical seeds when there is no history."""
     eps_grid = (0.00, 0.10, 0.20, 0.40)
     T_grid = (1.0, 2.0, 5.0)
     comps = ("AND", "OR")
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for e in eps_grid:
         for t in T_grid:
             for c in comps:
@@ -146,7 +147,7 @@ def _cold_start(k: int) -> List[Dict[str, Any]]:
 # =============================================================================
 
 
-def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
+def suggest(history: str, k: int = 6) -> list[dict[str, Any]]:
     """
     Propose up to k next trials based on the last audited configuration and outcome.
 
@@ -200,7 +201,7 @@ def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
     zone, uncertain = _region(cc, cc_ci)
     ci_tag = " (CI overlaps neutrality band)" if uncertain else ""
 
-    proposals: List[Dict[str, Any]] = []
+    proposals: list[dict[str, Any]] = []
 
     if zone == "constructive":
         # Exploit the valley; small isotropic moves; test both comp rules
@@ -284,8 +285,8 @@ def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
                     )
 
     # Deduplicate and keep ordering stable; cap to k
-    seen: set[Tuple[float, float, str]] = set()
-    uniq: List[Dict[str, Any]] = []
+    seen: set[tuple[float, float, str]] = set()
+    uniq: list[dict[str, Any]] = []
     for s in proposals:
         key = (float(s["epsilon"]), float(s["T"]), str(s["comp"]))
         if key not in seen:
@@ -300,7 +301,7 @@ def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
 # =============================================================================
 
 
-def main(argv: Optional[List[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
         description="Suggest next (epsilon, T, comp) trials from audit history."
     )

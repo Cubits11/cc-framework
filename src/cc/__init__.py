@@ -10,13 +10,13 @@ except _metadata.PackageNotFoundError:  # pragma: no cover - during local usage
     __version__ = "0.0.0"
 
 __all__ = [
-    "analysis",
+    "__version__",
     "adapters",
+    "analysis",
     "cartographer",
     "core",
     "exp",
     "guardrails",
     "io",
     "utils",
-    "__version__",
 ]

@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -97,23 +98,23 @@ def _to_float(x: Any, default: float = 0.0) -> float:
     return default
 
 
-def _read_cc_series(history: str | Path) -> List[float]:
-    vals: List[float] = []
+def _read_cc_series(history: str | Path) -> list[float]:
+    vals: list[float] = []
     for _, obj in _iter_jsonl(str(history)):
         m = obj.get("metrics", {}) if isinstance(obj, dict) else {}
         vals.append(_to_float(m.get("CC_max"), np.nan))
     return [v for v in vals if np.isfinite(v)]
 
 
-def _last_record(history: str | Path) -> Optional[Dict[str, Any]]:
-    last: Optional[Dict[str, Any]] = None
+def _last_record(history: str | Path) -> dict[str, Any] | None:
+    last: dict[str, Any] | None = None
     for _, obj in _iter_jsonl(str(history)):
         if isinstance(obj, dict):
             last = obj
     return last
 
 
-def _extract_phase_points(history: str | Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _extract_phase_points(history: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     eps, Ts, ccs = [], [], []
     for _, obj in _iter_jsonl(str(history)):
         if not isinstance(obj, dict):
@@ -130,7 +131,7 @@ def _extract_phase_points(history: str | Path) -> Tuple[np.ndarray, np.ndarray, 
     return np.array(eps), np.array(Ts), np.array(ccs)
 
 
-def _auto_lims(x: float, y: float) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+def _auto_lims(x: float, y: float) -> tuple[tuple[float, float], tuple[float, float]]:
     span = max(0.05, 1.2 * max(abs(x), abs(y), 0.02))
     return (-span, span), (-span, span)
 
@@ -262,7 +263,7 @@ def _plot_cc_convergence(cc_series: Sequence[float], fig_path: Path) -> None:
     plt.close(fig)
 
 
-def _synthetic_roc() -> Tuple[np.ndarray, np.ndarray]:
+def _synthetic_roc() -> tuple[np.ndarray, np.ndarray]:
     fpr_single = np.array([0.0, 0.10, 0.20, 0.50, 1.0])
     tpr_single = np.array([0.0, 0.50, 0.70, 0.85, 1.0])
     fpr_comp = np.array([0.0, 0.05, 0.15, 0.40, 1.0])
@@ -270,7 +271,7 @@ def _synthetic_roc() -> Tuple[np.ndarray, np.ndarray]:
     return np.c_[fpr_single, tpr_single], np.c_[fpr_comp, tpr_comp]
 
 
-def _plot_roc_from_cfg(rec: Dict[str, Any], fig_path: Path) -> None:
+def _plot_roc_from_cfg(rec: dict[str, Any], fig_path: Path) -> None:
     cfg = rec.get("cfg", {}) if isinstance(rec, dict) else {}
     labelA = str(cfg.get("A", "A"))
     labelB = str(cfg.get("B", "B"))
@@ -309,9 +310,9 @@ def plot_roc_fh_slice(
     fpr_a: float,
     tpr_b: float,
     fpr_b: float,
-    alpha_cap: Optional[float],
-    I1: Tuple[float, float],
-    I0: Tuple[float, float],
+    alpha_cap: float | None,
+    I1: tuple[float, float],
+    I0: tuple[float, float],
     D: float,
     n1: int,
     n0: int,
@@ -340,8 +341,8 @@ def plot_roc_fh_slice(
     fpr_and = max(0.0, fpr_a + fpr_b - 1.0)
     tpr_or = min(1.0, tpr_a + tpr_b)
     fpr_or = max(fpr_a, fpr_b)
-    ax.text(0.02, 0.95, f"AND@θ: TPR≤{tpr_and:.3f}, FPR≥{fpr_and:.3f}", transform=ax.transAxes)
-    ax.text(0.02, 0.90, f"OR @θ: TPR≤{tpr_or:.3f},  FPR≥{fpr_or:.3f}", transform=ax.transAxes)
+    ax.text(0.02, 0.95, f"AND@θ: TPR<={tpr_and:.3f}, FPR≥{fpr_and:.3f}", transform=ax.transAxes)
+    ax.text(0.02, 0.90, f"OR @θ: TPR<={tpr_or:.3f},  FPR≥{fpr_or:.3f}", transform=ax.transAxes)
 
     ax.set_xlabel("FPR")
     ax.set_ylabel("TPR")
@@ -351,10 +352,7 @@ def plot_roc_fh_slice(
 
     # --- inset: Bernstein vs Hoeffding tail (Y=0)
     ax2 = fig.add_axes([0.75, 0.58, 0.22, 0.32], facecolor="white")
-    if I0[0] <= 0.5 <= I0[1]:
-        vbar0 = 0.25
-    else:
-        vbar0 = max(I0[0] * (1 - I0[0]), I0[1] * (1 - I0[1]))
+    vbar0 = 0.25 if I0[0] <= 0.5 <= I0[1] else max(I0[0] * (1 - I0[0]), I0[1] * (1 - I0[1]))
     eps = [i / 1000.0 for i in range(1, 251)]
     bern = [2.0 * math.exp(-n0 * (e * e) / (2.0 * vbar0 + (2.0 / 3.0) * e)) for e in eps]
     hoe = [2.0 * math.exp(-2.0 * n0 * (e * e)) for e in eps]
@@ -379,7 +377,7 @@ def plot_fh_heatmap(
     comp: str = "AND",
     add_anchors: bool = True,
     outpath: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """FH J-envelope heatmap over two ROC arrays. Returns analysis dict."""
     _, J = envelope_over_rocs(roc_a, roc_b, comp=comp, add_anchors=add_anchors)
     J_max = float(np.max(J)) if J.size else 0.0
@@ -408,7 +406,7 @@ def _plot_cc_ci_figure(
     newc_lo: float,
     newc_hi: float,
     outpath: str,
-    title: str = "CC CIs (FH–Bernstein vs. Newcombe)",
+    title: str = "CC CIs (FH-Bernstein vs. Newcombe)",
 ) -> None:
     """Internal: draw the CI comparison figure."""
     fig, ax = plt.subplots(figsize=(10.0, 5.0), facecolor="white")
@@ -464,26 +462,26 @@ def plot_cc_ci_comparison(
     tpr_b: float,
     fpr_a: float,
     fpr_b: float,
-    alpha_cap: Optional[float] = None,
+    alpha_cap: float | None = None,
     delta: float = 0.05,
     outpath: str,
-    title: str = "CC CIs (FH–Bernstein vs. Newcombe)",
-) -> Dict[str, Any]:
+    title: str = "CC CIs (FH-Bernstein vs. Newcombe)",
+) -> dict[str, Any]:
     """
-    Compute FH–Bernstein and Newcombe(Wilson) CIs for CC from raw inputs,
+    Compute FH-Bernstein and Newcombe(Wilson) CIs for CC from raw inputs,
     plot the comparison, and return a small summary dict.
     """
     # FH intervals at θ (policy bound applied to I0 via alpha_cap)
     I1, I0 = fh_intervals(tpr_a, tpr_b, fpr_a, fpr_b, alpha_cap=alpha_cap)
 
-    # FH–Bernstein CC CI
+    # FH-Bernstein CC CI
     bern_lo, bern_hi = cc_confint(
         n1=n1, n0=n0, p1_hat=p1_hat, p0_hat=p0_hat, D=D, I1=I1, I0=I0, delta=delta
     )
 
     # Newcombe CC CI (difference of proportions → CC transform)
-    x1 = int(round(p1_hat * n1))
-    x0 = int(round(p0_hat * n0))
+    x1 = round(p1_hat * n1)
+    x0 = round(p0_hat * n0)
     try:
         newc_lo, newc_hi = cc_confint_newcombe(x1, n1, x0, n0, D, delta=delta)
     except TypeError:
@@ -522,7 +520,7 @@ def _bootstrap_ci(
     alpha: float = 0.05,
     B: int = 10_000,
     random_state: int = 1337,
-) -> Optional[Tuple[float, float]]:
+) -> tuple[float, float] | None:
     arr = np.asarray([x for x in data if np.isfinite(x)], dtype=float)
     if arr.size < 3:
         return None
@@ -538,7 +536,7 @@ def _write_summary_csv(
     out_dir: Path,
     cc_series: Sequence[float],
     history: str | Path,
-    rec: Dict[str, Any],
+    rec: dict[str, Any],
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / "summary.csv"
@@ -594,7 +592,7 @@ def _add_week3_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--ci-comparison", action="store_true")
 
 
-def _parse_pair(txt: Optional[str]) -> Optional[Tuple[float, float]]:
+def _parse_pair(txt: str | None) -> tuple[float, float] | None:
     if not txt:
         return None
     parts = [p.strip() for p in str(txt).split(",")]
@@ -603,7 +601,7 @@ def _parse_pair(txt: Optional[str]) -> Optional[Tuple[float, float]]:
     return float(parts[0]), float(parts[1])
 
 
-def _parse_quad(txt: Optional[str]) -> Optional[Tuple[float, float, float, float]]:
+def _parse_quad(txt: str | None) -> tuple[float, float, float, float] | None:
     if not txt:
         return None
     parts = [p.strip() for p in str(txt).split(",")]
@@ -612,7 +610,7 @@ def _parse_quad(txt: Optional[str]) -> Optional[Tuple[float, float, float, float
     return float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3])
 
 
-def main(argv: Optional[Iterable[str]] = None) -> None:
+def main(argv: Iterable[str] | None = None) -> None:
     ap = argparse.ArgumentParser(
         description="Generate figures and summary.csv from audit history with Week-3 extensions."
     )

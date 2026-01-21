@@ -15,7 +15,7 @@ touch any of the model classes.
 
 import json
 import unicodedata
-from typing import Any, Dict
+from typing import Any
 
 from hypothesis import assume, given
 from hypothesis import strategies as st
@@ -49,7 +49,7 @@ def canonical_json(obj: Any) -> str:
         max_size=10,
     )
 )
-def test_hash_json_deterministic_no_salt(obj: Dict[str, int]):
+def test_hash_json_deterministic_no_salt(obj: dict[str, int]):
     """
     _hash_json must be deterministic for the same object when no salt is used.
 
@@ -81,7 +81,7 @@ def test_hash_json_deterministic_no_salt(obj: Dict[str, int]):
     ),
     salt=st.binary(min_size=1, max_size=16),
 )
-def test_hash_json_salt_changes_hash(obj: Dict[str, int], salt: bytes):
+def test_hash_json_salt_changes_hash(obj: dict[str, int], salt: bytes):
     """
     Adding a non-empty salt should almost always change the hash.
 
@@ -114,7 +114,7 @@ def test_hash_json_collision_smoke_for_unique_canonical_inputs():
     canonicals = {canonical_json(o) for o in objs}
     assert len(canonicals) == len(objs)
 
-    hashes: Dict[str, str] = {}
+    hashes: dict[str, str] = {}
     for o in objs:
         cj = canonical_json(o)
         h = _hash_json(o)

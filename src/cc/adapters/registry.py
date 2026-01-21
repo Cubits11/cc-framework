@@ -3,25 +3,26 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Type
+from collections.abc import Mapping
+from typing import Any
 
 from .base import GuardrailAdapter
 from .guardrails_ai import GuardrailsAIAdapter
 from .llama_guard import LlamaGuardAdapter
 from .nemo_guardrails import NeMoGuardrailsAdapter
 
-ADAPTER_REGISTRY: Dict[str, Type[GuardrailAdapter]] = {
+ADAPTER_REGISTRY: dict[str, type[GuardrailAdapter]] = {
     "llama_guard": LlamaGuardAdapter,
     "nemo_guardrails": NeMoGuardrailsAdapter,
     "guardrails_ai": GuardrailsAIAdapter,
 }
 
 
-def list_adapters() -> Dict[str, Type[GuardrailAdapter]]:
+def list_adapters() -> dict[str, type[GuardrailAdapter]]:
     return dict(ADAPTER_REGISTRY)
 
 
-def get_adapter_class(name: str) -> Type[GuardrailAdapter]:
+def get_adapter_class(name: str) -> type[GuardrailAdapter]:
     key = (name or "").strip()
     if key not in ADAPTER_REGISTRY:
         raise KeyError(f"Unknown adapter '{name}'. Available: {sorted(ADAPTER_REGISTRY)}")

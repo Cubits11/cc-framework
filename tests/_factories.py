@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Union
-
 from cc.core.models import AttackResult, WorldBit
 
 
-def _normalize_world_bit(world_bit: Union[int, WorldBit]) -> WorldBit:
+def _normalize_world_bit(world_bit: int | WorldBit) -> WorldBit:
     if isinstance(world_bit, WorldBit):
         return world_bit
     return WorldBit(int(world_bit))
@@ -15,7 +13,7 @@ def _normalize_world_bit(world_bit: Union[int, WorldBit]) -> WorldBit:
 
 def _deterministic_transcript(
     *,
-    world_bit: Union[int, WorldBit],
+    world_bit: int | WorldBit,
     success: bool,
     attack_id: str,
     guardrails_applied: str,
@@ -23,19 +21,13 @@ def _deterministic_transcript(
 ) -> str:
     wb = _normalize_world_bit(world_bit)
     return (
-        "attack_id={attack_id}|world_bit={world_bit}|success={success}|"
-        "guardrails_applied={guardrails_applied}|rng_seed={rng_seed}"
-    ).format(
-        attack_id=attack_id,
-        world_bit=int(wb),
-        success=success,
-        guardrails_applied=guardrails_applied,
-        rng_seed=rng_seed,
+        f"attack_id={attack_id}|world_bit={int(wb)}|success={success}|"
+        f"guardrails_applied={guardrails_applied}|rng_seed={rng_seed}"
     )
 
 
 def mk_attack_result(
-    world_bit: Union[int, WorldBit],
+    world_bit: int | WorldBit,
     success: bool,
     attack_id: str,
     guardrails_applied: str,

@@ -1,5 +1,5 @@
 # src/cc/guardrails/regex_filter.py
-"""Regular-expression–based guardrail with calibration, explainability, and safety niceties.
+"""Regular-expression-based guardrail with calibration, explainability, and safety niceties.
 
 Features
 --------
@@ -20,8 +20,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any
 
 try:
     # Third-party 'regex' supports timeouts; use if available
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 # Small helper to normalize flags from strings or ints
-_FLAG_MAP: Dict[str, int] = {
+_FLAG_MAP: dict[str, int] = {
     "I": re.IGNORECASE,
     "IGNORECASE": re.IGNORECASE,
     "M": re.MULTILINE,
@@ -54,7 +55,7 @@ _FLAG_MAP: Dict[str, int] = {
 }
 
 
-def _parse_flags(flags: Union[int, str, Iterable[str], None]) -> int:
+def _parse_flags(flags: int | str | Iterable[str] | None) -> int:
     if flags is None:
         return 0
     if isinstance(flags, int):
@@ -102,19 +103,19 @@ class RegexFilter(Guardrail):
         Friendly name for reporting; defaults to "regex_filter".
     """
 
-    patterns: Union[str, List[str]]
-    flags: Union[int, str, Iterable[str], None] = None
-    per_pattern_flags: Optional[Dict[str, Union[int, str, Iterable[str]]]] = None
+    patterns: str | list[str]
+    flags: int | str | Iterable[str] | None = None
+    per_pattern_flags: dict[str, int | str | Iterable[str]] | None = None
     min_hits: int = 1
     use_regex_backend: bool = True
     match_timeout_ms: int = 15
     binary_score: bool = True
     name: str = "regex_filter"
 
-    compiled: List[CompiledPattern] = field(default_factory=list, init=False)
+    compiled: list[CompiledPattern] = field(default_factory=list, init=False)
     threshold: float = field(default=0.5, init=False)  # preserved for compatibility
-    calibrated_fpr_: Optional[float] = field(default=None, init=False)
-    calib_hist_: Optional[Dict[str, Any]] = field(default=None, init=False)
+    calibrated_fpr_: float | None = field(default=None, init=False)
+    calib_hist_: dict[str, Any] | None = field(default=None, init=False)
 
     # -------------------------------
     # Guardrail lifecycle
@@ -142,7 +143,7 @@ class RegexFilter(Guardrail):
         denom = max(1, len(self.compiled))
         return min(1.0, hits / denom)
 
-    def explain(self, text: str, max_examples: int = 3) -> Dict[str, Any]:
+    def explain(self, text: str, max_examples: int = 3) -> dict[str, Any]:
         """
         Return a structured explanation of which patterns matched.
         {
@@ -156,7 +157,7 @@ class RegexFilter(Guardrail):
         }
         """
         hits, spans = self._match_details(text, want_spans=True)
-        examples: List[Dict[str, Any]] = []
+        examples: list[dict[str, Any]] = []
         for pat, mlist in spans:
             ex = []
             for m in mlist[:max_examples]:
@@ -173,7 +174,7 @@ class RegexFilter(Guardrail):
             "matches": examples,
         }
 
-    def calibrate(self, benign_texts: List[str], target_fpr: float = 0.05) -> None:
+    def calibrate(self, benign_texts: list[str], target_fpr: float = 0.05) -> None:
         """
         Choose the smallest 'min_hits' that achieves FPR <= target on benign_texts.
 
@@ -224,7 +225,7 @@ class RegexFilter(Guardrail):
     # Config helpers
     # -------------------------------
     @classmethod
-    def from_config(cls, cfg: Dict[str, Any]) -> "RegexFilter":
+    def from_config(cls, cfg: dict[str, Any]) -> RegexFilter:
         """
         Construct from a dict config; useful when loading YAML/JSON.
         Expected keys (all optional except 'patterns'):
@@ -248,7 +249,7 @@ class RegexFilter(Guardrail):
             name=str(cfg.get("name", "regex_filter")),
         )
 
-    def to_config(self) -> Dict[str, Any]:
+    def to_config(self) -> dict[str, Any]:
         """Serialize to a simple config dict."""
         return {
             "patterns": [p.raw for p in self.compiled] if self.compiled else self.patterns,
@@ -270,7 +271,7 @@ class RegexFilter(Guardrail):
         global_flags = _parse_flags(self.flags)
         pp_flags = self.per_pattern_flags or {}
 
-        compiled: List[CompiledPattern] = []
+        compiled: list[CompiledPattern] = []
         for raw in pats:
             f = global_flags | _parse_flags(pp_flags.get(raw))
             try:
@@ -285,7 +286,7 @@ class RegexFilter(Guardrail):
                 raise
         self.compiled = compiled
 
-    def _search_once(self, pat: CompiledPattern, text: str) -> Optional[Any]:
+    def _search_once(self, pat: CompiledPattern, text: str) -> Any | None:
         """Search with optional timeout if using 'regex' backend."""
         if pat.engine == "regex" and _HAS_REGEX:
             try:
@@ -302,9 +303,9 @@ class RegexFilter(Guardrail):
             # stdlib 're' has no timeout
             return pat.compiled.search(text)
 
-    def _finditer(self, pat: CompiledPattern, text: str, max_matches: int = 16) -> List[Any]:
+    def _finditer(self, pat: CompiledPattern, text: str, max_matches: int = 16) -> list[Any]:
         """Return up to 'max_matches' match objects for explanation."""
-        out: List[Any] = []
+        out: list[Any] = []
         try:
             if pat.engine == "regex" and _HAS_REGEX:
                 for m in pat.compiled.finditer(text, timeout=self.match_timeout_ms / 1000.0):
@@ -322,10 +323,10 @@ class RegexFilter(Guardrail):
 
     def _match_details(
         self, text: str, want_spans: bool
-    ) -> Tuple[int, List[Tuple[CompiledPattern, List[Any]]]]:
+    ) -> tuple[int, list[tuple[CompiledPattern, list[Any]]]]:
         """Return (#patterns that match, [(pattern, [matches]) ...])"""
         hits = 0
-        spans: List[Tuple[CompiledPattern, List[Any]]] = []
+        spans: list[tuple[CompiledPattern, list[Any]]] = []
         for pat in self.compiled:
             m = self._search_once(pat, text)
             if m:

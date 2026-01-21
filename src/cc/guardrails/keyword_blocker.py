@@ -15,15 +15,15 @@ Notes:
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Set
 
 import numpy as np
 
 from .base import Guardrail
 
 
-def _bigram_set(s: str) -> Set[str]:
+def _bigram_set(s: str) -> set[str]:
     """Return the set of character bigrams for a lowercased string."""
     if not s:
         return set()
@@ -33,7 +33,7 @@ def _bigram_set(s: str) -> Set[str]:
     return {s[i : i + 2] for i in range(len(s) - 1)}
 
 
-def _jaccard(a: Set[str], b: Set[str]) -> float:
+def _jaccard(a: set[str], b: set[str]) -> float:
     """Jaccard similarity for sets (safe on empties)."""
     if not a and not b:
         return 1.0
@@ -59,9 +59,9 @@ class KeywordBlocker(Guardrail):
         self.cfg = cfg or KeywordBlockerConfig()
 
         # Normalize/keep only non-empty
-        self.keywords: Set[str] = {k.strip().lower() for k in keywords if k and k.strip()}
+        self.keywords: set[str] = {k.strip().lower() for k in keywords if k and k.strip()}
         # Precompute bigrams for fuzzy similarity
-        self._kw_bigrams: Dict[str, Set[str]] = {k: _bigram_set(k) for k in self.keywords}
+        self._kw_bigrams: dict[str, set[str]] = {k: _bigram_set(k) for k in self.keywords}
 
         # Decision threshold (strictly greater than)
         self.blocking_threshold: float = float(self.cfg.initial_threshold)
@@ -154,7 +154,7 @@ class KeywordBlocker(Guardrail):
 
     # ----------------- Utilities -----------------
 
-    def keywords_list(self) -> List[str]:
+    def keywords_list(self) -> list[str]:
         """Sorted keywords for UIs/tests."""
         return sorted(self.keywords)
 

@@ -8,10 +8,10 @@ from .nemo_guardrails import NeMoGuardrailsAdapter
 from .registry import ADAPTER_REGISTRY
 
 __all__ = [
+    "ADAPTER_REGISTRY",
     "Decision",
     "GuardrailAdapter",
     "GuardrailsAIAdapter",
     "LlamaGuardAdapter",
     "NeMoGuardrailsAdapter",
-    "ADAPTER_REGISTRY",
 ]

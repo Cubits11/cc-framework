@@ -10,7 +10,7 @@ Scope:
 - Cross-version schema_version handling for AttackResult
 """
 
-from typing import Any, Dict, Type
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -33,7 +33,7 @@ from tests._factories import mk_attack_result
 # ---------------------------------------------------------------------
 
 
-def roundtrip_via_json(model_cls: Type[ModelBase], data: Dict[str, Any]) -> None:
+def roundtrip_via_json(model_cls: type[ModelBase], data: dict[str, Any]) -> None:
     """
     Generic JSON roundtrip for ModelBase subclasses.
 
@@ -109,8 +109,8 @@ def roundtrip_via_json(model_cls: Type[ModelBase], data: Dict[str, Any]) -> None
     ],
 )
 def test_roundtrip_all_models_via_json(
-    model_cls: Type[ModelBase],
-    data: Dict[str, Any],
+    model_cls: type[ModelBase],
+    data: dict[str, Any],
 ) -> None:
     """
     Simple sanity: all major models should support JSON roundtrip without
@@ -124,7 +124,7 @@ def test_roundtrip_all_models_via_json(
 # ---------------------------------------------------------------------
 
 
-def _valid_attack_result_fields() -> Dict[str, Any]:
+def _valid_attack_result_fields() -> dict[str, Any]:
     """
     Baseline valid field set for AttackResult.
 

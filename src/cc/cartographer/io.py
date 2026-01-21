@@ -22,7 +22,8 @@ Conventions
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import numpy as np
 import yaml
@@ -41,7 +42,7 @@ def load_config(path: str) -> Mapping[str, Any]:
         TypeError: if the root YAML node is not a mapping.
         yaml.YAMLError: if YAML parsing fails.
     """
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         raise TypeError(f"Config at {path} is not a mapping")
@@ -53,7 +54,7 @@ def load_config(path: str) -> Mapping[str, Any]:
 # =============================================================================
 
 
-def parse_samples(n: Optional[int], cfg: Mapping[str, Any], default: int = 200) -> int:
+def parse_samples(n: int | None, cfg: Mapping[str, Any], default: int = 200) -> int:
     """
     Robustly resolve sample size from CLI integer or cfg['samples'].
 
@@ -97,7 +98,7 @@ def _roc_from_scores(s0: np.ndarray, s1: np.ndarray, max_pts: int = 256) -> np.n
     Construct a ROC array [[FPR, TPR], ...] from score vectors.
 
     Conventions:
-      - Higher score ⇒ more likely to predict "attack"/positive.
+      - Higher score => more likely to predict "attack"/positive.
       - Threshold rule: predict positive if score >= t.
       - Uses pooled unique thresholds; subsamples if too many.
 
@@ -145,7 +146,7 @@ def _roc_from_scores(s0: np.ndarray, s1: np.ndarray, max_pts: int = 256) -> np.n
 # =============================================================================
 
 
-def load_scores(cfg: Mapping[str, Any], n: Optional[int] = None) -> Mapping[str, Any]:
+def load_scores(cfg: Mapping[str, Any], n: int | None = None) -> Mapping[str, Any]:
     """
     Generate deterministic toy A/B score sets and their ROC curves for smoke runs.
 
@@ -179,7 +180,7 @@ def load_scores(cfg: Mapping[str, Any], n: Optional[int] = None) -> Mapping[str,
     B1 = rng.normal(loc=mu_B, scale=sigma, size=size)
     rocB = _roc_from_scores(B0, B1)
 
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "A0": A0,
         "A1": A1,
         "B0": B0,

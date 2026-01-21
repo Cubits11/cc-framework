@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/adapters/registry.py
+# hypothesis_version: 6.147.0
+
+['guardrails_ai', 'llama_guard', 'name', 'nemo_guardrails']

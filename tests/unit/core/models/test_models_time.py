@@ -8,7 +8,7 @@ Focus:
 - _iso_from_unix: ISO-8601 format, precision, UTC semantics, ordering
 
 These tests are deliberately narrow: they do NOT touch model classes
-(AttackResult, ExperimentConfig, etc.) – those live in their own files.
+(AttackResult, ExperimentConfig, etc.) - those live in their own files.
 """
 
 import calendar
@@ -44,7 +44,7 @@ def test_now_unix_is_recent_and_monotone():
     assert isinstance(t1, float)
     assert isinstance(t2, float)
 
-    # Not absurdly old – within a few seconds of the system clock.
+    # Not absurdly old - within a few seconds of the system clock.
     assert t1 > time.time() - 5.0
 
     # Non-decreasing in normal operation.

@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/core/registry.py
+# hypothesis_version: 6.147.0
+
+[0.6, 'blocks', 'build_attacker', 'build_guardrails', 'evaluate', 'keyword', 'keyword_blocker', 'list_attackers', 'list_guardrails', 'name', 'params', 'rand_inject', 'random', 'random_injection', 'regex', 'regex_filter', 'regex_filters', 'register_attacker', 'register_guardrail', 'score', 'semantic', 'semantic_filter', 'toy_threshold', 'type']

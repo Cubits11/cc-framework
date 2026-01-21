@@ -13,7 +13,7 @@ import random
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import yaml
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_config(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
@@ -54,7 +54,7 @@ def _deep_set(cfg: dict, dotted: str, value: Any) -> None:
     cur[keys[-1]] = value
 
 
-def apply_overrides(cfg: dict, kvs: List[str]) -> dict:
+def apply_overrides(cfg: dict, kvs: list[str]) -> dict:
     """--set a.b=1 c.d=0.1    (int/float autodetected, else str)"""
     for kv in kvs:
         if "=" not in kv:
@@ -140,8 +140,8 @@ def create_attacker(cfg: dict):
     raise ValueError(f"Unknown attacker type: {a_type!r}")
 
 
-def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
-    worlds: Dict[int, WorldConfig] = {}
+def create_world_configs(cfg: dict) -> dict[int, WorldConfig]:
+    worlds: dict[int, WorldConfig] = {}
 
     # World 0 (baseline)
     worlds[0] = WorldConfig(
@@ -152,7 +152,7 @@ def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
     )
 
     # World 1 (guardrails)
-    guardrail_specs: List[GuardrailSpec] = []
+    guardrail_specs: list[GuardrailSpec] = []
     for g in cfg.get("guardrails") or []:
         guardrail_specs.append(
             GuardrailSpec(
@@ -176,7 +176,7 @@ def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
 # --------------------------------------------------------------------------- #
 
 
-def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int, float]:
+def _resolve_world_fprs(calibration_summary: dict[str, Any] | None) -> dict[int, float]:
     """Return world-indexed FPRs using calibration metadata when available."""
 
     if not calibration_summary:
@@ -216,7 +216,7 @@ def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int,
 
 
 def analyze_results(
-    results: List[AttackResult], calibration_summary: Dict[str, Any] | None = None
+    results: list[AttackResult], calibration_summary: dict[str, Any] | None = None
 ) -> dict:
     """Compute success rates, operating points, and CC metrics for the two worlds."""
     w0 = np.array([r.success for r in results if r.world_bit == 0], dtype=float)
@@ -289,7 +289,7 @@ def analyze_results(
 
 def _bootstrap_delta(
     arr0: np.ndarray, arr1: np.ndarray, alpha: float, seed: int = 2025
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     """Bootstrap CI for difference in success rates."""
     if arr0.size == 0 or arr1.size == 0:
         return float("nan"), float("nan"), float("nan")
@@ -304,10 +304,10 @@ def _bootstrap_delta(
 
 
 def _build_csv_rows(
-    results: List[AttackResult], alpha_cap: float, calibration: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+    results: list[AttackResult], alpha_cap: float, calibration: dict[str, Any]
+) -> list[dict[str, Any]]:
     """Construct per-prefix metrics for scan.csv."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     world_fprs = _resolve_world_fprs(calibration)
     fpr_a_default = world_fprs.get(0)
     fpr_b_default = world_fprs.get(1)
@@ -316,7 +316,7 @@ def _build_csv_rows(
         subset = arr_results[:idx]
         w0 = np.array([1.0 if r.success else 0.0 for r in subset if r.world_bit == 0], dtype=float)
         w1 = np.array([1.0 if r.success else 0.0 for r in subset if r.world_bit == 1], dtype=float)
-        row: Dict[str, Any] = {}
+        row: dict[str, Any] = {}
         row["tpr_a"] = ""
         row["tpr_b"] = ""
         row["fpr_a"] = fpr_a_default if fpr_a_default is not None else ""
@@ -436,11 +436,11 @@ def main() -> None:
     ap.add_argument("--experiment-id", default=None, help="Optional tag for this run")
     args = ap.parse_args()
 
-    calibration_summary: Dict[str, Any] = {}
+    calibration_summary: dict[str, Any] = {}
     if args.calibration_summary:
         calib_path = Path(args.calibration_summary)
         if calib_path.exists():
-            with open(calib_path, "r", encoding="utf-8") as f:
+            with open(calib_path, encoding="utf-8") as f:
                 calibration_summary = json.load(f)
 
     # Load & override config
@@ -519,7 +519,7 @@ def main() -> None:
         print(f"Starting experiment: n_sessions={n_sessions} (exp_id={exp_id})")
 
         # Run
-        results: List[AttackResult] = protocol.run_experiment(
+        results: list[AttackResult] = protocol.run_experiment(
             attacker=attacker,
             world_configs=worlds,
             n_sessions=n_sessions,

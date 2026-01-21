@@ -14,6 +14,7 @@ This script orchestrates the full correlation cliff experiment pipeline:
 
 Supports both legacy single-run schema and enterprise matrix schema.
 """
+import contextlib
 import hashlib
 import json
 import logging
@@ -21,10 +22,11 @@ import platform
 import subprocess
 import sys
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -148,11 +150,11 @@ def _atomic_write_text(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
-def _write_json(path: Path, obj: Dict[str, Any]) -> None:
+def _write_json(path: Path, obj: dict[str, Any]) -> None:
     _atomic_write_text(path, json.dumps(obj, indent=2, sort_keys=True) + "\n")
 
 
-def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> Optional[float]:
+def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> float | None:
     if len(x) < 2:
         return None
     for i in range(len(x) - 1):
@@ -175,7 +177,7 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _maybe_git_commit(repo_root: Path) -> Optional[str]:
+def _maybe_git_commit(repo_root: Path) -> str | None:
     """
     Best-effort git commit capture. Returns None if not available.
     """
@@ -219,7 +221,7 @@ def _validate_probability(p: float, name: str) -> float:
     return v
 
 
-def _linspace_grid(start: float, stop: float, num: int) -> List[float]:
+def _linspace_grid(start: float, stop: float, num: int) -> list[float]:
     if num < 2:
         raise ValueError(f"lambda grid num must be >=2, got {num}")
     a = float(start)
@@ -237,8 +239,8 @@ class RunSpec:
 
     rule: str
     path: str
-    path_params: Dict[str, Any]
-    lambdas_coarse: List[float]
+    path_params: dict[str, Any]
+    lambdas_coarse: list[float]
     refine_enabled: bool
     refine_half_width: float
     refine_num: int
@@ -247,7 +249,7 @@ class RunSpec:
 
 def _resolve_runs(
     cfg: Mapping[str, Any],
-) -> Tuple[TwoWorldMarginals, List[RunSpec], Dict[str, Any]]:
+) -> tuple[TwoWorldMarginals, list[RunSpec], dict[str, Any]]:
     """
     Resolve a pipeline config into:
     - TwoWorldMarginals
@@ -282,9 +284,9 @@ def _resolve_runs(
         cfg.get("composition"), Mapping
     )
 
-    rules: List[str] = []
-    paths: List[
-        Tuple[str, Dict[str, Any], Mapping[str, Any]]
+    rules: list[str] = []
+    paths: list[
+        tuple[str, dict[str, Any], Mapping[str, Any]]
     ] = []  # (path, params, primary_cfg_for_refine)
 
     if has_pipeline:
@@ -318,7 +320,7 @@ def _resolve_runs(
             if not isinstance(item, Mapping):
                 raise ValueError("dependence_paths.sensitivity items must be mappings")
             t = str(item.get("type", "fh_linear"))
-            pp: Dict[str, Any] = {}
+            pp: dict[str, Any] = {}
             for k in ("gamma", "k", "ppf_clip_eps"):
                 if k in item:
                     pp[k] = item[k]
@@ -371,9 +373,9 @@ def _resolve_runs(
         refine_method = "uniform"
 
     # Produce cartesian product of rules × paths
-    runs: List[RunSpec] = []
+    runs: list[RunSpec] = []
     for r in rules:
-        for ptype, pparams, primary_cfg_for_refine in paths:
+        for ptype, pparams, _primary_cfg_for_refine in paths:
             runs.append(
                 RunSpec(
                     rule=r,
@@ -391,7 +393,7 @@ def _resolve_runs(
         "schema_detected": "pipeline" if has_pipeline else "legacy",
         "rules": rules,
         "paths": [p[0] for p in paths],
-        "coarse_grid_n": int(len(lambdas_coarse)),
+        "coarse_grid_n": len(lambdas_coarse),
         "refine_enabled": bool(refine_enabled),
         "refine_half_width": float(refine_half_width),
         "refine_num": int(refine_num),
@@ -400,7 +402,7 @@ def _resolve_runs(
     return marg, runs, meta
 
 
-def _resolve_output_base(cfg: Mapping[str, Any], config_path: Path) -> Tuple[Path, Dict[str, Any]]:
+def _resolve_output_base(cfg: Mapping[str, Any], config_path: Path) -> tuple[Path, dict[str, Any]]:
     """
     Resolve output base dir and per-run subdir policy.
     Supports:
@@ -444,9 +446,9 @@ def population_curve_from_path(cfg: SimConfig) -> pd.DataFrame:
     Compute the population (infinite-sample) curve for the configured dependence path.
     This is path-aware and includes FH envelopes and dependence summaries (phi, tau).
     """
-    rows: list[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for lam in cfg.lambdas:
-        row: Dict[str, Any] = {"lambda": float(lam), "rule": cfg.rule, "path": cfg.path}
+        row: dict[str, Any] = {"lambda": float(lam), "rule": cfg.rule, "path": cfg.path}
         # Population feasibility envelope for JC (path-independent; FH feasibility only)
         jmin, jmax = compute_fh_jc_envelope(cfg.marginals, cfg.rule)
         row["JC_env_min"] = float(jmin)
@@ -498,11 +500,11 @@ def population_curve_from_path(cfg: SimConfig) -> pd.DataFrame:
 def estimate_thresholds(
     df_pop: pd.DataFrame,
     df_sum: pd.DataFrame,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Estimate population and empirical thresholds from curves.
     """
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     # Population threshold
     out["lambda_star_pop"] = _interp_root(
         df_pop["lambda"].to_numpy(dtype=float),
@@ -526,12 +528,12 @@ def estimate_thresholds(
 def write_manifest(
     *,
     out_dir: Path,
-    cfg_dict: Dict[str, Any],
-    cfg_resolved: Dict[str, Any],
-    thresholds: Dict[str, Any],
-    figure_paths: Dict[str, str],
-    files_hashed: Dict[str, str],
-    run_meta: Dict[str, Any],
+    cfg_dict: dict[str, Any],
+    cfg_resolved: dict[str, Any],
+    thresholds: dict[str, Any],
+    figure_paths: dict[str, str],
+    files_hashed: dict[str, str],
+    run_meta: dict[str, Any],
 ) -> None:
     """
     Write a reproducibility manifest capturing config + environment + outputs.
@@ -541,7 +543,7 @@ def write_manifest(
         if len(Path(__file__).resolve().parents) >= 3
         else Path(__file__).resolve().parent
     )
-    manifest: Dict[str, Any] = {
+    manifest: dict[str, Any] = {
         "run_started_utc": run_meta.get("run_started_utc"),
         "run_finished_utc": datetime.utcnow().isoformat() + "Z",
         "elapsed_seconds": float(run_meta.get("elapsed_seconds", float("nan"))),
@@ -562,7 +564,7 @@ def write_manifest(
 # ----------------------------
 # Main runner
 # ----------------------------
-def _load_yaml(path: Path) -> Dict[str, Any]:
+def _load_yaml(path: Path) -> dict[str, Any]:
     """
     YAML loader (explicit dependency).
     """
@@ -570,7 +572,7 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
         import yaml  # type: ignore
     except Exception as e:
         raise ImportError("pyyaml is required to run run_all.py with a YAML config") from e
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         obj = yaml.safe_load(f)
     if obj is None:
         return {}
@@ -580,7 +582,7 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 
 
 def _build_sim_config(
-    cfg: Mapping[str, Any], marg: TwoWorldMarginals, run: RunSpec, lambdas: List[float]
+    cfg: Mapping[str, Any], marg: TwoWorldMarginals, run: RunSpec, lambdas: list[float]
 ) -> SimConfig:
     """
     Build SimConfig from either:
@@ -649,12 +651,12 @@ def _build_sim_config(
 
 def _maybe_refine_grid(
     *,
-    lambdas_coarse: List[float],
-    lam_star: Optional[float],
+    lambdas_coarse: list[float],
+    lam_star: float | None,
     enabled: bool,
     half_width: float,
     num: int,
-) -> List[float]:
+) -> list[float]:
     if not enabled or lam_star is None or not math.isfinite(lam_star):
         return sorted({float(x) for x in lambdas_coarse})
     a = max(0.0, float(lam_star) - float(half_width))
@@ -665,7 +667,7 @@ def _maybe_refine_grid(
 
 def run(
     config_path: Path,
-    out_dir: Optional[Path] = None,
+    out_dir: Path | None = None,
     *,
     skip_sim: bool = False,
     skip_figures: bool = False,
@@ -711,8 +713,8 @@ def run(
     else:
         also_png = bool(_get(cfg_map, "also_png", True))
 
-    files_hashed: Dict[str, str] = {}
-    run_index: List[Dict[str, Any]] = []
+    files_hashed: dict[str, str] = {}
+    run_index: list[dict[str, Any]] = []
 
     # Run each (rule × path) combo into its own subdir for hygiene
     for rs in runs:
@@ -763,7 +765,7 @@ def run(
         _write_json(subdir / "thresholds.json", thresholds)
 
         # 5) Figures
-        figure_paths: Dict[str, str] = {}
+        figure_paths: dict[str, str] = {}
         if not skip_figures:
             style = FigureStyle(title_prefix=title_prefix, neutrality_eta=neutrality_eta)
             figure_paths = make_all_figures(
@@ -787,10 +789,8 @@ def run(
             for _, fp in figure_paths.items():
                 pp = Path(fp)
                 if pp.exists():
-                    try:
+                    with contextlib.suppress(Exception):
                         files_hashed[str(pp.relative_to(out_dir))] = _sha256_file(pp)
-                    except Exception:
-                        pass
 
         run_index.append(
             {
@@ -846,7 +846,7 @@ def run(
     return out_dir
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
     ap = argparse.ArgumentParser(description="Run the full correlation_cliff experiment pipeline.")

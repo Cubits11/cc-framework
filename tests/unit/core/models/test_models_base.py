@@ -15,7 +15,7 @@ Scope:
 
 import concurrent.futures
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 from hypothesis import given
@@ -299,9 +299,9 @@ def test_modelbase_protobuf_basic_fields_preserved():
     msg = m.to_protobuf()
 
     assert isinstance(msg, PBMessage)
-    assert getattr(msg, "field") == 42
-    assert getattr(msg, "extra_field") == "hello"
-    assert getattr(msg, "schema_version") == "4.2"
+    assert msg.field == 42
+    assert msg.extra_field == "hello"
+    assert msg.schema_version == "4.2"
 
 
 @pytest.mark.skipif(not PROTO_AVAILABLE, reason="protobuf not available")
@@ -339,7 +339,7 @@ def test_modelbase_openapi_schema_includes_field_description():
 
 
 @given(st.dictionaries(st.text(min_size=1, max_size=10), st.text()))
-def test_modelbase_migrate_best_effort(old_data: Dict[str, str]):
+def test_modelbase_migrate_best_effort(old_data: dict[str, str]):
     """
     migrate() should be best-effort and never throw on arbitrary old dicts.
 
@@ -349,7 +349,7 @@ def test_modelbase_migrate_best_effort(old_data: Dict[str, str]):
     """
 
     class TestModel(ModelBase):
-        optional_field: Optional[str] = None
+        optional_field: str | None = None
 
     # Ensure schema_version is not present to exercise defaulting behaviour
     old_data = {k: v for k, v in old_data.items() if k != "schema_version"}
@@ -367,7 +367,7 @@ def test_modelbase_migrate_preserves_known_fields_ignores_extra():
     """
 
     class TestModel(ModelBase):
-        optional_field: Optional[str] = None
+        optional_field: str | None = None
 
     old_data = {
         "optional_field": "hello",

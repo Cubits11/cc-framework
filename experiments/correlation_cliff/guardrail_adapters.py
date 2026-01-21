@@ -6,7 +6,6 @@ Each adapter implements: .check(text: str) -> bool
 
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, List
 
 
 class GuardrailAdapter(ABC):
@@ -15,9 +14,8 @@ class GuardrailAdapter(ABC):
     @abstractmethod
     def check(self, text: str) -> bool:
         """Returns True if guardrail triggers (blocks), False if passes."""
-        pass
 
-    def batch_check(self, texts: List[str]) -> List[bool]:
+    def batch_check(self, texts: list[str]) -> list[bool]:
         """Batch interface (default: sequential calls)."""
         return [self.check(t) for t in texts]
 
@@ -25,7 +23,7 @@ class GuardrailAdapter(ABC):
 class OpenAIModerationAdapter(GuardrailAdapter):
     """OpenAI Moderation API v2."""
 
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str | None = None):
         import openai
 
         self.client = openai.OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
@@ -38,7 +36,7 @@ class OpenAIModerationAdapter(GuardrailAdapter):
 class PerspectiveAPIAdapter(GuardrailAdapter):
     """Google Perspective API (toxicity)."""
 
-    def __init__(self, api_key: str = None, threshold: float = 0.7):
+    def __init__(self, api_key: str | None = None, threshold: float = 0.7):
         from googleapiclient import discovery
 
         self.api_key = api_key or os.getenv("PERSPECTIVE_API_KEY")
@@ -86,7 +84,7 @@ def evaluate_guardrail_pair(
     rail_A: GuardrailAdapter,
     rail_B: GuardrailAdapter,
     dataset: TwoWorldDataset,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Evaluate two guardrails on a two-world dataset.
     Returns marginals: {pA0, pB0, pA1, pB1}

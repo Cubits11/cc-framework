@@ -7,29 +7,29 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from cc.cartographer import audit as audit_chain
 
 
-def _load_manifest(path: Path) -> Dict[str, Any]:
+def _load_manifest(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _manifest_paths(manifest_dir: Path) -> List[Path]:
+def _manifest_paths(manifest_dir: Path) -> list[Path]:
     if not manifest_dir.exists():
         return []
     return sorted(p for p in manifest_dir.glob("*.json") if not p.name.endswith(".jsonl"))
 
 
-def _chain_head_for(run_id: str, manifest_dir: Path) -> Optional[str]:
+def _chain_head_for(run_id: str, manifest_dir: Path) -> str | None:
     chain_path = manifest_dir / f"{run_id}.jsonl"
     if not chain_path.exists():
         return None
     return audit_chain.tail_sha(str(chain_path))
 
 
-def _manifest_entry(path: Path, manifest_dir: Path) -> Dict[str, Any]:
+def _manifest_entry(path: Path, manifest_dir: Path) -> dict[str, Any]:
     payload = _load_manifest(path)
     run_id = payload.get("run_id") or path.stem
     chain_path = manifest_dir / f"{run_id}.jsonl"
@@ -44,9 +44,9 @@ def _manifest_entry(path: Path, manifest_dir: Path) -> Dict[str, Any]:
 def _resolve_manifest(
     *,
     manifest_dir: Path,
-    run_id: Optional[str],
-    chain_hash: Optional[str],
-) -> Tuple[Optional[Path], Optional[Dict[str, Any]]]:
+    run_id: str | None,
+    chain_hash: str | None,
+) -> tuple[Path | None, dict[str, Any] | None]:
     if run_id:
         candidate = manifest_dir / f"{run_id}.json"
         if candidate.exists():
@@ -105,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "show" and not (args.run_id or args.hash):

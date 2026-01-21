@@ -19,7 +19,8 @@ Updated: 2025-09-28
 from __future__ import annotations
 
 import difflib
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Type
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 # Core types
 from cc.core.attackers import AttackStrategy, RandomInjectionAttacker
@@ -53,7 +54,7 @@ except Exception:  # pragma: no cover
 # Attacker registry
 # ------------------------------------------------------------------------------
 
-_Attackers: Dict[str, Type[AttackStrategy]] = {
+_Attackers: dict[str, type[AttackStrategy]] = {
     # canonical
     "random_injection": RandomInjectionAttacker,
     # aliases
@@ -65,7 +66,7 @@ _Attackers: Dict[str, Type[AttackStrategy]] = {
 # Guardrail registry (class references) + aliases
 # ------------------------------------------------------------------------------
 
-_Guardrails: Dict[str, Optional[Type[Guardrail]]] = {
+_Guardrails: dict[str, type[Guardrail] | None] = {
     # canonical names
     "keyword_blocker": KeywordBlocker,
     "regex_filter": RegexFilter,  # preferred modern name
@@ -110,8 +111,8 @@ def _ensure_guardrail_interface(obj: Any) -> None:
 
 
 def _instantiate_guardrail(
-    cls: Type[Guardrail],
-    params: Optional[Mapping[str, Any]],
+    cls: type[Guardrail],
+    params: Mapping[str, Any] | None,
 ) -> Guardrail:
     """Create and validate a guardrail instance."""
     instance = cls(**(params or {}))  # type: ignore[call-arg]
@@ -119,7 +120,7 @@ def _instantiate_guardrail(
     return instance
 
 
-def _resolve_guardrail_class(name: str) -> Type[Guardrail]:
+def _resolve_guardrail_class(name: str) -> type[Guardrail]:
     """
     Resolve a guardrail class by (case-insensitive) name with aliasing,
     raising a clear error if missing or not importable.
@@ -138,7 +139,7 @@ def _resolve_guardrail_class(name: str) -> Type[Guardrail]:
 # ------------------------------------------------------------------------------
 
 
-def build_attacker(cfg: Optional[Dict[str, Any]]) -> AttackStrategy:
+def build_attacker(cfg: dict[str, Any] | None) -> AttackStrategy:
     """
     Build an attacker from a dict config:
       cfg = {"type": <name>, "params": {...}}
@@ -157,7 +158,7 @@ def build_attacker(cfg: Optional[Dict[str, Any]]) -> AttackStrategy:
     return cls(**params)  # type: ignore[call-arg]
 
 
-def build_guardrails(cfg_list: Optional[List[Dict[str, Any]]]) -> List[Guardrail]:
+def build_guardrails(cfg_list: list[dict[str, Any]] | None) -> list[Guardrail]:
     """
     Build a list of guardrails from a list of dict configs:
 
@@ -172,7 +173,7 @@ def build_guardrails(cfg_list: Optional[List[Dict[str, Any]]]) -> List[Guardrail
         ValueError if any name is unknown or unavailable.
         TypeError if constructed instance fails interface validation.
     """
-    out: List[Guardrail] = []
+    out: list[Guardrail] = []
     for cfg in cfg_list or []:
         name = cfg.get("name")
         if not name:
@@ -183,13 +184,13 @@ def build_guardrails(cfg_list: Optional[List[Dict[str, Any]]]) -> List[Guardrail
     return out
 
 
-def build_guardrail_stack_from_specs(specs: Optional[List[GuardrailSpec]]) -> List[Guardrail]:
+def build_guardrail_stack_from_specs(specs: list[GuardrailSpec] | None) -> list[Guardrail]:
     """
     Build a guardrail stack from typed GuardrailSpec objects.
 
     Each GuardrailSpec carries `name`, `params`, and optional calibration hints.
     """
-    out: List[Guardrail] = []
+    out: list[Guardrail] = []
     for spec in specs or []:
         cls = _resolve_guardrail_class(spec.name)
         out.append(_instantiate_guardrail(cls, spec.params))
@@ -201,17 +202,17 @@ def build_guardrail_stack_from_specs(specs: Optional[List[GuardrailSpec]]) -> Li
 # ------------------------------------------------------------------------------
 
 
-def list_attackers() -> List[str]:
+def list_attackers() -> list[str]:
     """Return canonical attacker keys available in this registry."""
     return sorted(_Attackers.keys())
 
 
-def list_guardrails() -> List[str]:
+def list_guardrails() -> list[str]:
     """Return canonical guardrail keys and known aliases."""
     return sorted(set(_Guardrails.keys()))
 
 
-def register_attacker(name: str, cls: Type[AttackStrategy]) -> None:
+def register_attacker(name: str, cls: type[AttackStrategy]) -> None:
     """
     Register a custom attacker at runtime.
 
@@ -223,7 +224,7 @@ def register_attacker(name: str, cls: Type[AttackStrategy]) -> None:
     _Attackers[name.lower().strip()] = cls
 
 
-def register_guardrail(name: str, cls: Type[Guardrail]) -> None:
+def register_guardrail(name: str, cls: type[Guardrail]) -> None:
     """
     Register a custom guardrail at runtime.
 
@@ -239,7 +240,7 @@ def register_guardrail(name: str, cls: Type[Guardrail]) -> None:
     _Guardrails[key] = cls
     # lightweight interface check (best-effort)
     try:
-        _ensure_guardrail_interface(cls(**{}))  # type: ignore[misc]
+        _ensure_guardrail_interface(cls())  # type: ignore[misc]
     except Exception:
         # Defer strict checks until actual instantiation with params.
         pass
@@ -247,8 +248,8 @@ def register_guardrail(name: str, cls: Type[Guardrail]) -> None:
 
 __all__ = [
     "build_attacker",
-    "build_guardrails",
     "build_guardrail_stack_from_specs",
+    "build_guardrails",
     "list_attackers",
     "list_guardrails",
     "register_attacker",

@@ -26,7 +26,7 @@ simulate_replicate_at_lambda = _export("simulate_replicate_at_lambda", ("core", 
 __all__ = [
     "SimConfig",
     "p11_from_path",
-    "simulate_replicate_at_lambda",
     "simulate_grid",
+    "simulate_replicate_at_lambda",
     "summarize_simulation",
 ]

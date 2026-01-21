@@ -11,8 +11,9 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+from typing import Any, cast
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -32,9 +33,9 @@ NEUTRAL_LO, NEUTRAL_HI = 0.95, 1.05  # 5% neutrality band
 # ---------------------------------------------------------------------------
 
 
-def _read_json(path: Path) -> Dict[str, Any]:
+def _read_json(path: Path) -> dict[str, Any]:
     with path.open() as f:
-        return cast(Dict[str, Any], json.load(f))
+        return cast(dict[str, Any], json.load(f))
 
 
 def _hash_file(path: Path) -> str:
@@ -45,11 +46,11 @@ def _hash_file(path: Path) -> str:
     return h.hexdigest()[:12]
 
 
-def _discover_cc_runs() -> List[Path]:
-    return [p for p in RESULTS.glob("**/metrics_fixed.json")]
+def _discover_cc_runs() -> list[Path]:
+    return list(RESULTS.glob("**/metrics_fixed.json"))
 
 
-def _ci_width(lo: Optional[float], hi: Optional[float]) -> Optional[float]:
+def _ci_width(lo: float | None, hi: float | None) -> float | None:
     if lo is None or hi is None:
         return None
     try:
@@ -58,7 +59,7 @@ def _ci_width(lo: Optional[float], hi: Optional[float]) -> Optional[float]:
         return None
 
 
-def _cc_decision_from_ci(lo: Optional[float], hi: Optional[float]) -> Optional[str]:
+def _cc_decision_from_ci(lo: float | None, hi: float | None) -> str | None:
     if lo is None or hi is None:
         return None
     if lo > NEUTRAL_HI:
@@ -73,9 +74,9 @@ def _cc_decision_from_ci(lo: Optional[float], hi: Optional[float]) -> Optional[s
 # ---------------------------------------------------------------------------
 
 
-def summarize_metrics(metrics: Dict[str, float], precision: int = 4) -> List[Tuple[str, float]]:
+def summarize_metrics(metrics: dict[str, float], precision: int = 4) -> list[tuple[str, float]]:
     """Stable, rounded list of (metric, value)."""
-    out: List[Tuple[str, float]] = []
+    out: list[tuple[str, float]] = []
     for k, v in sorted(metrics.items()):
         try:
             out.append((k, round(float(v), precision)))
@@ -85,14 +86,14 @@ def summarize_metrics(metrics: Dict[str, float], precision: int = 4) -> List[Tup
     return out
 
 
-def metrics_to_markdown(summary: Iterable[Tuple[str, float]]) -> str:
+def metrics_to_markdown(summary: Iterable[tuple[str, float]]) -> str:
     lines = ["| Metric | Value |", "| --- | --- |"]
     for metric, value in summary:
         lines.append(f"| {metric} | {value} |")
     return "\n".join(lines) + "\n"
 
 
-def metrics_to_csv(summary: Iterable[Tuple[str, float]]) -> str:
+def metrics_to_csv(summary: Iterable[tuple[str, float]]) -> str:
     lines = ["metric,value"]
     for metric, value in summary:
         lines.append(f"{metric},{value}")
@@ -104,8 +105,8 @@ def metrics_to_csv(summary: Iterable[Tuple[str, float]]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _collect_cc_rows() -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _collect_cc_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for mfile in _discover_cc_runs():
         try:
             metrics = _read_json(mfile)
@@ -145,7 +146,7 @@ def _collect_cc_rows() -> List[Dict[str, Any]]:
     return rows
 
 
-def _write_rows_csv(rows: List[Dict[str, Any]], out: Path) -> None:
+def _write_rows_csv(rows: list[dict[str, Any]], out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
         with out.open("w", newline="") as f:
@@ -175,7 +176,7 @@ def _write_rows_csv(rows: List[Dict[str, Any]], out: Path) -> None:
         w.writerows(rows)
 
 
-def _write_md(rows: List[Dict[str, Any]], out: Path, title: str) -> None:
+def _write_md(rows: list[dict[str, Any]], out: Path, title: str) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     lines = [f"# {title}", ""]
     if not rows:
@@ -200,8 +201,8 @@ def _write_md(rows: List[Dict[str, Any]], out: Path, title: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _read_ccc_addenda_csvs() -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _read_ccc_addenda_csvs() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     if not CCC_DIR.exists():
         return rows
     for csv_path in CCC_DIR.glob("*.csv"):
@@ -219,8 +220,8 @@ def _read_ccc_addenda_csvs() -> List[Dict[str, Any]]:
 
 
 # Normalize CCC columns a bit for merged views
-def _normalize_ccc_rows(raw: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
+def _normalize_ccc_rows(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     for r in raw:
         out.append(
             {
@@ -243,14 +244,14 @@ def _normalize_ccc_rows(raw: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def build_cc() -> List[Dict[str, Any]]:
+def build_cc() -> list[dict[str, Any]]:
     rows = _collect_cc_rows()
     _write_rows_csv(rows, REPORTS_DIR / "summary_cc.csv")
     _write_md(rows, REPORTS_DIR / "readiness_cc.md", "CC Readiness Report")
     return rows
 
 
-def build_ccc() -> List[Dict[str, Any]]:
+def build_ccc() -> list[dict[str, Any]]:
     raw = _read_ccc_addenda_csvs()
     rows = _normalize_ccc_rows(raw)
     # write CCC-only summaries
@@ -285,14 +286,14 @@ def build_ccc() -> List[Dict[str, Any]]:
 def build_all(mode: str = "all") -> None:
     """Build reports. mode ∈ {'cc','ccc','all'}."""
     mode = (mode or "all").lower()
-    cc_rows: List[Dict[str, Any]] = []
-    ccc_rows: List[Dict[str, Any]] = []
+    cc_rows: list[dict[str, Any]] = []
+    ccc_rows: list[dict[str, Any]] = []
     if mode in ("cc", "all"):
         cc_rows = build_cc()
     if mode in ("ccc", "all"):
         ccc_rows = build_ccc()
     # merged pane
-    merged: List[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     merged.extend(cc_rows)
     merged.extend(ccc_rows)
     _write_rows_csv(merged, REPORTS_DIR / "summary_all.csv")

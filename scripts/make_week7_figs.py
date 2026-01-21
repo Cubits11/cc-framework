@@ -7,7 +7,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -70,7 +69,7 @@ def load_point(path: Path) -> PointRecord:
     )
 
 
-def load_points(directory: Path) -> List[PointRecord]:
+def load_points(directory: Path) -> list[PointRecord]:
     return [load_point(path) for path in sorted(directory.glob("point_*.json"))]
 
 
@@ -78,7 +77,7 @@ def ensure_output(out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
 
-def _style_for_classification(label: str) -> Dict[str, object]:
+def _style_for_classification(label: str) -> dict[str, object]:
     colors = {
         "constructive": (0.0, 0.45, 0.74),
         "independent": (0.2, 0.6, 0.2),
@@ -87,7 +86,7 @@ def _style_for_classification(label: str) -> Dict[str, object]:
     return {"color": colors.get(label, (0.5, 0.5, 0.5))}
 
 
-def plot_roc_grid(points: List[PointRecord], topology: str, out_path: Path) -> None:
+def plot_roc_grid(points: list[PointRecord], topology: str, out_path: Path) -> None:
     fig, ax = plt.subplots(figsize=(7.2, 5.6))
     grouped = aggregate_by_group([p for p in points if p.topology == topology])
 
@@ -133,7 +132,7 @@ def plot_roc_grid(points: List[PointRecord], topology: str, out_path: Path) -> N
     plt.close(fig)
 
 
-def plot_j_bands(points: List[PointRecord], topology: str, out_path: Path) -> None:
+def plot_j_bands(points: list[PointRecord], topology: str, out_path: Path) -> None:
     grouped = aggregate_by_group([p for p in points if p.topology == topology])
     labels = []
     bands = []
@@ -174,7 +173,7 @@ def plot_j_bands(points: List[PointRecord], topology: str, out_path: Path) -> No
     plt.close(fig)
 
 
-def plot_ci_diagnostics(points: List[PointRecord], out_path: Path) -> None:
+def plot_ci_diagnostics(points: list[PointRecord], out_path: Path) -> None:
     grouped = aggregate_by_group(points)
     items = list(grouped.items())
     summaries = [summarise_group(entry) for _, entry in items]
@@ -200,7 +199,7 @@ def plot_ci_diagnostics(points: List[PointRecord], out_path: Path) -> None:
     plt.close(fig)
 
 
-def plot_regime_map(points: List[PointRecord], topology: str, out_path: Path) -> None:
+def plot_regime_map(points: list[PointRecord], topology: str, out_path: Path) -> None:
     relevant = [p for p in points if p.topology == topology]
     groups = aggregate_by_group(relevant)
     summaries = {key: summarise_group(entry) for key, entry in groups.items()}

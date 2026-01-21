@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 
 from experiments.correlation_cliff.simulate.config import SimConfig
@@ -7,7 +6,7 @@ from experiments.correlation_cliff.simulate.core import simulate_grid
 
 def test_simulate_replicate_metadata_present():
     cfg = SimConfig(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
         rule="OR",
         lambdas=[0.5],
         n=100,
@@ -27,7 +26,7 @@ def test_simulate_replicate_metadata_present():
 
 def test_envelope_violation_boundary():
     cfg = SimConfig(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.5, pB=0.5)),
+        marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.5, "pB": 0.5}},
         rule="OR",
         lambdas=[0.0, 0.5, 1.0],
         n=500,
@@ -49,7 +48,7 @@ def test_envelope_violation_boundary():
 
 def test_batch_sampling_mode_toggles():
     cfg_batch = SimConfig(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
         rule="OR",
         lambdas=[0.5],
         n=100,
@@ -60,7 +59,7 @@ def test_batch_sampling_mode_toggles():
         batch_sampling=True,
     )
     cfg_std = SimConfig(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
         rule="OR",
         lambdas=[0.5],
         n=100,
@@ -90,7 +89,7 @@ def test_batch_sampling_mode_toggles():
 
 def test_determinism_stable_per_cell():
     cfg = SimConfig(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        marginals={"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
         rule="OR",
         lambdas=[0.5],
         n=100,
@@ -114,15 +113,15 @@ def test_lambda_ordering_stable_per_cell():
     lambdas1 = [0.0, 0.25, 0.5, 0.75, 1.0]
     lambdas2 = [1.0, 0.5, 0.0, 0.75, 0.25]
 
-    cfg_base = dict(
-        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
-        rule="OR",
-        n=100,
-        n_reps=3,
-        seed=42,
-        path="fh_linear",
-        seed_policy="stable_per_cell",
-    )
+    cfg_base = {
+        "marginals": {"w0": {"pA": 0.5, "pB": 0.5}, "w1": {"pA": 0.6, "pB": 0.6}},
+        "rule": "OR",
+        "n": 100,
+        "n_reps": 3,
+        "seed": 42,
+        "path": "fh_linear",
+        "seed_policy": "stable_per_cell",
+    }
 
     df1 = simulate_grid(SimConfig(**cfg_base, lambdas=lambdas1))
     df2 = simulate_grid(SimConfig(**cfg_base, lambdas=lambdas2))

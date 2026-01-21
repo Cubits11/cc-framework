@@ -12,7 +12,8 @@ Scope:
 - AttackStrategy: simple roundtrip + params behaviour
 """
 
-from typing import Any, Dict, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import pytest
 from hypothesis import given
@@ -48,7 +49,7 @@ def test_attack_strategy_basic_roundtrip():
     name=st.text(min_size=1, max_size=16),
     params=st.dictionaries(st.text(min_size=1, max_size=8), st.integers(), max_size=4),
 )
-def test_attack_strategy_params_can_be_empty_or_mapping(name: str, params: Dict[str, int]):
+def test_attack_strategy_params_can_be_empty_or_mapping(name: str, params: dict[str, int]):
     """
     AttackStrategy.params must accept arbitrary JSON-like mappings and roundtrip.
     """
@@ -201,7 +202,7 @@ def test_world_config_baseline_success_rate_bounds():
 # ---------------------------------------------------------------------
 
 
-def _minimal_guardrail_cfg() -> Dict[str, Sequence[GuardrailSpec]]:
+def _minimal_guardrail_cfg() -> dict[str, Sequence[GuardrailSpec]]:
     return {"cfg": [GuardrailSpec(name="g", params={})]}
 
 

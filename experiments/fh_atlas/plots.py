@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
 
 import matplotlib
 
@@ -18,7 +18,7 @@ from theory.fh_bounds import (
 )
 
 
-def _save_plot(fig: plt.Figure, path: Path, metadata: Dict[str, object]) -> None:
+def _save_plot(fig: plt.Figure, path: Path, metadata: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, bbox_inches="tight")
     fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
@@ -29,9 +29,9 @@ def _save_plot(fig: plt.Figure, path: Path, metadata: Dict[str, object]) -> None
 def plot_fh_envelope(
     output_dir: Path,
     scenario_id: str,
-    thetas: List[float],
-    observed_j: List[float],
-    observed_ci: List[Tuple[float, float]],
+    thetas: list[float],
+    observed_j: list[float],
+    observed_ci: list[tuple[float, float]],
     bounds: ComposedJBounds,
     j_independence: float,
     title: str,
@@ -75,8 +75,8 @@ def plot_fh_envelope(
 def plot_cc_regime_heatmap(
     output_dir: Path,
     scenario_id: str,
-    miss_grid: List[float],
-    fpr_grid: List[float],
+    miss_grid: list[float],
+    fpr_grid: list[float],
     composition_type: str,
 ) -> Path:
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -125,8 +125,8 @@ def plot_cc_regime_heatmap(
 def plot_identifiability_map(
     output_dir: Path,
     scenario_id: str,
-    miss_grid: List[float],
-    fpr_grid: List[float],
+    miss_grid: list[float],
+    fpr_grid: list[float],
     composition_type: str,
 ) -> Path:
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -208,8 +208,8 @@ def plot_more_rails_scaling(
 def plot_cii_distribution(
     output_dir: Path,
     scenario_id: str,
-    thetas: List[float],
-    cii_values: List[float],
+    thetas: list[float],
+    cii_values: list[float],
 ) -> Path:
     fig, ax = plt.subplots(figsize=(6, 4.5))
     ax.plot(thetas, cii_values, marker="o", color="tab:purple")

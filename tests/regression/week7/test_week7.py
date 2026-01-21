@@ -4,8 +4,8 @@ import json
 import math
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Sequence, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))  # so `import scripts` works
@@ -27,11 +27,11 @@ from cc.analysis.week7_utils import (
 from scripts import make_week7_runs as runs_module
 
 
-def _random_probabilities(rng: np.random.Generator, k: int) -> List[float]:
+def _random_probabilities(rng: np.random.Generator, k: int) -> list[float]:
     return rng.uniform(0.05, 0.95, size=k).tolist()
 
 
-def _percentile_interval(samples: np.ndarray, alpha: float = 0.05) -> Tuple[float, float]:
+def _percentile_interval(samples: np.ndarray, alpha: float = 0.05) -> tuple[float, float]:
     return float(np.quantile(samples, alpha / 2.0)), float(np.quantile(samples, 1.0 - alpha / 2.0))
 
 
@@ -175,9 +175,9 @@ def test_fh_union_formulae_match():
 
 def test_nested_sets_reach_extremes():
     marginals = [0.2, 0.4, 0.6]
-    lower, upper = fh_bounds_intersection(marginals)
+    _lower, upper = fh_bounds_intersection(marginals)
     assert upper == pytest.approx(min(marginals))
-    lower_u, upper_u = fh_bounds_union(marginals)
+    lower_u, _upper_u = fh_bounds_union(marginals)
     assert lower_u == pytest.approx(max(marginals))
 
 
@@ -190,12 +190,12 @@ def test_monotonicity_additional_rail():
         extra_fpr = rng.uniform(0.01, 0.1)
         env_two_and = fh_envelope("parallel_and", base_tprs, base_fprs)
         env_three_and = fh_envelope(
-            "parallel_and", base_tprs + [extra_tpr], base_fprs + [extra_fpr]
+            "parallel_and", [*base_tprs, extra_tpr], [*base_fprs, extra_fpr]
         )
         assert env_three_and.tpr_upper <= env_two_and.tpr_upper + 1e-9
         assert env_three_and.tpr_lower <= env_two_and.tpr_lower + 1e-9
         env_two_or = fh_envelope("serial_or", base_tprs, base_fprs)
-        env_three_or = fh_envelope("serial_or", base_tprs + [extra_tpr], base_fprs + [extra_fpr])
+        env_three_or = fh_envelope("serial_or", [*base_tprs, extra_tpr], [*base_fprs, extra_fpr])
         assert env_three_or.fpr_upper >= env_two_or.fpr_upper - 1e-9
         assert env_three_or.tpr_lower >= env_two_or.tpr_lower - 1e-9
 
@@ -237,7 +237,7 @@ def test_independence_matches_monte_carlo():
     trials = 40_000
     hits_or = np.zeros(trials, dtype=bool)
     false_or = np.zeros(trials, dtype=bool)
-    for tpr, fpr in zip(tprs, fprs):
+    for tpr, fpr in zip(tprs, fprs, strict=False):
         hits_or |= rng.random(trials) < tpr
         false_or |= rng.random(trials) < fpr
     assert hits_or.mean() == pytest.approx(baseline_or["tpr"], rel=0.02)
@@ -245,7 +245,7 @@ def test_independence_matches_monte_carlo():
 
     hits_and = np.ones(trials, dtype=bool)
     false_and = np.ones(trials, dtype=bool)
-    for tpr, fpr in zip(tprs, fprs):
+    for tpr, fpr in zip(tprs, fprs, strict=False):
         hits_and &= rng.random(trials) < tpr
         false_and &= rng.random(trials) < fpr
     assert hits_and.mean() == pytest.approx(baseline_and["tpr"], rel=0.05)

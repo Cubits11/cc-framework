@@ -44,7 +44,7 @@ import traceback
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -75,7 +75,7 @@ def _fmt_path(p: Path) -> str:
         return str(p)
 
 
-def _get(d: Dict[str, Any], path: str) -> Any:
+def _get(d: dict[str, Any], path: str) -> Any:
     """
     Safe dotted-path getter for dicts.
     Raises KeyError with a precise failing segment.
@@ -118,9 +118,9 @@ class ExperimentMetrics:
     tpr: float
     threshold: float
     delta: float
-    n_world0: Optional[int]
-    n_world1: Optional[int]
-    confidence_interval: Tuple[float, float]
+    n_world0: int | None
+    n_world1: int | None
+    confidence_interval: tuple[float, float]
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.fpr <= 1.0):
@@ -146,11 +146,11 @@ class ExperimentMetrics:
 
 @dataclass(frozen=True)
 class CalibrationInfo:
-    name: Optional[str]
+    name: str | None
     threshold: float
-    n_samples: Optional[int]
-    target_fpr: Optional[float]
-    target_window: Optional[Tuple[float, float]]
+    n_samples: int | None
+    target_fpr: float | None
+    target_window: tuple[float, float] | None
 
 
 # ---------------------------------------------------------------------
@@ -158,7 +158,7 @@ class CalibrationInfo:
 # ---------------------------------------------------------------------
 
 
-def load_json(path: Path) -> Dict[str, Any]:
+def load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise ValidationError(f"File not found: {_fmt_path(path)}")
     if path.stat().st_size == 0:
@@ -191,7 +191,7 @@ def compute_file_hash(path: Path) -> str:
 
 
 def extract_metrics(
-    analysis: Dict[str, Any], *, calibration_name: Optional[str] = None
+    analysis: dict[str, Any], *, calibration_name: str | None = None
 ) -> ExperimentMetrics:
     """
     Required minimal contract (must exist):
@@ -205,8 +205,8 @@ def extract_metrics(
       - results.sample_sizes.world_0 / world_1 (used for small-n tolerance rules)
     """
     # --- sample sizes (optional) ---
-    n0: Optional[int] = None
-    n1: Optional[int] = None
+    n0: int | None = None
+    n1: int | None = None
     sizes = analysis.get("results", {}).get("sample_sizes")
     if isinstance(sizes, dict):
         # present -> must be well-formed
@@ -216,11 +216,13 @@ def extract_metrics(
         warnings.warn(
             "analysis.json missing results.sample_sizes; proceeding with strict FPR window checks (no small-n tolerance).",
             ValidationWarning,
+            stacklevel=2,
         )
     else:
         warnings.warn(
             f"analysis.json results.sample_sizes is not an object (got {type(sizes).__name__}); ignoring it.",
             ValidationWarning,
+            stacklevel=2,
         )
 
     # --- operating point ---
@@ -243,6 +245,7 @@ def extract_metrics(
             warnings.warn(
                 f"Calibration name '{calibration_name}' not found in analysis guardrails; using guardrails[0].",
                 ValidationWarning,
+                stacklevel=2,
             )
     if chosen is None:
         chosen = guardrails[0]
@@ -274,11 +277,13 @@ def extract_metrics(
         warnings.warn(
             f"TPR ({tpr:.4f}) < FPR ({fpr:.4f}); classifier may be inverted or miscalibrated.",
             ValidationWarning,
+            stacklevel=2,
         )
     if (ci_hi - ci_lo) > 0.5:
         warnings.warn(
             f"Wide CI [{ci_lo:.4f}, {ci_hi:.4f}] — increase sample size or bootstrap reps.",
             ValidationWarning,
+            stacklevel=2,
         )
 
     return ExperimentMetrics(
@@ -292,7 +297,7 @@ def extract_metrics(
     )
 
 
-def extract_calibration(cal: Dict[str, Any]) -> CalibrationInfo:
+def extract_calibration(cal: dict[str, Any]) -> CalibrationInfo:
     """
     Accepts multiple calibration summary shapes.
 
@@ -303,8 +308,8 @@ def extract_calibration(cal: Dict[str, Any]) -> CalibrationInfo:
       {"name":"...", "guardrails":[{"threshold": 0.12, "n_samples": 200}], "fpr": 0.05, "target_window":[...]}
     """
     name = cal.get("name")
-    thr: Optional[float] = None
-    n: Optional[int] = None
+    thr: float | None = None
+    n: int | None = None
 
     # nested first
     if isinstance(cal.get("guardrails"), list) and cal["guardrails"]:
@@ -329,12 +334,12 @@ def extract_calibration(cal: Dict[str, Any]) -> CalibrationInfo:
             "Calibration JSON lacks a threshold (expected 'threshold' or guardrails[0].threshold)."
         )
 
-    target_fpr = cal.get("fpr", None)
+    target_fpr = cal.get("fpr")
     if target_fpr is not None:
         target_fpr = _as_float(target_fpr, where="calibration.fpr")
 
-    tw = cal.get("target_window", None)
-    target_window: Optional[Tuple[float, float]] = None
+    tw = cal.get("target_window")
+    target_window: tuple[float, float] | None = None
     if isinstance(tw, (list, tuple)) and len(tw) == 2:
         lo = _as_float(tw[0], where="calibration.target_window[0]")
         hi = _as_float(tw[1], where="calibration.target_window[1]")
@@ -370,7 +375,7 @@ def validate_threshold_equality(run_thr: float, cal_thr: float, tol: float = TOL
     print(f"✓ Threshold equality verified (diff={diff:.2e})")
 
 
-def compute_expected_false_positives(target_fpr: float, n: int) -> Tuple[float, float]:
+def compute_expected_false_positives(target_fpr: float, n: int) -> tuple[float, float]:
     """
     Normal approximation for FP count. Returns (expected, ~95% half-width).
     Useful for explaining why FPR=0 can be plausible for small n.
@@ -384,10 +389,10 @@ def compute_expected_false_positives(target_fpr: float, n: int) -> Tuple[float, 
 def validate_fpr_window_adaptive(
     *,
     fpr: float,
-    n_samples: Optional[int],
+    n_samples: int | None,
     lo: float,
     hi: float,
-    target_from_cal: Optional[float] = None,
+    target_from_cal: float | None = None,
 ) -> None:
     """
     Alpha-cap / operating point window validation.
@@ -428,6 +433,7 @@ def validate_fpr_window_adaptive(
             f"FPR=0 with n={n} is plausible under target≈{target:.3f} "
             f"(expected FP={expected_fp:.1f}±{ciw:.1f}). Consider increasing n.",
             ValidationWarning,
+            stacklevel=2,
         )
         print(f"⚠ FPR {fpr:.4f} accepted under small-sample rule (n={n}).")
         return
@@ -437,6 +443,7 @@ def validate_fpr_window_adaptive(
         warnings.warn(
             f"FPR {fpr:.4f} slightly outside [{lo:.4f},{hi:.4f}] but within ±{slack:.4f} slack for n={n}.",
             ValidationWarning,
+            stacklevel=2,
         )
         print(f"⚠ FPR {fpr:.4f} accepted with small-n slack (n={n}).")
         return
@@ -456,7 +463,7 @@ def run_experiment(
     *,
     config: Path,
     output: Path,
-    audit: Optional[Path],
+    audit: Path | None,
     seed: int,
     verbose: bool,
     runner_module: str,
@@ -494,7 +501,7 @@ def run_experiment(
         raise ValidationError(f"Experiment process exited with {res.returncode}")
 
 
-def print_summary(m: ExperimentMetrics, cal: Optional[CalibrationInfo]) -> None:
+def print_summary(m: ExperimentMetrics, cal: CalibrationInfo | None) -> None:
     print("\n" + "=" * 72)
     print("WEEK-6 VALIDATION SUMMARY")
     print("=" * 72)
@@ -590,7 +597,7 @@ def main() -> None:
         raise ValidationError("Invalid FPR window: need 0 <= fpr-lo <= fpr-hi <= 1")
 
     # Load calibration first (optional) so we can choose the right guardrail by name.
-    cal: Optional[CalibrationInfo] = None
+    cal: CalibrationInfo | None = None
     if args.calibration:
         cal_obj = load_json(args.calibration)
         cal = extract_calibration(cal_obj)
@@ -613,6 +620,7 @@ def main() -> None:
                 f"--config does not exist ({_fmt_path(args.config)}), but analysis.json exists; "
                 "skipping runner and proceeding with validation-only.",
                 ValidationWarning,
+                stacklevel=2,
             )
 
     # Load analysis.
@@ -634,7 +642,9 @@ def main() -> None:
             target_from_cal=(cal.target_fpr if cal else None),
         )
     else:
-        warnings.warn("FPR window validation skipped (--skip-fpr-check).", ValidationWarning)
+        warnings.warn(
+            "FPR window validation skipped (--skip-fpr-check).", ValidationWarning, stacklevel=2
+        )
 
     # Summary.
     print_summary(metrics, cal)

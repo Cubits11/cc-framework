@@ -52,7 +52,7 @@ def test_causal_effect_cluster_robust_imbalanced_clusters() -> None:
 
     results = []
     idx = 0
-    for cluster_id, (size, effect) in enumerate(zip(cluster_sizes, cluster_effects)):
+    for cluster_id, (size, effect) in enumerate(zip(cluster_sizes, cluster_effects, strict=False)):
         for i in range(size):
             world_bit = i % 2
             p = base + effect + treat * world_bit

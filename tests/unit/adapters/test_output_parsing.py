@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -42,7 +42,7 @@ def mock_guardrails_adapter():
 def mock_llama_guard_adapter():
     """LlamaGuard with mock generator for deterministic outputs."""
 
-    def mock_gen(prompt_text: str) -> tuple[str, float | None, Dict[str, Any]]:
+    def mock_gen(prompt_text: str) -> tuple[str, float | None, dict[str, Any]]:
         # Deterministic: hash prompt → score
         score = (int(hashlib.md5(prompt_text.encode()).hexdigest(), 16) % 100) / 100.0
         output = "safe" if score < 0.5 else "unsafe\nCategory: violence"

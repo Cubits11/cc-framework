@@ -16,7 +16,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Iterable, List
+from collections.abc import Iterable
 
 from .base import Guardrail
 
@@ -25,7 +25,7 @@ class CompositeGuardrail(Guardrail):
     """Base class for guardrails composed of other guardrails."""
 
     def __init__(self, guardrails: Iterable[Guardrail] | None = None):
-        self.guardrails: List[Guardrail] = list(guardrails or [])
+        self.guardrails: list[Guardrail] = list(guardrails or [])
 
     # Guardrail API -----------------------------------------------------
     def calibrate(self, benign_texts: Iterable[str], target_fpr: float = 0.05) -> None:

@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any
 
 from .base import (
     Decision,
@@ -22,7 +23,7 @@ from .base import (
 class GuardrailsAIAdapter(GuardrailAdapter):
     """Guardrails AI adapter wrapping a small validator bundle."""
 
-    validators: Optional[Sequence[Any]] = None
+    validators: Sequence[Any] | None = None
     guard: Any = None
 
     name: str = "guardrails_ai"
@@ -30,8 +31,8 @@ class GuardrailsAIAdapter(GuardrailAdapter):
     supports_input_check: bool = True
     supports_output_check: bool = True
 
-    _validator_names: Tuple[str, ...] = field(default_factory=tuple, init=False)
-    _config_fingerprint: Optional[str] = field(default=None, init=False)
+    _validator_names: tuple[str, ...] = field(default_factory=tuple, init=False)
+    _config_fingerprint: str | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.guard is None:
@@ -52,7 +53,7 @@ class GuardrailsAIAdapter(GuardrailAdapter):
                 self._validator_names = tuple(v.__class__.__name__ for v in self.validators)
         self._config_fingerprint = fingerprint_payload({"validators": list(self._validator_names)})
 
-    def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
+    def check(self, prompt: str, response: str | None, metadata: dict[str, Any]) -> Decision:
         target = response or prompt
         started_at = time.time()
         try:
@@ -101,7 +102,7 @@ class GuardrailsAIAdapter(GuardrailAdapter):
         )
 
 
-def _decision_from_guardrails(result: Any) -> Tuple[str, Optional[str], str]:
+def _decision_from_guardrails(result: Any) -> tuple[str, str | None, str]:
     passed = getattr(result, "validation_passed", None)
     if passed is None:
         passed = getattr(result, "is_valid", None)
@@ -113,12 +114,9 @@ def _decision_from_guardrails(result: Any) -> Tuple[str, Optional[str], str]:
     return "review", None, "Guardrails validators returned an indeterminate result."
 
 
-def _extract_request_id(result: Any) -> Optional[str]:
+def _extract_request_id(result: Any) -> str | None:
     for key in ("request_id", "id", "trace_id"):
-        if isinstance(result, dict):
-            val = result.get(key)
-        else:
-            val = getattr(result, key, None)
+        val = result.get(key) if isinstance(result, dict) else getattr(result, key, None)
         if isinstance(val, str) and val.strip():
             return val
     return None

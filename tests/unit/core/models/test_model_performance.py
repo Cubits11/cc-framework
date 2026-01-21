@@ -2,7 +2,6 @@
 
 import time
 import timeit
-from typing import Dict, List
 
 import pytest
 
@@ -90,7 +89,7 @@ def test_hash_json_bulk_10k_under_reasonable_budget():
         An accidental O(n^2) operation (e.g., repeated sorting, copying) would
         silently blow up runtime on realistic experiment sizes.
     """
-    objs: List[Dict[str, int]] = [{"k": i, "v": i * 2} for i in range(10_000)]
+    objs: list[dict[str, int]] = [{"k": i, "v": i * 2} for i in range(10_000)]
 
     def worker():
         for obj in objs:
@@ -134,7 +133,7 @@ def test_attack_result_from_transcript_scaling_1k():
             )
 
     duration = timeit.timeit(worker, number=1)
-    # Loose upper bound – on a modern laptop this should be far below this.
+    # Loose upper bound - on a modern laptop this should be far below this.
     assert duration < 2.0, (
         f"AttackResult.from_transcript too slow: {duration:.3f}s for 1k "
         "creations; check for accidental heavy work in the hot path."

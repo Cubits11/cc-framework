@@ -9,7 +9,7 @@ def create_three_figures(results_dir: Path, output_dir: Path):
     """Generate exactly 3 publication-quality figures"""
 
     # Figure 1: CC vs Sessions with CI ribbons
-    fig1, ax1 = plt.subplots(figsize=(8, 6))
+    _fig1, ax1 = plt.subplots(figsize=(8, 6))
     sessions = [200, 500, 1000, 2000, 5000]
     cc_mean = [0.8, 0.82, 0.85, 0.87, 0.88]
     cc_lower = [0.75, 0.78, 0.82, 0.84, 0.86]
@@ -26,7 +26,7 @@ def create_three_figures(results_dir: Path, output_dir: Path):
     plt.savefig(output_dir / "cc_convergence.pdf", dpi=300, bbox_inches="tight")
 
     # Figure 2: Phase Diagram
-    fig2, ax2 = plt.subplots(figsize=(8, 6))
+    _fig2, ax2 = plt.subplots(figsize=(8, 6))
     x = np.linspace(0, 1, 50)  # Guardrail 1 strength
     y = np.linspace(0, 1, 50)  # Guardrail 2 strength
     X, Y = np.meshgrid(x, y)
@@ -41,7 +41,7 @@ def create_three_figures(results_dir: Path, output_dir: Path):
     plt.savefig(output_dir / "phase_diagram.pdf", dpi=300, bbox_inches="tight")
 
     # Figure 3: ROC Comparison
-    fig3, ax3 = plt.subplots(figsize=(8, 6))
+    _fig3, ax3 = plt.subplots(figsize=(8, 6))
     fpr_single = np.array([0, 0.1, 0.2, 0.5, 1.0])
     tpr_single = np.array([0, 0.5, 0.7, 0.85, 1.0])
     fpr_composed = np.array([0, 0.05, 0.15, 0.4, 1.0])

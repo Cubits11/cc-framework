@@ -7,7 +7,7 @@ import hashlib
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from .base import (
     Decision,
@@ -27,15 +27,15 @@ DEFAULT_RAILS_PATH = Path(__file__).with_name("nemo_configs") / "minimal"
 class NeMoGuardrailsAdapter(GuardrailAdapter):
     """NeMo Guardrails adapter using a local rails config."""
 
-    rails_config_path: Optional[Path] = None
+    rails_config_path: Path | None = None
     rails: Any = None
 
     name: str = "nemo_guardrails"
     version: str = "unknown"
     supports_input_check: bool = True
     supports_output_check: bool = True
-    _config_fingerprint: Optional[str] = field(default=None, init=False)
-    _resolved_config_path: Optional[Path] = field(default=None, init=False)
+    _config_fingerprint: str | None = field(default=None, init=False)
+    _resolved_config_path: Path | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         self._resolved_config_path = (
@@ -61,7 +61,7 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
         self._resolved_config_path = cfg_path
         self._config_fingerprint = _fingerprint_rails_config(cfg_path)
 
-    def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
+    def check(self, prompt: str, response: str | None, metadata: dict[str, Any]) -> Decision:
         started_at = time.time()
         try:
             reply, context = _run_rails(self.rails, prompt, response)
@@ -111,7 +111,7 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
         )
 
 
-def _run_rails(rails: Any, prompt: str, response: Optional[str]) -> Tuple[str, Dict[str, Any]]:
+def _run_rails(rails: Any, prompt: str, response: str | None) -> tuple[str, dict[str, Any]]:
     messages = [{"role": "user", "content": prompt}]
     if response:
         messages.append({"role": "assistant", "content": response})
@@ -123,7 +123,7 @@ def _run_rails(rails: Any, prompt: str, response: Optional[str]) -> Tuple[str, D
         return reply, {}
 
 
-def _decision_from_context(context: Dict[str, Any], reply: str) -> Tuple[str, Optional[str], str]:
+def _decision_from_context(context: dict[str, Any], reply: str) -> tuple[str, str | None, str]:
     blocked_flag = _find_blocked_flag(context)
     if blocked_flag is True:
         return "block", _extract_category(context), "Blocked by rails policy."
@@ -134,7 +134,7 @@ def _decision_from_context(context: Dict[str, Any], reply: str) -> Tuple[str, Op
     return "review", None, "Rails did not surface an explicit decision."
 
 
-def _find_blocked_flag(context: Dict[str, Any]) -> Optional[bool]:
+def _find_blocked_flag(context: dict[str, Any]) -> bool | None:
     for key in ("blocked", "input_blocked", "output_blocked"):
         if key in context:
             return bool(context[key])
@@ -146,7 +146,7 @@ def _find_blocked_flag(context: Dict[str, Any]) -> Optional[bool]:
     return None
 
 
-def _extract_category(context: Dict[str, Any]) -> Optional[str]:
+def _extract_category(context: dict[str, Any]) -> str | None:
     for key in ("category", "policy", "rail"):
         val = context.get(key)
         if isinstance(val, str):
@@ -161,7 +161,7 @@ def _looks_like_refusal(text: str) -> bool:
         for phrase in (
             "i'm sorry",
             "i cannot",
-            "i can’t",
+            "i can't",
             "cannot assist",
             "not able to help",
             "refuse",
@@ -169,7 +169,7 @@ def _looks_like_refusal(text: str) -> bool:
     )
 
 
-def _fingerprint_rails_config(path: Path) -> Optional[str]:
+def _fingerprint_rails_config(path: Path) -> str | None:
     if not path.exists():
         return None
     files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
@@ -183,7 +183,7 @@ def _fingerprint_rails_config(path: Path) -> Optional[str]:
     return hasher.hexdigest()
 
 
-def _extract_request_id(context: Dict[str, Any]) -> Optional[str]:
+def _extract_request_id(context: dict[str, Any]) -> str | None:
     for key in ("request_id", "id", "trace_id"):
         val = context.get(key)
         if isinstance(val, str) and val.strip():

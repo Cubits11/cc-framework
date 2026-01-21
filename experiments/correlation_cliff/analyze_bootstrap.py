@@ -37,7 +37,7 @@ B) Optional curve-level threshold bootstrap:
      tables via multinomial bootstrap, recompute CC(lambda), and solve for lambda* where
      CC crosses 1 by interpolation. This gives a sampling distribution over lambda*.
 
-Important caveats (and why they’re OK here)
+Important caveats (and why they're OK here)
 -------------------------------------------
 1) Kinks from absolute values:
    JC = |pC^1 - pC^0| can have a non-smooth point when (pC^1 - pC^0) crosses 0.
@@ -75,9 +75,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -199,7 +200,7 @@ def compute_metrics_from_counts(
     n10_1: int,
     n11_1: int,
     eps: float = 1e-12,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute (JC_hat, CC_hat, dependence summaries, etc.) from cell counts.
 
@@ -247,10 +248,7 @@ def compute_metrics_from_counts(
     dC = pC1 - pC0
     JC = abs(dC)
 
-    if Jbest <= eps:
-        CC = float("nan")
-    else:
-        CC = JC / Jbest
+    CC = float("nan") if Jbest <= eps else JC / Jbest
 
     return {
         "n0": float(n0),
@@ -311,8 +309,8 @@ def _counts_to_probs_4(n00: int, n01: int, n10: int, n11: int) -> np.ndarray:
 def _jackknife_acceleration_multinomial(
     *,
     rule: Rule,
-    counts0: Tuple[int, int, int, int],
-    counts1: Tuple[int, int, int, int],
+    counts0: tuple[int, int, int, int],
+    counts1: tuple[int, int, int, int],
     stat_key: Literal["CC_hat", "JC_hat"] = "CC_hat",
     eps: float = 1e-12,
 ) -> float:
@@ -341,11 +339,11 @@ def _jackknife_acceleration_multinomial(
         return 0.0
 
     # Weighted jackknife estimates theta_(i) for each leave-one-out observation
-    thetas: List[float] = []
-    weights: List[int] = []
+    thetas: list[float] = []
+    weights: list[int] = []
 
     def add_pattern(
-        weight: int, c0: Tuple[int, int, int, int], c1: Tuple[int, int, int, int]
+        weight: int, c0: tuple[int, int, int, int], c1: tuple[int, int, int, int]
     ) -> None:
         if weight <= 0:
             return
@@ -419,7 +417,7 @@ def bca_interval(
     theta_boot: np.ndarray,
     acceleration: float,
     alpha: float = 0.05,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute BCa CI endpoints for a scalar statistic.
 
@@ -491,21 +489,21 @@ class BcaConfig:
     alpha: float = 0.05
     seed: int = 123
     eps: float = 1e-12
-    stat_keys: Tuple[Literal["CC_hat", "JC_hat"], ...] = ("CC_hat", "JC_hat")
+    stat_keys: tuple[Literal["CC_hat", "JC_hat"], ...] = ("CC_hat", "JC_hat")
 
 
 def bca_for_one_lambda(
     *,
     lam: float,
     rule: Rule,
-    counts0: Tuple[int, int, int, int],
-    counts1: Tuple[int, int, int, int],
+    counts0: tuple[int, int, int, int],
+    counts1: tuple[int, int, int, int],
     cfg: BcaConfig,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute BCa CIs for CC_hat and JC_hat for a single lambda row.
     """
-    rng = np.random.default_rng(cfg.seed + int(round(lam * 1e6)) % 10_000_000)
+    rng = np.random.default_rng(cfg.seed + round(lam * 1e6) % 10_000_000)
 
     (n00_0, n01_0, n10_0, n11_0) = counts0
     (n00_1, n01_1, n10_1, n11_1) = counts1
@@ -529,7 +527,7 @@ def bca_for_one_lambda(
     p0 = _counts_to_probs_4(n00_0, n01_0, n10_0, n11_0)
     p1 = _counts_to_probs_4(n00_1, n01_1, n10_1, n11_1)
 
-    out: Dict[str, float] = {"lambda": float(lam)}
+    out: dict[str, float] = {"lambda": float(lam)}
 
     # Some diagnostics (useful in paper + debugging)
     out["kink_risk"] = float(m0["kink_risk"])
@@ -624,7 +622,7 @@ def bca_table_for_curve(
         raise ValueError(f"df_counts missing required columns: {missing}")
 
     cfg = BcaConfig(rule=rule, B=int(B), alpha=float(alpha), seed=int(seed), eps=float(eps))
-    rows: List[Dict[str, float]] = []
+    rows: list[dict[str, float]] = []
 
     d = df_counts.sort_values("lambda").reset_index(drop=True)
     for _, r in d.iterrows():
@@ -691,7 +689,7 @@ def select_observed_counts_from_sim_long(
 # =============================================================================
 # Curve-level threshold bootstrap (percentile)
 # =============================================================================
-def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> Optional[float]:
+def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> float | None:
     if len(x) < 2:
         return None
     for i in range(len(x) - 1):
@@ -713,7 +711,7 @@ def threshold_bootstrap_percentile(
     B: int = 2000,
     seed: int = 123,
     eps: float = 1e-12,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Bootstrap the entire CC(lambda) curve and estimate a sampling distribution for lambda*.
 
@@ -763,10 +761,10 @@ def threshold_bootstrap_percentile(
 
     rng = np.random.default_rng(int(seed))
 
-    lam_stars: List[float] = []
+    lam_stars: list[float] = []
     n_lam = len(lambdas)
 
-    for b in range(int(B)):
+    for _b in range(int(B)):
         CCs = np.empty(n_lam, dtype=float)
         for i in range(n_lam):
             c0 = rng.multinomial(int(n0[i]), p0s[i])
@@ -816,13 +814,13 @@ def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
-def _write_json(path: Path, obj: Dict[str, Any]) -> None:
+def _write_json(path: Path, obj: dict[str, Any]) -> None:
     _ensure_dir(path.parent)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, sort_keys=True)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     import argparse
 
     ap = argparse.ArgumentParser(

@@ -1,14 +1,14 @@
 # experiments/correlation_cliff/tests/test_paths.py
 import math
+
 import pytest
 
-from experiments.correlation_cliff.simulate.paths import (
-    p11_from_path,
-    InputValidationError,
-    FeasibilityError,
-)
 from experiments.correlation_cliff.simulate import utils as U
-from experiments.correlation_cliff.simulate.config import Path
+from experiments.correlation_cliff.simulate.paths import (
+    FeasibilityError,
+    InputValidationError,
+    p11_from_path,
+)
 
 
 def _bounds(pA, pB):
@@ -176,7 +176,9 @@ def test_clip_policy_raise_throws_on_large_violation(monkeypatch):
     monkeypatch.setattr(P.U, "p11_fh_linear", _bad_linear)
 
     with pytest.raises(FeasibilityError):
-        p11_from_path(0.2, 0.7, 0.5, path="fh_linear", path_params={"clip_policy": "raise", "clip_tol": 0.0})
+        p11_from_path(
+            0.2, 0.7, 0.5, path="fh_linear", path_params={"clip_policy": "raise", "clip_tol": 0.0}
+        )
 
 
 def test_clip_policy_clip_clips_and_marks_meta(monkeypatch):

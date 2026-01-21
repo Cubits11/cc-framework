@@ -26,7 +26,8 @@ Notes on composition helpers
 
 from __future__ import annotations
 
-from typing import Any, Mapping, NamedTuple, Protocol, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, NamedTuple, Protocol, cast
 
 import numpy as np
 
@@ -34,9 +35,9 @@ __all__ = [
     "JResult",
     "JStatFn",
     "_empirical_j",
-    "compute_j_ci",
-    "compose_cc",
     "bootstrap_diagnostics",
+    "compose_cc",
+    "compute_j_ci",
 ]
 
 
@@ -47,7 +48,7 @@ __all__ = [
 
 class JResult(NamedTuple):
     j: float
-    ci: Tuple[float, float]
+    ci: tuple[float, float]
 
 
 class JStatFn(Protocol):
@@ -64,7 +65,7 @@ def _empirical_j(s0: np.ndarray, s1: np.ndarray) -> float:
     Compute Youden's J = max_t [TPR(t) - FPR(t)] using pooled unique thresholds.
 
     Conventions:
-      - Higher score ⇒ more likely to classify as positive (attack).
+      - Higher score => more likely to classify as positive (attack).
       - Decision rule at threshold t: predict positive if score >= t.
     """
     s0 = np.asarray(s0, dtype=float).ravel()
@@ -85,7 +86,7 @@ def compute_j_ci(
     s1: np.ndarray,
     n_boot: int = 1000,
     alpha: float = 0.05,
-) -> Tuple[float, Tuple[float, float]]:
+) -> tuple[float, tuple[float, float]]:
     """
     Back-compat API: Returns (J_hat, (ci_low, ci_high)).
 
@@ -115,7 +116,7 @@ def compute_j_ci(
     if n_boot <= 0:
         return j_hat, (j_hat, j_hat)
 
-    n0, n1 = int(len(s0)), int(len(s1))
+    n0, n1 = len(s0), len(s1)
     if n0 == 0 or n1 == 0:
         return j_hat, (j_hat, j_hat)
 
@@ -135,7 +136,7 @@ def compute_j_ci(
 # =============================================================================
 
 
-def compose_cc(JA: float, JB: float, Jc: float) -> Tuple[float, float]:
+def compose_cc(JA: float, JB: float, Jc: float) -> tuple[float, float]:
     """
     Minimal composition helpers for smoke dashboards (NOT a theorem).
 

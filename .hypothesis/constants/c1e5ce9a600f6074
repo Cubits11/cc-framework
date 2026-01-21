@@ -1,0 +1,4 @@
+# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/guardrails/regex_filters.py
+# hypothesis_version: 6.147.0
+
+[0.0, 0.05, 0.5, 1.0, 1000.0, 'A', 'ASCII', 'DOTALL', 'I', 'IGNORECASE', 'M', 'MULTILINE', 'S', 'U', 'UNICODE', 'VERBOSE', 'X', 'achieved_fpr', 'binary_score', 'blocked', 'chosen_min_hits', 'engine', 'examples', 'flags', 'fprs', 'hits', 'match_timeout_ms', 'matches', 'min_hits', 'n_benign', 'name', 'pattern', 'patterns', 'per_pattern_flags', 're', 'regex', 'regex_filter', 'target_fpr', 'use_regex_backend']
