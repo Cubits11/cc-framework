@@ -26,6 +26,40 @@ def test_validate_cell_probs_accepts_and_clips_tiny_negative():
     assert np.isclose(out.sum(), 1.0, atol=1e-6, rtol=0.0)
 
 
+def test_validate_cell_probs_with_meta_tracks_clipping():
+    p = np.array([-1e-8, 0.5, 0.25, 0.25000001], dtype=np.float64)
+    out, meta = sampling.validate_cell_probs_with_meta(
+        p,
+        prob_tol=1e-6,
+        allow_tiny_negative=True,
+        tiny_negative_eps=1e-6,
+    )
+    assert out.shape == (4,)
+    assert meta["clipped_any"] == 1.0
+    assert meta["clipped_low"] == 1.0
+    assert meta["clipped_high"] in (0.0, 1.0)
+
+
+def test_validate_cell_probs_sum_tolerance_boundary():
+    p_ok = np.array([0.25, 0.25, 0.25, 0.2500009], dtype=np.float64)
+    out = sampling.validate_cell_probs(
+        p_ok,
+        prob_tol=1e-6,
+        allow_tiny_negative=False,
+        tiny_negative_eps=1e-6,
+    )
+    assert np.isclose(out.sum(), 1.0, atol=1e-6, rtol=0.0)
+
+    p_bad = np.array([0.25, 0.25, 0.25, 0.250002], dtype=np.float64)
+    with pytest.raises(ValueError, match="do not sum to 1"):
+        sampling.validate_cell_probs(
+            p_bad,
+            prob_tol=1e-6,
+            allow_tiny_negative=False,
+            tiny_negative_eps=1e-6,
+        )
+
+
 def test_validate_cell_probs_clips_tiny_over_one():
     p = np.array([0.1, 0.2, 0.3, 0.4000000005], dtype=np.float64)
     out = sampling.validate_cell_probs(
@@ -73,7 +107,7 @@ def test_validate_cell_probs_rejects_nonfinite():
 
 def test_draw_joint_counts_deterministic_single_cell():
     rng = np.random.default_rng(0)
-    n00, n01, n10, n11 = sampling.draw_joint_counts(
+    (n00, n01, n10, n11), meta = sampling.draw_joint_counts(
         rng,
         n=5,
         p00=0.0,
@@ -83,14 +117,17 @@ def test_draw_joint_counts_deterministic_single_cell():
         prob_tol=1e-12,
         allow_tiny_negative=False,
         tiny_negative_eps=1e-6,
+        return_meta=True,
     )
     assert (n00, n01, n10, n11) == (0, 0, 0, 5)
+    assert np.isclose(meta["p11_used"], 1.0)
+    assert meta["p11_mismatch"] <= meta["p11_mismatch_tol"]
 
 
 def test_draw_joint_counts_counts_sum_to_n():
     rng = np.random.default_rng(123)
     n = 100
-    n00, n01, n10, n11 = sampling.draw_joint_counts(
+    (n00, n01, n10, n11), meta = sampling.draw_joint_counts(
         rng,
         n=n,
         p00=0.1,
@@ -100,10 +137,12 @@ def test_draw_joint_counts_counts_sum_to_n():
         prob_tol=1e-12,
         allow_tiny_negative=False,
         tiny_negative_eps=1e-6,
+        return_meta=True,
     )
     assert all(isinstance(x, int) for x in (n00, n01, n10, n11))
     assert n00 + n01 + n10 + n11 == n
     assert all(x >= 0 for x in (n00, n01, n10, n11))
+    assert meta["sum_error"] <= 1e-12
 
 
 def test_draw_joint_counts_rejects_non_generator_rng():
@@ -132,6 +171,44 @@ def test_draw_joint_counts_rejects_bad_n(bad_n):
             p01=0.25,
             p10=0.25,
             p11=0.25,
+            prob_tol=1e-12,
+            allow_tiny_negative=False,
+            tiny_negative_eps=1e-6,
+        )
+
+
+def test_draw_joint_counts_batch_shape_and_sum():
+    rng = np.random.default_rng(321)
+    counts, meta = sampling.draw_joint_counts_batch(
+        rng,
+        n=50,
+        p00=0.1,
+        p01=0.2,
+        p10=0.3,
+        p11=0.4,
+        size=5,
+        prob_tol=1e-12,
+        allow_tiny_negative=False,
+        tiny_negative_eps=1e-6,
+        return_meta=True,
+    )
+    assert counts.shape == (5, 4)
+    assert np.all(counts.sum(axis=1) == 50)
+    assert meta["p11_mismatch"] <= meta["p11_mismatch_tol"]
+
+
+@pytest.mark.parametrize("bad_size", [0, -1, 3.2, True])
+def test_draw_joint_counts_batch_rejects_bad_size(bad_size):
+    rng = np.random.default_rng(0)
+    with pytest.raises((TypeError, ValueError)):
+        sampling.draw_joint_counts_batch(
+            rng,
+            n=10,
+            p00=0.25,
+            p01=0.25,
+            p10=0.25,
+            p11=0.25,
+            size=bad_size,  # type: ignore[arg-type]
             prob_tol=1e-12,
             allow_tiny_negative=False,
             tiny_negative_eps=1e-6,

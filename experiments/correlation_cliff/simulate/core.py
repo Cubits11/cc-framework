@@ -34,7 +34,13 @@ import pandas as pd
 from . import utils as U
 from .config import SimConfig, validate_cfg
 from .paths import p11_from_path
-from .sampling import draw_joint_counts, empirical_from_counts, rng_for_cell, validate_cell_probs
+from .sampling import (
+    draw_joint_counts,
+    draw_joint_counts_batch,
+    empirical_from_counts,
+    rng_for_cell,
+    validate_cell_probs,
+)
 
 
 # ----------------------------
@@ -80,6 +86,143 @@ def _bool_to_float(b: Any) -> float:
         return 1.0 if bool(b) else 0.0
     except Exception:
         return 0.0
+
+
+def _finalize_row(
+    out: Dict[str, Any],
+    *,
+    cfg: SimConfig,
+    jmin: float,
+    jmax: float,
+) -> Dict[str, Any]:
+    """
+    Populate cross-world and population-level aggregates plus envelope checks.
+    """
+    w0_ok = bool(out.get("world_valid_w0", False))
+    w1_ok = bool(out.get("world_valid_w1", False))
+    worlds_valid = bool(w0_ok and w1_ok)
+    out["worlds_valid"] = worlds_valid
+    out["row_ok"] = worlds_valid
+
+    if worlds_valid:
+        pA0 = float(out["pA_hat_w0"])
+        pA1 = float(out["pA_hat_w1"])
+        pB0 = float(out["pB_hat_w0"])
+        pB1 = float(out["pB_hat_w1"])
+        pC0 = float(out["pC_hat_w0"])
+        pC1 = float(out["pC_hat_w1"])
+
+        JA_hat = abs(pA1 - pA0)
+        JB_hat = abs(pB1 - pB0)
+        Jbest_hat = max(JA_hat, JB_hat)
+        dC_hat = pC1 - pC0
+        JC_hat = abs(dC_hat)
+        CC_hat = (
+            (JC_hat / Jbest_hat)
+            if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0)
+            else float("nan")
+        )
+
+        out["JA_hat"] = float(JA_hat)
+        out["JB_hat"] = float(JB_hat)
+        out["Jbest_hat"] = float(Jbest_hat)
+        out["dC_hat"] = float(dC_hat)
+        out["JC_hat"] = float(JC_hat)
+        out["CC_hat"] = float(CC_hat)
+
+        phi0 = float(out.get("phi_hat_w0", float("nan")))
+        phi1 = float(out.get("phi_hat_w1", float("nan")))
+        tau0 = float(out.get("tau_hat_w0", float("nan")))
+        tau1 = float(out.get("tau_hat_w1", float("nan")))
+        out["phi_hat_avg"] = _nan_robust_avg(phi0, phi1)
+        out["tau_hat_avg"] = _nan_robust_avg(tau0, tau1)
+    else:
+        for k in (
+            "JA_hat",
+            "JB_hat",
+            "Jbest_hat",
+            "dC_hat",
+            "JC_hat",
+            "CC_hat",
+            "phi_hat_avg",
+            "tau_hat_avg",
+        ):
+            out[k] = float("nan")
+
+    JA_pop = abs(float(cfg.marginals.w1.pA) - float(cfg.marginals.w0.pA))
+    JB_pop = abs(float(cfg.marginals.w1.pB) - float(cfg.marginals.w0.pB))
+    Jbest_pop = max(JA_pop, JB_pop)
+    out["JA_pop"] = float(JA_pop)
+    out["JB_pop"] = float(JB_pop)
+    out["Jbest_pop"] = float(Jbest_pop)
+
+    pC0_true = float(out.get("pC_true_w0", float("nan")))
+    pC1_true = float(out.get("pC_true_w1", float("nan")))
+    dC_pop = pC1_true - pC0_true
+    JC_pop = abs(dC_pop)
+    CC_pop = (
+        (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
+    )
+
+    out["dC_pop"] = float(dC_pop)
+    out["JC_pop"] = float(JC_pop)
+    out["CC_pop"] = float(CC_pop)
+
+    phi0_true = float(out.get("phi_true_w0", float("nan")))
+    phi1_true = float(out.get("phi_true_w1", float("nan")))
+    tau0_true = float(out.get("tau_true_w0", float("nan")))
+    tau1_true = float(out.get("tau_true_w1", float("nan")))
+    out["phi_pop_avg"] = _nan_robust_avg(phi0_true, phi1_true)
+    out["tau_pop_avg"] = _nan_robust_avg(tau0_true, tau1_true)
+
+    if cfg.include_theory_reference and callable(getattr(U, "compute_metrics_for_lambda", None)):
+        try:
+            theory = U.compute_metrics_for_lambda(
+                cfg.marginals,
+                cfg.rule,
+                float(out["lambda"]),
+                path=cfg.path,
+                path_params=cfg.path_params,
+            )  # type: ignore[misc]
+            out["CC_theory_ref"] = float(theory.get("CC", float("nan")))
+            out["JC_theory_ref"] = float(theory.get("JC", float("nan")))
+            out["dC_theory_ref"] = float(theory.get("dC", float("nan")))
+            out["phi_theory_ref_avg"] = float(theory.get("phi_avg", float("nan")))
+            out["tau_theory_ref_avg"] = float(theory.get("tau_avg", float("nan")))
+            out["CC_ref_minus_pop"] = float(out["CC_theory_ref"] - out["CC_pop"])
+            out["JC_ref_minus_pop"] = float(out["JC_theory_ref"] - out["JC_pop"])
+        except Exception as e:
+            out["theory_ref_error"] = f"{type(e).__name__}: {e}"
+
+    tol = float(cfg.envelope_tol)
+    JC_hat = float(out.get("JC_hat", float("nan")))
+    if (
+        worlds_valid
+        and math.isfinite(JC_hat)
+        and math.isfinite(float(jmin))
+        and math.isfinite(float(jmax))
+    ):
+        low = float(jmin) - tol
+        high = float(jmax) + tol
+        violated_low = JC_hat < low
+        violated_high = JC_hat > high
+        violated = bool(violated_low or violated_high)
+        out["JC_env_violation"] = violated
+        out["JC_env_violation_low"] = bool(violated_low)
+        out["JC_env_violation_high"] = bool(violated_high)
+        if violated_low:
+            out["JC_env_gap"] = float(low - JC_hat)
+        elif violated_high:
+            out["JC_env_gap"] = float(JC_hat - high)
+        else:
+            out["JC_env_gap"] = 0.0
+    else:
+        out["JC_env_violation"] = False
+        out["JC_env_violation_low"] = False
+        out["JC_env_violation_high"] = False
+        out["JC_env_gap"] = float("nan")
+
+    return out
 
 
 # ----------------------------
@@ -260,7 +403,7 @@ def simulate_replicate_at_lambda(
 
         # Sample multinomial counts
         try:
-            n00, n01, n10, n11 = draw_joint_counts(
+            counts, sample_meta = draw_joint_counts(
                 rng_w,
                 n=cfg.n,
                 p00=float(cells["p00"]),
@@ -271,12 +414,22 @@ def simulate_replicate_at_lambda(
                 allow_tiny_negative=cfg.allow_tiny_negative,
                 tiny_negative_eps=cfg.tiny_negative_eps,
                 context=w_ctx,
+                return_meta=True,
             )
         except Exception as e:
             if cfg.hard_fail_on_invalid:
                 raise
             _mark_world_invalid(w, stage="draw_joint_counts", msg=f"{type(e).__name__}: {e}")
             continue
+
+        if isinstance(sample_meta, dict):
+            for mk, mv in sample_meta.items():
+                try:
+                    out[f"samplemeta_{mk}_w{w}"] = float(mv)
+                except Exception:
+                    out[f"samplemeta_{mk}_w{w}"] = float("nan")
+
+        n00, n01, n10, n11 = counts
 
         out[f"n00_w{w}"] = int(n00)
         out[f"n01_w{w}"] = int(n01)
@@ -322,138 +475,7 @@ def simulate_replicate_at_lambda(
         out[f"phi_true_w{w}"] = phi_true
         out[f"tau_true_w{w}"] = tau_true
 
-    # ----------------------------
-    # Cross-world aggregate metrics
-    # ----------------------------
-    w0_ok = bool(out.get("world_valid_w0", False))
-    w1_ok = bool(out.get("world_valid_w1", False))
-    worlds_valid = bool(w0_ok and w1_ok)
-    out["worlds_valid"] = worlds_valid
-
-    # Row OK means: replicate is fully valid (both worlds valid)
-    out["row_ok"] = worlds_valid
-
-    if worlds_valid:
-        pA0 = float(out["pA_hat_w0"])
-        pA1 = float(out["pA_hat_w1"])
-        pB0 = float(out["pB_hat_w0"])
-        pB1 = float(out["pB_hat_w1"])
-        pC0 = float(out["pC_hat_w0"])
-        pC1 = float(out["pC_hat_w1"])
-
-        JA_hat = abs(pA1 - pA0)
-        JB_hat = abs(pB1 - pB0)
-        Jbest_hat = max(JA_hat, JB_hat)
-        dC_hat = pC1 - pC0
-        JC_hat = abs(dC_hat)
-        CC_hat = (
-            (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
-        )
-
-        out["JA_hat"] = float(JA_hat)
-        out["JB_hat"] = float(JB_hat)
-        out["Jbest_hat"] = float(Jbest_hat)
-        out["dC_hat"] = float(dC_hat)
-        out["JC_hat"] = float(JC_hat)
-        out["CC_hat"] = float(CC_hat)
-
-        phi0 = float(out.get("phi_hat_w0", float("nan")))
-        phi1 = float(out.get("phi_hat_w1", float("nan")))
-        tau0 = float(out.get("tau_hat_w0", float("nan")))
-        tau1 = float(out.get("tau_hat_w1", float("nan")))
-        out["phi_hat_avg"] = _nan_robust_avg(phi0, phi1)
-        out["tau_hat_avg"] = _nan_robust_avg(tau0, tau1)
-    else:
-        # Explicitly mark cross-world outputs as NaN
-        for k in (
-            "JA_hat",
-            "JB_hat",
-            "Jbest_hat",
-            "dC_hat",
-            "JC_hat",
-            "CC_hat",
-            "phi_hat_avg",
-            "tau_hat_avg",
-        ):
-            out[k] = float("nan")
-
-    # Population-level cross-world baselines (JA/JB from marginals always computable)
-    JA_pop = abs(float(cfg.marginals.w1.pA) - float(cfg.marginals.w0.pA))
-    JB_pop = abs(float(cfg.marginals.w1.pB) - float(cfg.marginals.w0.pB))
-    Jbest_pop = max(JA_pop, JB_pop)
-    out["JA_pop"] = float(JA_pop)
-    out["JB_pop"] = float(JB_pop)
-    out["Jbest_pop"] = float(Jbest_pop)
-
-    pC0_true = float(out.get("pC_true_w0", float("nan")))
-    pC1_true = float(out.get("pC_true_w1", float("nan")))
-    dC_pop = pC1_true - pC0_true
-    JC_pop = abs(dC_pop)
-    CC_pop = (
-        (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
-    )
-
-    out["dC_pop"] = float(dC_pop)
-    out["JC_pop"] = float(JC_pop)
-    out["CC_pop"] = float(CC_pop)
-
-    phi0_true = float(out.get("phi_true_w0", float("nan")))
-    phi1_true = float(out.get("phi_true_w1", float("nan")))
-    tau0_true = float(out.get("tau_true_w0", float("nan")))
-    tau1_true = float(out.get("tau_true_w1", float("nan")))
-    out["phi_pop_avg"] = _nan_robust_avg(phi0_true, phi1_true)
-    out["tau_pop_avg"] = _nan_robust_avg(tau0_true, tau1_true)
-
-    # Optional: theory reference overlays (separate, explicitly labeled)
-    if cfg.include_theory_reference and callable(getattr(U, "compute_metrics_for_lambda", None)):
-        try:
-            theory = U.compute_metrics_for_lambda(
-                cfg.marginals,
-                cfg.rule,
-                lam_f,
-                path=cfg.path,
-                path_params=cfg.path_params,
-            )  # type: ignore[misc]
-            out["CC_theory_ref"] = float(theory.get("CC", float("nan")))
-            out["JC_theory_ref"] = float(theory.get("JC", float("nan")))
-            out["dC_theory_ref"] = float(theory.get("dC", float("nan")))
-            out["phi_theory_ref_avg"] = float(theory.get("phi_avg", float("nan")))
-            out["tau_theory_ref_avg"] = float(theory.get("tau_avg", float("nan")))
-            out["CC_ref_minus_pop"] = float(out["CC_theory_ref"] - out["CC_pop"])
-            out["JC_ref_minus_pop"] = float(out["JC_theory_ref"] - out["JC_pop"])
-        except Exception as e:
-            out["theory_ref_error"] = f"{type(e).__name__}: {e}"
-
-    # Envelope violation check on JC_hat (only meaningful if worlds valid)
-    tol = float(cfg.envelope_tol)
-    JC_hat = float(out.get("JC_hat", float("nan")))
-    if (
-        worlds_valid
-        and math.isfinite(JC_hat)
-        and math.isfinite(float(jmin))
-        and math.isfinite(float(jmax))
-    ):
-        low = float(jmin) - tol
-        high = float(jmax) + tol
-        violated_low = JC_hat < low
-        violated_high = JC_hat > high
-        violated = bool(violated_low or violated_high)
-        out["JC_env_violation"] = violated
-        out["JC_env_violation_low"] = bool(violated_low)
-        out["JC_env_violation_high"] = bool(violated_high)
-        if violated_low:
-            out["JC_env_gap"] = float(low - JC_hat)
-        elif violated_high:
-            out["JC_env_gap"] = float(JC_hat - high)
-        else:
-            out["JC_env_gap"] = 0.0
-    else:
-        out["JC_env_violation"] = False
-        out["JC_env_violation_low"] = False
-        out["JC_env_violation_high"] = False
-        out["JC_env_gap"] = float("nan")
-
-    return out
+    return _finalize_row(out, cfg=cfg, jmin=jmin, jmax=jmax)
 
 
 # ----------------------------
@@ -487,6 +509,291 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
     total = int(cfg.n_reps) * int(len(lambdas_list))
     rows: list[Dict[str, Any]] = []
     rows_append = rows.append
+
+    _WORLD_NUM_FIELDS: Tuple[str, ...] = (
+        "pA_true",
+        "pB_true",
+        "p00_true",
+        "p01_true",
+        "p10_true",
+        "p11_true",
+        "n00",
+        "n01",
+        "n10",
+        "n11",
+        "p00_hat",
+        "p01_hat",
+        "p10_hat",
+        "p11_hat",
+        "pA_hat",
+        "pB_hat",
+        "pC_hat",
+        "phi_hat",
+        "tau_hat",
+        "degenerate_A",
+        "degenerate_B",
+        "phi_finite",
+        "tau_finite",
+        "pC_true",
+        "phi_true",
+        "tau_true",
+    )
+
+    def _init_row(lam: float, lam_index: int, rep: int, jmin: float, jmax: float) -> Dict[str, Any]:
+        out_row: Dict[str, Any] = {
+            "lambda": float(lam),
+            "lambda_index": int(lam_index),
+            "rep": int(rep),
+            "rule": cfg.rule,
+            "path": cfg.path,
+            "seed": int(cfg.seed),
+            "seed_policy": cfg.seed_policy,
+            "n_per_world": int(cfg.n),
+            "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
+            "row_ok": True,
+            "row_error_stage": "",
+            "row_error_msg": "",
+        }
+        out_row["JC_env_min"] = float(jmin)
+        out_row["JC_env_max"] = float(jmax)
+        for w in (0, 1):
+            out_row[f"world_valid_w{w}"] = True
+            out_row[f"invalid_joint_w{w}"] = False
+            out_row[f"world_error_stage_w{w}"] = ""
+            out_row[f"world_error_msg_w{w}"] = ""
+            out_row[f"rng_seed_w{w}"] = float("nan")
+            for base in _WORLD_NUM_FIELDS:
+                out_row[f"{base}_w{w}"] = float("nan")
+        return out_row
+
+    def _mark_world_invalid(out_row: Dict[str, Any], w: int, *, stage: str, msg: str) -> None:
+        out_row[f"world_valid_w{w}"] = False
+        out_row[f"world_error_stage_w{w}"] = str(stage)
+        out_row[f"world_error_msg_w{w}"] = str(msg)
+        out_row[f"invalid_joint_w{w}"] = stage in (
+            "p11_from_path",
+            "joint_cells_from_marginals",
+            "validate_joint_probs",
+            "draw_joint_counts",
+        )
+
+    if cfg.seed_policy == "sequential" and cfg.batch_sampling:
+        for lam in lambdas_list:
+            lam_index = cfg.lambda_index_for_seed(lam)
+            row_ctx = f"(lam={float(lam):.6g}, idx={lam_index})"
+            jmin, jmax = U.compute_fh_jc_envelope(cfg.marginals, cfg.rule)
+
+            world_cache: Dict[int, Dict[str, Any]] = {}
+            for w, wm in ((0, cfg.marginals.w0), (1, cfg.marginals.w1)):
+                w_ctx = f"{row_ctx}, w={w}"
+                cache: Dict[str, Any] = {
+                    "pA_true": float(wm.pA),
+                    "pB_true": float(wm.pB),
+                    "ok": True,
+                    "error_stage": "",
+                    "error_msg": "",
+                }
+                try:
+                    p11, meta = p11_from_path(
+                        float(wm.pA),
+                        float(wm.pB),
+                        float(lam),
+                        path=cfg.path,
+                        path_params=cfg.path_params,
+                    )
+                    cache["p11"] = float(p11)
+                    cache["pathmeta"] = meta if isinstance(meta, dict) else {}
+                except Exception as e:
+                    cache.update(
+                        {
+                            "ok": False,
+                            "error_stage": "p11_from_path",
+                            "error_msg": f"{type(e).__name__}: {e}",
+                        }
+                    )
+                    world_cache[w] = cache
+                    continue
+
+                try:
+                    cells = U.joint_cells_from_marginals(
+                        float(wm.pA),
+                        float(wm.pB),
+                        float(cache["p11"]),
+                    )
+                    cache["cells"] = cells
+                except Exception as e:
+                    cache.update(
+                        {
+                            "ok": False,
+                            "error_stage": "joint_cells_from_marginals",
+                            "error_msg": f"{type(e).__name__}: {e}",
+                        }
+                    )
+                    world_cache[w] = cache
+                    continue
+
+                try:
+                    _ = validate_cell_probs(
+                        np.array(
+                            [cells["p00"], cells["p01"], cells["p10"], cells["p11"]],
+                            dtype=np.float64,
+                        ),
+                        prob_tol=cfg.prob_tol,
+                        allow_tiny_negative=cfg.allow_tiny_negative,
+                        tiny_negative_eps=cfg.tiny_negative_eps,
+                        context=w_ctx,
+                    )
+                except Exception as e:
+                    cache.update(
+                        {
+                            "ok": False,
+                            "error_stage": "validate_joint_probs",
+                            "error_msg": f"{type(e).__name__}: {e}",
+                        }
+                    )
+                    world_cache[w] = cache
+                    continue
+
+                try:
+                    counts_arr, sample_meta = draw_joint_counts_batch(
+                        base_rng,
+                        n=cfg.n,
+                        p00=float(cells["p00"]),
+                        p01=float(cells["p01"]),
+                        p10=float(cells["p10"]),
+                        p11=float(cells["p11"]),
+                        size=int(cfg.n_reps),
+                        prob_tol=cfg.prob_tol,
+                        allow_tiny_negative=cfg.allow_tiny_negative,
+                        tiny_negative_eps=cfg.tiny_negative_eps,
+                        context=w_ctx,
+                        return_meta=True,
+                    )
+                    cache["counts"] = counts_arr
+                    cache["sample_meta"] = sample_meta
+                except Exception as e:
+                    cache.update(
+                        {
+                            "ok": False,
+                            "error_stage": "draw_joint_counts",
+                            "error_msg": f"{type(e).__name__}: {e}",
+                        }
+                    )
+                    world_cache[w] = cache
+                    continue
+
+                try:
+                    cache["pC_true"] = float(
+                        U.pC_from_joint(cfg.rule, cells, pA=float(wm.pA), pB=float(wm.pB))
+                    )
+                    cache["phi_true"] = float(
+                        U.phi_from_joint(float(wm.pA), float(wm.pB), float(cells["p11"]))
+                    )
+                    cache["tau_true"] = float(U.kendall_tau_a_from_joint(cells))
+                except Exception as e:
+                    cache.update(
+                        {
+                            "ok": False,
+                            "error_stage": "population_overlays",
+                            "error_msg": f"{type(e).__name__}: {e}",
+                        }
+                    )
+
+                world_cache[w] = cache
+
+            for rep in range(int(cfg.n_reps)):
+                out = _init_row(float(lam), int(lam_index), int(rep), float(jmin), float(jmax))
+                for w, wm in ((0, cfg.marginals.w0), (1, cfg.marginals.w1)):
+                    cache = world_cache[w]
+                    out[f"pA_true_w{w}"] = float(wm.pA)
+                    out[f"pB_true_w{w}"] = float(wm.pB)
+
+                    if not cache.get("ok", False):
+                        if cfg.hard_fail_on_invalid:
+                            raise RuntimeError(
+                                f"{cache.get('error_stage')}: {cache.get('error_msg')}"
+                            )
+                        _mark_world_invalid(
+                            out,
+                            w,
+                            stage=str(cache.get("error_stage", "")),
+                            msg=str(cache.get("error_msg", "")),
+                        )
+                        continue
+
+                    cells = cache["cells"]
+                    out[f"p00_true_w{w}"] = float(cells["p00"])
+                    out[f"p01_true_w{w}"] = float(cells["p01"])
+                    out[f"p10_true_w{w}"] = float(cells["p10"])
+                    out[f"p11_true_w{w}"] = float(cells["p11"])
+
+                    if isinstance(cache.get("pathmeta"), dict):
+                        for mk, mv in cache["pathmeta"].items():
+                            try:
+                                out[f"pathmeta_{mk}_w{w}"] = float(mv)
+                            except Exception:
+                                out[f"pathmeta_{mk}_w{w}"] = float("nan")
+
+                    if isinstance(cache.get("sample_meta"), dict):
+                        for mk, mv in cache["sample_meta"].items():
+                            try:
+                                out[f"samplemeta_{mk}_w{w}"] = float(mv)
+                            except Exception:
+                                out[f"samplemeta_{mk}_w{w}"] = float("nan")
+
+                    counts = cache["counts"][rep]
+                    n00, n01, n10, n11 = (int(counts[0]), int(counts[1]), int(counts[2]), int(counts[3]))
+                    out[f"n00_w{w}"] = n00
+                    out[f"n01_w{w}"] = n01
+                    out[f"n10_w{w}"] = n10
+                    out[f"n11_w{w}"] = n11
+
+                    try:
+                        hats = empirical_from_counts(
+                            n=cfg.n,
+                            n00=n00,
+                            n01=n01,
+                            n10=n10,
+                            n11=n11,
+                            rule=cfg.rule,
+                            context=f"{row_ctx}, w={w}, rep={rep}",
+                        )
+                    except Exception as e:
+                        if cfg.hard_fail_on_invalid:
+                            raise
+                        _mark_world_invalid(
+                            out,
+                            w,
+                            stage="empirical_from_counts",
+                            msg=f"{type(e).__name__}: {e}",
+                        )
+                        continue
+
+                    _COLLIDE = {"n", "n00", "n01", "n10", "n11"}
+                    for hk, hv in hats.items():
+                        if hk in _COLLIDE:
+                            continue
+                        out[f"{hk}_w{w}"] = float(hv)
+
+                    out[f"pC_true_w{w}"] = float(cache.get("pC_true", float("nan")))
+                    out[f"phi_true_w{w}"] = float(cache.get("phi_true", float("nan")))
+                    out[f"tau_true_w{w}"] = float(cache.get("tau_true", float("nan")))
+
+                out = _finalize_row(out, cfg=cfg, jmin=float(out["JC_env_min"]), jmax=float(out["JC_env_max"]))
+                rows_append(out)
+
+        df = pd.DataFrame.from_records(rows)
+        sort_cols = [c for c in ("lambda", "rep") if c in df.columns]
+        df = (
+            df.sort_values(sort_cols, kind="mergesort").reset_index(drop=True)
+            if sort_cols
+            else df.reset_index(drop=True)
+        )
+
+        if len(df) != total and cfg.hard_fail_on_invalid:
+            raise RuntimeError(f"simulate_grid produced {len(df)} rows, expected {total}")
+
+        return df
 
     for rep in range(int(cfg.n_reps)):
         for lam in lambdas_list:
