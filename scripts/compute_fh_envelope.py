@@ -60,9 +60,7 @@ def compute_for_point(data: Dict) -> Dict:
             and fh_payload["fpr_lower"] - 1e-12
             <= independence["fpr"]
             <= fh_payload["fpr_upper"] + 1e-12
-            and fh_payload["j_lower"] - 1e-12
-            <= independence["j"]
-            <= fh_payload["j_upper"] + 1e-12
+            and fh_payload["j_lower"] - 1e-12 <= independence["j"] <= fh_payload["j_upper"] + 1e-12
         )
         data.setdefault("audit", {})["fh_contains_independence"] = bool(contained)
     return data
@@ -70,8 +68,12 @@ def compute_for_point(data: Dict) -> Dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Annotate point summaries with FH envelopes")
-    parser.add_argument("--in", dest="input_dir", required=True, help="Directory containing point_*.json")
-    parser.add_argument("--out", dest="output_dir", required=True, help="Directory to write updated JSON")
+    parser.add_argument(
+        "--in", dest="input_dir", required=True, help="Directory containing point_*.json"
+    )
+    parser.add_argument(
+        "--out", dest="output_dir", required=True, help="Directory to write updated JSON"
+    )
     args = parser.parse_args()
 
     in_dir = Path(args.input_dir)

@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cc.adapters.nemo_guardrails import NeMoGuardrailsAdapter
 
+
 def main():
     print("[*] Instantiating NeMoGuardrailsAdapter...")
     try:
@@ -32,6 +33,7 @@ def main():
     print(f"[✓] Config fingerprint: {decision.audit['config_fingerprint']}")
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

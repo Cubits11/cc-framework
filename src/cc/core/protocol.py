@@ -69,8 +69,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TypeAlias
 
 import numpy as np
-from scipy import stats  # required for t / normal ops (legacy parts)
 import statsmodels.api as sm
+from scipy import stats  # required for t / normal ops (legacy parts)
 
 # Core imports from CC-Framework
 from cc.adapters.base import build_audit_payload, fingerprint_payload
@@ -99,8 +99,10 @@ WorldBit: TypeAlias = int
 # ENUMS & RESULT MODELS
 # =============================================================================
 
+
 class ExperimentState(Enum):
     """Experiment execution states."""
+
     INITIALIZING = "initializing"
     RUNNING = "running"
     PAUSED = "paused"
@@ -111,6 +113,7 @@ class ExperimentState(Enum):
 
 class StoppingReason(Enum):
     """Reasons for early experiment termination."""
+
     MAX_SESSIONS = "max_sessions_reached"
     STATISTICAL_SIGNIFICANCE = "statistical_significance"
     FUTILITY = "futility_boundary"
@@ -130,6 +133,7 @@ class BayesianTestResult:
       - 'accept_h0' when HDI entirely inside ROPE
       - 'inconclusive' otherwise
     """
+
     bayes_factor: float
     posterior_prob_h1: float
     posterior_prob_h0: float
@@ -145,8 +149,9 @@ class BayesianTestResult:
 @dataclass
 class CausalEffect:
     """Causal effect estimation result (difference in means)."""
+
     ate: float  # Average Treatment Effect (p1 - p0)
-    se: float   # Standard Error (cluster-robust or mixed-effects)
+    se: float  # Standard Error (cluster-robust or mixed-effects)
     ci_lower: float
     ci_upper: float
     p_value: float
@@ -158,6 +163,7 @@ class CausalEffect:
 @dataclass
 class SessionMetadata:
     """Enhanced metadata for an attack session (optional; not required for API)."""
+
     session_id: str
     world_bit: int
     start_time: float
@@ -182,6 +188,7 @@ class ICCAnalysis:
 
     Cluster labels are based on attack strategy identity (attack_strategy).
     """
+
     global_icc: float
     effective_n: int
     design_effect: float
@@ -193,6 +200,7 @@ class ICCAnalysis:
 # =============================================================================
 # STATISTICAL COMPONENTS
 # =============================================================================
+
 
 class ICCComputer:
     """
@@ -276,7 +284,7 @@ class ICCComputer:
             cv = float(np.std(cluster_sizes, ddof=1) / m_bar)
         else:
             cv = 0.0
-        design_effect = 1.0 + icc * (m_bar - 1.0) * (1.0 + cv ** 2)
+        design_effect = 1.0 + icc * (m_bar - 1.0) * (1.0 + cv**2)
         design_effect = max(design_effect, 1.0)
         effective_n = int(round(n / design_effect))
         widening_factor = float(np.sqrt(design_effect))
@@ -441,8 +449,12 @@ class BayesianSequentialTester:
             )
 
         # Uniform priors Beta(1,1)
-        p0_samples = stats.beta.rvs(w0_success + 1, (w0_trials - w0_success) + 1, size=self.posterior_samples)
-        p1_samples = stats.beta.rvs(w1_success + 1, (w1_trials - w1_success) + 1, size=self.posterior_samples)
+        p0_samples = stats.beta.rvs(
+            w0_success + 1, (w0_trials - w0_success) + 1, size=self.posterior_samples
+        )
+        p1_samples = stats.beta.rvs(
+            w1_success + 1, (w1_trials - w1_success) + 1, size=self.posterior_samples
+        )
         effect_samples = p1_samples - p0_samples
 
         effect_mean = float(np.mean(effect_samples))
@@ -613,7 +625,7 @@ class CausalInferenceEngine:
             # Fallback: treat samples as independent when robust estimators fail.
             se0 = float(np.sqrt(var0 / max(n0, 1)))
             se1 = float(np.sqrt(var1 / max(n1, 1)))
-            se_diff_adj = float(np.sqrt(se0 ** 2 + se1 ** 2))
+            se_diff_adj = float(np.sqrt(se0**2 + se1**2))
             df = max(min(n0, n1) - 1, 1)
             method = "welch_t_test_independent"
 
@@ -657,6 +669,7 @@ class CausalInferenceEngine:
 # PLUGIN / FACTORY LAYER
 # =============================================================================
 
+
 class GuardrailPlugin(ABC):
     """Base class for guardrail plugins (optional extension point)."""
 
@@ -677,7 +690,9 @@ class AttackStrategyPlugin(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def adapt(self, strategy: AttackStrategy, history: List[AttackResult]) -> None:  # pragma: no cover
+    def adapt(
+        self, strategy: AttackStrategy, history: List[AttackResult]
+    ) -> None:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -743,6 +758,7 @@ class GuardrailFactory:
 # METRICS
 # =============================================================================
 
+
 class MetricsCollector:
     """Thread-safe metric accumulator with summary stats."""
 
@@ -772,6 +788,7 @@ class MetricsCollector:
 # =============================================================================
 # MAIN ENGINE
 # =============================================================================
+
 
 class AdaptiveExperimentEngine:
     """
@@ -839,8 +856,7 @@ class AdaptiveExperimentEngine:
             return []
 
         key_payload = [
-            {"name": s.name, "version": s.version, "params": s.params or {}}
-            for s in specs
+            {"name": s.name, "version": s.version, "params": s.params or {}} for s in specs
         ]
         cache_key = hashlib.sha256(
             json.dumps(key_payload, sort_keys=True).encode("utf-8")
@@ -867,7 +883,9 @@ class AdaptiveExperimentEngine:
         self._guardrail_cache[cache_key] = stack
         return stack
 
-    def apply_guardrail_stack(self, stack: List[Guardrail], text: str) -> Tuple[bool, float, List[str]]:
+    def apply_guardrail_stack(
+        self, stack: List[Guardrail], text: str
+    ) -> Tuple[bool, float, List[str]]:
         """
         Evaluate text through the guardrail stack, short-circuiting on block.
 
@@ -945,7 +963,9 @@ class AdaptiveExperimentEngine:
 
         self._current_session_id = session_id
         try:
-            with audit_context(self.logger, "attack_session", session_id=session_id, world=world_bit):
+            with audit_context(
+                self.logger, "attack_session", session_id=session_id, world=world_bit
+            ):
                 history: List[Dict[str, Any]] = []
                 triggered: List[str] = []
                 final_success = False
@@ -1103,7 +1123,7 @@ class AdaptiveExperimentEngine:
                 if (i + 1) % 50 == 0:
                     elapsed = time.time() - t0
                     rate = (i + 1) / max(elapsed, 1e-9)
-                    logging.info(f"Session {i+1}/{max_sessions} | Rate: {rate:.2f} sess/s")
+                    logging.info(f"Session {i + 1}/{max_sessions} | Rate: {rate:.2f} sess/s")
 
             t1 = time.time()
             self.state = ExperimentState.COMPLETED
@@ -1431,7 +1451,9 @@ class AdaptiveExperimentEngine:
             },
         )
 
-    def _save_checkpoint(self, experiment_id: str, results: List[AttackResult], final: bool = False) -> None:
+    def _save_checkpoint(
+        self, experiment_id: str, results: List[AttackResult], final: bool = False
+    ) -> None:
         """Write JSON checkpoint with full experiment snapshot."""
         ckpt_dir = Path("checkpoints") / experiment_id
         ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -1500,6 +1522,7 @@ class AdaptiveExperimentEngine:
 # =============================================================================
 # BACKWARD-COMPATIBLE FAÇADE
 # =============================================================================
+
 
 class TwoWorldProtocol(AdaptiveExperimentEngine):
     """

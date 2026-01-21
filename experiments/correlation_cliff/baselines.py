@@ -10,7 +10,7 @@ Baselines:
 
 import numpy as np
 from theory_core import TwoWorldMarginals
-from simulate import SimConfig, simulate_grid
+
 
 def baseline_random_composition(w: TwoWorldMarginals, n: int, seed: int):
     """
@@ -23,7 +23,7 @@ def baseline_random_composition(w: TwoWorldMarginals, n: int, seed: int):
     # World 1
     A1 = rng.binomial(1, w.pA1, size=n)
     B1 = rng.permutation(rng.binomial(1, w.pB1, size=n))
-    
+
     # Compute CC for OR rule
     C0 = np.logical_or(A0, B0).astype(int)
     C1 = np.logical_or(A1, B1).astype(int)
@@ -31,8 +31,8 @@ def baseline_random_composition(w: TwoWorldMarginals, n: int, seed: int):
     pC1 = C1.mean()
     JC = abs(pC1 - pC0)
     Jbest = max(abs(w.pA1 - w.pA0), abs(w.pB1 - w.pB0))
-    CC = JC / Jbest if Jbest > 0 else float('nan')
-    
+    CC = JC / Jbest if Jbest > 0 else float("nan")
+
     return {"CC_random": CC, "JC_random": JC}
 
 
@@ -43,13 +43,13 @@ def baseline_independent_composition(w: TwoWorldMarginals):
     # World 0
     p11_0 = w.pA0 * w.pB0
     pC0 = w.pA0 + w.pB0 - p11_0  # OR rule
-    
+
     # World 1
     p11_1 = w.pA1 * w.pB1
     pC1 = w.pA1 + w.pB1 - p11_1
-    
+
     JC = abs(pC1 - pC0)
     Jbest = max(abs(w.pA1 - w.pA0), abs(w.pB1 - w.pB0))
-    CC = JC / Jbest if Jbest > 0 else float('nan')
-    
+    CC = JC / Jbest if Jbest > 0 else float("nan")
+
     return {"CC_independent": CC, "JC_independent": JC}

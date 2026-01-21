@@ -1,5 +1,6 @@
 # tests/integration/test_e2e_ledger_attestation.py
 """End-to-end ledger attestation hash chain."""
+
 from __future__ import annotations
 
 import json

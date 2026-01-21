@@ -46,8 +46,8 @@ def _jaccard(a: Set[str], b: Set[str]) -> float:
 
 @dataclass
 class KeywordBlockerConfig:
-    fuzzy_threshold: float = 0.80    # token ≈ keyword if Jaccard ≥ this
-    fuzzy_weight: float = 0.50       # contribution of fuzzy vs exact (∈[0,1])
+    fuzzy_threshold: float = 0.80  # token ≈ keyword if Jaccard ≥ this
+    fuzzy_weight: float = 0.50  # contribution of fuzzy vs exact (∈[0,1])
     initial_threshold: float = 0.50  # pre-calibration threshold
     verbose: bool = False
 

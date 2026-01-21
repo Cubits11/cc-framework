@@ -59,17 +59,16 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Literal,
     Mapping,
     Optional,
     Tuple,
-    Union,
     cast,
-    Literal,
 )
 
 import numpy as np
 
-from .bounds import envelope_over_rocs, ensure_anchors
+from .bounds import ensure_anchors, envelope_over_rocs
 
 __all__ = [
     # JSONL chain
@@ -78,7 +77,7 @@ __all__ = [
     "tail_sha",
     "make_record",
     "rehash_file",
-    "append_record",   # convenience: make_record + append_jsonl
+    "append_record",  # convenience: make_record + append_jsonl
     "truncate_to_last_valid",
     "AuditError",
     # FH auditor
@@ -95,6 +94,7 @@ __all__ = [
 @dataclass
 class AuditError(Exception):
     """Base class for audit chain errors."""
+
     message: str
 
     def __str__(self) -> str:
@@ -265,9 +265,7 @@ def verify_chain(path: str) -> None:
         content = {k: v for k, v in obj.items() if k != "sha256"}
         got_sha = _compute_record_sha(content)
         if got_sha != exp_sha:
-            raise AuditError(
-                f"Line {i}: SHA mismatch (expected {exp_sha}, recomputed {got_sha})"
-            )
+            raise AuditError(f"Line {i}: SHA mismatch (expected {exp_sha}, recomputed {got_sha})")
 
         # Verify chain pointer
         if content.get("prev_sha256") != prev:
@@ -331,7 +329,7 @@ def truncate_to_last_valid(path: str) -> Optional[int]:
     count = 0
     with open(path, "r+", encoding="utf-8") as f:
         while True:
-            pos = f.tell()
+            f.tell()
             line = f.readline()
             if not line:
                 break
@@ -359,9 +357,7 @@ def _now_iso_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def _ci(
-    ci: Optional[Tuple[Optional[float], Optional[float]]]
-) -> Optional[Tuple[float, float]]:
+def _ci(ci: Optional[Tuple[Optional[float], Optional[float]]]) -> Optional[Tuple[float, float]]:
     """
     Normalize CI:
       - if None -> None

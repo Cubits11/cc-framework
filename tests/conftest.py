@@ -8,6 +8,7 @@ Why:
 
 This ensures ./src is always on sys.path for any pytest invocation.
 """
+
 from __future__ import annotations
 
 import sys

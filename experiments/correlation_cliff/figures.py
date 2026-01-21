@@ -42,12 +42,12 @@ Outputs
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Tuple
 
+import matplotlib
 import numpy as np
 import pandas as pd
 
-import matplotlib
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 
@@ -161,7 +161,11 @@ def plot_cc_vs_dependence(
     if "lambda" not in df_sum.columns:
         raise ValueError("df_sum must include 'lambda' column")
 
-    x = df_sum[dependence_x].to_numpy(dtype=float) if dependence_x in df_sum.columns else df_sum["lambda"].to_numpy(dtype=float)
+    x = (
+        df_sum[dependence_x].to_numpy(dtype=float)
+        if dependence_x in df_sum.columns
+        else df_sum["lambda"].to_numpy(dtype=float)
+    )
 
     fig, ax = plt.subplots(figsize=(9.5, 4.8))
     title = f"{style.title_prefix}CC vs dependence".strip()
@@ -186,7 +190,11 @@ def plot_cc_vs_dependence(
 
     # Population overlay
     if df_pop is not None and ("CC_pop" in df_pop.columns):
-        xp = df_pop[dependence_x].to_numpy(dtype=float) if dependence_x in df_pop.columns else df_pop["lambda"].to_numpy(dtype=float)
+        xp = (
+            df_pop[dependence_x].to_numpy(dtype=float)
+            if dependence_x in df_pop.columns
+            else df_pop["lambda"].to_numpy(dtype=float)
+        )
         ax.plot(xp, df_pop["CC_pop"].to_numpy(dtype=float), linestyle="--", label="Population")
 
     # Threshold markers
@@ -198,13 +206,31 @@ def plot_cc_vs_dependence(
         lam_emp = thresholds.get("lambda_star_emp", None)
         lam_pop = thresholds.get("lambda_star_pop", None)
 
-        if dependence_x != "lambda" and dep_key_emp in thresholds and thresholds[dep_key_emp] is not None:
-            ax.axvline(float(thresholds[dep_key_emp]), linestyle=":", linewidth=1.2, label="Empirical threshold")
+        if (
+            dependence_x != "lambda"
+            and dep_key_emp in thresholds
+            and thresholds[dep_key_emp] is not None
+        ):
+            ax.axvline(
+                float(thresholds[dep_key_emp]),
+                linestyle=":",
+                linewidth=1.2,
+                label="Empirical threshold",
+            )
         elif dependence_x == "lambda" and lam_emp is not None:
             ax.axvline(float(lam_emp), linestyle=":", linewidth=1.2, label="Empirical threshold")
 
-        if dependence_x != "lambda" and dep_key_pop in thresholds and thresholds[dep_key_pop] is not None:
-            ax.axvline(float(thresholds[dep_key_pop]), linestyle="--", linewidth=1.2, label="Population threshold")
+        if (
+            dependence_x != "lambda"
+            and dep_key_pop in thresholds
+            and thresholds[dep_key_pop] is not None
+        ):
+            ax.axvline(
+                float(thresholds[dep_key_pop]),
+                linestyle="--",
+                linewidth=1.2,
+                label="Population threshold",
+            )
         elif dependence_x == "lambda" and lam_pop is not None:
             ax.axvline(float(lam_pop), linestyle="--", linewidth=1.2, label="Population threshold")
 
@@ -240,7 +266,11 @@ def plot_jc_fh_envelope(
     if not {"JC_hat_mean", "JC_env_min", "JC_env_max"}.issubset(df_sum.columns):
         raise ValueError("df_sum must contain JC_hat_mean, JC_env_min, JC_env_max")
 
-    x = df_sum[dependence_x].to_numpy(dtype=float) if dependence_x in df_sum.columns else df_sum["lambda"].to_numpy(dtype=float)
+    x = (
+        df_sum[dependence_x].to_numpy(dtype=float)
+        if dependence_x in df_sum.columns
+        else df_sum["lambda"].to_numpy(dtype=float)
+    )
 
     fig, ax = plt.subplots(figsize=(9.5, 4.8))
     title = f"{style.title_prefix}J_C with FH envelope".strip()
@@ -262,7 +292,11 @@ def plot_jc_fh_envelope(
 
     # Population overlay
     if df_pop is not None and ("JC_pop" in df_pop.columns):
-        xp = df_pop[dependence_x].to_numpy(dtype=float) if dependence_x in df_pop.columns else df_pop["lambda"].to_numpy(dtype=float)
+        xp = (
+            df_pop[dependence_x].to_numpy(dtype=float)
+            if dependence_x in df_pop.columns
+            else df_pop["lambda"].to_numpy(dtype=float)
+        )
         ax.plot(xp, df_pop["JC_pop"].to_numpy(dtype=float), linestyle="--", label="Population")
 
     ax.set_xlabel(dependence_x)
@@ -293,7 +327,11 @@ def plot_theory_vs_empirical(
     if "CC_hat_mean" not in df_sum.columns:
         raise ValueError("df_sum must contain CC_hat_mean")
 
-    x = df_sum[dependence_x].to_numpy(dtype=float) if dependence_x in df_sum.columns else df_sum["lambda"].to_numpy(dtype=float)
+    x = (
+        df_sum[dependence_x].to_numpy(dtype=float)
+        if dependence_x in df_sum.columns
+        else df_sum["lambda"].to_numpy(dtype=float)
+    )
 
     fig, ax = plt.subplots(figsize=(9.5, 4.8))
     title = f"{style.title_prefix}Empirical minus population (CC)".strip()
@@ -319,10 +357,20 @@ def plot_theory_vs_empirical(
         if lo_col and hi_col and dependence_x == "lambda":
             # approximate error band by subtracting population curve from CI endpoints
             # (conservative if population curve is treated fixed)
-            dfci = df_sum[["lambda", lo_col, hi_col]].merge(dfp, on="lambda", how="inner").sort_values("lambda")
+            dfci = (
+                df_sum[["lambda", lo_col, hi_col]]
+                .merge(dfp, on="lambda", how="inner")
+                .sort_values("lambda")
+            )
             lo_err = (dfci[lo_col] - dfci["CC_pop"]).to_numpy(dtype=float)
             hi_err = (dfci[hi_col] - dfci["CC_pop"]).to_numpy(dtype=float)
-            ax.fill_between(dfci["lambda"].to_numpy(dtype=float), lo_err, hi_err, alpha=float(style.ci_alpha), label="CI band (shifted)")
+            ax.fill_between(
+                dfci["lambda"].to_numpy(dtype=float),
+                lo_err,
+                hi_err,
+                alpha=float(style.ci_alpha),
+                label="CI band (shifted)",
+            )
 
         ax.set_ylabel("Error in CC")
 
@@ -360,16 +408,30 @@ def plot_dependence_mapping(
 
     # Empirical dependence averages (means)
     if "phi_hat_avg_mean" in df_sum.columns:
-        ax.plot(x, df_sum["phi_hat_avg_mean"].to_numpy(dtype=float), label="Empirical phi_avg (mean)")
+        ax.plot(
+            x, df_sum["phi_hat_avg_mean"].to_numpy(dtype=float), label="Empirical phi_avg (mean)"
+        )
     if "tau_hat_avg_mean" in df_sum.columns:
-        ax.plot(x, df_sum["tau_hat_avg_mean"].to_numpy(dtype=float), label="Empirical tau_avg (mean)")
+        ax.plot(
+            x, df_sum["tau_hat_avg_mean"].to_numpy(dtype=float), label="Empirical tau_avg (mean)"
+        )
 
     # Population
     if df_pop is not None:
         if "phi_pop_avg" in df_pop.columns:
-            ax.plot(df_pop["lambda"].to_numpy(dtype=float), df_pop["phi_pop_avg"].to_numpy(dtype=float), linestyle="--", label="Population phi_avg")
+            ax.plot(
+                df_pop["lambda"].to_numpy(dtype=float),
+                df_pop["phi_pop_avg"].to_numpy(dtype=float),
+                linestyle="--",
+                label="Population phi_avg",
+            )
         if "tau_pop_avg" in df_pop.columns:
-            ax.plot(df_pop["lambda"].to_numpy(dtype=float), df_pop["tau_pop_avg"].to_numpy(dtype=float), linestyle="--", label="Population tau_avg")
+            ax.plot(
+                df_pop["lambda"].to_numpy(dtype=float),
+                df_pop["tau_pop_avg"].to_numpy(dtype=float),
+                linestyle="--",
+                label="Population tau_avg",
+            )
 
     ax.set_xlabel("lambda")
     ax.set_ylabel("Dependence summary")
@@ -412,19 +474,31 @@ def make_all_figures(
     # 1) CC plot
     pdf = p("cc_vs_dependence.pdf")
     png = p("cc_vs_dependence.png") if also_png else None
-    plot_cc_vs_dependence(df_pop, df_sum, out_path_pdf=pdf, out_path_png=png, thresholds=thresholds, dependence_x=dependence_x, style=style)
+    plot_cc_vs_dependence(
+        df_pop,
+        df_sum,
+        out_path_pdf=pdf,
+        out_path_png=png,
+        thresholds=thresholds,
+        dependence_x=dependence_x,
+        style=style,
+    )
     saved["cc_vs_dependence"] = str(pdf)
 
     # 2) JC with envelope
     pdf = p("jc_fh_envelope.pdf")
     png = p("jc_fh_envelope.png") if also_png else None
-    plot_jc_fh_envelope(df_pop, df_sum, out_path_pdf=pdf, out_path_png=png, dependence_x=dependence_x, style=style)
+    plot_jc_fh_envelope(
+        df_pop, df_sum, out_path_pdf=pdf, out_path_png=png, dependence_x=dependence_x, style=style
+    )
     saved["jc_fh_envelope"] = str(pdf)
 
     # 3) Error / comparison
     pdf = p("theory_vs_empirical.pdf")
     png = p("theory_vs_empirical.png") if also_png else None
-    plot_theory_vs_empirical(df_pop, df_sum, out_path_pdf=pdf, out_path_png=png, dependence_x=dependence_x, style=style)
+    plot_theory_vs_empirical(
+        df_pop, df_sum, out_path_pdf=pdf, out_path_png=png, dependence_x=dependence_x, style=style
+    )
     saved["theory_vs_empirical"] = str(pdf)
 
     # 4) Dependence mapping

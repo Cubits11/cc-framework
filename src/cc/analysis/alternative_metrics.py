@@ -159,14 +159,13 @@ EXAMPLE
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Literal
 import typing
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
-
 
 # ---------------------------------------------------------------------------
 # Types and constants
@@ -207,6 +206,7 @@ _DATAFRAME_COLUMNS: List[str] = [
 # Configuration dataclasses
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class MetricResult:
     """
@@ -234,6 +234,7 @@ class MetricResult:
     notes : Optional[str]
         Free-form note for flags (e.g., "fh_clip_low", "fh_degenerate").
     """
+
     metric_name: str
     score: float
     baseline_score: Optional[float]
@@ -253,6 +254,7 @@ class MetricResult:
 # ---------------------------------------------------------------------------
 # Low-level numeric helpers
 # ---------------------------------------------------------------------------
+
 
 def _ensure_finite(name: str, value: Any) -> float:
     """
@@ -292,14 +294,13 @@ def _validate_thresholds(
     if threshold_cost < 0.0:
         raise ValueError(f"threshold_cost must be >= 0, got {threshold_cost}")
     if not (0.0 <= fh_neutral_bound <= 0.5):
-        raise ValueError(
-            f"fh_neutral_bound must be in [0.0, 0.5], got {fh_neutral_bound}"
-        )
+        raise ValueError(f"fh_neutral_bound must be in [0.0, 0.5], got {fh_neutral_bound}")
 
 
 # ---------------------------------------------------------------------------
 # Primitive scorers
 # ---------------------------------------------------------------------------
+
 
 def euclidean_distance_index(tpr: float, fpr: float) -> float:
     """
@@ -319,7 +320,7 @@ def euclidean_distance_index(tpr: float, fpr: float) -> float:
     """
     tpr_f = _ensure_finite("tpr", tpr)
     fpr_f = _ensure_finite("fpr", fpr)
-    return float(np.sqrt((1.0 - tpr_f) ** 2 + (fpr_f ** 2)))
+    return float(np.sqrt((1.0 - tpr_f) ** 2 + (fpr_f**2)))
 
 
 def cost_weighted_error(
@@ -447,6 +448,7 @@ def fh_envelope_percentile(
 # ---------------------------------------------------------------------------
 # Small helpers
 # ---------------------------------------------------------------------------
+
 
 def _classify_delta(
     obs_value: float,
@@ -606,16 +608,12 @@ def _validate_record(cfg: str, rec: Mapping[str, Any]) -> Dict[str, float]:
         ("fpr_indep", fpr_ind),
     ):
         if val < -1e-6 or val > 1.0 + 1e-6:
-            raise ValueError(
-                f"[{cfg}] {name}={val} is outside [0, 1] (tolerance 1e-6)"
-            )
+            raise ValueError(f"[{cfg}] {name}={val} is outside [0, 1] (tolerance 1e-6)")
 
     # J should be within [-1, 1] in theory; tolerate small drift.
     for name, val in (("j_obs", j_obs), ("j_indep", j_ind)):
         if val < -1.0 - 1e-6 or val > 1.0 + 1e-6:
-            raise ValueError(
-                f"[{cfg}] {name}={val} is outside [-1, 1] (tolerance 1e-6)"
-            )
+            raise ValueError(f"[{cfg}] {name}={val} is outside [-1, 1] (tolerance 1e-6)")
 
     # J consistency checks
     if abs((tpr_ind - fpr_ind) - j_ind) > 1e-6:
@@ -624,10 +622,7 @@ def _validate_record(cfg: str, rec: Mapping[str, Any]) -> Dict[str, float]:
             f"{j_ind} vs {tpr_ind - fpr_ind}"
         )
     if abs((tpr - fpr) - j_obs) > 1e-6:
-        raise ValueError(
-            f"[{cfg}] j_obs inconsistent with (tpr - fpr): "
-            f"{j_obs} vs {tpr - fpr}"
-        )
+        raise ValueError(f"[{cfg}] j_obs inconsistent with (tpr - fpr): {j_obs} vs {tpr - fpr}")
 
     if fh_lower > fh_upper:
         raise ValueError(f"[{cfg}] fh_lower > fh_upper: {fh_lower} > {fh_upper}")
@@ -745,9 +740,7 @@ def _iter_config_metrics(
 
         # 3) Cost-weighted (lower is better) with TRUE independence baseline
         c_obs = cost_weighted_error(tpr, fpr, cost_fp=cost_fp, cost_fn=cost_fn)
-        c_base = cost_weighted_error(
-            tpr_indep, fpr_indep, cost_fp=cost_fp, cost_fn=cost_fn
-        )
+        c_base = cost_weighted_error(tpr_indep, fpr_indep, cost_fp=cost_fp, cost_fn=cost_fn)
         c_delta = c_obs - c_base
         cost_class = _classify_delta(
             obs_value=c_obs,
@@ -795,6 +788,7 @@ def _iter_config_metrics(
 # ---------------------------------------------------------------------------
 # Public API – structured and DataFrame versions
 # ---------------------------------------------------------------------------
+
 
 def compare_all_metrics_structured(
     config_results: Mapping[str, Mapping[str, Any]],
@@ -981,6 +975,7 @@ def compare_all_metrics(
 # Agreement & disagreement analysis
 # ---------------------------------------------------------------------------
 
+
 def cohen_kappa(
     method1_classes: Iterable[str],
     method2_classes: Iterable[str],
@@ -1096,9 +1091,7 @@ def analyze_disagreements(df: pd.DataFrame) -> pd.DataFrame:
     }
     missing = required_cols - set(df.columns)
     if missing:
-        raise ValueError(
-            f"Missing required columns for disagreement analysis: {sorted(missing)}"
-        )
+        raise ValueError(f"Missing required columns for disagreement analysis: {sorted(missing)}")
 
     if df.empty:
         return df.copy()

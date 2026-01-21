@@ -81,7 +81,9 @@ def dataset_hash_from_config(config: Mapping[str, Any], base_dir: Path | None = 
             candidate_path = base / candidate_path
 
         if any(ch in entry for ch in "*?["):
-            matches = sorted({p for p in candidate_path.parent.glob(candidate_path.name) if p.exists()})
+            matches = sorted(
+                {p for p in candidate_path.parent.glob(candidate_path.name) if p.exists()}
+            )
         else:
             matches = [candidate_path]
 
@@ -108,7 +110,9 @@ class StorageBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def save_json(self, payload: Mapping[str, Any], *, category: str = "runs", filename: str = "manifest.json") -> Path:
+    def save_json(
+        self, payload: Mapping[str, Any], *, category: str = "runs", filename: str = "manifest.json"
+    ) -> Path:
         raise NotImplementedError
 
     @abstractmethod
@@ -123,7 +127,9 @@ class StorageBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def save_artifact(self, source_path: Path, *, category: str = "figures", filename: str | None = None) -> Path:
+    def save_artifact(
+        self, source_path: Path, *, category: str = "figures", filename: str | None = None
+    ) -> Path:
         raise NotImplementedError
 
 
@@ -137,7 +143,9 @@ class LocalStorageBackend(StorageBackend):
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / filename
 
-    def save_json(self, payload: Mapping[str, Any], *, category: str = "runs", filename: str = "manifest.json") -> Path:
+    def save_json(
+        self, payload: Mapping[str, Any], *, category: str = "runs", filename: str = "manifest.json"
+    ) -> Path:
         data = _stable_json(payload)
         content_hash = _hash_text(data)
         path = self.resolve_path(category, content_hash, filename)
@@ -163,7 +171,9 @@ class LocalStorageBackend(StorageBackend):
                 writer.writerow({k: row.get(k, "") for k in header_list})
         return path
 
-    def save_artifact(self, source_path: Path, *, category: str = "figures", filename: str | None = None) -> Path:
+    def save_artifact(
+        self, source_path: Path, *, category: str = "figures", filename: str | None = None
+    ) -> Path:
         if not source_path.exists():
             raise FileNotFoundError(f"Artifact does not exist: {source_path}")
         content_hash = _hash_file(source_path)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate dummy CCC addendum and figures for pipeline checks."""
+
 from __future__ import annotations
 
 import csv

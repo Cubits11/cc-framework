@@ -52,13 +52,14 @@ from typing import Any, List, Literal, Mapping, Optional
 
 import numpy as np
 
-# Core cartographer surfaces
-from cc.cartographer import atlas, audit, bounds, io, stats
 # Reporting aggregator (CC/CCC)
 from cc.analysis import reporting
 
 # Week-3 methods plumbing
 from cc.analysis.cc_estimation import estimate_cc_methods_from_rates
+
+# Core cartographer surfaces
+from cc.cartographer import atlas, audit, bounds, io, stats
 from cc.cartographer.intervals import cc_ci_bootstrap, cc_ci_wilson
 
 # Optional figure helper (present if you added plot_roc_fh_slice earlier)
@@ -71,6 +72,7 @@ except Exception:
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
+
 
 def _norm_comp(x: Any) -> Literal["AND", "OR"]:
     """
@@ -96,7 +98,7 @@ def _maybe_post_github_comment(context_json: str, body: str) -> None:
             "actor": ctx.get("actor"),
             "body": body,
         }
-        print(f"::github-comment::{json.dumps(payload, separators=(',',':'))}")
+        print(f"::github-comment::{json.dumps(payload, separators=(',', ':'))}")
     except Exception:
         return
 
@@ -132,17 +134,26 @@ def _maybe_counts_to_phat(k: Optional[int], n: Optional[int]) -> Optional[float]
 # Subcommands
 # -----------------------------------------------------------------------------
 
+
 def _cmd_run(argv: List[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli run",
-        description="Execute a single run: load scores, compute J/CI and CC, draw a figure, and append to audit."
+        description="Execute a single run: load scores, compute J/CI and CC, draw a figure, and append to audit.",
     )
-    p.add_argument("--config", required=True, help="Path to YAML config (experiments/configs/*.yaml)")
-    p.add_argument("--samples", type=int, default=200, help="Override sample count for synthetic loaders")
+    p.add_argument(
+        "--config", required=True, help="Path to YAML config (experiments/configs/*.yaml)"
+    )
+    p.add_argument(
+        "--samples", type=int, default=200, help="Override sample count for synthetic loaders"
+    )
     p.add_argument("--fig", required=True, help="Path to write the phase-point figure (PNG/PDF)")
     p.add_argument("--audit", required=True, help="Path to JSONL audit log (append-only)")
-    p.add_argument("--post-comment", type=str, default="false", help="If 'true', emit GH comment payload line")
-    p.add_argument("--github-context", type=str, default="", help="JSON string with repo/issue/sha/actor")
+    p.add_argument(
+        "--post-comment", type=str, default="false", help="If 'true', emit GH comment payload line"
+    )
+    p.add_argument(
+        "--github-context", type=str, default="", help="JSON string with repo/issue/sha/actor"
+    )
     args = p.parse_args(argv)
 
     # Load config and generate/ingest scores
@@ -173,7 +184,9 @@ def _cmd_run(argv: List[str]) -> None:
     )
 
     # Tamper-evident audit append
-    rec = audit.make_record(cfg, None, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, decision, [fig_path])
+    rec = audit.make_record(
+        cfg, None, JA, JA_ci, JB, JB_ci, Jc, Jc_ci, CC, Dadd, decision, [fig_path]
+    )
     sha = audit.append_jsonl(args.audit, rec)
 
     # Console outputs (human + machine)
@@ -183,13 +196,15 @@ def _cmd_run(argv: List[str]) -> None:
 
     # Optional GitHub comment emission
     if args.post_comment.lower() == "true" and args.github_context:
-        _maybe_post_github_comment(args.github_context, entry + "\n\n" + decision + f"\n\n**audit_sha:** `{sha}`")
+        _maybe_post_github_comment(
+            args.github_context, entry + "\n\n" + decision + f"\n\n**audit_sha:** `{sha}`"
+        )
 
 
 def _cmd_verify_audit(argv: List[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli verify-audit",
-        description="Verify integrity of the append-only JSONL audit chain."
+        description="Verify integrity of the append-only JSONL audit chain.",
     )
     p.add_argument("--audit", required=True, help="Path to JSONL audit log")
     args = p.parse_args(argv)
@@ -200,10 +215,15 @@ def _cmd_verify_audit(argv: List[str]) -> None:
 def _cmd_verify_stats(argv: List[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli verify-stats",
-        description="Run bootstrap diagnostics to sanity-check score plumbing."
+        description="Run bootstrap diagnostics to sanity-check score plumbing.",
     )
     p.add_argument("--config", required=True, help="Path to YAML config")
-    p.add_argument("--bootstrap", type=int, default=10_000, help="Bootstrap resamples (module may cap internally)")
+    p.add_argument(
+        "--bootstrap",
+        type=int,
+        default=10_000,
+        help="Bootstrap resamples (module may cap internally)",
+    )
     args = p.parse_args(argv)
 
     cfg = io.load_config(args.config)
@@ -215,13 +235,13 @@ def _cmd_verify_stats(argv: List[str]) -> None:
 def _cmd_build_reports(argv: List[str]) -> None:
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli build-reports",
-        description="Aggregate reports from existing artifacts under results/ and evaluation/ccc/addenda."
+        description="Aggregate reports from existing artifacts under results/ and evaluation/ccc/addenda.",
     )
     p.add_argument(
         "--mode",
         default="all",
         choices=["cc", "ccc", "all"],
-        help="Which reports to build (default: all)"
+        help="Which reports to build (default: all)",
     )
     args = p.parse_args(argv)
     reporting.build_all(mode=args.mode)
@@ -233,10 +253,12 @@ def _cmd_methods(argv: List[str]) -> None:
     """
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli methods",
-        description="Compute FH–Bernstein + Wilson + Bootstrap CC CIs at a fixed operating point θ."
+        description="Compute FH–Bernstein + Wilson + Bootstrap CC CIs at a fixed operating point θ.",
     )
     # Required operating context
-    p.add_argument("--D", type=float, required=True, help="Denominator (>0): D = min_r (1 - J_r(θ_r*)).")
+    p.add_argument(
+        "--D", type=float, required=True, help="Denominator (>0): D = min_r (1 - J_r(θ_r*))."
+    )
     p.add_argument("--tpr-a", type=float, required=True)
     p.add_argument("--tpr-b", type=float, required=True)
     p.add_argument("--fpr-a", type=float, required=True)
@@ -252,11 +274,17 @@ def _cmd_methods(argv: List[str]) -> None:
 
     # Policy + risk + planner
     p.add_argument("--alpha-cap", type=float, default=None, help="Policy cap α: binds I0 upper.")
-    p.add_argument("--delta", type=float, default=0.05, help="Two-sided risk for CIs (default 0.05).")
-    p.add_argument("--target-t", type=float, default=None, help="Optional target half-width t for CC planner.")
+    p.add_argument(
+        "--delta", type=float, default=0.05, help="Two-sided risk for CIs (default 0.05)."
+    )
+    p.add_argument(
+        "--target-t", type=float, default=None, help="Optional target half-width t for CC planner."
+    )
 
     # Bootstrap controls
-    p.add_argument("--bootstrap-B", type=int, default=2000, help="Bootstrap replicates if samples provided.")
+    p.add_argument(
+        "--bootstrap-B", type=int, default=2000, help="Bootstrap replicates if samples provided."
+    )
     p.add_argument("--seed", type=int, default=7, help="RNG seed for bootstrap.")
 
     # Outputs
@@ -306,7 +334,9 @@ def _cmd_methods(argv: List[str]) -> None:
     # Bootstrap CC CI (if samples provided)
     boo_lo = boo_hi = None
     if y1 is not None and y0 is not None:
-        boo_lo, boo_hi = cc_ci_bootstrap(y1, y0, args.D, args.delta, B=args.bootstrap_B, seed=args.seed)
+        boo_lo, boo_hi = cc_ci_bootstrap(
+            y1, y0, args.D, args.delta, B=args.bootstrap_B, seed=args.seed
+        )
 
     # Pretty print
     point = report["point"]
@@ -321,13 +351,19 @@ def _cmd_methods(argv: List[str]) -> None:
     print(f"  p0_hat (A∨B|Y=0): {p0_hat:.4f} (n0={args.n0})")
     print(f"  D: {args.D:.6f}   CC_hat: {point['cc_hat']:.4f}")
     print(f"  I1 (FH AND, Y=1): {fmt_iv(tuple(bounds['I1']))}   v̄1: {bounds['vbar1']:.4f}")
-    print(f"  I0 (FH OR , Y=0): {fmt_iv(tuple(bounds['I0']))}   v̄0: {bounds['vbar0']:.4f}   α-cap: {args.alpha_cap}")
+    print(
+        f"  I0 (FH OR , Y=0): {fmt_iv(tuple(bounds['I0']))}   v̄0: {bounds['vbar0']:.4f}   α-cap: {args.alpha_cap}"
+    )
 
     print(f"\n  CIs (two-sided, δ = {args.delta:.3f}):")
-    print(f"    FH–Bernstein: [{ci_b['lo']:.4f}, {ci_b['hi']:.4f}]  (planner t={ci_b.get('target_t')})")
+    print(
+        f"    FH–Bernstein: [{ci_b['lo']:.4f}, {ci_b['hi']:.4f}]  (planner t={ci_b.get('target_t')})"
+    )
     print(f"    Wilson      : [{wil_lo:.4f}, {wil_hi:.4f}]")
     if boo_lo is not None:
-        print(f"    Bootstrap   : [{boo_lo:.4f}, {boo_hi:.4f}]   (B={args.bootstrap_B}, seed={args.seed})")
+        print(
+            f"    Bootstrap   : [{boo_lo:.4f}, {boo_hi:.4f}]   (B={args.bootstrap_B}, seed={args.seed})"
+        )
     else:
         print("    Bootstrap   : (skipped — provide --y1-samples/--y0-samples)")
 
@@ -338,7 +374,9 @@ def _cmd_methods(argv: List[str]) -> None:
     # Optional figure
     if args.figure_out:
         if plot_roc_fh_slice is None:
-            print("Figure helper not available; add plot_roc_fh_slice() to cc.analysis.generate_figures.")
+            print(
+                "Figure helper not available; add plot_roc_fh_slice() to cc.analysis.generate_figures."
+            )
         else:
             out = Path(args.figure_out)
             out.parent.mkdir(parents=True, exist_ok=True)
@@ -378,6 +416,7 @@ def _cmd_methods(argv: List[str]) -> None:
 # -----------------------------------------------------------------------------
 # Entrypoint
 # -----------------------------------------------------------------------------
+
 
 def main() -> None:
     if len(sys.argv) < 2:

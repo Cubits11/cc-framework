@@ -1,7 +1,7 @@
 import pytest
 
-from experiments.correlation_cliff.simulate.config import ConfigError, SimConfig
 from experiments.correlation_cliff.simulate import utils as U
+from experiments.correlation_cliff.simulate.config import ConfigError, SimConfig
 
 
 def _marginals():
@@ -24,7 +24,9 @@ def _base_kwargs():
 
 
 def test_simconfig_normalizes_rule_and_path_and_seed_policy():
-    cfg = SimConfig(**{**_base_kwargs(), "rule": "or", "path": "FH_LINEAR", "seed_policy": "SEQUENTIAL"})
+    cfg = SimConfig(
+        **{**_base_kwargs(), "rule": "or", "path": "FH_LINEAR", "seed_policy": "SEQUENTIAL"}
+    )
     assert cfg.rule == "OR"
     assert cfg.path == "fh_linear"
     assert cfg.seed_policy == "sequential"

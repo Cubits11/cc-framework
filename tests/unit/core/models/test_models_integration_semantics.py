@@ -22,7 +22,6 @@ from cc.core.models import (
 )
 from tests._factories import mk_attack_result
 
-
 # ---------------------------------------------------------------------
 # ExperimentConfig ↔ AttackResult temporal semantics
 # ---------------------------------------------------------------------

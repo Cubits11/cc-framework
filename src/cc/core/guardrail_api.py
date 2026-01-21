@@ -31,17 +31,16 @@ Notes
 
 from __future__ import annotations
 
+import math
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any, Iterable, List, Optional, Protocol, Tuple, runtime_checkable
 
-import math
-
-
 # -----------------------------------------------------------------------------
 # Lightweight structural typing for guardrails (duck typing > inheritance)
 # -----------------------------------------------------------------------------
+
 
 @runtime_checkable
 class GuardrailLike(Protocol):
@@ -52,7 +51,9 @@ class GuardrailLike(Protocol):
     def blocks(self, text: str) -> bool: ...  # pragma: no cover - optional
 
     # Optional calibration hook
-    def calibrate(self, benign_texts: Iterable[str], target_fpr: float = 0.05) -> Any: ...  # pragma: no cover - optional
+    def calibrate(
+        self, benign_texts: Iterable[str], target_fpr: float = 0.05
+    ) -> Any: ...  # pragma: no cover - optional
 
     # Optional threshold attribute
     threshold: float  # pragma: no cover - optional
@@ -61,6 +62,7 @@ class GuardrailLike(Protocol):
 # -----------------------------------------------------------------------------
 # Adapter
 # -----------------------------------------------------------------------------
+
 
 @dataclass
 class GuardrailAdapter:

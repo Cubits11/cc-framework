@@ -24,8 +24,9 @@ Notes
 
 from __future__ import annotations
 
-from typing import Iterable, List, Sequence, Tuple, Optional, Literal
 import math
+from typing import Iterable, List, Literal, Optional, Sequence, Tuple
+
 import numpy as np
 
 # Prefer project’s cartographer implementation if available.
@@ -42,6 +43,7 @@ ROC = Sequence[ROCPoint]
 # ---------------------------------------------------------------------------
 # Public API — FH bounds on J for AND / OR (upper+lower)
 # ---------------------------------------------------------------------------
+
 
 def upper_bound_j_and(roc_a: ROC, roc_b: ROC) -> float:
     """FH-style upper bound on composed J for AND-composition."""
@@ -70,6 +72,7 @@ def lower_bound_j_or(roc_a: ROC, roc_b: ROC) -> float:
 # ---------------------------------------------------------------------------
 # Scores → ROC (robust, optional convexification)
 # ---------------------------------------------------------------------------
+
 
 def discretize_scores_to_roc(
     scores: Iterable[Tuple[float, int]],
@@ -134,7 +137,9 @@ def discretize_scores_to_roc(
         return [(0.0, 1.0), (1.0, 1.0)]
 
     # Sort by score descending; group ties so threshold moves only at unique scores
-    order = np.lexsort((-y, s))  # stable secondary key keeps positives before negatives at same score
+    order = np.lexsort(
+        (-y, s)
+    )  # stable secondary key keeps positives before negatives at same score
     s_sorted = s[order][::-1]
     y_sorted = y[order][::-1]
     w_sorted = w[order][::-1]
@@ -175,6 +180,7 @@ def discretize_scores_to_roc(
 # Utilities
 # ---------------------------------------------------------------------------
 
+
 def youden_j(roc: ROC) -> Tuple[float, ROCPoint]:
     """Return max J (TPR−FPR) over the ROC and the achieving point (FPR, TPR)."""
     if not roc:
@@ -207,6 +213,7 @@ def roc_upper_convex_hull(roc: ROC) -> List[ROCPoint]:
 # ---------------------------------------------------------------------------
 # Internal: FH bounds engine (vectorized over ROC×ROC)
 # ---------------------------------------------------------------------------
+
 
 def _frechet_bound_j(
     roc_a: ROC,
@@ -283,6 +290,7 @@ def _frechet_bound_j(
 # ---------------------------------------------------------------------------
 # Internal: ROC helpers
 # ---------------------------------------------------------------------------
+
 
 def _validate_and_array(roc: ROC) -> np.ndarray:
     """Return an (n,2) float array clipped to [0,1], deduped and sorted by FPR."""

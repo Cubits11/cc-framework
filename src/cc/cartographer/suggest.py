@@ -23,10 +23,9 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .audit import _iter_jsonl  # reuse the stable JSONL reader
-
 
 # =============================================================================
 # Config / bounds
@@ -302,9 +301,15 @@ def suggest(history: str, k: int = 6) -> List[Dict[str, Any]]:
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    p = argparse.ArgumentParser(description="Suggest next (epsilon, T, comp) trials from audit history.")
+    p = argparse.ArgumentParser(
+        description="Suggest next (epsilon, T, comp) trials from audit history."
+    )
     p.add_argument("--history", required=True, help="Path to runs/audit.jsonl")
-    p.add_argument("--out", required=True, help="Path to write JSON suggestions (e.g., experiments/grids/next.json)")
+    p.add_argument(
+        "--out",
+        required=True,
+        help="Path to write JSON suggestions (e.g., experiments/grids/next.json)",
+    )
     p.add_argument("--k", type=int, default=6, help="Number of suggestions to emit")
     args = p.parse_args(argv)
 

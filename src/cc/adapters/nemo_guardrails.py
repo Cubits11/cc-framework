@@ -105,7 +105,6 @@ class NeMoGuardrailsAdapter(GuardrailAdapter):
                 "context": sanitize_vendor_payload(context),
                 "metadata": sanitize_metadata(metadata),
             },
-
             adapter_name=self.name,
             adapter_version=self.version,
             audit=audit_payload,

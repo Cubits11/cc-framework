@@ -14,18 +14,27 @@ Research-OS guarantees:
 - Sequential seeding is deterministic for a given iteration order, but order-dependent by design.
 - Explicit per-world validity flags + stage + message.
 - Stable output schema with no meta-key collisions.
+
+Design notes (Correlation Cliff):
+- Two worlds w∈{0,1} with fixed marginals (pA,pB) per world.
+- Dependence enters only via p11 = P(A=1,B=1), chosen via p11_from_path(...).
+- For each world, we construct a valid 2x2 joint, sample multinomial counts,
+  compute empirical metrics, and overlay population (“true”) metrics.
+- Across worlds, we compute CC_hat and CC_pop:
+    JA = |pA1 - pA0|, JB = |pB1 - pB0|, Jbest = max(JA, JB)
+    JC = |pC1 - pC0|, CC = JC / Jbest
 """
 
+import math
 from typing import Any, Dict, List, Sequence, Tuple
 
-import math
 import numpy as np
 import pandas as pd
 
+from . import utils as U
 from .config import SimConfig, validate_cfg
 from .paths import p11_from_path
 from .sampling import draw_joint_counts, empirical_from_counts, rng_for_cell, validate_cell_probs
-from . import utils as U
 
 
 # ----------------------------
@@ -56,6 +65,21 @@ def _nan_robust_avg(a: float, b: float) -> float:
     if not valid:
         return float("nan")
     return float(sum(valid) / len(valid))
+
+
+def _safe_float(x: Any, default: float = float("nan")) -> float:
+    try:
+        v = float(x)
+        return v if math.isfinite(v) else default
+    except Exception:
+        return default
+
+
+def _bool_to_float(b: Any) -> float:
+    try:
+        return 1.0 if bool(b) else 0.0
+    except Exception:
+        return 0.0
 
 
 # ----------------------------
@@ -96,7 +120,7 @@ def simulate_replicate_at_lambda(
         "seed_policy": cfg.seed_policy,
         "n_per_world": int(cfg.n),
         "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
-        "row_ok": True,  # will be refined after world runs
+        "row_ok": True,  # refined after world runs
         "row_error_stage": "",
         "row_error_msg": "",
     }
@@ -108,13 +132,32 @@ def simulate_replicate_at_lambda(
 
     # World schema: keep consistent column names across all rows.
     _WORLD_NUM_FIELDS: Tuple[str, ...] = (
-        "pA_true", "pB_true", "p00_true", "p01_true", "p10_true", "p11_true",
-        "n00", "n01", "n10", "n11",
-        "p00_hat", "p01_hat", "p10_hat", "p11_hat",
-        "pA_hat", "pB_hat", "pC_hat",
-        "phi_hat", "tau_hat",
-        "degenerate_A", "degenerate_B", "phi_finite", "tau_finite",
-        "pC_true", "phi_true", "tau_true",
+        "pA_true",
+        "pB_true",
+        "p00_true",
+        "p01_true",
+        "p10_true",
+        "p11_true",
+        "n00",
+        "n01",
+        "n10",
+        "n11",
+        "p00_hat",
+        "p01_hat",
+        "p10_hat",
+        "p11_hat",
+        "pA_hat",
+        "pB_hat",
+        "pC_hat",
+        "phi_hat",
+        "tau_hat",
+        "degenerate_A",
+        "degenerate_B",
+        "phi_finite",
+        "tau_finite",
+        "pC_true",
+        "phi_true",
+        "tau_true",
     )
 
     def _prime_world_schema(w: int) -> None:
@@ -163,7 +206,9 @@ def simulate_replicate_at_lambda(
         # p11 from chosen path
         try:
             p11, meta = p11_from_path(
-                float(wm.pA), float(wm.pB), lam_f,
+                float(wm.pA),
+                float(wm.pB),
+                lam_f,
                 path=cfg.path,
                 path_params=cfg.path_params,
             )
@@ -194,7 +239,9 @@ def simulate_replicate_at_lambda(
         # Validate joint probabilities (no renorm; tiny clip allowed)
         try:
             _ = validate_cell_probs(
-                np.array([cells["p00"], cells["p01"], cells["p10"], cells["p11"]], dtype=np.float64),
+                np.array(
+                    [cells["p00"], cells["p01"], cells["p10"], cells["p11"]], dtype=np.float64
+                ),
                 prob_tol=cfg.prob_tol,
                 allow_tiny_negative=cfg.allow_tiny_negative,
                 tiny_negative_eps=cfg.tiny_negative_eps,
@@ -297,9 +344,11 @@ def simulate_replicate_at_lambda(
         JA_hat = abs(pA1 - pA0)
         JB_hat = abs(pB1 - pB0)
         Jbest_hat = max(JA_hat, JB_hat)
-        dC_hat = (pC1 - pC0)
+        dC_hat = pC1 - pC0
         JC_hat = abs(dC_hat)
-        CC_hat = (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
+        CC_hat = (
+            (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
+        )
 
         out["JA_hat"] = float(JA_hat)
         out["JB_hat"] = float(JB_hat)
@@ -315,8 +364,17 @@ def simulate_replicate_at_lambda(
         out["phi_hat_avg"] = _nan_robust_avg(phi0, phi1)
         out["tau_hat_avg"] = _nan_robust_avg(tau0, tau1)
     else:
-        # Explicitly mark cross-world outputs as NaN (don’t let NaN propagation be “silent logic”)
-        for k in ("JA_hat", "JB_hat", "Jbest_hat", "dC_hat", "JC_hat", "CC_hat", "phi_hat_avg", "tau_hat_avg"):
+        # Explicitly mark cross-world outputs as NaN
+        for k in (
+            "JA_hat",
+            "JB_hat",
+            "Jbest_hat",
+            "dC_hat",
+            "JC_hat",
+            "CC_hat",
+            "phi_hat_avg",
+            "tau_hat_avg",
+        ):
             out[k] = float("nan")
 
     # Population-level cross-world baselines (JA/JB from marginals always computable)
@@ -331,7 +389,9 @@ def simulate_replicate_at_lambda(
     pC1_true = float(out.get("pC_true_w1", float("nan")))
     dC_pop = pC1_true - pC0_true
     JC_pop = abs(dC_pop)
-    CC_pop = (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
+    CC_pop = (
+        (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
+    )
 
     out["dC_pop"] = float(dC_pop)
     out["JC_pop"] = float(JC_pop)
@@ -367,7 +427,12 @@ def simulate_replicate_at_lambda(
     # Envelope violation check on JC_hat (only meaningful if worlds valid)
     tol = float(cfg.envelope_tol)
     JC_hat = float(out.get("JC_hat", float("nan")))
-    if worlds_valid and math.isfinite(JC_hat) and math.isfinite(float(jmin)) and math.isfinite(float(jmax)):
+    if (
+        worlds_valid
+        and math.isfinite(JC_hat)
+        and math.isfinite(float(jmin))
+        and math.isfinite(float(jmax))
+    ):
         low = float(jmin) - tol
         high = float(jmax) + tol
         violated_low = JC_hat < low
@@ -413,7 +478,11 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
         if not math.isfinite(lam) or not (0.0 <= lam <= 1.0):
             raise ValueError(f"Invalid lambda at index {i}: got {lam!r}")
 
-    base_rng = np.random.default_rng(int(cfg.seed)) if cfg.seed_policy == "sequential" else np.random.default_rng(0)
+    base_rng = (
+        np.random.default_rng(int(cfg.seed))
+        if cfg.seed_policy == "sequential"
+        else np.random.default_rng(0)
+    )
 
     total = int(cfg.n_reps) * int(len(lambdas_list))
     rows: list[Dict[str, Any]] = []
@@ -421,7 +490,7 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
 
     for rep in range(int(cfg.n_reps)):
         for lam in lambdas_list:
-            lam_index = cfg.lambda_index_for_seed(lam)  # canonical index for stable_per_cell seeding
+            lam_index = cfg.lambda_index_for_seed(lam)  # canonical for stable_per_cell seeding
             try:
                 row = simulate_replicate_at_lambda(
                     cfg,
@@ -431,6 +500,7 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                     rng=base_rng,
                 )
                 # Ensure row-level fields exist even if older code paths forget them
+                row.setdefault("worlds_valid", bool(row.get("world_valid_w0", False) and row.get("world_valid_w1", False)))
                 row.setdefault("row_ok", bool(row.get("worlds_valid", False)))
                 row.setdefault("row_error_stage", "")
                 row.setdefault("row_error_msg", "")
@@ -458,7 +528,11 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
 
     df = pd.DataFrame.from_records(rows)
     sort_cols = [c for c in ("lambda", "rep") if c in df.columns]
-    df = df.sort_values(sort_cols, kind="mergesort").reset_index(drop=True) if sort_cols else df.reset_index(drop=True)
+    df = (
+        df.sort_values(sort_cols, kind="mergesort").reset_index(drop=True)
+        if sort_cols
+        else df.reset_index(drop=True)
+    )
 
     if len(df) != total and cfg.hard_fail_on_invalid:
         raise RuntimeError(f"simulate_grid produced {len(df)} rows, expected {total}")
@@ -476,6 +550,11 @@ def summarize_simulation(
 ) -> pd.DataFrame:
     """
     Aggregate replicate-level results to produce per-lambda summaries.
+
+    Outputs are designed to be:
+    - plot-ready (mean/std/quantiles),
+    - audit-ready (ok-rate, invalid-joint rates, envelope violation rates),
+    - reviewer-proof (NaN rates, population drift diagnostics).
     """
     if df_long is None or df_long.empty:
         return pd.DataFrame()
@@ -489,6 +568,7 @@ def summarize_simulation(
         if not math.isfinite(qq) or not (0.0 <= qq <= 1.0):
             raise ValueError(f"Invalid quantile {qq!r}")
 
+    # round + dedupe with explicit error if user gave duplicates
     q = sorted({round(qq, 12) for qq in q_raw})
     if len(q) != len(q_raw):
         raise ValueError(f"quantiles contains duplicates after rounding: {quantiles!r}")
@@ -517,35 +597,85 @@ def summarize_simulation(
         bad = df_long.loc[df["lambda"].isna(), "lambda"].head(5).tolist()
         raise ValueError(f"Found non-numeric lambda values (first few): {bad!r}")
 
+    # Core replicate outputs (empirical)
     core_cols = (
-        "CC_hat", "JC_hat", "dC_hat", "JA_hat", "JB_hat", "Jbest_hat",
-        "phi_hat_avg", "tau_hat_avg",
+        "CC_hat",
+        "JC_hat",
+        "dC_hat",
+        "JA_hat",
+        "JB_hat",
+        "Jbest_hat",
+        "phi_hat_avg",
+        "tau_hat_avg",
     )
 
+    # Population/theory columns that should be constant within a lambda group
     pop_cols = (
-        "CC_pop", "JC_pop", "dC_pop", "phi_pop_avg", "tau_pop_avg",
-        "JC_env_min", "JC_env_max",
+        "CC_pop",
+        "JC_pop",
+        "dC_pop",
+        "phi_pop_avg",
+        "tau_pop_avg",
+        "JC_env_min",
+        "JC_env_max",
+        "JA_pop",
+        "JB_pop",
+        "Jbest_pop",
     )
 
-    theory_cols = (
-        "CC_theory_ref", "JC_theory_ref", "dC_theory_ref",
-        "phi_theory_ref_avg", "tau_theory_ref_avg",
-    )
-
-    groups: list[Dict[str, Any]] = []
     gb = df.groupby(group_keys, sort=True, dropna=False)
+    rows: List[Dict[str, Any]] = []
+
+    def _constancy_block(g: pd.DataFrame, col: str) -> Dict[str, Any]:
+        """Report population constancy and drift within a group."""
+        if col not in g.columns:
+            return {}
+        s = pd.to_numeric(g[col], errors="coerce")
+        nn = int(s.notna().sum())
+        if nn == 0:
+            return {
+                f"{col}_value": float("nan"),
+                f"{col}_n": 0,
+                f"{col}_std": float("nan"),
+                f"{col}_drift": False,
+                f"{col}_unique": 0,
+            }
+        # Use std as drift proxy; also count unique rounded values
+        std = float(s.std(ddof=0)) if nn >= 2 else 0.0
+        # Unique after rounding to avoid float micro-noise
+        uniq = int(pd.Series(np.round(s.dropna().to_numpy(dtype=float), 15)).nunique())
+        drift = bool((std > 1e-15) or (uniq > 1))
+        # “Value” as median (robust) since it should be constant anyway
+        val = float(s.median())
+        return {
+            f"{col}_value": val,
+            f"{col}_n": nn,
+            f"{col}_std": std,
+            f"{col}_drift": drift,
+            f"{col}_unique": uniq,
+        }
 
     for key, g in gb:
         row: Dict[str, Any] = {}
+
+        # Materialize group identifiers
         if isinstance(key, tuple):
             for kname, kval in zip(group_keys, key):
-                row[kname] = float(kval) if kname == "lambda" else (None if pd.isna(kval) else str(kval))
+                if kname == "lambda":
+                    row[kname] = float(kval)
+                else:
+                    row[kname] = None if pd.isna(kval) else str(kval)
         else:
             row["lambda"] = float(key)
 
         row["n_rows"] = int(len(g))
-        row["n_reps"] = int(pd.to_numeric(g["rep"], errors="coerce").nunique(dropna=True)) if "rep" in g.columns else int(len(g))
+        row["n_reps"] = (
+            int(pd.to_numeric(g["rep"], errors="coerce").nunique(dropna=True))
+            if "rep" in g.columns
+            else int(len(g))
+        )
 
+        # Row validity
         if "row_ok" in g.columns:
             ok = g["row_ok"].fillna(False).astype(bool)
             row["row_ok_rate"] = float(ok.mean()) if len(ok) > 0 else float("nan")
@@ -556,6 +686,7 @@ def summarize_simulation(
             row["n_row_ok"] = int(len(g))
             row["n_row_fail"] = 0
 
+        # Core stats
         for col in core_cols:
             if col in g.columns:
                 s = pd.to_numeric(g[col], errors="coerce")
@@ -564,11 +695,13 @@ def summarize_simulation(
                 row[f"{col}_n"] = int(s.notna().sum())
                 row[f"{col}_nan_rate"] = float(s.isna().mean())
 
+        # Quantiles for headline curves
         if "CC_hat" in g.columns:
             row.update(_qcols(g["CC_hat"], "CC_hat"))
         if "JC_hat" in g.columns:
             row.update(_qcols(g["JC_hat"], "JC_hat"))
 
+        # Envelope violation summary
         if "JC_env_violation" in g.columns:
             v = g["JC_env_violation"].fillna(False).astype(bool)
             row["JC_env_violation_rate"] = float(v.mean()) if len(v) > 0 else float("nan")
@@ -577,14 +710,41 @@ def summarize_simulation(
             row["JC_env_violation_rate"] = float("nan")
             row["JC_env_violation_n"] = 0
 
-        # Summarize invalid-joint flags emitted by core
+        # Invalid-joint flags emitted by simulate_replicate_at_lambda
         inv_cols = [c for c in g.columns if c.startswith("invalid_joint_w")]
         for c in inv_cols:
             v = g[c].fillna(False).astype(bool)
             row[f"{c}_rate"] = float(v.mean()) if len(v) > 0 else float("nan")
             row[f"{c}_n"] = int(v.sum())
 
-        # Population columns should be constant within a group; report drift if not.
+        # Population constancy / drift diagnostics
         for col in pop_cols:
-            if col in g.columns:
-                s
+            row.update(_constancy_block(g, col))
+
+        # Optional: theory ref overlays constancy
+        for col in ("CC_theory_ref", "JC_theory_ref", "dC_theory_ref", "phi_theory_ref_avg", "tau_theory_ref_avg", "CC_ref_minus_pop", "JC_ref_minus_pop"):
+            row.update(_constancy_block(g, col))
+
+        # Optional: report most common failure stages (helps debugging experiment validity)
+        if "row_error_stage" in g.columns:
+            stages = g["row_error_stage"].fillna("").astype(str)
+            # exclude empty
+            bad = stages[stages != ""]
+            if len(bad) > 0:
+                top = bad.value_counts().head(3)
+                for i, (stage, cnt) in enumerate(top.items(), start=1):
+                    row[f"top_fail_stage_{i}"] = str(stage)
+                    row[f"top_fail_stage_{i}_n"] = int(cnt)
+
+        rows.append(row)
+
+    df_out = pd.DataFrame(rows)
+
+    # Sort by lambda (and rule/path if present)
+    sort_cols = [c for c in ("lambda", "rule", "path") if c in df_out.columns]
+    if sort_cols:
+        df_out = df_out.sort_values(sort_cols, kind="mergesort").reset_index(drop=True)
+    else:
+        df_out = df_out.reset_index(drop=True)
+
+    return df_out

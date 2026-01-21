@@ -15,20 +15,17 @@ unit tests without having to execute the full experiment pipeline.
 
 from __future__ import annotations
 
-import dataclasses
-import json
 import math
 from dataclasses import dataclass
-from itertools import product
 from statistics import NormalDist
-from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Binomial confidence intervals
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class WilsonInterval:
@@ -55,9 +52,9 @@ def wilson_interval(successes: int, trials: int, alpha: float = 0.05) -> WilsonI
 
     z = NormalDist().inv_cdf(1.0 - alpha / 2.0)
     phat = successes / trials
-    denom = 1.0 + (z ** 2) / trials
-    center = (phat + (z ** 2) / (2.0 * trials)) / denom
-    half_width = z * math.sqrt((phat * (1.0 - phat) / trials) + (z ** 2) / (4.0 * trials ** 2)) / denom
+    denom = 1.0 + (z**2) / trials
+    center = (phat + (z**2) / (2.0 * trials)) / denom
+    half_width = z * math.sqrt((phat * (1.0 - phat) / trials) + (z**2) / (4.0 * trials**2)) / denom
 
     lower = max(0.0, center - half_width)
     upper = min(1.0, center + half_width)
@@ -67,6 +64,7 @@ def wilson_interval(successes: int, trials: int, alpha: float = 0.05) -> WilsonI
 # ---------------------------------------------------------------------------
 # Independence baselines
 # ---------------------------------------------------------------------------
+
 
 def stable_prod_one_minus(values: Sequence[float]) -> float:
     """Compute ``∏ (1 - x)`` with log-space stabilisation.
@@ -132,6 +130,7 @@ def independence_and(tprs: Sequence[float], fprs: Sequence[float]) -> Dict[str, 
 # ---------------------------------------------------------------------------
 # Fréchet–Hoeffding envelopes
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class FHEnvelope:
@@ -236,6 +235,7 @@ def fh_envelope(topology: str, tprs: Sequence[float], fprs: Sequence[float]) -> 
 # Bootstrap helpers
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class BCaInterval:
     """Bias corrected and accelerated confidence interval."""
@@ -245,7 +245,9 @@ class BCaInterval:
     width: float
 
 
-def _jackknife_statistics(samples: Sequence[np.ndarray], stat_fn: Callable[[Sequence[np.ndarray]], float]) -> np.ndarray:
+def _jackknife_statistics(
+    samples: Sequence[np.ndarray], stat_fn: Callable[[Sequence[np.ndarray]], float]
+) -> np.ndarray:
     parts: List[float] = []
     for idx, arr in enumerate(samples):
         if arr.size == 0:
@@ -346,6 +348,7 @@ def bca_bootstrap(
 # ---------------------------------------------------------------------------
 # Grouping utilities used by figure + memo writers
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class PointRecord:

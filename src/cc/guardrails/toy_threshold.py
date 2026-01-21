@@ -7,6 +7,8 @@ from typing import Iterable
 import numpy as np
 
 from .base import Guardrail
+
+
 class ToyThresholdGuardrail(Guardrail):
     """Counts harmful keywords and blocks when the normalized score exceeds a threshold."""
 

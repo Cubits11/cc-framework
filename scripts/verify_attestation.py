@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Verify an audit run attestation against its manifest + results."""
 
-from pathlib import Path
 import argparse
+from pathlib import Path
 
 from cc.core.audit_runner import verify_attestation
 

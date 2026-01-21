@@ -18,22 +18,21 @@ This class remains API-compatible with existing Guardrail interface: blocks(), s
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Iterable, List, Optional, Tuple, Dict, Any, Union
-
 import logging
 import re
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 try:
     # Third-party 'regex' supports timeouts; use if available
     import regex as reX  # type: ignore
+
     _HAS_REGEX = True
 except Exception:  # pragma: no cover
     reX = None
     _HAS_REGEX = False
 
 from .base import Guardrail
-
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +166,12 @@ class RegexFilter(Guardrail):
                 except Exception:  # pragma: no cover
                     ex.append(str(m))
             examples.append({"pattern": pat.raw, "engine": pat.engine, "examples": ex})
-        return {"blocked": hits >= self.min_hits, "hits": hits, "min_hits": self.min_hits, "matches": examples}
+        return {
+            "blocked": hits >= self.min_hits,
+            "hits": hits,
+            "min_hits": self.min_hits,
+            "matches": examples,
+        }
 
     def calibrate(self, benign_texts: List[str], target_fpr: float = 0.05) -> None:
         """
@@ -287,7 +291,9 @@ class RegexFilter(Guardrail):
             try:
                 return pat.compiled.search(text, timeout=self.match_timeout_ms / 1000.0)
             except reX.TimeoutError:  # type: ignore
-                logger.warning("Regex timeout for pattern %r (%.1f ms).", pat.raw, self.match_timeout_ms)
+                logger.warning(
+                    "Regex timeout for pattern %r (%.1f ms).", pat.raw, self.match_timeout_ms
+                )
                 return None
             except Exception as e:  # pragma: no cover
                 logger.error("Regex engine error for %r: %s", pat.raw, e)
@@ -314,7 +320,9 @@ class RegexFilter(Guardrail):
             pass
         return out
 
-    def _match_details(self, text: str, want_spans: bool) -> Tuple[int, List[Tuple[CompiledPattern, List[Any]]]]:
+    def _match_details(
+        self, text: str, want_spans: bool
+    ) -> Tuple[int, List[Tuple[CompiledPattern, List[Any]]]]:
         """Return (#patterns that match, [(pattern, [matches]) ...])"""
         hits = 0
         spans: List[Tuple[CompiledPattern, List[Any]]] = []

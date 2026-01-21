@@ -1,5 +1,6 @@
 # tests/unit/test_output_parsing_properties.py
 """Property tests for output parsing with explicit seeding."""
+
 from __future__ import annotations
 
 import pytest

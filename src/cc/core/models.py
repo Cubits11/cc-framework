@@ -69,8 +69,8 @@ import json
 import math
 import threading
 import time
-import uuid
 import unicodedata
+import uuid
 import warnings
 from datetime import datetime
 from enum import Enum, IntEnum
@@ -116,10 +116,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
     computed_field,
     field_serializer,
     field_validator,
-    StrictBool,
 )
 
 # ---------------------------------------------------------------------------
@@ -132,9 +132,9 @@ FloatSeq = Sequence[float]
 TModel = TypeVar("TModel", bound="ModelBase")
 
 # Magic-number constants
-BLAKE3_HEX_LENGTH: int = 64                   # BLAKE3 hex digest length
-REQUEST_ID_LENGTH: int = 12                   # Short, human-ish request id
-MAX_REASONABLE_UNIX_TIMESTAMP: float = 1e12   # ~year 33658, avoids overflow
+BLAKE3_HEX_LENGTH: int = 64  # BLAKE3 hex digest length
+REQUEST_ID_LENGTH: int = 12  # Short, human-ish request id
+MAX_REASONABLE_UNIX_TIMESTAMP: float = 1e12  # ~year 33658, avoids overflow
 
 
 # ---------------------------------------------------------------------------
@@ -214,17 +214,13 @@ def _normalize_unix_timestamp(
     try:
         f = float(v)
     except (TypeError, ValueError):
-        raise ValueError(
-            f"timestamp must be numeric unix seconds (got {type(v).__name__}: {v!r})"
-        )
+        raise ValueError(f"timestamp must be numeric unix seconds (got {type(v).__name__}: {v!r})")
 
     if not math.isfinite(f):
         raise ValueError(f"timestamp must be finite (got {f!r})")
 
     if max_ts is not None and f > max_ts:
-        raise ValueError(
-            f"timestamp {f!r} exceeds MAX_REASONABLE_UNIX_TIMESTAMP={max_ts!r}"
-        )
+        raise ValueError(f"timestamp {f!r} exceeds MAX_REASONABLE_UNIX_TIMESTAMP={max_ts!r}")
 
     return f
 
@@ -243,6 +239,7 @@ def _iso_from_unix(ts: float) -> str:
         f"T{tm.tm_hour:02d}:{tm.tm_min:02d}:{tm.tm_sec:02d}.{ms:03d}Z"
     )
 
+
 def _normalize_unicode_for_hash(obj: Any) -> Any:
     """
     Recursively normalize all text to NFC for hashing stability.
@@ -260,8 +257,7 @@ def _normalize_unicode_for_hash(obj: Any) -> Any:
     # Normalize dict keys and values
     if isinstance(obj, dict):
         return {
-            _normalize_unicode_for_hash(k): _normalize_unicode_for_hash(v)
-            for k, v in obj.items()
+            _normalize_unicode_for_hash(k): _normalize_unicode_for_hash(v) for k, v in obj.items()
         }
 
     # Normalize lists
@@ -307,7 +303,6 @@ def _hash_json(obj: Any, *, salt: Optional[bytes] = None) -> str:
     return hasher.hexdigest()
 
 
-
 def _hash_text(text: Union[str, bytes], *, salt: Optional[bytes] = None) -> str:
     """
     Hash raw transcript text/bytes with BLAKE3.
@@ -337,12 +332,14 @@ def _hash_text(text: Union[str, bytes], *, salt: Optional[bytes] = None) -> str:
 
 class WorldBit(IntEnum):
     """World indicator for the two-world protocol."""
+
     BASELINE = 0
     PROTECTED = 1
 
 
 class CiMethod(str, Enum):
     """Methods for constructing confidence intervals."""
+
     BOOTSTRAP = "bootstrap"
     WILSON = "wilson"
     BAYES = "bayes"  # reserved for future Bayesian CIs
@@ -350,6 +347,7 @@ class CiMethod(str, Enum):
 
 class RiskLevel(str, Enum):
     """Coarse qualitative risk tags for guardrail specs."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -363,6 +361,7 @@ if SQLALCHEMY_AVAILABLE:
 
     class OrmBase(DeclarativeBase):
         """Base for SQLAlchemy ORM models in the CC framework."""
+
         pass
 
     class AuditColumnsMixin:
@@ -399,10 +398,12 @@ else:  # pragma: no cover
 
     class OrmBase:  # type: ignore[too-many-ancestors]
         """Fallback stub when SQLAlchemy is not installed."""
+
         pass
 
     class AuditColumnsMixin:  # type: ignore[too-many-ancestors]
         """Fallback stub when SQLAlchemy is not installed."""
+
         pass
 
 
@@ -665,7 +666,11 @@ class ModelBase(BaseModel):
             raise ImportError("google.protobuf required for protobuf export")
 
         # Local imports avoid hard dependency when PROTO_AVAILABLE is False
-        from google.protobuf import descriptor_pb2, descriptor_pool, message_factory  # type: ignore[import]
+        from google.protobuf import (  # type: ignore[import]
+            descriptor_pb2,
+            descriptor_pool,
+            message_factory,
+        )
 
         data = self.model_dump(mode="json")
 
@@ -758,9 +763,7 @@ class ModelBase(BaseModel):
                     pool = descriptor_pool.DescriptorPool()
                     fd = pool.AddSerializedFile(fd_proto.SerializeToString())
                     factory = message_factory.MessageFactory(pool=pool)
-                    msg_cls = factory.GetPrototype(
-                        fd.message_types_by_name[cls.__name__]
-                    )
+                    msg_cls = factory.GetPrototype(fd.message_types_by_name[cls.__name__])
 
                     # Cache both the Message class and the dropped fields.
                     ModelBase._PROTO_MESSAGE_CACHE[cache_key] = (
@@ -814,6 +817,7 @@ class ModelBase(BaseModel):
         clean = dict(old_data)
         clean.pop("schema_version", None)
         return cls.model_validate(clean)
+
 
 # ---------------------------------------------------------------------------
 # AttackResult
@@ -885,10 +889,7 @@ class AttackResult(ModelBase):
     utility_score: Optional[float] = None
     request_id: str = Field(
         default_factory=lambda: uuid.uuid4().hex[:REQUEST_ID_LENGTH],
-        description=(
-            f"Short request identifier (first {REQUEST_ID_LENGTH} "
-            "hex chars of uuid4)."
-        ),
+        description=(f"Short request identifier (first {REQUEST_ID_LENGTH} hex chars of uuid4)."),
     )
 
     # -----------------------
@@ -938,8 +939,7 @@ class AttackResult(ModelBase):
             f = float(v)
         except (TypeError, ValueError):
             raise ValueError(
-                f"utility_score must be numeric or None "
-                f"(got {type(v).__name__}: {v!r})"
+                f"utility_score must be numeric or None (got {type(v).__name__}: {v!r})"
             )
         if math.isnan(f) or math.isinf(f):
             raise ValueError("utility_score cannot be NaN or infinite")
@@ -968,9 +968,7 @@ class AttackResult(ModelBase):
         try:
             iv = int(v)
         except (TypeError, ValueError):
-            raise ValueError(
-                f"rng_seed must be an integer (got {type(v).__name__}: {v!r})"
-            )
+            raise ValueError(f"rng_seed must be an integer (got {type(v).__name__}: {v!r})")
         return iv
 
     @field_validator(
@@ -1077,7 +1075,6 @@ class AttackResult(ModelBase):
             utility_score=utility_score,
             creator_id=creator_id,
         )
-
 
 
 # ---------------------------------------------------------------------------

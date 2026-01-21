@@ -14,7 +14,7 @@ Dates:
                 env snapshot, thread-safety, schema v3, tail/head utilities)
   - 2025-11-13: (async support, Prometheus metrics, PII patterns,
                 strict mode, config from env, hooks, full tests/docs)
-  - 2025-11-13 (expanded): Fixed bugs (Prometheus labels, async kwargs via partial, pip freeze try/except, 
+  - 2025-11-13 (expanded): Fixed bugs (Prometheus labels, async kwargs via partial, pip freeze try/except,
                 compile_patterns fail-soft, PII value scanning), added levels, encryption option, alerting example in hook,
                 async lock handling, more tests/docs per research.
   - 2025-11-14: Upgraded to 10/10 production readiness: fixed lock precedence and nested locks, encryption key management,
@@ -87,8 +87,8 @@ import secrets
 import socket
 import subprocess
 import sys
-import time
 import threading
+import time
 from collections import deque
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
@@ -229,6 +229,7 @@ def _coerce_json_safe(obj: Any) -> Any:
             return str(obj)
     return obj
 
+
 def _sanitize_for_json(obj: Any) -> Any:
     """
     Recursively coerce `obj` into a JSON-serializable structure.
@@ -290,6 +291,7 @@ def _ensure_json(obj: Any, auto_sanitize: bool) -> Any:
         allow_nan=False,
     )
     return obj
+
 
 def _canonical_dumps(obj: Dict[str, Any], auto_sanitize: bool) -> str:
     """
@@ -450,9 +452,11 @@ def _compile_patterns(pats: Optional[Sequence[str]], strict_mode: bool) -> List[
             continue
     return out
 
+
 # ---------------------------------------------------------------------------
 # Environment snapshot helpers
 # ---------------------------------------------------------------------------
+
 
 def _safe_pip_freeze() -> List[str]:
     """
@@ -489,16 +493,13 @@ def _capture_env_snapshot() -> Dict[str, Any]:
         platform_str = platform.platform()
     except Exception:
         platform_str = "-".join(
-            part
-            for part in (platform.system(), platform.release(), platform.machine())
-            if part
+            part for part in (platform.system(), platform.release(), platform.machine()) if part
         )
     return {
         "python": sys.version,
         "platform": platform_str,
         "pip_freeze": _safe_pip_freeze(),
     }
-
 
 
 @dataclass
@@ -635,9 +636,7 @@ class ChainedJSONLLogger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
         self.lockfile = (
-            self.path.with_suffix(self.path.suffix + _LOCKFILE_SUFFIX)
-            if enable_lock
-            else None
+            self.path.with_suffix(self.path.suffix + _LOCKFILE_SUFFIX) if enable_lock else None
         )
         self.lock_timeout = float(lock_timeout)
         self.lock_retry_delay = float(lock_retry_delay)
@@ -681,9 +680,7 @@ class ChainedJSONLLogger:
         if encrypt_backups and ENCRYPTION_AVAILABLE:
             if encryption_key is None:
                 if self.strict_mode:
-                    raise LoggingError(
-                    "encrypt_backups=True but no encryption_key provided"
-                    )
+                    raise LoggingError("encrypt_backups=True but no encryption_key provided")
                 # soft-disable encryption if key missing and not strict
                 encrypt_backups = False
 
@@ -782,9 +779,7 @@ class ChainedJSONLLogger:
                     except Exception as e:
                         LOG_ERRORS.labels(type="metrics").inc()
                         if self.strict_mode:
-                            raise LoggingError(
-                                f"Metrics update failed post-rotation: {e}"
-                            ) from e
+                            raise LoggingError(f"Metrics update failed post-rotation: {e}") from e
                 return rotated
             return None
         except Exception as e:
@@ -821,9 +816,7 @@ class ChainedJSONLLogger:
                 # Optional compression
                 if self.compress_backups:
                     gz_path = Path(rotated_str + ".gz")
-                    with open(rotated_str, "rb") as f_in, gzip.open(
-                        gz_path, "wb"
-                    ) as f_out:
+                    with open(rotated_str, "rb") as f_in, gzip.open(gz_path, "wb") as f_out:
                         while True:
                             chunk = f_in.read(64 * 1024)
                             if not chunk:
@@ -856,7 +849,7 @@ class ChainedJSONLLogger:
         self,
         payload: Dict[str, Any],
         extra: Dict[str, Any],
-        ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         if not self.redact_keys and not self.redact_patterns:
             return payload, extra
         pay = _deep_redact(
@@ -923,7 +916,6 @@ class ChainedJSONLLogger:
 
         return rec
 
-
     def _fsync_best_effort(self) -> None:
         """Attempt to fsync the file (best-effort; raise in strict if fails)."""
         """Attempt to fsync the file (best-effort; raise in strict if fails)."""
@@ -981,8 +973,7 @@ class ChainedJSONLLogger:
             if self.enable_prometheus:
                 LOG_ERRORS.labels(type="lock").inc()
             raise LoggingError(
-                f"Failed to acquire process lock {self.lockfile} within "
-                f"{self.lock_timeout:.2f}s"
+                f"Failed to acquire process lock {self.lockfile} within {self.lock_timeout:.2f}s"
             )
 
         if locked:
@@ -1006,7 +997,7 @@ class ChainedJSONLLogger:
         seed: Optional[int] = None,
         extra_meta: Optional[Dict[str, Any]] = None,
         verify_on_write: Optional[bool] = None,
-        ) -> str:
+    ) -> str:
         """
         Append a record to the audit chain.
 
@@ -1141,9 +1132,7 @@ class ChainedJSONLLogger:
                         except Exception:
                             pass
                         if self.strict_mode:
-                            raise LoggingError(
-                                f"Prometheus metrics update failed: {e}"
-                            ) from e
+                            raise LoggingError(f"Prometheus metrics update failed: {e}") from e
                         # non-strict: swallow metrics failure
 
                 # ----------------------------------------------------------

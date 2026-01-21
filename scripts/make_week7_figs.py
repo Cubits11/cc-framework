@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +17,6 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from cc.analysis.week7_utils import PointRecord, aggregate_by_group, summarise_group
-
 
 FIG_NAMES = [
     "roc_grid_or.png",
@@ -60,7 +59,9 @@ def load_point(path: Path) -> PointRecord:
         fh_j_lower=float(fh_env.get("j_lower", 0.0)),
         fh_j_upper=float(fh_env.get("j_upper", 0.0)),
         classification=str(classification.get("label", "independent")),
-        cc_l=float(classification["cc_l"]) if classification.get("cc_l") is not None else float("nan"),
+        cc_l=float(classification["cc_l"])
+        if classification.get("cc_l") is not None
+        else float("nan"),
         d_lamp=bool(classification.get("d_lamp", False)),
         wilson_world0_width=float(wilson.get("world0", {}).get("width", 0.0)),
         wilson_world1_width=float(wilson.get("world1", {}).get("width", 0.0)),
@@ -104,9 +105,19 @@ def plot_roc_grid(points: List[PointRecord], topology: str, out_path: Path) -> N
         style = _style_for_classification(regime)
 
         ax.scatter([fpr_mean], [tpr_mean], marker="o", label=key, **style)
-        ax.scatter([indep_fpr], [indep_tpr], marker="D", facecolors="none", edgecolors=style["color"], s=60)
+        ax.scatter(
+            [indep_fpr], [indep_tpr], marker="D", facecolors="none", edgecolors=style["color"], s=60
+        )
         ax.add_patch(
-            plt.Rectangle((fh_l, fh_t_l), fh_u - fh_l, fh_t_u - fh_t_l, fill=False, linestyle=":", edgecolor=style["color"], alpha=0.8)
+            plt.Rectangle(
+                (fh_l, fh_t_l),
+                fh_u - fh_l,
+                fh_t_u - fh_t_l,
+                fill=False,
+                linestyle=":",
+                edgecolor=style["color"],
+                alpha=0.8,
+            )
         )
 
     ax.set_xlabel("FPR")
@@ -139,8 +150,20 @@ def plot_j_bands(points: List[PointRecord], topology: str, out_path: Path) -> No
     xs = np.arange(len(labels))
     for idx, (lo, hi) in enumerate(bands):
         ax.plot([idx, idx], [lo, hi], color="0.3", linewidth=3)
-        ax.scatter([idx], [indep[idx]], marker="D", color="tab:orange", label="Independence" if idx == 0 else "")
-        ax.scatter([idx], [empirical[idx]], marker="o", color="tab:blue", label="Empirical" if idx == 0 else "")
+        ax.scatter(
+            [idx],
+            [indep[idx]],
+            marker="D",
+            color="tab:orange",
+            label="Independence" if idx == 0 else "",
+        )
+        ax.scatter(
+            [idx],
+            [empirical[idx]],
+            marker="o",
+            color="tab:blue",
+            label="Empirical" if idx == 0 else "",
+        )
     ax.axhline(0.0, linestyle=":", color="0.5")
     ax.set_xticks(xs, labels, rotation=30, ha="right")
     ax.set_ylabel("J statistic")
@@ -205,7 +228,9 @@ def plot_regime_map(points: List[PointRecord], topology: str, out_path: Path) ->
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Make Week 7 figures from point summaries")
-    parser.add_argument("--in", dest="input_dir", required=True, help="Directory with point_*.json files")
+    parser.add_argument(
+        "--in", dest="input_dir", required=True, help="Directory with point_*.json files"
+    )
     parser.add_argument("--out", dest="output_dir", required=True, help="Directory for figure PNGs")
     args = parser.parse_args()
 

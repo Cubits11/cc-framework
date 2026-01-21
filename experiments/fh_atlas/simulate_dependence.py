@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Tuple
-
 import math
+from dataclasses import dataclass
+from typing import List, Tuple
+
 import numpy as np
 
 from theory.fh_bounds import robust_inverse_normal
@@ -68,8 +68,8 @@ def _sample_bivariate_copula(
         s = _sample_positive_stable(alpha, n, rng)
         e1 = rng.exponential(scale=1.0, size=n)
         e2 = rng.exponential(scale=1.0, size=n)
-        u = np.exp(-(e1 / s) ** alpha)
-        v = np.exp(-(e2 / s) ** alpha)
+        u = np.exp(-((e1 / s) ** alpha))
+        v = np.exp(-((e2 / s) ** alpha))
         return u, v
     if family == "frank":
         if abs(theta) < 1e-12:
@@ -106,7 +106,7 @@ def _simulate_latent_factor(
     thresholds = np.array([robust_inverse_normal(p) for p in probs], dtype=float)
     z = rng.standard_normal(size=n)
     eps = rng.standard_normal(size=(n, len(probs)))
-    latent = rho * z[:, None] + math.sqrt(1.0 - rho ** 2) * eps
+    latent = rho * z[:, None] + math.sqrt(1.0 - rho**2) * eps
     return latent < thresholds
 
 

@@ -14,9 +14,10 @@ Scope:
 
 from typing import Any, Dict, Mapping, Sequence
 
-from hypothesis import given, strategies as st
-from pydantic import ValidationError
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+from pydantic import ValidationError
 
 from cc.core.models import (
     AttackStrategy,
@@ -26,7 +27,6 @@ from cc.core.models import (
     WorldConfig,
     _iso_from_unix,
 )
-
 
 # ---------------------------------------------------------------------
 # AttackStrategy

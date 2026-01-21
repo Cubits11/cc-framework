@@ -9,14 +9,13 @@ Enterprise goals:
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, is_dataclass, asdict
 import hashlib
 import json
 import re
 import time
+from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Dict, Literal, Mapping, Optional, Sequence, TypedDict, Union
-
 
 # ----------------------------
 # Public contract
@@ -110,6 +109,7 @@ class AuditPayload(AuditPayloadV1, total=False):
 # ----------------------------
 # Canonicalization + hashing
 # ----------------------------
+
 
 def hash_text(text: Optional[str]) -> Optional[str]:
     """SHA256 over UTF-8 bytes. Never returns empty string unless text is empty."""
@@ -331,6 +331,7 @@ def fingerprint_payload(payload: Dict[str, Any], *, strict: bool = False) -> str
 # Audit payload builder
 # ----------------------------
 
+
 def build_audit_payload(
     *,
     prompt: str,
@@ -450,6 +451,7 @@ def build_audit_payload(
 # Decision + errors
 # ----------------------------
 
+
 @dataclass(frozen=True)
 class Decision:
     """Normalized guardrail decision returned by adapter checks."""
@@ -522,6 +524,7 @@ def error_summary_from_exception(exc: Exception, *, where: str) -> Dict[str, Any
 # ----------------------------
 # Adapter base class
 # ----------------------------
+
 
 class GuardrailAdapter(ABC):
     """Abstract base class for guardrail adapters.

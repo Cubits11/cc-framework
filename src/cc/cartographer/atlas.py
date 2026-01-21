@@ -126,6 +126,7 @@ def compose_entry(
 
 # --- Internals ---------------------------------------------------------------
 
+
 def _region(cc_max: float) -> str:
     if cc_max < _CC_CONSTRUCTIVE_MAX:
         return "Constructive Valley"

@@ -42,11 +42,10 @@ numpy, pandas. Optional:
 
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple
-
 import logging
 import math
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -76,11 +75,13 @@ def _import_theory_module():
     # 1) Prefer package-relative import
     try:
         from . import theory as T  # type: ignore
+
         mode = "package"
     except ImportError:
         # 2) Script-style fallback (only on ImportError)
         try:
             import theory as T  # type: ignore
+
             mode = "script"
         except ImportError as e:
             raise ImportError(
@@ -116,7 +117,9 @@ def _import_theory_module():
             "or your correlation_cliff/theory.py is incomplete."
         )
 
-    LOG.debug("Imported theory module in %s mode from %s", mode, getattr(T, "__file__", "<unknown>"))
+    LOG.debug(
+        "Imported theory module in %s mode from %s", mode, getattr(T, "__file__", "<unknown>")
+    )
     return T, mode
 
 
@@ -136,7 +139,10 @@ pC_from_joint = T.pC_from_joint
 
 # Optional: may or may not exist in the current theory façade.
 # This is treated as a *reference overlay* only (never silently assumed path-consistent).
-_compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(T, "compute_metrics_for_lambda", None)
+_compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(
+    T, "compute_metrics_for_lambda", None
+)
+
 
 # -----------------------------------------------------------------------------
 # Config
@@ -266,13 +272,17 @@ class SimConfig:
 
         tiny_eps = float(self.tiny_negative_eps)
         if tiny_eps < 0.0 or not math.isfinite(tiny_eps):
-            raise ValueError(f"tiny_negative_eps must be finite and >= 0, got {self.tiny_negative_eps!r}")
+            raise ValueError(
+                f"tiny_negative_eps must be finite and >= 0, got {self.tiny_negative_eps!r}"
+            )
         object.__setattr__(self, "tiny_negative_eps", tiny_eps)
 
         # ---- validate path + params container ----
         pp = str(self.path)
         if pp not in ("fh_linear", "fh_power", "fh_scurve", "gaussian_tau"):
-            raise ValueError(f"path must be one of fh_linear/fh_power/fh_scurve/gaussian_tau, got {self.path!r}")
+            raise ValueError(
+                f"path must be one of fh_linear/fh_power/fh_scurve/gaussian_tau, got {self.path!r}"
+            )
         object.__setattr__(self, "path", pp)  # type: ignore
 
         if self.path_params is None:
@@ -282,7 +292,9 @@ class SimConfig:
 
         sp = str(self.seed_policy)
         if sp not in ("stable_per_cell", "sequential"):
-            raise ValueError(f"seed_policy must be 'stable_per_cell' or 'sequential', got {self.seed_policy!r}")
+            raise ValueError(
+                f"seed_policy must be 'stable_per_cell' or 'sequential', got {self.seed_policy!r}"
+            )
         object.__setattr__(self, "seed_policy", sp)  # type: ignore
 
         # ---- normalize + validate lambdas ----
@@ -455,7 +467,9 @@ def _validate_cfg(cfg: SimConfig) -> None:
             )
         eps = float(cfg.tiny_negative_eps)
         if not math.isfinite(eps) or eps <= 0.0:
-            raise ValueError(f"tiny_negative_eps must be finite and > 0, got {cfg.tiny_negative_eps!r}.")
+            raise ValueError(
+                f"tiny_negative_eps must be finite and > 0, got {cfg.tiny_negative_eps!r}."
+            )
         if eps > 1e-6:
             raise ValueError(
                 f"tiny_negative_eps={eps} seems unreasonably large. "
@@ -536,7 +550,10 @@ def _validate_cfg(cfg: SimConfig) -> None:
         else:
             eps = float(ppf_clip_eps)
             if not math.isfinite(eps) or not (0.0 < eps < 0.5):
-                raise ValueError(f"ppf_clip_eps must be finite and in (0,0.5), got {ppf_clip_eps!r}.")
+                raise ValueError(
+                    f"ppf_clip_eps must be finite and in (0,0.5), got {ppf_clip_eps!r}."
+                )
+
 
 # -----------------------------------------------------------------------------
 # Helpers: lambda transforms / paths
@@ -575,7 +592,7 @@ def _lam_power(lam: float, gamma: float) -> float:
     if gamma == 1.0:
         return lam
 
-    y = lam ** gamma
+    y = lam**gamma
 
     # Defensive: numeric noise should never push outside [0,1], but floating can be weird.
     if y < 0.0:
@@ -660,6 +677,7 @@ def _lam_scurve(lam: float, k: float) -> float:
         s = 1.0
 
     return float(s)
+
 
 def _bvn_cdf_scipy(x: float, y: float, rho: float) -> float:
     """
@@ -795,6 +813,7 @@ def _p11_gaussian_tau(
     }
     return float(p11), meta
 
+
 def p11_from_path(
     pA: float,
     pB: float,
@@ -818,6 +837,7 @@ def p11_from_path(
       - "clip" (default): enforce p11 ∈ [L,U] and record clip_amt/clipped
       - "raise": if raw_p11 violates FH by > clip_tol, raise FeasibilityError
     """
+
     # ----------------------------
     # local exceptions (keep lightweight, but structured)
     # ----------------------------
@@ -841,7 +861,9 @@ def p11_from_path(
         pB = float(pB)
         lam = float(lam)
     except Exception as e:
-        raise InputValidationError(f"pA, pB, lam must be coercible to float. Got pA={pA!r}, pB={pB!r}, lam={lam!r}") from e
+        raise InputValidationError(
+            f"pA, pB, lam must be coercible to float. Got pA={pA!r}, pB={pB!r}, lam={lam!r}"
+        ) from e
 
     if not math.isfinite(pA) or not (0.0 <= pA <= 1.0):
         raise InputValidationError(f"pA must be finite and in [0,1], got {pA!r}")
@@ -886,7 +908,9 @@ def p11_from_path(
 
     clip_tol = float(path_params.get("clip_tol", 0.0))
     if not math.isfinite(clip_tol) or clip_tol < 0.0 or clip_tol > 1e-6:
-        raise InputValidationError(f"clip_tol must be finite, >=0, and small (<=1e-6). got {clip_tol!r}")
+        raise InputValidationError(
+            f"clip_tol must be finite, >=0, and small (<=1e-6). got {clip_tol!r}"
+        )
 
     def _finalize(raw: float, lam_eff: float) -> Tuple[float, Dict[str, float]]:
         if not math.isfinite(raw):
@@ -914,7 +938,9 @@ def p11_from_path(
 
         # postcondition: always within [L,U]
         if not (L <= clipped <= U):
-            raise NumericalError(f"Postcondition failed: p11 not in [L,U]. p11={clipped}, L={L}, U={U}")
+            raise NumericalError(
+                f"Postcondition failed: p11 not in [L,U]. p11={clipped}, L={L}, U={U}"
+            )
 
         return float(clipped), meta
 
@@ -932,7 +958,9 @@ def p11_from_path(
             raise InputValidationError(f"fh_power requires gamma > 0, got {gamma_raw!r}")
         lam_eff = _lam_power(lam, gamma)
         if not (0.0 <= lam_eff <= 1.0) or not math.isfinite(lam_eff):
-            raise NumericalError(f"fh_power produced invalid lam_eff={lam_eff} for lam={lam}, gamma={gamma}")
+            raise NumericalError(
+                f"fh_power produced invalid lam_eff={lam_eff} for lam={lam}, gamma={gamma}"
+            )
         raw = L + lam_eff * width
         meta["gamma"] = float(gamma)  # numeric-only metadata
         return _finalize(float(raw), lam_eff=float(lam_eff))
@@ -944,7 +972,9 @@ def p11_from_path(
             raise InputValidationError(f"fh_scurve requires k > 0, got {k_raw!r}")
         lam_eff = _lam_scurve(lam, k)
         if not (0.0 <= lam_eff <= 1.0) or not math.isfinite(lam_eff):
-            raise NumericalError(f"fh_scurve produced invalid lam_eff={lam_eff} for lam={lam}, k={k}")
+            raise NumericalError(
+                f"fh_scurve produced invalid lam_eff={lam_eff} for lam={lam}, k={k}"
+            )
         raw = L + lam_eff * width
         meta["k"] = float(k)
         return _finalize(float(raw), lam_eff=float(lam_eff))
@@ -979,7 +1009,9 @@ def p11_from_path(
         # For Gaussian copula: tau=+1 => comonotone => p11 = U; tau=-1 => countermonotone => p11 = L
         tau_ext_tol = float(path_params.get("tau_extreme_tol", 1e-12))
         if not math.isfinite(tau_ext_tol) or tau_ext_tol < 0.0 or tau_ext_tol > 1e-6:
-            raise InputValidationError(f"tau_extreme_tol must be finite and small (<=1e-6), got {tau_ext_tol!r}")
+            raise InputValidationError(
+                f"tau_extreme_tol must be finite and small (<=1e-6), got {tau_ext_tol!r}"
+            )
 
         if tau >= 1.0 - tau_ext_tol:
             rho = 1.0
@@ -1044,7 +1076,6 @@ def p11_from_path(
     raise InputValidationError(f"Unknown path: {path!r}")
 
 
-
 # -----------------------------------------------------------------------------
 # Probability validation & sampling
 # -----------------------------------------------------------------------------
@@ -1093,7 +1124,9 @@ def _validate_cell_probs(
         prob_tol_f = float(prob_tol)
         eps_f = float(tiny_negative_eps)
     except Exception as e:
-        raise ValueError(f"prob_tol and tiny_negative_eps must be floats. got prob_tol={prob_tol!r}, eps={tiny_negative_eps!r}") from e
+        raise ValueError(
+            f"prob_tol and tiny_negative_eps must be floats. got prob_tol={prob_tol!r}, eps={tiny_negative_eps!r}"
+        ) from e
 
     if not (math.isfinite(prob_tol_f) and prob_tol_f >= 0.0 and prob_tol_f <= 1e-3):
         raise ValueError(f"prob_tol must be finite and reasonably small, got {prob_tol_f}")
@@ -1106,12 +1139,18 @@ def _validate_cell_probs(
     if p_arr.shape != (4,):
         # allow (4,1), (1,4), etc. only if it is exactly 4 elements
         if p_arr.size == 4:
-            p_arr = p_arr.reshape(4,)
+            p_arr = p_arr.reshape(
+                4,
+            )
         else:
-            raise ValueError(f"Expected p shape (4,), got {p_arr.shape} (size={p_arr.size}).{(' ' + context) if context else ''}")
+            raise ValueError(
+                f"Expected p shape (4,), got {p_arr.shape} (size={p_arr.size}).{(' ' + context) if context else ''}"
+            )
 
     if not np.all(np.isfinite(p_arr)):
-        raise ValueError(f"Non-finite probabilities: {p_arr.tolist()}.{(' ' + context) if context else ''}")
+        raise ValueError(
+            f"Non-finite probabilities: {p_arr.tolist()}.{(' ' + context) if context else ''}"
+        )
 
     # Out-of-bounds handling: ONLY tiny jitter is clipped (no renormalization).
     pmin = float(p_arr.min())
@@ -1124,7 +1163,9 @@ def _validate_cell_probs(
             p_arr[p_arr < 0.0] = 0.0
             clipped_any = True
         else:
-            raise ValueError(f"Negative cell probability encountered: min={pmin}, p={p_arr.tolist()}.{(' ' + context) if context else ''}")
+            raise ValueError(
+                f"Negative cell probability encountered: min={pmin}, p={p_arr.tolist()}.{(' ' + context) if context else ''}"
+            )
 
     if pmax > 1.0:
         # Symmetric “tiny jitter” rule: if we're allowing tiny negatives, we also allow tiny >1
@@ -1134,15 +1175,21 @@ def _validate_cell_probs(
             p_arr[p_arr > 1.0] = 1.0
             clipped_any = True
         else:
-            raise ValueError(f"Cell probability > 1 encountered: max={pmax}, p={p_arr.tolist()}.{(' ' + context) if context else ''}")
+            raise ValueError(
+                f"Cell probability > 1 encountered: max={pmax}, p={p_arr.tolist()}.{(' ' + context) if context else ''}"
+            )
 
     # Post-clipping hard bounds check (should now be clean)
     if float(p_arr.min()) < 0.0 or float(p_arr.max()) > 1.0:
-        raise ValueError(f"Probabilities out of bounds after clipping: p={p_arr.tolist()}.{(' ' + context) if context else ''}")
+        raise ValueError(
+            f"Probabilities out of bounds after clipping: p={p_arr.tolist()}.{(' ' + context) if context else ''}"
+        )
 
     s = float(p_arr.sum())
     if not math.isfinite(s):
-        raise ValueError(f"Probability sum is non-finite: sum={s}, p={p_arr.tolist()}.{(' ' + context) if context else ''}")
+        raise ValueError(
+            f"Probability sum is non-finite: sum={s}, p={p_arr.tolist()}.{(' ' + context) if context else ''}"
+        )
 
     # No renormalization: either it's valid within tolerance or it's an error.
     err = abs(s - 1.0)
@@ -1155,6 +1202,7 @@ def _validate_cell_probs(
         )
 
     return p_arr
+
 
 def _draw_joint_counts(
     rng: np.random.Generator,
@@ -1197,7 +1245,9 @@ def _draw_joint_counts(
     """
     # RNG sanity (helps catch accidental passing of RandomState / None)
     if not isinstance(rng, np.random.Generator):
-        raise TypeError(f"rng must be a numpy.random.Generator, got {type(rng).__name__}.{(' ' + context) if context else ''}")
+        raise TypeError(
+            f"rng must be a numpy.random.Generator, got {type(rng).__name__}.{(' ' + context) if context else ''}"
+        )
 
     # n must be an integer-like positive
     if isinstance(n, bool):
@@ -1205,12 +1255,16 @@ def _draw_joint_counts(
     try:
         n_int = int(n)
     except Exception as e:
-        raise TypeError(f"n must be an int > 0, got {n!r}.{(' ' + context) if context else ''}") from e
+        raise TypeError(
+            f"n must be an int > 0, got {n!r}.{(' ' + context) if context else ''}"
+        ) from e
     if n_int <= 0:
         raise ValueError(f"n must be positive, got {n_int}.{(' ' + context) if context else ''}")
     if n_int != n:
         # If caller passed a float like 1000.0, we fail loudly; don't silently coerce.
-        raise TypeError(f"n must be an integer (no silent coercion), got {n!r}.{(' ' + context) if context else ''}")
+        raise TypeError(
+            f"n must be an integer (no silent coercion), got {n!r}.{(' ' + context) if context else ''}"
+        )
 
     # Validate probabilities as a joint simplex point (no renormalization)
     p = np.array([p00, p01, p10, p11], dtype=np.float64)
@@ -1226,15 +1280,20 @@ def _draw_joint_counts(
     counts = rng.multinomial(n_int, pvals=p, size=None)
 
     if counts.shape != (4,):
-        raise RuntimeError(f"Unexpected multinomial output shape: {counts.shape}, expected (4,).{(' ' + context) if context else ''}")
+        raise RuntimeError(
+            f"Unexpected multinomial output shape: {counts.shape}, expected (4,).{(' ' + context) if context else ''}"
+        )
 
     c0, c1, c2, c3 = (int(counts[0]), int(counts[1]), int(counts[2]), int(counts[3]))
     s = c0 + c1 + c2 + c3
     if s != n_int:
         # This should never happen; if it does, something is deeply wrong (dtype overflow, corrupted RNG, etc.)
-        raise RuntimeError(f"Multinomial draw inconsistent: sum(counts)={s} != n={n_int}. counts={counts.tolist()}.{(' ' + context) if context else ''}")
+        raise RuntimeError(
+            f"Multinomial draw inconsistent: sum(counts)={s} != n={n_int}. counts={counts.tolist()}.{(' ' + context) if context else ''}"
+        )
 
     return c0, c1, c2, c3
+
 
 def _empirical_from_counts(
     *,
@@ -1366,6 +1425,7 @@ def _empirical_from_counts(
         "tau_finite": float(tau_finite),
     }
 
+
 # -----------------------------------------------------------------------------
 # Core simulation
 # -----------------------------------------------------------------------------
@@ -1423,17 +1483,36 @@ def simulate_replicate_at_lambda(
     # (We keep booleans as float 0/1 only when it helps aggregation; otherwise bool is fine.)
     _WORLD_NUM_FIELDS = (
         # true marginals / joint
-        "pA_true", "pB_true", "p00_true", "p01_true", "p10_true", "p11_true",
+        "pA_true",
+        "pB_true",
+        "p00_true",
+        "p01_true",
+        "p10_true",
+        "p11_true",
         # counts
-        "n00", "n01", "n10", "n11",
+        "n00",
+        "n01",
+        "n10",
+        "n11",
         # hats (core)
-        "p00_hat", "p01_hat", "p10_hat", "p11_hat",
-        "pA_hat", "pB_hat", "pC_hat",
-        "phi_hat", "tau_hat",
+        "p00_hat",
+        "p01_hat",
+        "p10_hat",
+        "p11_hat",
+        "pA_hat",
+        "pB_hat",
+        "pC_hat",
+        "phi_hat",
+        "tau_hat",
         # hats (diagnostics from _empirical_from_counts, if present)
-        "degenerate_A", "degenerate_B", "phi_finite", "tau_finite",
+        "degenerate_A",
+        "degenerate_B",
+        "phi_finite",
+        "tau_finite",
         # path-consistent population overlays from constructed joint
-        "pC_true", "phi_true", "tau_true",
+        "pC_true",
+        "phi_true",
+        "tau_true",
     )
 
     def _prime_world_schema(w: int) -> None:
@@ -1466,7 +1545,9 @@ def simulate_replicate_at_lambda(
 
         # Choose p11 per configured path
         try:
-            p11, meta = p11_from_path(wm.pA, wm.pB, lam_f, path=cfg.path, path_params=cfg.path_params)
+            p11, meta = p11_from_path(
+                wm.pA, wm.pB, lam_f, path=cfg.path, path_params=cfg.path_params
+            )
         except Exception as e:
             if cfg.hard_fail_on_invalid:
                 raise
@@ -1483,7 +1564,9 @@ def simulate_replicate_at_lambda(
         except Exception as e:
             if cfg.hard_fail_on_invalid:
                 raise
-            _mark_world_invalid(w, stage="joint_cells_from_marginals", msg=f"{type(e).__name__}: {e}")
+            _mark_world_invalid(
+                w, stage="joint_cells_from_marginals", msg=f"{type(e).__name__}: {e}"
+            )
             continue
 
         # Validate joint probabilities (no silent normalization)
@@ -1588,9 +1671,11 @@ def simulate_replicate_at_lambda(
     JA_hat = abs(pA1 - pA0)
     JB_hat = abs(pB1 - pB0)
     Jbest_hat = max(JA_hat, JB_hat)
-    dC_hat = (pC1 - pC0)
+    dC_hat = pC1 - pC0
     JC_hat = abs(dC_hat)
-    CC_hat = (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
+    CC_hat = (
+        (JC_hat / Jbest_hat) if (math.isfinite(Jbest_hat) and Jbest_hat > 0.0) else float("nan")
+    )
 
     out["JA_hat"] = float(JA_hat)
     out["JB_hat"] = float(JB_hat)
@@ -1618,7 +1703,9 @@ def simulate_replicate_at_lambda(
     JA_pop = abs(float(cfg.marginals.w1.pA) - float(cfg.marginals.w0.pA))
     JB_pop = abs(float(cfg.marginals.w1.pB) - float(cfg.marginals.w0.pB))
     Jbest_pop = max(JA_pop, JB_pop)
-    CC_pop = (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
+    CC_pop = (
+        (JC_pop / Jbest_pop) if (Jbest_pop > 0.0 and math.isfinite(Jbest_pop)) else float("nan")
+    )
 
     out["dC_pop"] = float(dC_pop)
     out["JC_pop"] = float(JC_pop)
@@ -1676,6 +1763,7 @@ def simulate_replicate_at_lambda(
         out["JC_env_gap"] = float("nan")
 
     return out
+
 
 def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
     """
@@ -1776,6 +1864,7 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
         raise RuntimeError(f"simulate_grid produced {len(df)} rows, expected {total}")
 
     return df
+
 
 def summarize_simulation(
     df_long: pd.DataFrame,
@@ -1886,7 +1975,9 @@ def summarize_simulation(
 
         if isinstance(key, tuple):
             for kname, kval in zip(group_keys, key):
-                row[kname] = float(kval) if kname == "lambda" else (None if pd.isna(kval) else str(kval))
+                row[kname] = (
+                    float(kval) if kname == "lambda" else (None if pd.isna(kval) else str(kval))
+                )
         else:
             row["lambda"] = float(key)
 
@@ -2088,13 +2179,16 @@ def build_linear_lambda_grid(
     # Final hard guarantees
     grid = np.asarray(grid, dtype=dtype)
     if grid.ndim != 1 or grid.size != num_i:
-        raise RuntimeError(f"Internal error: expected 1D grid of length {num_i}, got shape {grid.shape}")
+        raise RuntimeError(
+            f"Internal error: expected 1D grid of length {num_i}, got shape {grid.shape}"
+        )
     if not np.all(np.isfinite(grid)):
         raise RuntimeError("Internal error: produced non-finite grid values.")
     if grid.size >= 2 and not np.all(np.diff(grid) > 0):
         raise RuntimeError("Internal error: grid is not strictly increasing.")
 
     return grid
+
 
 # -----------------------------------------------------------------------------
 # CLI config loading (enterprise-grade, schema-aware)
@@ -2239,13 +2333,15 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         xs = [float(x) for x in lams]
         for i, x in enumerate(xs):
             if not (math.isfinite(x) and 0.0 <= x <= 1.0):
-                raise ValueError(f"lambda values must be finite and in [0,1]; bad lambdas[{i}]={x!r}")
+                raise ValueError(
+                    f"lambda values must be finite and in [0,1]; bad lambdas[{i}]={x!r}"
+                )
         # Require non-decreasing; strict increasing is nicer but allow duplicates if user insists.
         for i in range(len(xs) - 1):
             if xs[i + 1] < xs[i]:
                 raise ValueError(
                     "lambdas must be non-decreasing (sorted). "
-                    f"Found lambdas[{i}]={xs[i]} > lambdas[{i+1}]={xs[i+1]}."
+                    f"Found lambdas[{i}]={xs[i]} > lambdas[{i + 1}]={xs[i + 1]}."
                 )
         return xs
 
@@ -2267,7 +2363,11 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
     # ----------------------------
     # Detect schema
     # ----------------------------
-    has_pipeline = isinstance(d.get("composition"), dict) or isinstance(d.get("dependence_paths"), dict) or isinstance(d.get("sampling"), dict)
+    has_pipeline = (
+        isinstance(d.get("composition"), dict)
+        or isinstance(d.get("dependence_paths"), dict)
+        or isinstance(d.get("sampling"), dict)
+    )
 
     if has_pipeline:
         # Rule (primary only)
@@ -2301,7 +2401,9 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
                 grid = _dget(d, "dependence_paths.primary.lambda_grid", None)
             if grid is None:
                 grid = d.get("lambda_grid", {"num": 21})
-            lambdas = list(_parse_lambdas_from_grid(grid, where="dependence_paths.primary.lambda_grid_coarse"))
+            lambdas = list(
+                _parse_lambdas_from_grid(grid, where="dependence_paths.primary.lambda_grid_coarse")
+            )
 
         lambdas = list(_ensure_monotone_increasing(lambdas))
 
@@ -2314,13 +2416,27 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
             raise ValueError(f"sampling.seed_policy invalid: {seed_policy!r}")
 
         # Numeric / validation policies: allow overrides in simulate.*
-        envelope_tol = _f(_dget(d, "simulate.envelope_tol", d.get("envelope_tol", 5e-3)), "simulate.envelope_tol")
-        hard_fail_on_invalid = _b(_dget(d, "simulate.hard_fail_on_invalid", d.get("hard_fail_on_invalid", True)), "simulate.hard_fail_on_invalid")
-        include_theory_reference = _b(_dget(d, "simulate.include_theory_reference", d.get("include_theory_reference", True)), "simulate.include_theory_reference")
+        envelope_tol = _f(
+            _dget(d, "simulate.envelope_tol", d.get("envelope_tol", 5e-3)), "simulate.envelope_tol"
+        )
+        hard_fail_on_invalid = _b(
+            _dget(d, "simulate.hard_fail_on_invalid", d.get("hard_fail_on_invalid", True)),
+            "simulate.hard_fail_on_invalid",
+        )
+        include_theory_reference = _b(
+            _dget(d, "simulate.include_theory_reference", d.get("include_theory_reference", True)),
+            "simulate.include_theory_reference",
+        )
 
         prob_tol = _f(_dget(d, "simulate.prob_tol", d.get("prob_tol", 1e-12)), "simulate.prob_tol")
-        allow_tiny_negative = _b(_dget(d, "simulate.allow_tiny_negative", d.get("allow_tiny_negative", True)), "simulate.allow_tiny_negative")
-        tiny_negative_eps = _f(_dget(d, "simulate.tiny_negative_eps", d.get("tiny_negative_eps", 1e-15)), "simulate.tiny_negative_eps")
+        allow_tiny_negative = _b(
+            _dget(d, "simulate.allow_tiny_negative", d.get("allow_tiny_negative", True)),
+            "simulate.allow_tiny_negative",
+        )
+        tiny_negative_eps = _f(
+            _dget(d, "simulate.tiny_negative_eps", d.get("tiny_negative_eps", 1e-15)),
+            "simulate.tiny_negative_eps",
+        )
 
     else:
         # ----------------------------
@@ -2378,7 +2494,9 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
     if not (0.0 <= prob_tol <= 1e-6):
         raise ValueError(f"prob_tol seems unreasonable: {prob_tol} (expected [0,1e-6])")
     if allow_tiny_negative and not (0.0 < tiny_negative_eps <= 1e-6):
-        raise ValueError(f"tiny_negative_eps seems unreasonable: {tiny_negative_eps} (expected (0,1e-6])")
+        raise ValueError(
+            f"tiny_negative_eps seems unreasonable: {tiny_negative_eps} (expected (0,1e-6])"
+        )
     if envelope_tol < 0.0 or not math.isfinite(envelope_tol):
         raise ValueError(f"envelope_tol must be finite and >=0, got {envelope_tol!r}")
 
@@ -2400,6 +2518,7 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         include_theory_reference=bool(include_theory_reference),
     )
 
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     CLI entrypoint for simulate.py.
@@ -2416,7 +2535,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     import hashlib
     import json
     import logging
-    import os
     import platform
     import subprocess
     import sys
@@ -2491,10 +2609,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "or the CLI will create ./artifacts/<UTCstamp>/ by default."
         ),
     )
-    ap.add_argument("--out_csv", type=str, default=None, help="Write replicate-level rows to CSV (legacy).")
-    ap.add_argument("--out_summary_csv", type=str, default=None, help="Write per-lambda summary to CSV (legacy).")
+    ap.add_argument(
+        "--out_csv", type=str, default=None, help="Write replicate-level rows to CSV (legacy)."
+    )
+    ap.add_argument(
+        "--out_summary_csv",
+        type=str,
+        default=None,
+        help="Write per-lambda summary to CSV (legacy).",
+    )
     ap.add_argument("--print_head", type=int, default=5, help="Print first N rows of summary.")
-    ap.add_argument("--log_level", type=str, default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR).")
+    ap.add_argument(
+        "--log_level", type=str, default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)."
+    )
     ap.add_argument(
         "--overwrite",
         action="store_true",
@@ -2508,7 +2635,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
 
     if args.config is None:
-        print("ERROR: Please provide --config path/to/config.yaml (or call simulate_grid() from Python).", file=sys.stderr)
+        print(
+            "ERROR: Please provide --config path/to/config.yaml (or call simulate_grid() from Python).",
+            file=sys.stderr,
+        )
         return 2
 
     run_started_utc = datetime.utcnow().isoformat() + "Z"
@@ -2522,7 +2652,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Resolve out_dir policy
     out_dir: Optional[Path] = Path(args.out_dir).expanduser() if args.out_dir else None
     legacy_out_csv: Optional[Path] = Path(args.out_csv).expanduser() if args.out_csv else None
-    legacy_out_sum: Optional[Path] = Path(args.out_summary_csv).expanduser() if args.out_summary_csv else None
+    legacy_out_sum: Optional[Path] = (
+        Path(args.out_summary_csv).expanduser() if args.out_summary_csv else None
+    )
 
     if out_dir is None and legacy_out_csv is None and legacy_out_sum is None:
         out_dir = Path.cwd() / "artifacts" / _now_stamp()
@@ -2549,8 +2681,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Run simulation
     # ----------------------------
     try:
-        LOG.info("Running simulate_grid: n=%s n_reps=%s lambdas=%s path=%s rule=%s seed_policy=%s",
-                 cfg.n, cfg.n_reps, len(cfg.lambdas), cfg.path, cfg.rule, cfg.seed_policy)
+        LOG.info(
+            "Running simulate_grid: n=%s n_reps=%s lambdas=%s path=%s rule=%s seed_policy=%s",
+            cfg.n,
+            cfg.n_reps,
+            len(cfg.lambdas),
+            cfg.path,
+            cfg.rule,
+            cfg.seed_policy,
+        )
         df_long = simulate_grid(cfg)
         df_sum = summarize_simulation(df_long)
     except Exception as e:
@@ -2598,7 +2737,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "tiny_negative_eps": float(cfg.tiny_negative_eps),
                 "include_theory_reference": bool(cfg.include_theory_reference),
             }
-            _atomic_write_text(out_dir / "config_resolved.json", json.dumps(cfg_snapshot, indent=2, sort_keys=True) + "\n")
+            _atomic_write_text(
+                out_dir / "config_resolved.json",
+                json.dumps(cfg_snapshot, indent=2, sort_keys=True) + "\n",
+            )
             outputs["config_resolved.json"] = str(out_dir / "config_resolved.json")
             file_hashes["config_resolved.json"] = _sha256_file(out_dir / "config_resolved.json")
 
@@ -2620,7 +2762,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # ----------------------------
     # Diagnostics (stable JSON)
     # ----------------------------
-    vio_rate = float(df_long["JC_env_violation"].mean()) if "JC_env_violation" in df_long.columns and not df_long.empty else float("nan")
+    vio_rate = (
+        float(df_long["JC_env_violation"].mean())
+        if "JC_env_violation" in df_long.columns and not df_long.empty
+        else float("nan")
+    )
     invalid_cols = [c for c in df_long.columns if c.startswith("invalid_joint_w")]
     invalid_rates = {c: float(df_long[c].fillna(False).astype(bool).mean()) for c in invalid_cols}
 
@@ -2644,7 +2790,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Persist diagnostics + manifest if out_dir is set
     if out_dir is not None:
         try:
-            _atomic_write_text(out_dir / "diagnostics.json", json.dumps(diag, indent=2, sort_keys=True) + "\n")
+            _atomic_write_text(
+                out_dir / "diagnostics.json", json.dumps(diag, indent=2, sort_keys=True) + "\n"
+            )
             outputs["diagnostics.json"] = str(out_dir / "diagnostics.json")
             file_hashes["diagnostics.json"] = _sha256_file(out_dir / "diagnostics.json")
 
@@ -2664,7 +2812,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "file_sha256": file_hashes,
                 "diagnostics": diag,
             }
-            _atomic_write_text(out_dir / "manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+            _atomic_write_text(
+                out_dir / "manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+            )
             outputs["manifest.json"] = str(out_dir / "manifest.json")
             file_hashes["manifest.json"] = _sha256_file(out_dir / "manifest.json")
         except Exception:

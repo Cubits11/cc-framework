@@ -28,9 +28,7 @@ class CompositeGuardrail(Guardrail):
         self.guardrails: List[Guardrail] = list(guardrails or [])
 
     # Guardrail API -----------------------------------------------------
-    def calibrate(
-        self, benign_texts: Iterable[str], target_fpr: float = 0.05
-    ) -> None:
+    def calibrate(self, benign_texts: Iterable[str], target_fpr: float = 0.05) -> None:
         for g in self.guardrails:
             g.calibrate(benign_texts, target_fpr)
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 from typing import Dict, List
@@ -53,9 +52,15 @@ def compute_for_point(data: Dict) -> Dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Annotate point summaries with independence baselines")
-    parser.add_argument("--in", dest="input_dir", required=True, help="Directory of point_*.json files")
-    parser.add_argument("--out", dest="output_dir", required=True, help="Directory to write updated JSON")
+    parser = argparse.ArgumentParser(
+        description="Annotate point summaries with independence baselines"
+    )
+    parser.add_argument(
+        "--in", dest="input_dir", required=True, help="Directory of point_*.json files"
+    )
+    parser.add_argument(
+        "--out", dest="output_dir", required=True, help="Directory to write updated JSON"
+    )
     args = parser.parse_args()
 
     in_dir = Path(args.input_dir)

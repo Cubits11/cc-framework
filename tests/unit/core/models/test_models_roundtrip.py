@@ -12,8 +12,8 @@ Scope:
 
 from typing import Any, Dict, Type
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from cc.core.models import (
     AttackResult,
@@ -27,7 +27,6 @@ from cc.core.models import (
 )
 from cc.core.schema import SCHEMA_VERSION as _SCHEMA_VERSION
 from tests._factories import mk_attack_result
-
 
 # ---------------------------------------------------------------------
 # Shared helper

@@ -12,16 +12,15 @@ Outputs deterministic, leak-safe artifacts:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import random
 import sys
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 from uuid import uuid4
-
 
 from cc.adapters.base import (
     AUDIT_SCHEMA_VERSION,
@@ -31,13 +30,13 @@ from cc.adapters.base import (
     summarize_value,
 )
 from cc.cartographer import audit as audit_chain
+from cc.core.guardrail_api import GuardrailAdapter
 from cc.core.manifest import (
     RunManifest,
     build_config_hashes,
     emit_run_manifest,
     guardrail_versions_from_instances,
 )
-from cc.core.guardrail_api import GuardrailAdapter
 from cc.core.registry import build_guardrails
 from cc.utils.artifacts import detect_git_commit, write_json
 
@@ -76,6 +75,7 @@ def _merkle_root(lines: Iterable[str]) -> str:
 def _load_private_key(path: Path):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ed25519
+
     if path.exists():
         return serialization.load_pem_private_key(path.read_bytes(), password=None)
     key = ed25519.Ed25519PrivateKey.generate()
@@ -181,6 +181,7 @@ def _event_id(run_id: str, prompt_hash: str, guardrail_name: str, index: int) ->
 
 def _render_block_rate_plot(path: Path, labels: Sequence[str], values: Sequence[float]) -> None:
     import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.bar(labels, values, color="#4C78A8")
     ax.set_ylim(0, 1)
@@ -277,9 +278,13 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
 
             guardrail_totals[guardrail_name] = guardrail_totals.get(guardrail_name, 0) + 1
             if verdict == "block":
-                guardrail_block_counts[guardrail_name] = guardrail_block_counts.get(guardrail_name, 0) + 1
+                guardrail_block_counts[guardrail_name] = (
+                    guardrail_block_counts.get(guardrail_name, 0) + 1
+                )
             if verdict == "review":
-                guardrail_review_counts[guardrail_name] = guardrail_review_counts.get(guardrail_name, 0) + 1
+                guardrail_review_counts[guardrail_name] = (
+                    guardrail_review_counts.get(guardrail_name, 0) + 1
+                )
 
             decisions.append(bool(blocked))
             verdicts.append(verdict)
@@ -299,7 +304,9 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
         line = json.dumps(record, sort_keys=True)
         results_lines.append(line)
 
-    results_path.write_text("\n".join(results_lines) + ("\n" if results_lines else ""), encoding="utf-8")
+    results_path.write_text(
+        "\n".join(results_lines) + ("\n" if results_lines else ""), encoding="utf-8"
+    )
 
     metrics = {
         "run_id": run_id,
@@ -398,7 +405,9 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> Dict[str, Any]:
         "ledger_tail_hash": audit_chain.tail_sha(str(ledger_path)),
         "public_key": public_key_bytes.hex(),
     }
-    attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     signature = private_key.sign(attestation_message).hex()
     attestation["signature"] = signature
     attestation_path = output_dir / "attestation.json"

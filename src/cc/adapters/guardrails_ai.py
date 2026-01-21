@@ -50,9 +50,7 @@ class GuardrailsAIAdapter(GuardrailAdapter):
             self.version = getattr(self.guard, "version", "unknown")
             if self.validators:
                 self._validator_names = tuple(v.__class__.__name__ for v in self.validators)
-        self._config_fingerprint = fingerprint_payload(
-            {"validators": list(self._validator_names)}
-        )
+        self._config_fingerprint = fingerprint_payload({"validators": list(self._validator_names)})
 
     def check(self, prompt: str, response: Optional[str], metadata: Dict[str, Any]) -> Decision:
         target = response or prompt
@@ -93,7 +91,10 @@ class GuardrailsAIAdapter(GuardrailAdapter):
             category=category,
             score=getattr(result, "validation_score", None),
             rationale=rationale,
-            raw={"result": sanitize_vendor_payload(result), "metadata": sanitize_metadata(metadata)},
+            raw={
+                "result": sanitize_vendor_payload(result),
+                "metadata": sanitize_metadata(metadata),
+            },
             adapter_name=self.name,
             adapter_version=self.version,
             audit=audit_payload,

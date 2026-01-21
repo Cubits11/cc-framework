@@ -18,18 +18,18 @@ import time
 from typing import Any
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from cc.core.models import (
+    MAX_REASONABLE_UNIX_TIMESTAMP,
     AttackResult,
     WorldBit,
     _hash_text,
     _iso_from_unix,
-    MAX_REASONABLE_UNIX_TIMESTAMP,
 )
 from tests._factories import mk_attack_result
-
 
 # ---------------------------------------------------------------------
 # Shared helper
@@ -215,9 +215,7 @@ def test_attack_result_from_transcript_and_salt_variants():
 
     # Baseline default for sessions/request IDs
     assert isinstance(ar1.session_id, str)
-    assert getattr(ar1, "request_id", None) is None or isinstance(
-        ar1.request_id, str
-    )
+    assert getattr(ar1, "request_id", None) is None or isinstance(ar1.request_id, str)
 
 
 def test_attack_result_model_hash_alias_and_immutability():

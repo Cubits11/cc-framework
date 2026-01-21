@@ -18,14 +18,14 @@ Notes:
 
 from __future__ import annotations
 
-from math import sqrt, log
+from math import log, sqrt
 from typing import Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
 
-
 # ---------- Utilities ----------
+
 
 def _validate_prob(name: str, x: float) -> None:
     if not (0.0 <= x <= 1.0):
@@ -47,34 +47,53 @@ def _norm_ppf(p: float) -> float:
     if not (0.0 < p < 1.0):
         raise ValueError(f"p must be in (0,1), got {p}")
     # Coefficients
-    a = [ -3.969683028665376e+01,  2.209460984245205e+02,
-          -2.759285104469687e+02,  1.383577518672690e+02,
-          -3.066479806614716e+01,  2.506628277459239e+00 ]
-    b = [ -5.447609879822406e+01,  1.615858368580409e+02,
-          -1.556989798598866e+02,  6.680131188771972e+01,
-          -1.328068155288572e+01 ]
-    c = [ -7.784894002430293e-03, -3.223964580411365e-01,
-          -2.400758277161838e+00, -2.549732539343734e+00,
-           4.374664141464968e+00,  2.938163982698783e+00 ]
-    d = [  7.784695709041462e-03,  3.224671290700398e-01,
-           2.445134137142996e+00,  3.754408661907416e+00 ]
-    plow  = 0.02425
+    a = [
+        -3.969683028665376e01,
+        2.209460984245205e02,
+        -2.759285104469687e02,
+        1.383577518672690e02,
+        -3.066479806614716e01,
+        2.506628277459239e00,
+    ]
+    b = [
+        -5.447609879822406e01,
+        1.615858368580409e02,
+        -1.556989798598866e02,
+        6.680131188771972e01,
+        -1.328068155288572e01,
+    ]
+    c = [
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e00,
+        -2.549732539343734e00,
+        4.374664141464968e00,
+        2.938163982698783e00,
+    ]
+    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00]
+    plow = 0.02425
     phigh = 1 - plow
     if p < plow:
-        q = sqrt(-2*log(p))
-        return (((((c[0]*q + c[1])*q + c[2])*q + c[3])*q + c[4])*q + c[5]) / \
-               ((((d[0]*q + d[1])*q + d[2])*q + d[3])*q + 1)
+        q = sqrt(-2 * log(p))
+        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1
+        )
     if p > phigh:
-        q = sqrt(-2*log(1-p))
-        return -(((((c[0]*q + c[1])*q + c[2])*q + c[3])*q + c[4])*q + c[5]) / \
-                 ((((d[0]*q + d[1])*q + d[2])*q + d[3])*q + 1)
+        q = sqrt(-2 * log(1 - p))
+        return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1
+        )
     q = p - 0.5
-    r = q*q
-    return (((((a[0]*r + a[1])*r + a[2])*r + a[3])*r + a[4])*r + a[5])*q / \
-           (((((b[0]*r + b[1])*r + b[2])*r + b[3])*r + b[4])*r + 1)
+    r = q * q
+    return (
+        (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
+        * q
+        / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
+    )
 
 
 # ---------- Wilson CI for a Bernoulli proportion ----------
+
 
 def wilson_ci_from_counts(k: int, n: int, delta: float = 0.05) -> Tuple[float, float]:
     """Two-sided Wilson score interval for a proportion with success count k.
@@ -93,11 +112,11 @@ def wilson_ci_from_counts(k: int, n: int, delta: float = 0.05) -> Tuple[float, f
     if not (0.0 < delta < 1.0):
         raise ValueError("delta must be in (0,1).")
     phat = k / n
-    z = _norm_ppf(1.0 - 0.5*delta)
-    z2 = z*z
-    denom = 1.0 + z2/n
-    center = (phat + z2/(2*n)) / denom
-    half = (z * sqrt((phat*(1.0 - phat) + z2/(4*n)) / n)) / denom
+    z = _norm_ppf(1.0 - 0.5 * delta)
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (phat + z2 / (2 * n)) / denom
+    half = (z * sqrt((phat * (1.0 - phat) + z2 / (4 * n)) / n)) / denom
     lo = _clip01(center - half)
     hi = _clip01(center + half)
     return lo, hi
@@ -112,6 +131,7 @@ def wilson_ci(phat: float, n: int, delta: float = 0.05) -> Tuple[float, float]:
 
 # ---------- Bootstrap percentile CI for a proportion ----------
 
+
 def bootstrap_proportion_ci(
     samples: NDArray[np.float64],
     delta: float = 0.05,
@@ -124,7 +144,7 @@ def bootstrap_proportion_ci(
         samples = samples.ravel()
     n = samples.size
     _validate_n("n", int(n))
-    if not ((samples == 0).all() or (samples == 1).any() or np.isin(samples, [0,1]).all()):
+    if not ((samples == 0).all() or (samples == 1).any() or np.isin(samples, [0, 1]).all()):
         # Allow float 0/1 inputs; reject out-of-support values
         bad = np.setdiff1d(np.unique(samples), np.array([0.0, 1.0]))
         if bad.size:
@@ -136,12 +156,13 @@ def bootstrap_proportion_ci(
     for b in range(B):
         idx = rng.integers(0, n, size=n, endpoint=False)
         means[b] = float(np.mean(samples[idx]))
-    lo = float(np.quantile(means, delta/2.0, method="linear"))
-    hi = float(np.quantile(means, 1.0 - delta/2.0, method="linear"))
+    lo = float(np.quantile(means, delta / 2.0, method="linear"))
+    hi = float(np.quantile(means, 1.0 - delta / 2.0, method="linear"))
     return _clip01(lo), _clip01(hi)
 
 
 # ---------- CC CIs via Wilson and Bootstrap ----------
+
 
 def _diff_interval(p1_lo: float, p1_hi: float, p0_lo: float, p0_hi: float) -> Tuple[float, float]:
     """Interval arithmetic for Δ = p1 - p0 given [p1_lo, p1_hi], [p0_lo, p0_hi]."""
@@ -160,8 +181,10 @@ def cc_ci_from_diff_interval(D: float, delta_lo: float, delta_hi: float) -> Tupl
 
 
 def cc_ci_wilson(
-    p1_hat: float, n1: int,
-    p0_hat: float, n0: int,
+    p1_hat: float,
+    n1: int,
+    p0_hat: float,
+    n0: int,
     D: float,
     delta: float = 0.05,
 ) -> Tuple[float, float]:
@@ -193,6 +216,8 @@ def cc_ci_bootstrap(
         seed: RNG seed
     """
     p1_lo, p1_hi = bootstrap_proportion_ci(y1_samples, delta, B=B, seed=seed)
-    p0_lo, p0_hi = bootstrap_proportion_ci(y0_samples, delta, B=B, seed=None if seed is None else seed+1)
+    p0_lo, p0_hi = bootstrap_proportion_ci(
+        y0_samples, delta, B=B, seed=None if seed is None else seed + 1
+    )
     d_lo, d_hi = _diff_interval(p1_lo, p1_hi, p0_lo, p0_hi)
     return cc_ci_from_diff_interval(D, d_lo, d_hi)

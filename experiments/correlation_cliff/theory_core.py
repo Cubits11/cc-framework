@@ -104,17 +104,28 @@ Public API
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import contextlib
 import math
 import warnings
-from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, Optional, Sequence, Tuple, TypedDict
-import numpy as np
+from dataclasses import dataclass
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypedDict,
+)
 
+import numpy as np
 
 # =============================================================================
 # Semantic errors (do not use ValueError directly in public functions)
 # =============================================================================
+
 
 class TheoryError(Exception):
     """Base error for this module."""
@@ -168,6 +179,7 @@ class TheoryConfig:
         Joint-cell sums within this tolerance of 1.0 are accepted without renorm.
         Beyond this, we renormalize if all cells are nonnegative within eps.
     """
+
     eps_prob: float = 1e-12
     strict_params: bool = True
     invariant_policy: InvariantPolicy = "raise"
@@ -236,6 +248,7 @@ def _invariant(msg: str) -> None:
 # Core validation helpers
 # =============================================================================
 
+
 def _is_finite_number(x: Any) -> bool:
     return isinstance(x, (int, float, np.floating)) and math.isfinite(float(x))
 
@@ -302,6 +315,7 @@ def _require_rule(rule: Any) -> Rule:
 # Data structures
 # =============================================================================
 
+
 @dataclass(frozen=True, slots=True)
 class FHBounds:
     """
@@ -313,6 +327,7 @@ class FHBounds:
     Invariants (within CONFIG.eps_prob):
       - 0 <= lower <= upper <= 1
     """
+
     lower: float
     upper: float
     pA: float
@@ -364,6 +379,7 @@ class TwoWorldMarginals:
 
     Stored as floats in [0,1] with strict validation.
     """
+
     pA0: float
     pB0: float
     pA1: float
@@ -378,6 +394,7 @@ class TwoWorldMarginals:
 
 class JointCells(TypedDict):
     """Typed 2×2 joint table."""
+
     p00: float
     p01: float
     p10: float
@@ -387,6 +404,7 @@ class JointCells(TypedDict):
 # =============================================================================
 # FH feasibility primitives
 # =============================================================================
+
 
 def fh_bounds(pA: Any, pB: Any) -> Tuple[float, float]:
     """
@@ -447,6 +465,7 @@ def validate_joint(pA: Any, pB: Any, p11: Any) -> float:
 # =============================================================================
 # Joint table construction (2×2)
 # =============================================================================
+
 
 def joint_cells_from_marginals(pA: Any, pB: Any, p11: Any) -> JointCells:
     """
@@ -538,6 +557,7 @@ def validate_joint_cells(cells: Mapping[str, Any], *, tol: float = 1e-8) -> None
 # Composition primitives
 # =============================================================================
 
+
 def composed_rate(rule: Any, pA: Any, pB: Any, p11: Any) -> float:
     """
     Compute composed rate pC = P(C=1) given rule and joint overlap p11.
@@ -600,6 +620,7 @@ def composed_rate_bounds(rule: Any, pA: Any, pB: Any) -> Tuple[float, float]:
 # Dependence paths: FH family + copulas
 # =============================================================================
 
+
 def _validate_params(params: Optional[Mapping[str, Any]], allowed: Sequence[str]) -> Dict[str, Any]:
     """
     Validate/whitelist path parameters.
@@ -616,7 +637,9 @@ def _validate_params(params: Optional[Mapping[str, Any]], allowed: Sequence[str]
     d = dict(params)
     unknown = set(d.keys()) - set(allowed)
     if unknown and CONFIG.strict_params:
-        raise InputValidationError(f"Unknown path_params keys {sorted(unknown)}; allowed={list(allowed)}")
+        raise InputValidationError(
+            f"Unknown path_params keys {sorted(unknown)}; allowed={list(allowed)}"
+        )
     return {k: d[k] for k in allowed if k in d}
 
 
@@ -659,7 +682,7 @@ def p11_from_lambda(
         power = float(pp.get("power", 1.0))
         if not math.isfinite(power) or power <= 0.0:
             raise InputValidationError("fh_power requires power>0 and finite")
-        return float(L + (l ** power) * W)
+        return float(L + (l**power) * W)
 
     if name == "fh_scurve":
         pp = _validate_params(path_params, allowed=("alpha",))
@@ -733,32 +756,53 @@ def _normal_ppf(p: float) -> float:
         raise InputValidationError("ppf requires p in (0,1)")
 
     # Coefficients for Acklam approximation
-    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
-         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
-    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
-         6.680131188771972e+01, -1.328068155288572e+01]
-    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
-    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
-         3.754408661907416e+00]
+    a = [
+        -3.969683028665376e01,
+        2.209460984245205e02,
+        -2.759285104469687e02,
+        1.383577518672690e02,
+        -3.066479806614716e01,
+        2.506628277459239e00,
+    ]
+    b = [
+        -5.447609879822406e01,
+        1.615858368580409e02,
+        -1.556989798598866e02,
+        6.680131188771972e01,
+        -1.328068155288572e01,
+    ]
+    c = [
+        -7.784894002430293e-03,
+        -3.223964580411365e-01,
+        -2.400758277161838e00,
+        -2.549732539343734e00,
+        4.374664141464968e00,
+        2.938163982698783e00,
+    ]
+    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00]
 
     plow = 0.02425
     phigh = 1.0 - plow
 
     if p < plow:
         q = math.sqrt(-2.0 * math.log(p))
-        return (((((c[0]*q + c[1])*q + c[2])*q + c[3])*q + c[4])*q + c[5]) / \
-               ((((d[0]*q + d[1])*q + d[2])*q + d[3])*q + 1.0)
+        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+        )
 
     if p > phigh:
         q = math.sqrt(-2.0 * math.log(1.0 - p))
-        return -(((((c[0]*q + c[1])*q + c[2])*q + c[3])*q + c[4])*q + c[5]) / \
-                ((((d[0]*q + d[1])*q + d[2])*q + d[3])*q + 1.0)
+        return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+        )
 
     q = p - 0.5
-    r = q*q
-    return (((((a[0]*r + a[1])*r + a[2])*r + a[3])*r + a[4])*r + a[5]) * q / \
-           (((((b[0]*r + b[1])*r + b[2])*r + b[3])*r + b[4])*r + 1.0)
+    r = q * q
+    return (
+        (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
+        * q
+        / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+    )
 
 
 def p11_gaussian_copula(
@@ -836,7 +880,7 @@ def p11_gaussian_copula(
     rng = np.random.default_rng(seed)
     # Correlated normals via linear construction:
     # y = rho*x + sqrt(1-rho^2)*z
-    s = math.sqrt(max(0.0, 1.0 - r*r))
+    s = math.sqrt(max(0.0, 1.0 - r * r))
     x = rng.standard_normal(size=n_mc)
     z = rng.standard_normal(size=n_mc)
     y = r * x + s * z
@@ -853,6 +897,7 @@ def p11_gaussian_copula(
 # Dependence summaries (interpretability)
 # =============================================================================
 
+
 def phi_from_joint(pA: Any, pB: Any, p11: Any) -> float:
     """
     Phi coefficient (binary Pearson correlation):
@@ -866,7 +911,7 @@ def phi_from_joint(pA: Any, pB: Any, p11: Any) -> float:
     denom = a * (1.0 - a) * b * (1.0 - b)
     if denom <= 0.0:
         return float("nan")
-    return float((x - a*b) / math.sqrt(denom))
+    return float((x - a * b) / math.sqrt(denom))
 
 
 def kendall_tau_a_from_cells(cells: Mapping[str, Any]) -> float:
@@ -881,7 +926,7 @@ def kendall_tau_a_from_cells(cells: Mapping[str, Any]) -> float:
     p01 = float(cells["p01"])
     p10 = float(cells["p10"])
     p11 = float(cells["p11"])
-    return float(2.0 * (p00*p11 - p01*p10))
+    return float(2.0 * (p00 * p11 - p01 * p10))
 
 
 def avg_ignore_nan(x: float, y: float) -> float:
@@ -902,6 +947,7 @@ def avg_ignore_nan(x: float, y: float) -> float:
 # =============================================================================
 # Two-world primitives and dependence-agnostic bounds
 # =============================================================================
+
 
 def singleton_gaps(w: TwoWorldMarginals) -> Tuple[float, float, float]:
     """
@@ -1027,5 +1073,3 @@ __all__ = [
     "jc_bounds",
     "cc_bounds",
 ]
-
-

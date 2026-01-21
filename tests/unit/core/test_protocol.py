@@ -34,9 +34,7 @@ def test_apply_guardrail_stack_scores_once(tmp_path: Path) -> None:
     adapter = GuardrailAdapter(cg)
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    proto = TwoWorldProtocol(
-        logger=ChainedJSONLLogger(str(log_dir / "audit.jsonl"))
-    )
+    proto = TwoWorldProtocol(logger=ChainedJSONLLogger(str(log_dir / "audit.jsonl")))
 
     blocked, score, triggered = proto.apply_guardrail_stack([adapter], "attack")
     assert blocked is True

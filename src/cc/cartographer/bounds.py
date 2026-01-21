@@ -23,7 +23,7 @@ Tip: For power users, you can import the advanced classes directly:
 from __future__ import annotations
 
 from math import ceil, exp, log
-from typing import Iterable, Literal, Optional, Sequence, Tuple, Union, Dict, Any
+from typing import Any, Dict, Iterable, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -108,6 +108,7 @@ ROCArrayLike: TypeAlias = Union[
 
 # ---- Utilities (ROC arrays) ------------------------------------------------
 
+
 def _to_array_roc(
     arr: ROCArrayLike, *, clip: Literal["silent", "warn", "error"] = "silent"
 ) -> NDArray[np.float64]:
@@ -134,6 +135,7 @@ def _to_array_roc(
             raise ValueError(f"ROC contains out-of-range values; first few: {bad[:4]!r}")
         elif clip == "warn":
             import warnings
+
             warnings.warn("Clipping ROC values to [0,1].", RuntimeWarning, stacklevel=2)
         roc = np.clip(roc, 0.0, 1.0)
 
@@ -194,6 +196,7 @@ def _frechet_grid_OR(
 
 # ---- n-rail FH helpers -----------------------------------------------------
 
+
 def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     FH bounds for ∧_i A_i given per-rail trigger rates alphas = P(A_i) with shape (k, ...).
@@ -222,6 +225,7 @@ def fh_or_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], ND
 
 
 # ---- Public API: FH ceilings over ROC curves -------------------------------
+
 
 def _maybe_delegate_to_enterprise(fname: str, **kw: Any):
     """
@@ -268,8 +272,16 @@ def frechet_upper(
     )
     if maybe is not None:
         # Delegate entirely; enterprise variant matches this signature.
-        return maybe(roc_a, roc_b, comp=comp, clip=clip, add_anchors=add_anchors,
-                     use_gpu=use_gpu, uncertainty=uncertainty, n_bootstrap=n_bootstrap)
+        return maybe(
+            roc_a,
+            roc_b,
+            comp=comp,
+            clip=clip,
+            add_anchors=add_anchors,
+            use_gpu=use_gpu,
+            uncertainty=uncertainty,
+            n_bootstrap=n_bootstrap,
+        )
 
     # ---- Core implementation (numpy-only) ---------------------------------
     if add_anchors:
@@ -382,8 +394,10 @@ def envelope_over_rocs(
         A = _to_array_roc(roc_a, clip=clip)
         B = _to_array_roc(roc_b, clip=clip)
 
-    FPR_a = A[:, 0][:, None]; TPR_a = A[:, 1][:, None]
-    FPR_b = B[:, 0][None, :]; TPR_b = B[:, 1][None, :]
+    FPR_a = A[:, 0][:, None]
+    TPR_a = A[:, 1][:, None]
+    FPR_b = B[:, 0][None, :]
+    TPR_b = B[:, 1][None, :]
 
     comp_u = comp.upper()
     if comp_u == "AND":
@@ -398,6 +412,7 @@ def envelope_over_rocs(
 
 
 # ---- FH/Bernstein utilities at a fixed θ -----------------------------------
+
 
 def _validate_prob(name: str, x: float) -> None:
     if not (0.0 <= x <= 1.0) or not np.isfinite(x):
@@ -486,7 +501,9 @@ def bernstein_tail(
     if args:
         if len(args) == 3 and all(a is not None for a in args):
             n_pos, eps_pos, vbar_pos = args  # type: ignore
-            n = int(n_pos); eps = float(eps_pos); vbar = float(vbar_pos)
+            n = int(n_pos)
+            eps = float(eps_pos)
+            vbar = float(vbar_pos)
         else:
             raise TypeError(
                 "Legacy positional call must be bernstein_tail(n, eps, vbar). "
@@ -519,7 +536,7 @@ def bernstein_tail(
     if denom <= 0.0:
         return 1.0
 
-    exponent = - (n * eps * eps) / denom
+    exponent = -(n * eps * eps) / denom
     # Avoid under/overflow; map to [0,1].
     base = exp(exponent)
     prob = (2.0 * base) if two_sided else base
@@ -576,8 +593,9 @@ def cc_two_sided_bound(
         raise ValueError("t must be >= 0.")
     v1 = fh_var_envelope(I1)
     v0 = fh_var_envelope(I0)
-    s = bernstein_tail(t=t, n=n1, vbar=v1, D=D, two_sided=True) \
-      + bernstein_tail(t=t, n=n0, vbar=v0, D=D, two_sided=True)
+    s = bernstein_tail(t=t, n=n1, vbar=v1, D=D, two_sided=True) + bernstein_tail(
+        t=t, n=n0, vbar=v0, D=D, two_sided=True
+    )
     return min(1.0, s) if cap_at_one else s
 
 

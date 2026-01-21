@@ -24,16 +24,16 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
-
 import math
-import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
+import matplotlib.pyplot as plt
 
 # ---------------------------
 # IO + parsing
 # ---------------------------
+
 
 def _safe_get(d: Dict[str, Any], path: List[str], default: Any = None) -> Any:
     cur: Any = d
@@ -65,7 +65,9 @@ def rail_name_from_analysis(data: Dict[str, Any], fallback: str) -> str:
     return fallback or "rail"
 
 
-def extract_metrics(data: Dict[str, Any]) -> Tuple[float, float, float, Tuple[float, float], float, Optional[float]]:
+def extract_metrics(
+    data: Dict[str, Any],
+) -> Tuple[float, float, float, Tuple[float, float], float, Optional[float]]:
     """
     Returns: tpr, fpr, delta_empirical, (ci_lo, ci_hi), cc_max, alpha_cap
     """
@@ -95,6 +97,7 @@ def extract_metrics(data: Dict[str, Any]) -> Tuple[float, float, float, Tuple[fl
 # ---------------------------
 # Plotting
 # ---------------------------
+
 
 def make_delta_bar(
     rows: List[Tuple[str, float, Tuple[float, float]]],
@@ -161,8 +164,14 @@ def make_roc_grid(
     for name, tpr, fpr in rows:
         ax.scatter([fpr], [tpr], label=name)
         if annotate:
-            ax.annotate(f"({tpr:.2f}, {fpr:.3f})", (fpr, tpr), xytext=(5, 5),
-                        textcoords="offset points", fontsize=8, alpha=0.8)
+            ax.annotate(
+                f"({tpr:.2f}, {fpr:.3f})",
+                (fpr, tpr),
+                xytext=(5, 5),
+                textcoords="offset points",
+                fontsize=8,
+                alpha=0.8,
+            )
 
     ax.set_xlabel("FPR")
     ax.set_ylabel("TPR")
@@ -187,29 +196,36 @@ def make_roc_grid(
 # CLI
 # ---------------------------
 
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Week-6 figure generator (upgraded)")
     ap.add_argument("--inputs", nargs="+", required=True, help="One or more analysis.json files")
     ap.add_argument("--out-dir", required=True, help="Output directory for figures & table")
-    ap.add_argument("--alpha-cap", type=float, default=None,
-                    help="Optional α-cap to draw if not found in inputs")
-    ap.add_argument("--sort", choices=["name", "delta", "tpr", "fpr"], default="name",
-                    help="Sort order for Δ bars (default: name)")
-    ap.add_argument("--annotate", action="store_true",
-                    help="Annotate ROC points with (TPR,FPR)")
-    ap.add_argument("--svg", action="store_true",
-                    help="Also write SVG versions of figures")
-    ap.add_argument("--roc-grid", action="store_true",
-                    help="Force ROC grid even for single rail")
-    ap.add_argument("--delta-bars", action="store_true",
-                    help="Force Δ bars even for single rail")
+    ap.add_argument(
+        "--alpha-cap",
+        type=float,
+        default=None,
+        help="Optional α-cap to draw if not found in inputs",
+    )
+    ap.add_argument(
+        "--sort",
+        choices=["name", "delta", "tpr", "fpr"],
+        default="name",
+        help="Sort order for Δ bars (default: name)",
+    )
+    ap.add_argument("--annotate", action="store_true", help="Annotate ROC points with (TPR,FPR)")
+    ap.add_argument("--svg", action="store_true", help="Also write SVG versions of figures")
+    ap.add_argument("--roc-grid", action="store_true", help="Force ROC grid even for single rail")
+    ap.add_argument("--delta-bars", action="store_true", help="Force Δ bars even for single rail")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Collect rows
-    summary_rows: List[Tuple[str, float, float, float, Tuple[float, float], float, Optional[float]]] = []
+    summary_rows: List[
+        Tuple[str, float, float, float, Tuple[float, float], float, Optional[float]]
+    ] = []
     for p in args.inputs:
         pth = Path(p)
         data = load_analysis(pth)
@@ -238,8 +254,10 @@ def main() -> None:
     table_path = out_dir / "table.csv"
     with table_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["rail", "TPR", "FPR", "Δ_empirical", "CI_lo", "CI_hi", "CC_max", "alpha_cap"])
-        for (name, tpr, fpr, delta, ci, cc, a) in sorted_rows:
+        writer.writerow(
+            ["rail", "TPR", "FPR", "Δ_empirical", "CI_lo", "CI_hi", "CC_max", "alpha_cap"]
+        )
+        for name, tpr, fpr, delta, ci, cc, a in sorted_rows:
             writer.writerow([name, tpr, fpr, delta, ci[0], ci[1], cc, a])
 
     # Decide which figures to render by default
@@ -250,7 +268,9 @@ def main() -> None:
 
     # ---------------- Δ bars ----------------
     if args.delta_bars:
-        rows_for_bars = [(name, delta, ci) for (name, _tpr, _fpr, delta, ci, _cc, _a) in sorted_rows]
+        rows_for_bars = [
+            (name, delta, ci) for (name, _tpr, _fpr, delta, ci, _cc, _a) in sorted_rows
+        ]
         make_delta_bar(
             rows_for_bars,
             out_png=out_dir / "delta_bar.png",

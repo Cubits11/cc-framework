@@ -63,8 +63,10 @@ WorldBit = int
 # States / reasons
 # =============================================================================
 
+
 class ExperimentState(Enum):
     """Experiment execution states."""
+
     INITIALIZING = "initializing"
     RUNNING = "running"
     PAUSED = "paused"
@@ -75,6 +77,7 @@ class ExperimentState(Enum):
 
 class StoppingReason(Enum):
     """Reasons for early experiment termination."""
+
     MAX_SESSIONS = "max_sessions_reached"
     STATISTICAL_SIGNIFICANCE = "statistical_significance"
     FUTILITY = "futility_boundary"
@@ -87,9 +90,11 @@ class StoppingReason(Enum):
 # Result containers
 # =============================================================================
 
+
 @dataclass
 class BayesianTestResult:
     """Results from Bayesian sequential testing."""
+
     bayes_factor: float
     posterior_prob_h1: float
     should_stop: bool
@@ -102,8 +107,9 @@ class BayesianTestResult:
 @dataclass
 class CausalEffect:
     """Causal effect estimation result (difference in means)."""
+
     ate: float  # Average Treatment Effect
-    se: float   # Standard Error
+    se: float  # Standard Error
     ci_lower: float
     ci_upper: float
     p_value: float
@@ -113,6 +119,7 @@ class CausalEffect:
 @dataclass
 class SessionMetadata:
     """Enhanced metadata for an attack session."""
+
     session_id: str
     world_bit: int
     start_time: float
@@ -129,6 +136,7 @@ class SessionMetadata:
 @dataclass
 class ExperimentMetadata:
     """Enhanced experiment metadata."""
+
     experiment_id: str
     start_time: float
     end_time: float
@@ -144,6 +152,7 @@ class ExperimentMetadata:
 # =============================================================================
 # Statistical components
 # =============================================================================
+
 
 class BayesianSequentialTester:
     """
@@ -320,6 +329,7 @@ class CausalInferenceEngine:
 # Plugin architecture
 # =============================================================================
 
+
 class GuardrailPlugin(ABC):
     """Base class for guardrail plugins."""
 
@@ -340,7 +350,9 @@ class AttackStrategyPlugin(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def adapt(self, strategy: AttackStrategy, history: List[AttackResult]) -> None:  # pragma: no cover
+    def adapt(
+        self, strategy: AttackStrategy, history: List[AttackResult]
+    ) -> None:  # pragma: no cover
         raise NotImplementedError
 
 
@@ -365,6 +377,7 @@ class PluginManager:
 # =============================================================================
 # Distributed execution (threaded)
 # =============================================================================
+
 
 class SessionWorker:
     """Worker to execute an individual session (placeholder for real RPC)."""
@@ -417,7 +430,9 @@ class DistributedExecutor:
         futures = []
         for i in range(max(0, int(n_sessions))):
             worker = self.workers[i % self.n_workers]
-            cfg = session_configs[i] if i < len(session_configs) else {"session_id": f"dist_{i:06d}"}
+            cfg = (
+                session_configs[i] if i < len(session_configs) else {"session_id": f"dist_{i:06d}"}
+            )
             futures.append(self.executor.submit(worker.run_session, attacker, world_configs, cfg))
 
         results: List[AttackResult] = []
@@ -435,6 +450,7 @@ class DistributedExecutor:
 # =============================================================================
 # Metrics
 # =============================================================================
+
 
 class MetricsCollector:
     """Thread-safe metric accumulator with summary stats."""
@@ -474,6 +490,7 @@ class MetricsCollector:
 # =============================================================================
 # Main engine
 # =============================================================================
+
 
 class AdaptiveExperimentEngine:
     """
@@ -541,8 +558,12 @@ class AdaptiveExperimentEngine:
         if not specs:
             return []
 
-        key_payload = [{"name": s.name, "version": s.version, "params": s.params or {}} for s in specs]
-        cache_key = hashlib.sha256(json.dumps(key_payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        key_payload = [
+            {"name": s.name, "version": s.version, "params": s.params or {}} for s in specs
+        ]
+        cache_key = hashlib.sha256(
+            json.dumps(key_payload, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:16]
 
         if cache_key in self._guardrail_cache:
             return self._guardrail_cache[cache_key]
@@ -588,7 +609,9 @@ class AdaptiveExperimentEngine:
 
     # ----------------------------------------------------------------- evaluation
 
-    def apply_guardrail_stack(self, stack: List[Guardrail], text: str) -> Tuple[bool, float, List[str]]:
+    def apply_guardrail_stack(
+        self, stack: List[Guardrail], text: str
+    ) -> Tuple[bool, float, List[str]]:
         """Evaluate text through the guardrail stack, short-circuiting on block."""
         if not stack:
             return False, 0.0, []
@@ -610,7 +633,13 @@ class AdaptiveExperimentEngine:
                     triggered.append(guardrail.__class__.__name__)
                     break
             except Exception as e:  # pragma: no cover - defensive
-                self.logger.log({"event": "guardrail_error", "guardrail": guardrail.__class__.__name__, "error": str(e)})
+                self.logger.log(
+                    {
+                        "event": "guardrail_error",
+                        "guardrail": guardrail.__class__.__name__,
+                        "error": str(e),
+                    }
+                )
 
         return blocked, max_score, triggered
 
@@ -792,7 +821,7 @@ class AdaptiveExperimentEngine:
                 if (i + 1) % 10 == 0:
                     elapsed = time.time() - t0
                     rate = (i + 1) / max(elapsed, 1e-9)
-                    print(f"Session {i+1}/{max_sessions} | Rate: {rate:.2f} sess/s")
+                    print(f"Session {i + 1}/{max_sessions} | Rate: {rate:.2f} sess/s")
 
             t1 = time.time()
             self.state = ExperimentState.COMPLETED
@@ -823,7 +852,11 @@ class AdaptiveExperimentEngine:
         except KeyboardInterrupt:  # pragma: no cover - user interrupt
             self.state = ExperimentState.FAILED
             self.logger.log(
-                {"event": "experiment_interrupted", "experiment_id": experiment_id, "completed_sessions": len(session_results)}
+                {
+                    "event": "experiment_interrupted",
+                    "experiment_id": experiment_id,
+                    "completed_sessions": len(session_results),
+                }
             )
         except Exception as e:
             self.state = ExperimentState.FAILED
@@ -861,7 +894,9 @@ class AdaptiveExperimentEngine:
         Bayesian stopping disabled to produce exactly `n_sessions`.
         """
         if parallel and self.enable_distributed and hasattr(self, "distributed_executor"):
-            return self._run_distributed_experiment(attacker, world_configs, n_sessions, experiment_id)
+            return self._run_distributed_experiment(
+                attacker, world_configs, n_sessions, experiment_id
+            )
 
         # Disable Bayesian stopping to guarantee n_sessions
         old = self.enable_bayesian_stopping
@@ -892,8 +927,13 @@ class AdaptiveExperimentEngine:
             raise RuntimeError("Distributed execution not enabled")
         experiment_id = experiment_id or f"dist_exp_{int(time.time())}"
 
-        sess_cfgs = [{"session_id": f"{experiment_id}_s{i:06d}", "session_index": i} for i in range(max(0, int(n_sessions)))]
-        results = self.distributed_executor.run_sessions_parallel(attacker, world_configs, int(n_sessions), sess_cfgs)
+        sess_cfgs = [
+            {"session_id": f"{experiment_id}_s{i:06d}", "session_index": i}
+            for i in range(max(0, int(n_sessions)))
+        ]
+        results = self.distributed_executor.run_sessions_parallel(
+            attacker, world_configs, int(n_sessions), sess_cfgs
+        )
         self.results.extend(results)
         return results
 
@@ -1025,7 +1065,9 @@ class AdaptiveExperimentEngine:
         if metric_name:
             self.metrics_collector.record_metric(metric_name, float(delta))
 
-    def _save_checkpoint(self, experiment_id: str, results: List[AttackResult], final: bool = False) -> None:
+    def _save_checkpoint(
+        self, experiment_id: str, results: List[AttackResult], final: bool = False
+    ) -> None:
         """Write a JSON checkpoint with experiment snapshot."""
         ckpt_dir = Path("checkpoints") / experiment_id
         ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -1059,7 +1101,9 @@ class AdaptiveExperimentEngine:
                 }
             )
         except Exception as e:  # pragma: no cover - IO errors
-            self.logger.log({"event": "checkpoint_save_error", "experiment_id": experiment_id, "error": str(e)})
+            self.logger.log(
+                {"event": "checkpoint_save_error", "experiment_id": experiment_id, "error": str(e)}
+            )
             raise
 
     # -------------------------------------------------------------------- public
@@ -1106,6 +1150,7 @@ class AdaptiveExperimentEngine:
 # =============================================================================
 # Backward compatible façade
 # =============================================================================
+
 
 class TwoWorldProtocol(AdaptiveExperimentEngine):
     """

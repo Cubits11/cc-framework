@@ -5,10 +5,10 @@ import math
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT))          # so `import scripts` works
+sys.path.insert(0, str(REPO_ROOT))  # so `import scripts` works
 sys.path.insert(0, str(REPO_ROOT / "src"))  # so `import cc...` works even without PYTHONPATH
 
 import numpy as np
@@ -61,11 +61,51 @@ def toy_pipeline(tmp_path_factory):
     def run(cmd: Sequence[str]) -> None:
         subprocess.run(cmd, check=True)
 
-    run([sys.executable, "scripts/make_week7_runs.py", "--config", str(cfg_path), "--outdir", str(outdir), "--audit", str(audit)])
-    run([sys.executable, "scripts/compute_independence.py", "--in", str(outdir), "--out", str(outdir)])
-    run([sys.executable, "scripts/compute_fh_envelope.py", "--in", str(outdir), "--out", str(outdir)])
+    run(
+        [
+            sys.executable,
+            "scripts/make_week7_runs.py",
+            "--config",
+            str(cfg_path),
+            "--outdir",
+            str(outdir),
+            "--audit",
+            str(audit),
+        ]
+    )
+    run(
+        [
+            sys.executable,
+            "scripts/compute_independence.py",
+            "--in",
+            str(outdir),
+            "--out",
+            str(outdir),
+        ]
+    )
+    run(
+        [
+            sys.executable,
+            "scripts/compute_fh_envelope.py",
+            "--in",
+            str(outdir),
+            "--out",
+            str(outdir),
+        ]
+    )
     run([sys.executable, "scripts/make_week7_figs.py", "--in", str(outdir), "--out", str(figs)])
-    run([sys.executable, "scripts/write_week7_memo.py", "--summary", str(summary), "--out", str(memo), "--points", str(outdir)])
+    run(
+        [
+            sys.executable,
+            "scripts/write_week7_memo.py",
+            "--summary",
+            str(summary),
+            "--out",
+            str(memo),
+            "--points",
+            str(outdir),
+        ]
+    )
 
     points = []
     for path in sorted(outdir.glob("point_*.json")):
@@ -149,7 +189,9 @@ def test_monotonicity_additional_rail():
         extra_tpr = rng.uniform(0.4, 0.9)
         extra_fpr = rng.uniform(0.01, 0.1)
         env_two_and = fh_envelope("parallel_and", base_tprs, base_fprs)
-        env_three_and = fh_envelope("parallel_and", base_tprs + [extra_tpr], base_fprs + [extra_fpr])
+        env_three_and = fh_envelope(
+            "parallel_and", base_tprs + [extra_tpr], base_fprs + [extra_fpr]
+        )
         assert env_three_and.tpr_upper <= env_two_and.tpr_upper + 1e-9
         assert env_three_and.tpr_lower <= env_two_and.tpr_lower + 1e-9
         env_two_or = fh_envelope("serial_or", base_tprs, base_fprs)
@@ -229,7 +271,9 @@ def test_bca_beats_percentile_coverage():
     cover_perc = []
     for _ in range(80):
         data = rng.binomial(1, true_p, size=90)
-        bca = bca_bootstrap(data, lambda xs: float(np.mean(xs[0])), rng=rng.integers(0, 10_000), n_bootstrap=500)
+        bca = bca_bootstrap(
+            data, lambda xs: float(np.mean(xs[0])), rng=rng.integers(0, 10_000), n_bootstrap=500
+        )
         boots = np.array([np.mean(data[rng.integers(0, data.size, data.size)]) for _ in range(500)])
         lo, hi = _percentile_interval(boots)
         cover_bca.append(bca.lower <= true_p <= bca.upper)
@@ -244,8 +288,12 @@ def test_bca_width_shrinks_with_sample_size():
     rng = np.random.default_rng(8)
     small = rng.binomial(1, 0.7, size=40)
     large = rng.binomial(1, 0.7, size=400)
-    width_small = bca_bootstrap(small, lambda xs: float(np.mean(xs[0])), rng=0, n_bootstrap=400).width
-    width_large = bca_bootstrap(large, lambda xs: float(np.mean(xs[0])), rng=1, n_bootstrap=400).width
+    width_small = bca_bootstrap(
+        small, lambda xs: float(np.mean(xs[0])), rng=0, n_bootstrap=400
+    ).width
+    width_large = bca_bootstrap(
+        large, lambda xs: float(np.mean(xs[0])), rng=1, n_bootstrap=400
+    ).width
     assert width_large < width_small
 
 
@@ -281,7 +329,6 @@ def test_classification_destructive_case():
 
 
 def test_regime_labels_follow_delta_sign(toy_pipeline):
-    points = []
     for raw in toy_pipeline["points"]:
         delta_j = raw["empirical"]["j"] - max(m["j"] for m in raw["per_rail"].values())
         label = raw["classification"]["label"]
@@ -355,7 +402,21 @@ def test_week7_pipeline_completes_quickly(tmp_path):
     cfg_path = _make_toy_config(tmp_path / "grid.json")
     outdir = tmp_path / "summaries"
     audit = tmp_path / "audit.jsonl"
-    subprocess.run([sys.executable, "scripts/make_week7_runs.py", "--config", str(cfg_path), "--outdir", str(outdir), "--audit", str(audit), "--limit", "1"], check=True)
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_week7_runs.py",
+            "--config",
+            str(cfg_path),
+            "--outdir",
+            str(outdir),
+            "--audit",
+            str(audit),
+            "--limit",
+            "1",
+        ],
+        check=True,
+    )
     assert audit.exists()
     first_point = next(outdir.glob("point_*.json"))
     with first_point.open("r", encoding="utf-8") as fh:
@@ -369,9 +430,55 @@ def test_summary_memo_generation(tmp_path):
     audit = tmp_path / "audit.jsonl"
     summary = tmp_path / "summary.json"
     memo = tmp_path / "memo.md"
-    subprocess.run([sys.executable, "scripts/make_week7_runs.py", "--config", str(cfg_path), "--outdir", str(outdir), "--audit", str(audit), "--limit", "1"], check=True)
-    subprocess.run([sys.executable, "scripts/compute_independence.py", "--in", str(outdir), "--out", str(outdir)], check=True)
-    subprocess.run([sys.executable, "scripts/compute_fh_envelope.py", "--in", str(outdir), "--out", str(outdir)], check=True)
-    subprocess.run([sys.executable, "scripts/write_week7_memo.py", "--summary", str(summary), "--out", str(memo), "--points", str(outdir)], check=True)
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_week7_runs.py",
+            "--config",
+            str(cfg_path),
+            "--outdir",
+            str(outdir),
+            "--audit",
+            str(audit),
+            "--limit",
+            "1",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/compute_independence.py",
+            "--in",
+            str(outdir),
+            "--out",
+            str(outdir),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/compute_fh_envelope.py",
+            "--in",
+            str(outdir),
+            "--out",
+            str(outdir),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/write_week7_memo.py",
+            "--summary",
+            str(summary),
+            "--out",
+            str(memo),
+            "--points",
+            str(outdir),
+        ],
+        check=True,
+    )
     assert summary.exists()
     assert memo.exists()

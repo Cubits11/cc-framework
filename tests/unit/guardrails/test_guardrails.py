@@ -7,6 +7,7 @@ def test_keyword_blocker_exact_and_fuzzy():
     assert kb.score("leak TOKEN now") > 0.0
     assert kb.blocks("api_key=abcd") is (kb.score("api_key=abcd") > kb.blocking_threshold)
 
+
 def test_keyword_blocker_calibration_ties_pass():
     benign = ["hello world", "nice day", "just chatting"]
     kb = KeywordBlocker(["secret"], KeywordBlockerConfig(verbose=False, initial_threshold=0.0))

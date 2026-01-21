@@ -177,7 +177,12 @@ def test_empirical_from_counts_and_rule_is_p11():
 def test_empirical_from_counts_rejects_bad_rule():
     with pytest.raises(ValueError, match="Invalid rule"):
         sampling.empirical_from_counts(
-            n=10, n00=1, n01=2, n10=3, n11=4, rule="XOR"  # type: ignore[arg-type]
+            n=10,
+            n00=1,
+            n01=2,
+            n10=3,
+            n11=4,
+            rule="XOR",  # type: ignore[arg-type]
         )
 
 

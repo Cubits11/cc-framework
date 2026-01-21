@@ -1,11 +1,10 @@
-import math
 import numpy as np
 import pandas as pd
 import pytest
 
-from experiments.correlation_cliff.simulate.config import SimConfig, ConfigError
-from experiments.correlation_cliff.simulate import utils as U
 from experiments.correlation_cliff.simulate import core
+from experiments.correlation_cliff.simulate import utils as U
+from experiments.correlation_cliff.simulate.config import SimConfig
 
 
 def _marginals():
@@ -65,16 +64,33 @@ def test_simulate_grid_stable_per_cell_order_invariant():
     cfg_a = _base_cfg(seed_policy="stable_per_cell", lambdas=[0.0, 0.5, 1.0])
     cfg_b = _base_cfg(seed_policy="stable_per_cell", lambdas=[1.0, 0.5, 0.0])  # reordered
 
-    df_a = core.simulate_grid(cfg_a).sort_values(["lambda", "rep"], kind="mergesort").reset_index(drop=True)
-    df_b = core.simulate_grid(cfg_b).sort_values(["lambda", "rep"], kind="mergesort").reset_index(drop=True)
+    df_a = (
+        core.simulate_grid(cfg_a)
+        .sort_values(["lambda", "rep"], kind="mergesort")
+        .reset_index(drop=True)
+    )
+    df_b = (
+        core.simulate_grid(cfg_b)
+        .sort_values(["lambda", "rep"], kind="mergesort")
+        .reset_index(drop=True)
+    )
 
     # Select a stable subset of columns that must match exactly.
     cols = [
-        "lambda", "rep",
-        "n00_w0", "n01_w0", "n10_w0", "n11_w0",
-        "n00_w1", "n01_w1", "n10_w1", "n11_w1",
-        "JC_hat", "CC_hat",
-        "worlds_valid", "row_ok",
+        "lambda",
+        "rep",
+        "n00_w0",
+        "n01_w0",
+        "n10_w0",
+        "n11_w0",
+        "n00_w1",
+        "n01_w1",
+        "n10_w1",
+        "n11_w1",
+        "JC_hat",
+        "CC_hat",
+        "worlds_valid",
+        "row_ok",
     ]
     for c in cols:
         assert c in df_a.columns and c in df_b.columns
@@ -87,8 +103,16 @@ def test_simulate_grid_sequential_is_order_dependent():
     cfg_a = _base_cfg(seed_policy="sequential", lambdas=[0.0, 0.5, 1.0])
     cfg_b = _base_cfg(seed_policy="sequential", lambdas=[1.0, 0.5, 0.0])
 
-    df_a = core.simulate_grid(cfg_a).sort_values(["lambda", "rep"], kind="mergesort").reset_index(drop=True)
-    df_b = core.simulate_grid(cfg_b).sort_values(["lambda", "rep"], kind="mergesort").reset_index(drop=True)
+    df_a = (
+        core.simulate_grid(cfg_a)
+        .sort_values(["lambda", "rep"], kind="mergesort")
+        .reset_index(drop=True)
+    )
+    df_b = (
+        core.simulate_grid(cfg_b)
+        .sort_values(["lambda", "rep"], kind="mergesort")
+        .reset_index(drop=True)
+    )
 
     # Very high probability these differ; we check a concrete column.
     assert not np.array_equal(df_a["n11_w0"].to_numpy(), df_b["n11_w0"].to_numpy())

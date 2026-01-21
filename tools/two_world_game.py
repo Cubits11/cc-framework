@@ -93,7 +93,9 @@ class TwoWorldGame:
             if log_dir and not os.path.exists(log_dir):
                 os.makedirs(log_dir, exist_ok=True)
             with open(log_path, "w", newline="", encoding="utf-8") as f:
-                csv.writer(f).writerow(["round", "query_type", "response_A", "response_B", "logLR", "posterior_H0"])
+                csv.writer(f).writerow(
+                    ["round", "query_type", "response_A", "response_B", "logLR", "posterior_H0"]
+                )
 
     def _latency_ms(self, cfg: WorldConfig) -> int:
         mu = cfg.mean_latency_ms + cfg.extra_delay_ms
@@ -144,6 +146,7 @@ class TwoWorldGame:
     def _epsilon_policy(self) -> str:
         if random.random() < self.epsilon:
             return random.choice(["benign", "attack"])
+
         def diff_rate(qtype: str) -> float:
             ca, cb = self.counts["A"], self.counts["B"]
             if qtype == "benign":
@@ -153,6 +156,7 @@ class TwoWorldGame:
                 ra = ca["a_block"] / ca["attack"] if ca["attack"] else 0.0
                 rb = cb["a_block"] / cb["attack"] if cb["attack"] else 0.0
             return abs(ra - rb)
+
         return "attack" if diff_rate("attack") >= diff_rate("benign") else "benign"
 
     def _info_policy(self) -> str:
@@ -161,11 +165,16 @@ class TwoWorldGame:
             llr = 0.0
             for respA in ("Allowed", "Blocked"):
                 for respB in ("Allowed", "Blocked"):
-                    pH0 = self._p_outcome("A", qtype, respA, "H0") * self._p_outcome("B", qtype, respB, "H0")
-                    pH1 = self._p_outcome("A", qtype, respA, "H1") * self._p_outcome("B", qtype, respB, "H1")
+                    pH0 = self._p_outcome("A", qtype, respA, "H0") * self._p_outcome(
+                        "B", qtype, respB, "H0"
+                    )
+                    pH1 = self._p_outcome("A", qtype, respA, "H1") * self._p_outcome(
+                        "B", qtype, respB, "H1"
+                    )
                     if pH0 > 0.0 and pH1 > 0.0:
                         llr += pH0 * math.log(pH0 / pH1)
             return llr
+
         return "attack" if expected_llr("attack") >= expected_llr("benign") else "benign"
 
     def choose_query(self) -> str:
@@ -200,7 +209,9 @@ class TwoWorldGame:
 
             if self.log_path:
                 with open(self.log_path, "a", newline="", encoding="utf-8") as f:
-                    csv.writer(f).writerow([i, qtype, respA, respB, f"{self.log_lr:.6f}", f"{self.posterior_H0():.6f}"])
+                    csv.writer(f).writerow(
+                        [i, qtype, respA, respB, f"{self.log_lr:.6f}", f"{self.posterior_H0():.6f}"]
+                    )
 
             if online:
                 print(f"  logLR = {self.log_lr:+.3f}, posterior(H0) = {self.posterior_H0():.3f}")
@@ -229,7 +240,7 @@ class TwoWorldGame:
 
     def _attack_pairs(self) -> List[Tuple[int, int]]:
         pairs: List[Tuple[int, int]] = []
-        for (_i, qtype, respA, respB) in self.history:
+        for _i, qtype, respA, respB in self.history:
             if qtype != "attack":
                 continue
             a = 1 if respA == "Allowed" else 0
@@ -291,20 +302,22 @@ class TwoWorldGame:
             print(f"  p1 = P(Allowed | W1) = {p1:.3f}")
             print(f"  Ĵ = p0 − p1 = {j:.3f}  (95% CI: {lo:.3f}, {hi:.3f})")
 
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Two-world attack game)")
-    p.add_argument("-n","--rounds", type=int, default=20)
+    p.add_argument("-n", "--rounds", type=int, default=20)
     p.add_argument("--seed", type=int, default=None)
-    p.add_argument("--difficulty", choices=["easy","normal","hard"], default="normal")
+    p.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal")
     p.add_argument("--leaky-timing", action="store_true")
     p.add_argument("--bot", action="store_true")
     p.add_argument("--epsilon", type=float, default=0.15)
-    p.add_argument("--strategy", choices=["epsilon","info"], default="info")
+    p.add_argument("--strategy", choices=["epsilon", "info"], default="info")
     p.add_argument("--online", action="store_true")
     p.add_argument("--sprt-alpha", type=float, default=0.05)
     p.add_argument("--sprt-beta", type=float, default=0.05)
     p.add_argument("--log", type=str, default=None)
     return p.parse_args(argv)
+
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     a = parse_args(argv)
@@ -321,6 +334,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         log_path=a.log,
     )
     game.play(online=a.online)
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -23,8 +23,9 @@ def wilson_ci(successes: int, n: int, alpha: float = 0.05) -> Tuple[float, float
     return float(lower), float(upper)
 
 
-def bootstrap_ci(samples: Iterable[float], n_resamples: int = 200, alpha: float = 0.05,
-                  random_state: int = 42) -> Tuple[float, float]:
+def bootstrap_ci(
+    samples: Iterable[float], n_resamples: int = 200, alpha: float = 0.05, random_state: int = 42
+) -> Tuple[float, float]:
     """Percentile bootstrap interval for a scalar statistic.
 
     If ``n_resamples`` ≤ 0 the function simply returns the alpha/2 and (1-alpha/2)

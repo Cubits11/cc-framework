@@ -13,13 +13,13 @@ Usage:
         [--threshold-j 0.05 --threshold-euclid 0.02 ...]
 """
 
-import argparse, json
+import argparse
+import json
 from pathlib import Path
-from typing import Dict, Any, Iterable, Optional
+from typing import Dict, Iterable, Optional
 
-import pandas as pd
+from cc.analysis.alternative_metrics import analyze_disagreements, compare_all_metrics, kappa_matrix
 
-from cc.analysis.alternative_metrics import compare_all_metrics, kappa_matrix, analyze_disagreements
 
 def load_results(path: Path) -> Dict[str, Dict]:
     """Load JSONL results and map to the required metric dictionary."""
@@ -41,6 +41,7 @@ def load_results(path: Path) -> Dict[str, Dict]:
             }
     return configs
 
+
 def main(argv: Optional[Iterable[str]] = None) -> None:
     ap = argparse.ArgumentParser(description="Compare interference metrics across configurations.")
     ap.add_argument("--results", required=True)
@@ -49,7 +50,8 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
     args = ap.parse_args(argv)
     configs = load_results(Path(args.results))
     df = compare_all_metrics(configs)
-    out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_dir / "comparisons.csv", index=False)
     kappas = kappa_matrix(df, ["youden_class", "euclidean_class", "cost_class", "fh_class"])
     kappas.to_csv(out_dir / "kappa_matrix.csv")

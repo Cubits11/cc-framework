@@ -16,12 +16,11 @@ Research-OS invariants:
 - Validate theory surface eagerly: crash early, crash loud.
 """
 
-from dataclasses import dataclass
-from importlib import import_module
-from typing import Any, Callable, Dict, Literal, Mapping, Optional, Sequence
-
 import logging
 import math
+from importlib import import_module
+from typing import Any, Callable, Dict, Literal, Optional
+
 import numpy as np
 
 LOG = logging.getLogger(__name__)
@@ -77,7 +76,6 @@ def _import_theory_module() -> tuple[Any, str]:
     # Compute parent package robustly.
     pkg = __package__ or ""
     parent = pkg.rsplit(".", 1)[0] if "." in pkg else ""
-    attempted = f"{parent}.theory" if parent else "theory"
 
     # 1) Package import
     if parent:
@@ -128,7 +126,9 @@ def _import_theory_module() -> tuple[Any, str]:
             "simulate.utils imported 'theory' in script mode from unexpected location: %s", origin
         )
 
-    LOG.debug("Imported theory module in %s mode from %s", mode, getattr(T, "__file__", "<unknown>"))
+    LOG.debug(
+        "Imported theory module in %s mode from %s", mode, getattr(T, "__file__", "<unknown>")
+    )
     return T, mode
 
 
@@ -147,7 +147,9 @@ p11_fh_linear = T.p11_fh_linear
 pC_from_joint = T.pC_from_joint
 
 # Optional: reference overlay helper (never assumed path-consistent)
-compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(T, "compute_metrics_for_lambda", None)
+compute_metrics_for_lambda: Optional[Callable[..., Dict[str, float]]] = getattr(
+    T, "compute_metrics_for_lambda", None
+)
 
 
 # -----------------------------------------------------------------------------
@@ -226,7 +228,9 @@ def build_linear_lambda_grid(
 
     grid = np.asarray(grid, dtype=dtype)
     if grid.ndim != 1 or grid.size != num_i:
-        raise RuntimeError(f"Internal error: expected 1D grid of length {num_i}, got shape {grid.shape}")
+        raise RuntimeError(
+            f"Internal error: expected 1D grid of length {num_i}, got shape {grid.shape}"
+        )
     if not np.all(np.isfinite(grid)):
         raise RuntimeError("Internal error: produced non-finite grid values.")
     if grid.size >= 2 and not np.all(np.diff(grid) > 0):

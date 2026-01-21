@@ -17,7 +17,8 @@ import json
 import unicodedata
 from typing import Any, Dict
 
-from hypothesis import assume, given, strategies as st
+from hypothesis import assume, given
+from hypothesis import strategies as st
 
 from cc.core.models import _hash_json, _hash_text
 
@@ -109,7 +110,7 @@ def test_hash_json_collision_smoke_for_unique_canonical_inputs():
     NOTE:
         This is NOT a cryptographic proof, just a regression tripwire.
     """
-    objs = [{"k": i, "v": i * 2, "w": i ** 2} for i in range(10_000)]
+    objs = [{"k": i, "v": i * 2, "w": i**2} for i in range(10_000)]
     canonicals = {canonical_json(o) for o in objs}
     assert len(canonicals) == len(objs)
 
@@ -195,6 +196,7 @@ def test_hash_text_determinism_and_salt(text: str, salt: bytes):
     h_salted = _hash_text(text, salt=salt)
     assert h_salted != h_plain1
 
+
 @given(st.text(min_size=0, max_size=50))
 def test_hash_text_bytes_and_str_match_for_valid_utf8(s: str):
     """
@@ -214,7 +216,6 @@ def test_hash_text_bytes_and_str_match_for_valid_utf8(s: str):
     h_bytes = _hash_text(data)
     h_str = _hash_text(s)
     assert h_bytes == h_str
-
 
 
 @given(st.binary(min_size=1, max_size=64))

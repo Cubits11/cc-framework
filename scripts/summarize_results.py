@@ -21,8 +21,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def load_final_results(path: Path) -> List[Dict[str, Any]]:
@@ -67,9 +67,19 @@ def write_csv(stats: Dict[int, Dict[str, float]], out_csv: Path) -> None:
             w.writerow([wb, s["n"], s["mean"], s["sd"]])
 
 
-def make_histogram(stats: Dict[int, Dict[str, float]], records: List[Dict[str, Any]], out_png: Path) -> None:
-    x0 = [float(r["utility_score"]) for r in records if int(r.get("world_bit", -1)) == 0 and "utility_score" in r]
-    x1 = [float(r["utility_score"]) for r in records if int(r.get("world_bit", -1)) == 1 and "utility_score" in r]
+def make_histogram(
+    stats: Dict[int, Dict[str, float]], records: List[Dict[str, Any]], out_png: Path
+) -> None:
+    x0 = [
+        float(r["utility_score"])
+        for r in records
+        if int(r.get("world_bit", -1)) == 0 and "utility_score" in r
+    ]
+    x1 = [
+        float(r["utility_score"])
+        for r in records
+        if int(r.get("world_bit", -1)) == 1 and "utility_score" in r
+    ]
     fig, ax = plt.subplots(figsize=(7, 4))
     bins = 20
     if x0:

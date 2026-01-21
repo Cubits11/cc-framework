@@ -1,5 +1,6 @@
 # tests/unit/test_vendor_forward_compat.py
 """Forward-compatibility: new vendor fields must not leak prompt data."""
+
 from __future__ import annotations
 
 import json
@@ -38,11 +39,14 @@ def _generator_with_new_fields(prompt_text: str):
     return "safe", 0.1, {"new_prompt_field": prompt_text, "nested": {"prompt": prompt_text}}
 
 
-@pytest.mark.parametrize("adapter", [
-    GuardrailsAIAdapter(guard=_GuardWithNewFields()),
-    LlamaGuardAdapter(generator=_generator_with_new_fields, model_name="mock-llama-guard"),
-    NeMoGuardrailsAdapter(rails=_RailsWithNewFields()),
-])
+@pytest.mark.parametrize(
+    "adapter",
+    [
+        GuardrailsAIAdapter(guard=_GuardWithNewFields()),
+        LlamaGuardAdapter(generator=_generator_with_new_fields, model_name="mock-llama-guard"),
+        NeMoGuardrailsAdapter(rails=_RailsWithNewFields()),
+    ],
+)
 def test_vendor_forward_compat_no_leak(adapter) -> None:
     prompt = "sensitive prompt"
     decision = adapter.check(prompt, None, {})

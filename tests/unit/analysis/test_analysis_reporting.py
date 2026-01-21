@@ -1,6 +1,7 @@
 """Unit tests for analysis utilities and reporting helpers."""
 
 import hashlib
+
 import pytest
 
 from cc.analysis.cc_estimation import estimate_cc_metrics
@@ -20,7 +21,6 @@ def _synthetic_results():
     # World 0: 3 successes out of 5 -> p0 = 0.6
     successes_w0 = [True, True, False, True, False]
     for i, success in enumerate(successes_w0):
-        attack_id = f"a{i}"
         results.append(
             mk_attack_result(
                 world_bit=0,
@@ -35,7 +35,6 @@ def _synthetic_results():
     successes_w1 = [False, False, True, False, False]
     offset = len(successes_w0)
     for i, success in enumerate(successes_w1, start=offset):
-        attack_id = f"a{i}"
         results.append(
             mk_attack_result(
                 world_bit=1,

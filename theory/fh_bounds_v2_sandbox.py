@@ -63,6 +63,7 @@ MATHEMATICAL_TOLERANCE: float = 1e-9
 
 class FHBoundsError(Exception):
     """Base exception for all errors raised by the fh_bounds module."""
+
     pass
 
 
@@ -75,6 +76,7 @@ class FHBoundViolationError(FHBoundsError):
         * probability outside [0, 1]
         * structural mismatches such as k_rails inconsistency
     """
+
     pass
 
 
@@ -90,6 +92,7 @@ class CompositionIncoherenceError(FHBoundsError):
     If these equalities fail beyond MATHEMATICAL_TOLERANCE, this exception is
     raised.
     """
+
     pass
 
 
@@ -101,6 +104,7 @@ class NumericalInstabilityError(FHBoundsError):
     MATHEMATICAL_TOLERANCE but are not exactly equal, this suggests that a
     mathematically sharp identity has been computed in an unstable way.
     """
+
     pass
 
 
@@ -111,6 +115,7 @@ class InvalidProbabilityError(FHBoundsError):
     This covers values outside [0, 1], NaN, Inf, or non-numeric objects that
     cannot be cast to float.
     """
+
     pass
 
 
@@ -209,6 +214,7 @@ class FHBounds:
         * If ``|upper − lower| < MATHEMATICAL_TOLERANCE`` but ``upper != lower``
           (raw inequality), a NumericalInstabilityError is raised.
     """
+
     lower: float
     upper: float
     marginals: Sequence[float]
@@ -236,23 +242,16 @@ class FHBounds:
 
         if len(self.marginals) != self.k_rails:
             raise FHBoundViolationError(
-                f"len(marginals)={len(self.marginals)} inconsistent with "
-                f"k_rails={self.k_rails}"
+                f"len(marginals)={len(self.marginals)} inconsistent with k_rails={self.k_rails}"
             )
 
         # Domain constraints for the composite probability
         if not _approx_ge(lower, 0.0):
-            raise FHBoundViolationError(
-                f"lower={lower} is negative beyond tolerance"
-            )
+            raise FHBoundViolationError(f"lower={lower} is negative beyond tolerance")
         if not _approx_le(upper, 1.0):
-            raise FHBoundViolationError(
-                f"upper={upper} exceeds 1 beyond tolerance"
-            )
+            raise FHBoundViolationError(f"upper={upper} exceeds 1 beyond tolerance")
         if not _approx_le(lower, upper):
-            raise FHBoundViolationError(
-                f"lower={lower} exceeds upper={upper} beyond tolerance"
-            )
+            raise FHBoundViolationError(f"lower={lower} exceeds upper={upper} beyond tolerance")
 
         # Numerical instability check: suspiciously tight but not equal
         if abs(upper - lower) < MATHEMATICAL_TOLERANCE and upper != lower:
@@ -288,6 +287,7 @@ class RailPerformance:
         * j lies in [-1, 1].
         * j is numerically consistent with tpr − fpr.
     """
+
     tpr: float
     fpr: float
     j: float
@@ -308,9 +308,7 @@ class RailPerformance:
 
         computed_j = tpr - fpr
         if abs(j - computed_j) > MATHEMATICAL_TOLERANCE:
-            raise ValueError(
-                f"j={j} inconsistent with tpr − fpr={computed_j}"
-            )
+            raise ValueError(f"j={j} inconsistent with tpr − fpr={computed_j}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,6 +342,7 @@ class ComposedJBounds:
               j_lower ≈ tpr_bounds.lower − fpr_bounds.upper
               j_upper ≈ tpr_bounds.upper − fpr_bounds.lower
     """
+
     j_lower: float
     j_upper: float
     tpr_bounds: FHBounds
@@ -362,13 +361,9 @@ class ComposedJBounds:
             raise FHBoundViolationError(f"j_upper is not finite: {j_upper}")
 
         if j_lower < -1.0 - MATHEMATICAL_TOLERANCE:
-            raise FHBoundViolationError(
-                f"j_lower={j_lower} < -1 beyond tolerance"
-            )
+            raise FHBoundViolationError(f"j_lower={j_lower} < -1 beyond tolerance")
         if j_upper > 1.0 + MATHEMATICAL_TOLERANCE:
-            raise FHBoundViolationError(
-                f"j_upper={j_upper} > 1 beyond tolerance"
-            )
+            raise FHBoundViolationError(f"j_upper={j_upper} > 1 beyond tolerance")
         if not _approx_le(j_lower, j_upper):
             raise FHBoundViolationError(
                 f"j_lower={j_lower} exceeds j_upper={j_upper} beyond tolerance"
@@ -396,14 +391,11 @@ class ComposedJBounds:
             for i, j in enumerate(self.individual_j_stats):
                 jf = float(j)
                 if math.isnan(jf) or math.isinf(jf) or not (-1.0 <= jf <= 1.0):
-                    raise FHBoundViolationError(
-                        f"individual_j_stats[{i}]={jf} not in [-1, 1]"
-                    )
+                    raise FHBoundViolationError(f"individual_j_stats[{i}]={jf} not in [-1, 1]")
 
         if self.composition_type not in ("serial_or", "parallel_and"):
             raise FHBoundViolationError(
-                f"composition_type={self.composition_type!r} "
-                "must be 'serial_or' or 'parallel_and'"
+                f"composition_type={self.composition_type!r} must be 'serial_or' or 'parallel_and'"
             )
 
         # Coherence with TPR/FPR bounds
@@ -857,8 +849,8 @@ def independence_serial_or_rates(
     prod_one_minus_tpr = 1.0
     prod_one_minus_fpr = 1.0
     for tpr, fpr in zip(individual_tprs, individual_fprs):
-        prod_one_minus_tpr *= (1.0 - float(tpr))
-        prod_one_minus_fpr *= (1.0 - float(fpr))
+        prod_one_minus_tpr *= 1.0 - float(tpr)
+        prod_one_minus_fpr *= 1.0 - float(fpr)
 
     tpr_sys = 1.0 - prod_one_minus_tpr
     fpr_sys = 1.0 - prod_one_minus_fpr
@@ -1018,11 +1010,7 @@ def compute_composability_interference_index(
     j_best = float(bounds.j_upper)
 
     # Determine baseline
-    if (
-        use_independence_baseline
-        and individual_tprs is not None
-        and individual_fprs is not None
-    ):
+    if use_independence_baseline and individual_tprs is not None and individual_fprs is not None:
         validate_probability_vector(individual_tprs, "individual_tprs")
         validate_probability_vector(individual_fprs, "individual_fprs")
 
@@ -1045,9 +1033,7 @@ def compute_composability_interference_index(
         # FH midpoint baseline (data-independent, neutral prior)
         j_baseline = 0.5 * (j_worst + j_best)
         baseline_type = "fh_midpoint"
-        if use_independence_baseline and (
-            individual_tprs is None or individual_fprs is None
-        ):
+        if use_independence_baseline and (individual_tprs is None or individual_fprs is None):
             notes.append(
                 "use_independence_baseline=True but individual rates not provided; "
                 "using FH midpoint as neutral baseline instead."
@@ -1065,12 +1051,8 @@ def compute_composability_interference_index(
         kappa = (observed_j - j_baseline) / denom
 
     # Within-bounds checks
-    baseline_within_bounds = (
-        _approx_ge(j_baseline, j_worst) and _approx_le(j_baseline, j_best)
-    )
-    observed_within_bounds = (
-        _approx_ge(observed_j, j_worst) and _approx_le(observed_j, j_best)
-    )
+    baseline_within_bounds = _approx_ge(j_baseline, j_worst) and _approx_le(j_baseline, j_best)
+    observed_within_bounds = _approx_ge(observed_j, j_worst) and _approx_le(observed_j, j_best)
 
     if not observed_within_bounds:
         notes.append(
@@ -1317,8 +1299,7 @@ def _extract_success_flag(r: Any, idx: int) -> bool:
     s = getattr(r, "success")
     if s is None:
         raise ValueError(
-            f"AttackResult at index {idx} has success=None; cannot infer "
-            "detection outcome."
+            f"AttackResult at index {idx} has success=None; cannot infer detection outcome."
         )
     return bool(s)
 
@@ -1372,13 +1353,10 @@ def empirical_j_from_attack_results(
         try:
             observed_j = float(compute_j_statistic(results))
         except Exception as e:
-            raise ValueError(
-                f"compute_j_statistic raised {type(e).__name__}: {e}"
-            ) from e
+            raise ValueError(f"compute_j_statistic raised {type(e).__name__}: {e}") from e
         if not (-1.0 <= observed_j <= 1.0):
             raise ValueError(
-                f"compute_j_statistic returned invalid J={observed_j}; "
-                "expected value in [-1, 1]"
+                f"compute_j_statistic returned invalid J={observed_j}; expected value in [-1, 1]"
             )
         # Without world semantics we cannot construct a meaningful Wilson CI.
         warnings.warn(
@@ -1620,10 +1598,7 @@ def verify_fh_bound_properties(verbose: bool = False) -> None:
     individual_tprs = [0.9, 0.85]
     individual_fprs = [0.05, 0.1]
     j_indep_or = independence_serial_or_j(individual_tprs, individual_fprs)
-    expected_j = (
-        (1.0 - (1.0 - 0.9) * (1.0 - 0.85))
-        - (1.0 - (1.0 - 0.05) * (1.0 - 0.1))
-    )
+    expected_j = (1.0 - (1.0 - 0.9) * (1.0 - 0.85)) - (1.0 - (1.0 - 0.05) * (1.0 - 0.1))
     assert abs(j_indep_or - expected_j) < TOL
 
     # Test 6: CII sanity

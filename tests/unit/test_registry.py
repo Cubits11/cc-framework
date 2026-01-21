@@ -1,5 +1,6 @@
 # tests/unit/test_registry.py
 """Registry validation tests."""
+
 from __future__ import annotations
 
 import pytest

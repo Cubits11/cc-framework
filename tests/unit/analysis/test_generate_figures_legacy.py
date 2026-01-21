@@ -1,19 +1,20 @@
 import json
 from pathlib import Path
-import numpy as np
 
 from cc.analysis.generate_figures import main as gen_main
+
 
 def _make_audit_jsonl(tmp_path: Path, n=12):
     p = tmp_path / "audit.jsonl"
     with p.open("w", encoding="utf-8") as f:
         for i in range(n):
             rec = {
-                "cfg": {"epsilon": 0.1 + 0.02*i, "T": 5 + i, "samples": 100 + i},
-                "metrics": {"CC_max": 1.0 + 0.01*i}
+                "cfg": {"epsilon": 0.1 + 0.02 * i, "T": 5 + i, "samples": 100 + i},
+                "metrics": {"CC_max": 1.0 + 0.01 * i},
             }
             f.write(json.dumps(rec) + "\n")
     return p
+
 
 def test_generate_figures_legacy_end_to_end(tmp_path):
     hist = _make_audit_jsonl(tmp_path, n=15)

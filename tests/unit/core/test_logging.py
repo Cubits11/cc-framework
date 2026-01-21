@@ -12,20 +12,19 @@ import pytest
 
 from cc.core import logging as cclogging
 
-
 # ---------------------------------------------------------------------------
 # Test helpers / fixtures
 # ---------------------------------------------------------------------------
 
 
 class DummyAudit:
-    '''
+    """
     Minimal deterministic stand-in for cc.cartographer.audit.
 
     - append_jsonl(path, rec) writes canonical JSONL and returns sha256 of the line
     - tail_sha(path) returns last sha for that file
     - verify_chain(path) optionally raises if verify_should_raise is True
-    '''
+    """
 
     def __init__(self) -> None:
         self.records_by_path: Dict[str, List[Dict[str, Any]]] = {}
@@ -63,9 +62,9 @@ class DummyAudit:
 
 @pytest.fixture
 def dummy_audit(monkeypatch) -> DummyAudit:
-    '''
+    """
     Replace cc.cartographer.audit with an in-memory DummyAudit for each test.
-    '''
+    """
     dummy = DummyAudit()
     monkeypatch.setattr(cclogging, "audit", dummy)
     return dummy
@@ -178,6 +177,7 @@ def test_deep_redact_respects_exclude_keys():
     # "allowed" still gets string-level redaction
     assert redacted["allowed"] == "*** text"
 
+
 def test_is_valid_short_sha():
     assert cclogging._is_valid_short_sha("0123abcdefab")
     assert not cclogging._is_valid_short_sha("0123abc")  # too short
@@ -217,9 +217,7 @@ def test_acquire_lock_creates_and_breaks_stale_lock(tmp_path, monkeypatch):
     lockfile = tmp_path / "lock"
 
     # First acquire should create the file
-    ok = cclogging._acquire_lock(
-        lockfile, stale_seconds=60.0, timeout=0.5, retry_delay=0.01
-    )
+    ok = cclogging._acquire_lock(lockfile, stale_seconds=60.0, timeout=0.5, retry_delay=0.01)
     assert ok is True
     assert lockfile.exists()
 
@@ -234,9 +232,7 @@ def test_acquire_lock_creates_and_breaks_stale_lock(tmp_path, monkeypatch):
     # Treat that PID as dead so stale logic is allowed to break the lock
     monkeypatch.setattr(cclogging, "_pid_is_alive", lambda pid: False)
 
-    ok2 = cclogging._acquire_lock(
-        lockfile, stale_seconds=1.0, timeout=0.5, retry_delay=0.01
-    )
+    ok2 = cclogging._acquire_lock(lockfile, stale_seconds=1.0, timeout=0.5, retry_delay=0.01)
     assert ok2 is True
     assert lockfile.exists()
 
@@ -249,7 +245,6 @@ def test_acquire_lock_creates_and_breaks_stale_lock(tmp_path, monkeypatch):
     assert not lockfile.exists()
 
 
-
 def test_acquire_lock_does_not_break_live_lock(tmp_path, monkeypatch):
     lockfile = tmp_path / "lock_live"
     # create a lock owned by a "live" PID
@@ -257,9 +252,7 @@ def test_acquire_lock_does_not_break_live_lock(tmp_path, monkeypatch):
     lockfile.write_text(json.dumps(data), encoding="utf-8")
     monkeypatch.setattr(cclogging, "_pid_is_alive", lambda pid: True)
 
-    ok = cclogging._acquire_lock(
-        lockfile, stale_seconds=1.0, timeout=0.05, retry_delay=0.01
-    )
+    ok = cclogging._acquire_lock(lockfile, stale_seconds=1.0, timeout=0.05, retry_delay=0.01)
     # We shouldn't be able to break the live lock; acquisition fails
     assert ok is False
 
@@ -279,9 +272,9 @@ def make_logger(
     enable_prometheus: bool = False,
     **kwargs: Any,
 ) -> cclogging.ChainedJSONLLogger:
-    '''
+    """
     Small helper so tests can make loggers with sane defaults.
-    '''
+    """
     return cclogging.ChainedJSONLLogger(
         path=log_path,
         capture_env=capture_env,
@@ -300,9 +293,7 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-def test_basic_log_event_writes_record_and_updates_head_and_level(
-    dummy_audit, log_path
-):
+def test_basic_log_event_writes_record_and_updates_head_and_level(dummy_audit, log_path):
     logger = make_logger(log_path)
     sha = logger.log_event("test_event", fields={"x": 1})
     records = read_jsonl(log_path)
@@ -685,9 +676,7 @@ def test_rotation_errors_respect_strict_mode(dummy_audit, log_path, monkeypatch)
         raise OSError("disk full")
 
     # --- non-strict logger: rotation error should be swallowed ---
-    monkeypatch.setattr(
-        logger_soft, "_rotate_files", boom.__get__(logger_soft, type(logger_soft))
-    )
+    monkeypatch.setattr(logger_soft, "_rotate_files", boom.__get__(logger_soft, type(logger_soft)))
 
     # first call writes something
     logger_soft.log_event("seed")
@@ -715,15 +704,12 @@ def test_rotation_errors_respect_strict_mode(dummy_audit, log_path, monkeypatch)
         logger_strict.log_event("third")
 
 
-
 # ---------------------------------------------------------------------------
 # Env snapshot / flags
 # ---------------------------------------------------------------------------
 
 
-def test_env_snapshot_included_when_capture_env_true(
-    dummy_audit, log_path, monkeypatch
-):
+def test_env_snapshot_included_when_capture_env_true(dummy_audit, log_path, monkeypatch):
     # Avoid running real pip freeze in tests
     def fake_check_output(args, **kwargs):
         return b"pkg==1.0\n"

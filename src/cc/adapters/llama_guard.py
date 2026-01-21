@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import time
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from .base import (
@@ -200,11 +200,13 @@ def _score_from_logits(logits: Any, tokenizer: Any) -> Optional[float]:
     except ImportError:  # pragma: no cover - dependency guard
         return None
 
-    tokens = {"safe": tokenizer.encode("safe", add_special_tokens=False),
-              "unsafe": tokenizer.encode("unsafe", add_special_tokens=False)}
+    tokens = {
+        "safe": tokenizer.encode("safe", add_special_tokens=False),
+        "unsafe": tokenizer.encode("unsafe", add_special_tokens=False),
+    }
     if any(len(v) != 1 for v in tokens.values()):
         return None
-    safe_id = tokens["safe"][0]
+    tokens["safe"][0]
     unsafe_id = tokens["unsafe"][0]
     probs = torch.softmax(logits, dim=-1)
     return float(probs[0, unsafe_id])

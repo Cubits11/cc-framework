@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import csv
+import hashlib
+import json
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-import csv
-import hashlib
-import json
 import numpy as np
 
 from experiments.fh_atlas.config import FHAtlasConfig
@@ -25,9 +25,9 @@ from theory.fh_bounds import (
     default_cc_regime_thresholds,
     independence_parallel_and_j,
     independence_serial_or_j,
+    parallel_and_composition_bounds,
     propagate_marginal_uncertainty_to_composed_bounds,
     serial_or_composition_bounds,
-    parallel_and_composition_bounds,
     wilson_score_interval,
 )
 
@@ -123,13 +123,15 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
                                 cii_values.append(float(cii["cii"]))
 
                                 if certificate_payload is None:
-                                    certificate_payload = propagate_marginal_uncertainty_to_composed_bounds(
-                                        tp_counts=sim.tp_counts,
-                                        fn_counts=sim.fn_counts,
-                                        fp_counts=sim.fp_counts,
-                                        tn_counts=sim.tn_counts,
-                                        composition_type=composition_type,
-                                        alpha=0.05,
+                                    certificate_payload = (
+                                        propagate_marginal_uncertainty_to_composed_bounds(
+                                            tp_counts=sim.tp_counts,
+                                            fn_counts=sim.fn_counts,
+                                            fp_counts=sim.fp_counts,
+                                            tn_counts=sim.tn_counts,
+                                            composition_type=composition_type,
+                                            alpha=0.05,
+                                        )
                                     )
 
                                 table_rows.append(
@@ -171,7 +173,9 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
                         }
 
                         metrics_path = metrics_dir / f"scenario_{scenario_id}.json"
-                        metrics_path.write_text(json.dumps(metrics_payload, indent=2), encoding="utf-8")
+                        metrics_path.write_text(
+                            json.dumps(metrics_payload, indent=2), encoding="utf-8"
+                        )
                         manifest_entries.append(
                             ManifestEntry(
                                 path=str(metrics_path.relative_to(output_root)),
@@ -195,7 +199,9 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
                             j_independence,
                             title,
                         )
-                        cii_plot_path = plot_cii_distribution(plots_dir, scenario_id, thetas, cii_values)
+                        cii_plot_path = plot_cii_distribution(
+                            plots_dir, scenario_id, thetas, cii_values
+                        )
 
                         cc_plot_path = plot_cc_regime_heatmap(
                             plots_dir,
@@ -247,7 +253,10 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
                                 json.dumps(certificate_payload, indent=2),
                                 encoding="utf-8",
                             )
-                            if not any(entry.path == str(certificate_path.relative_to(output_root)) for entry in manifest_entries):
+                            if not any(
+                                entry.path == str(certificate_path.relative_to(output_root))
+                                for entry in manifest_entries
+                            ):
                                 manifest_entries.append(
                                     ManifestEntry(
                                         path=str(certificate_path.relative_to(output_root)),

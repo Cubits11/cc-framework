@@ -12,7 +12,6 @@ import yaml
 
 from cc.io.storage import LocalStorageBackend, dataset_hash_from_config
 
-
 REQUIRED_SECTIONS = ["experiment", "protocol", "worlds", "attacker"]
 
 

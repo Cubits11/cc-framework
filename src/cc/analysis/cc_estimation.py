@@ -25,24 +25,23 @@ Refined: 2025-09-12
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Dict, Iterable, Optional, Tuple, Union
 
+# Week-3 methods (FH–Bernstein)
+from cc.cartographer.bounds import (
+    cc_confint,
+    cc_two_sided_bound,
+    fh_intervals,
+    fh_var_envelope,
+    needed_n_bernstein,
+)
+from cc.cartographer.intervals import cc_ci_bootstrap, cc_ci_wilson
 from cc.core.models import AttackResult
 from cc.core.stats import (
     compute_composability_coefficients,
     compute_j_statistic,
 )
-
-# Week-3 methods (FH–Bernstein)
-from cc.cartographer.bounds import (
-    fh_intervals,
-    fh_var_envelope,
-    cc_confint,
-    needed_n_bernstein,
-    cc_two_sided_bound,
-)
-from cc.cartographer.intervals import cc_ci_wilson, cc_ci_bootstrap
 
 __all__ = [
     # Back-compat
@@ -63,6 +62,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Backward-compatible helpers (existing API)
 # ---------------------------------------------------------------------------
+
 
 def estimate_j_statistics(results: Iterable[AttackResult]) -> Dict[str, float]:
     """Compute empirical J statistic and world success rates."""
@@ -89,9 +89,11 @@ def estimate_cc_metrics(
 # Week-3 FH–Bernstein: CC at a fixed θ with policy binding and finite-sample CI
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class CCPoint:
     """Point-estimate and context for CC at θ."""
+
     cc_hat: float
     D: float
     p1_hat: float
@@ -108,6 +110,7 @@ class CCPoint:
 @dataclass(frozen=True)
 class CCBounds:
     """FH intervals and variance envelopes used in the Bernstein bound."""
+
     I1: Tuple[float, float]  # for p1 (AND on Y=1)
     I0: Tuple[float, float]  # for p0 (OR on Y=0)
     vbar1: float
@@ -117,6 +120,7 @@ class CCBounds:
 @dataclass(frozen=True)
 class CCCI:
     """Finite-sample CC confidence interval and planning outputs."""
+
     delta: float
     lo: float
     hi: float
@@ -162,9 +166,12 @@ def estimate_cc_methods_from_rates(
     """End-to-end FH–Bernstein CC workflow given scalar rates at θ."""
     # Validate inputs
     for nm, val in [
-        ("p1_hat", p1_hat), ("p0_hat", p0_hat),
-        ("tpr_a", tpr_a), ("tpr_b", tpr_b),
-        ("fpr_a", fpr_a), ("fpr_b", fpr_b),
+        ("p1_hat", p1_hat),
+        ("p0_hat", p0_hat),
+        ("tpr_a", tpr_a),
+        ("tpr_b", tpr_b),
+        ("fpr_a", fpr_a),
+        ("fpr_b", fpr_b),
     ]:
         _validate_prob(nm, val)
     if n1 <= 0 or n0 <= 0:
@@ -188,10 +195,15 @@ def estimate_cc_methods_from_rates(
 
     # Finite-sample CI via Bernstein inversion
     lo, hi = cc_confint(
-        n1=n1, n0=n0,
-        p1_hat=p1_hat, p0_hat=p0_hat,
-        D=D, I1=I1, I0=I0,
-        delta=delta, split=split,
+        n1=n1,
+        n0=n0,
+        p1_hat=p1_hat,
+        p0_hat=p0_hat,
+        D=D,
+        I1=I1,
+        I0=I0,
+        delta=delta,
+        split=split,
     )
 
     # Optional planning for a desired half-width (t)
@@ -207,13 +219,20 @@ def estimate_cc_methods_from_rates(
 
     # Package results
     point = CCPoint(
-        cc_hat=cc_hat, D=D, p1_hat=p1_hat, p0_hat=p0_hat,
-        tpr_a=tpr_a, tpr_b=tpr_b, fpr_a=fpr_a, fpr_b=fpr_b,
-        n1=n1, n0=n0, alpha_cap=alpha_cap,
+        cc_hat=cc_hat,
+        D=D,
+        p1_hat=p1_hat,
+        p0_hat=p0_hat,
+        tpr_a=tpr_a,
+        tpr_b=tpr_b,
+        fpr_a=fpr_a,
+        fpr_b=fpr_b,
+        n1=n1,
+        n0=n0,
+        alpha_cap=alpha_cap,
     )
     bounds = CCBounds(I1=I1, I0=I0, vbar1=vbar1, vbar0=vbar0)
-    ci = CCCI(delta=delta, lo=lo, hi=hi, target_t=target_t,
-              n1_star=n1_star, n0_star=n0_star)
+    ci = CCCI(delta=delta, lo=lo, hi=hi, target_t=target_t, n1_star=n1_star, n0_star=n0_star)
 
     return {
         "point": asdict(point),
@@ -250,15 +269,26 @@ def estimate_cc_methods(
     res = list(results)
     j_stat, p0_hat, p1_hat = compute_j_statistic(res)
     return estimate_cc_methods_from_rates(
-        p1_hat=p1_hat, p0_hat=p0_hat,
-        D=D, tpr_a=tpr_a, tpr_b=tpr_b, fpr_a=fpr_a, fpr_b=fpr_b,
-        n1=n1, n0=n0, alpha_cap=alpha_cap, delta=delta,
-        target_t=target_t, split=split,
+        p1_hat=p1_hat,
+        p0_hat=p0_hat,
+        D=D,
+        tpr_a=tpr_a,
+        tpr_b=tpr_b,
+        fpr_a=fpr_a,
+        fpr_b=fpr_b,
+        n1=n1,
+        n0=n0,
+        alpha_cap=alpha_cap,
+        delta=delta,
+        target_t=target_t,
+        split=split,
     )
+
 
 # ---------------------------------------------------------------------------
 # Convenience: Wilson and bootstrap CC CIs (delegating to cartographer.intervals)
 # ---------------------------------------------------------------------------
+
 
 def cc_ci_wilson_from_rates(
     p1_hat: float, n1: int, p0_hat: float, n0: int, D: float, delta: float = 0.05
@@ -278,16 +308,19 @@ def cc_ci_bootstrap_from_samples(
     """Two-sided CC CI via bootstrap from class-labeled samples."""
     return cc_ci_bootstrap(y1_samples, y0_samples, D, delta, B=B, seed=seed)
 
+
 # ---------------------------------------------------------------------------
 # Wilson / Newcombe helpers (exported for direct import)
 # ---------------------------------------------------------------------------
 
 from statistics import NormalDist
 
+
 def _z_for(alpha: float = 0.05) -> float:
     if not (0.0 < alpha < 1.0):
         raise ValueError("alpha must be in (0,1)")
     return NormalDist().inv_cdf(1.0 - alpha / 2.0)
+
 
 def wilson_interval(x: int, n: int, alpha: float = 0.05) -> Tuple[float, float]:
     """Wilson score interval for a single proportion (two-sided)."""
@@ -304,7 +337,10 @@ def wilson_interval(x: int, n: int, alpha: float = 0.05) -> Tuple[float, float]:
     lo, hi = center - margin, center + margin
     return (0.0 if lo < 0.0 else lo, 1.0 if hi > 1.0 else hi)
 
-def newcombe_diff_ci(x1: int, n1: int, x0: int, n0: int, alpha: float = 0.05) -> Tuple[float, float]:
+
+def newcombe_diff_ci(
+    x1: int, n1: int, x0: int, n0: int, alpha: float = 0.05
+) -> Tuple[float, float]:
     """
     Newcombe (1998) method 10: Wilson intervals on each proportion, then ΔCI = (L1 - U0, U1 - L0),
     where Δ = p1 - p0. Better than Wald for small n or extreme p.
@@ -313,9 +349,12 @@ def newcombe_diff_ci(x1: int, n1: int, x0: int, n0: int, alpha: float = 0.05) ->
     L0, U0 = wilson_interval(x0, n0, alpha)
     return (L1 - U0, U1 - L0)
 
+
 def cc_confint_newcombe(
-    x1: int, n1: int,
-    x0: int, n0: int,
+    x1: int,
+    n1: int,
+    x0: int,
+    n0: int,
     D: float,
     alpha: float = 0.05,
     clamp01: bool = False,

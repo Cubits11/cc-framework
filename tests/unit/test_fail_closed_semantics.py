@@ -1,5 +1,6 @@
 # tests/unit/test_fail_closed_semantics.py
 """Fail-closed behavior under exceptions and concurrent load."""
+
 from __future__ import annotations
 
 import json
@@ -59,9 +60,11 @@ def test_fail_closed_concurrency_stress() -> None:
         def validate(self, text: str):
             if "fail" in text:
                 raise RuntimeError("boom")
+
             class Result:
                 validation_passed = True
                 is_valid = True
+
             return Result()
 
     adapter = GuardrailsAIAdapter(guard=FlakyGuard())

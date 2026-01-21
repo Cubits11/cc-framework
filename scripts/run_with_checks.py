@@ -38,7 +38,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import subprocess
 import sys
 import traceback
@@ -67,6 +66,7 @@ class ValidationWarning(Warning):
 # ---------------------------------------------------------------------
 # Small helpers
 # ---------------------------------------------------------------------
+
 
 def _fmt_path(p: Path) -> str:
     try:
@@ -109,9 +109,11 @@ def _as_int(x: Any, *, where: str) -> int:
 # Data structures
 # ---------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class ExperimentMetrics:
     """Minimal metrics validated from analysis.json."""
+
     fpr: float
     tpr: float
     threshold: float
@@ -155,6 +157,7 @@ class CalibrationInfo:
 # IO helpers
 # ---------------------------------------------------------------------
 
+
 def load_json(path: Path) -> Dict[str, Any]:
     if not path.exists():
         raise ValidationError(f"File not found: {_fmt_path(path)}")
@@ -186,7 +189,10 @@ def compute_file_hash(path: Path) -> str:
 # Extraction from analysis/calibration
 # ---------------------------------------------------------------------
 
-def extract_metrics(analysis: Dict[str, Any], *, calibration_name: Optional[str] = None) -> ExperimentMetrics:
+
+def extract_metrics(
+    analysis: Dict[str, Any], *, calibration_name: Optional[str] = None
+) -> ExperimentMetrics:
     """
     Required minimal contract (must exist):
       - results.operating_points.world_1.fpr
@@ -248,7 +254,9 @@ def extract_metrics(analysis: Dict[str, Any], *, calibration_name: Optional[str]
     if not isinstance(params, dict) or "threshold" not in params:
         raise ValidationError("Guardrail params.threshold missing in analysis.json")
 
-    threshold = _as_float(params["threshold"], where="metadata.configuration.guardrails[i].params.threshold")
+    threshold = _as_float(
+        params["threshold"], where="metadata.configuration.guardrails[i].params.threshold"
+    )
 
     # --- j statistic + CI ---
     j = _get(analysis, "results.j_statistic")
@@ -317,7 +325,9 @@ def extract_calibration(cal: Dict[str, Any]) -> CalibrationInfo:
             n = _as_int(cal["n_samples"], where="calibration.n_samples")
 
     if thr is None:
-        raise ValidationError("Calibration JSON lacks a threshold (expected 'threshold' or guardrails[0].threshold).")
+        raise ValidationError(
+            "Calibration JSON lacks a threshold (expected 'threshold' or guardrails[0].threshold)."
+        )
 
     target_fpr = cal.get("fpr", None)
     if target_fpr is not None:
@@ -342,6 +352,7 @@ def extract_calibration(cal: Dict[str, Any]) -> CalibrationInfo:
 # ---------------------------------------------------------------------
 # Validation helpers
 # ---------------------------------------------------------------------
+
 
 def validate_threshold_equality(run_thr: float, cal_thr: float, tol: float = TOL) -> None:
     diff = abs(run_thr - cal_thr)
@@ -404,9 +415,7 @@ def validate_fpr_window_adaptive(
     # Large n => strict.
     if n >= 200:
         if not (lo <= fpr <= hi):
-            raise ValidationError(
-                f"FPR {fpr:.6f} outside window [{lo:.4f},{hi:.4f}] (n={n})"
-            )
+            raise ValidationError(f"FPR {fpr:.6f} outside window [{lo:.4f},{hi:.4f}] (n={n})")
         print(f"✓ FPR {fpr:.4f} within window [{lo:.4f},{hi:.4f}] (n={n})")
         return
 
@@ -441,6 +450,7 @@ def validate_fpr_window_adaptive(
 # ---------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------
+
 
 def run_experiment(
     *,
@@ -524,22 +534,50 @@ def print_summary(m: ExperimentMetrics, cal: Optional[CalibrationInfo]) -> None:
 # CLI
 # ---------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(
         description="Week-6 two-world validator with α-window + threshold equality checks"
     )
-    ap.add_argument("--config", type=Path, required=True, help="Calibrated YAML used to run the experiment")
-    ap.add_argument("--out-json", type=Path, required=True, help="Path to analysis.json to validate (and/or write)")
-    ap.add_argument("--calibration", type=Path, help="Calibration summary JSON (threshold equality & target FPR/window)")
-    ap.add_argument("--audit", type=Path, help="Audit JSONL path (forwarded to runner if --force-rerun)")
+    ap.add_argument(
+        "--config", type=Path, required=True, help="Calibrated YAML used to run the experiment"
+    )
+    ap.add_argument(
+        "--out-json",
+        type=Path,
+        required=True,
+        help="Path to analysis.json to validate (and/or write)",
+    )
+    ap.add_argument(
+        "--calibration",
+        type=Path,
+        help="Calibration summary JSON (threshold equality & target FPR/window)",
+    )
+    ap.add_argument(
+        "--audit", type=Path, help="Audit JSONL path (forwarded to runner if --force-rerun)"
+    )
     ap.add_argument("--seed", type=int, default=123, help="RNG seed forwarded to runner")
-    ap.add_argument("--fpr-lo", type=float, default=0.04, help="Lower bound of α-window (default 0.04)")
-    ap.add_argument("--fpr-hi", type=float, default=0.06, help="Upper bound of α-window (default 0.06)")
-    ap.add_argument("--force-rerun", action="store_true", help="Run the experiment to regenerate analysis.json")
-    ap.add_argument("--skip-fpr-check", action="store_true", help="Skip FPR window validation (not recommended)")
-    ap.add_argument("--runner-module", default="cc.exp.run_two_world", help="Python module to execute with -m")
-    ap.add_argument("--verbose", "-v", action="store_true", help="Verbose subprocess output / debug traceback")
-    ap.add_argument("--tol", type=float, default=TOL, help=f"Threshold equality tolerance (default {TOL:g})")
+    ap.add_argument(
+        "--fpr-lo", type=float, default=0.04, help="Lower bound of α-window (default 0.04)"
+    )
+    ap.add_argument(
+        "--fpr-hi", type=float, default=0.06, help="Upper bound of α-window (default 0.06)"
+    )
+    ap.add_argument(
+        "--force-rerun", action="store_true", help="Run the experiment to regenerate analysis.json"
+    )
+    ap.add_argument(
+        "--skip-fpr-check", action="store_true", help="Skip FPR window validation (not recommended)"
+    )
+    ap.add_argument(
+        "--runner-module", default="cc.exp.run_two_world", help="Python module to execute with -m"
+    )
+    ap.add_argument(
+        "--verbose", "-v", action="store_true", help="Verbose subprocess output / debug traceback"
+    )
+    ap.add_argument(
+        "--tol", type=float, default=TOL, help=f"Threshold equality tolerance (default {TOL:g})"
+    )
     return ap.parse_args()
 
 

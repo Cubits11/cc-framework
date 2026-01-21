@@ -1,12 +1,12 @@
 # tests/experiments/test_experiment_leak_metrics.py
 """Leak canary experiment (gated by marker/env)."""
+
 from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import random
-import sys
+from pathlib import Path
 from typing import List
 
 import pytest
@@ -20,7 +20,6 @@ from cc.utils.artifacts import (
     wilson_interval,
     write_json,
 )
-
 
 pytestmark = pytest.mark.experiment
 

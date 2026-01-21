@@ -25,7 +25,6 @@ Notes
 from __future__ import annotations
 
 import math
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -40,13 +39,16 @@ import pytest
 def _import_sim():
     try:
         from experiments.correlation_cliff import simulate_legacy as sim  # type: ignore
+
         return sim
     except Exception:
         import simulate_legacy as sim  # type: ignore
+
         return sim
 
 
 sim = _import_sim()
+
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -96,6 +98,7 @@ def _make_cfg(
 def _have_scipy() -> bool:
     try:
         import scipy  # noqa: F401
+
         return True
     except Exception:
         return False
@@ -290,7 +293,9 @@ def test_p11_from_path_gaussian_tau_runs_and_meta_contains_tau_rho():
     assert "tau" in meta and "rho" in meta
 
 
-@pytest.mark.skipif(_have_scipy(), reason="SciPy installed; gaussian_tau ImportError expectation not applicable")
+@pytest.mark.skipif(
+    _have_scipy(), reason="SciPy installed; gaussian_tau ImportError expectation not applicable"
+)
 def test_p11_from_path_gaussian_tau_raises_if_no_scipy():
     with pytest.raises(ImportError):
         sim.p11_from_path(
@@ -343,7 +348,10 @@ def test_cfg_from_dict_pipeline_schema_smoke():
         "marginals": {"w0": {"pA": 0.2, "pB": 0.35}, "w1": {"pA": 0.45, "pB": 0.35}},
         "composition": {"primary_rule": "OR"},
         "dependence_paths": {
-            "primary": {"type": "fh_linear", "lambda_grid_coarse": {"start": 0.0, "stop": 1.0, "num": 3}}
+            "primary": {
+                "type": "fh_linear",
+                "lambda_grid_coarse": {"start": 0.0, "stop": 1.0, "num": 3},
+            }
         },
         "sampling": {"n_per_world": 50, "n_reps": 2, "seed": 7, "seed_policy": "stable_per_cell"},
         "simulate": {"include_theory_reference": False},
@@ -460,9 +468,16 @@ def test_seed_policy_stable_per_cell_order_invariant_results():
     cols = [
         "lambda",
         "rep",
-        "n00_w0", "n01_w0", "n10_w0", "n11_w0",
-        "n00_w1", "n01_w1", "n10_w1", "n11_w1",
-        "JC_hat", "CC_hat",
+        "n00_w0",
+        "n01_w0",
+        "n10_w0",
+        "n11_w0",
+        "n00_w1",
+        "n01_w1",
+        "n10_w1",
+        "n11_w1",
+        "JC_hat",
+        "CC_hat",
     ]
     # Some columns may be absent if a row failed; enforce row_ok before comparing
     if "row_ok" in df_a.columns and "row_ok" in df_b.columns:

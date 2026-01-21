@@ -29,10 +29,10 @@ from cc.core.logging import ChainedJSONLLogger
 from cc.core.registry import build_guardrails
 from cc.guardrails.toy_threshold import ToyThresholdGuardrail
 
-
 # --------------------------
 # YAML IO helpers
 # --------------------------
+
 
 def load_config(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
@@ -67,10 +67,10 @@ def update_threshold_in_config(path_in: Path, path_out: Path, thr: float) -> Non
 # Data + calibration helpers
 # --------------------------
 
-def load_benign_texts(dataset: Path,
-                      synthetic_vocab: List[str],
-                      harmful_vocab: List[str],
-                      n_synthetic: int = 200) -> List[str]:
+
+def load_benign_texts(
+    dataset: Path, synthetic_vocab: List[str], harmful_vocab: List[str], n_synthetic: int = 200
+) -> List[str]:
     texts: List[str] = []
     if dataset.is_file():
         texts.extend([line.strip() for line in dataset.read_text().splitlines() if line.strip()])
@@ -92,11 +92,13 @@ def load_benign_texts(dataset: Path,
     return texts
 
 
-def calibrate_guardrail_entry(entry: Dict[str, Any],
-                              cfg: Dict[str, Any],
-                              benign_texts: List[str],
-                              window_lo: float = 0.04,
-                              window_hi: float = 0.06) -> Dict[str, Any]:
+def calibrate_guardrail_entry(
+    entry: Dict[str, Any],
+    cfg: Dict[str, Any],
+    benign_texts: List[str],
+    window_lo: float = 0.04,
+    window_hi: float = 0.06,
+) -> Dict[str, Any]:
     """
     Calibrate a ToyThresholdGuardrail to target FPR within [window_lo, window_hi] and
     <= alpha_cap if present.
@@ -207,26 +209,42 @@ def estimate_stack_fpr(cfg: Dict[str, Any], benign_texts: List[str]) -> Optional
 # CLI
 # --------------------------
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Calibrate toy guardrail thresholds (Week-6).")
     parser.add_argument("--config", required=True, help="Path to YAML config file.")
-    parser.add_argument("--dataset", default="datasets/benign",
-                        help="Directory/file with benign texts used for FPR calibration.")
-    parser.add_argument("--summary", required=True,
-                        help="Path to write calibration_summary.json (flat object).")
-    parser.add_argument("--audit", default="runs/audit_week6.jsonl",
-                        help="Append calibration event to this JSONL chain.")
+    parser.add_argument(
+        "--dataset",
+        default="datasets/benign",
+        help="Directory/file with benign texts used for FPR calibration.",
+    )
+    parser.add_argument(
+        "--summary", required=True, help="Path to write calibration_summary.json (flat object)."
+    )
+    parser.add_argument(
+        "--audit",
+        default="runs/audit_week6.jsonl",
+        help="Append calibration event to this JSONL chain.",
+    )
     # Week-6 write-back options (mutually exclusive)
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--write-inplace", action="store_true",
-                       help="Update the provided config file in-place with calibrated threshold.")
-    group.add_argument("--write-config-out", default=None,
-                       help="Write a derived YAML config with the calibrated threshold.")
+    group.add_argument(
+        "--write-inplace",
+        action="store_true",
+        help="Update the provided config file in-place with calibrated threshold.",
+    )
+    group.add_argument(
+        "--write-config-out",
+        default=None,
+        help="Write a derived YAML config with the calibrated threshold.",
+    )
     # α-window
-    parser.add_argument("--window-lo", type=float, default=0.04,
-                        help="Lower bound for α-window (inclusive).")
-    parser.add_argument("--window-hi", type=float, default=0.06,
-                        help="Upper bound for α-window (inclusive).")
+    parser.add_argument(
+        "--window-lo", type=float, default=0.04, help="Lower bound for α-window (inclusive)."
+    )
+    parser.add_argument(
+        "--window-hi", type=float, default=0.06, help="Upper bound for α-window (inclusive)."
+    )
     return parser.parse_args()
 
 
@@ -317,25 +335,27 @@ def main() -> None:
     if not in_window:
         print(
             f"ERROR: Measured FPR={flat_summary['fpr']:.4f} outside target window [{lo:.2f},{hi:.2f}].",
-            file=sys.stderr
+            file=sys.stderr,
         )
 
     # Audit (best-effort, never overrides exit code)
     try:
         logger = ChainedJSONLLogger(str(args.audit))
-        logger.log({
-            "event": "guardrail_calibration",
-            "name": flat_summary["name"],
-            "threshold": flat_summary["threshold"],
-            "fpr": flat_summary["fpr"],
-            "n_texts": flat_summary["n_texts"],
-            "alpha_cap": flat_summary["alpha_cap"],
-            "window": [lo, hi],
-            "config_in": str(cfg_path),
-            "config_out": str(derived_out) if derived_out else None,
-            "dataset": str(dataset_path),
-            "ts": int(time.time()),
-        })
+        logger.log(
+            {
+                "event": "guardrail_calibration",
+                "name": flat_summary["name"],
+                "threshold": flat_summary["threshold"],
+                "fpr": flat_summary["fpr"],
+                "n_texts": flat_summary["n_texts"],
+                "alpha_cap": flat_summary["alpha_cap"],
+                "window": [lo, hi],
+                "config_in": str(cfg_path),
+                "config_out": str(derived_out) if derived_out else None,
+                "dataset": str(dataset_path),
+                "ts": int(time.time()),
+            }
+        )
     except Exception:
         pass
 

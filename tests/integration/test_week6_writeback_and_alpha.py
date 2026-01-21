@@ -3,7 +3,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-import tempfile
 
 PY = sys.executable
 
@@ -31,9 +30,7 @@ def test_threshold_and_fpr_checks_pass(tmp_path: Path):
     analysis = {
         "metadata": {
             "configuration": {
-                "guardrails": [
-                    {"name": "toy_threshold", "params": {"threshold": 0.314159}}
-                ]
+                "guardrails": [{"name": "toy_threshold", "params": {"threshold": 0.314159}}]
             }
         },
         "results": {
@@ -64,14 +61,22 @@ def test_threshold_and_fpr_checks_pass(tmp_path: Path):
     # Easiest: invoke run_with_checks.py but skip the run by setting out_json already
     # and wrapping python to always succeed. We'll edit the script call argument list.
     cmd = [
-        PY, "scripts/run_with_checks.py",
-        "--config", str(shim),  # bogus; process executes shim but we pre-wrote outputs
-        "--out-json", str(out_json),
-        "--audit", str(audit),
-        "--seed", "123",
-        "--fpr-lo", "0.04",
-        "--fpr-hi", "0.06",
-        "--calibration", str(cal_path),
+        PY,
+        "scripts/run_with_checks.py",
+        "--config",
+        str(shim),  # bogus; process executes shim but we pre-wrote outputs
+        "--out-json",
+        str(out_json),
+        "--audit",
+        str(audit),
+        "--seed",
+        "123",
+        "--fpr-lo",
+        "0.04",
+        "--fpr-hi",
+        "0.06",
+        "--calibration",
+        str(cal_path),
     ]
     # We need run_with_checks to execute python -m cc.exp.run_two_world ...
     # To avoid running, we create a fake 'cc' package entry; but that's intrusive.
@@ -89,7 +94,13 @@ def test_threshold_and_fpr_checks_pass(tmp_path: Path):
         # Fall back: if calling the script fails due to module import, do a direct check
         # by reading the out_json and comparing thresholds/FPR.
         data = json.loads(out_json.read_text(encoding="utf-8"))
-        assert abs(data["metadata"]["configuration"]["guardrails"][0]["params"]["threshold"] - cal["threshold"]) < 1e-9
+        assert (
+            abs(
+                data["metadata"]["configuration"]["guardrails"][0]["params"]["threshold"]
+                - cal["threshold"]
+            )
+            < 1e-9
+        )
         fpr = float(data["results"]["operating_points"]["world_1"]["fpr"])
         assert 0.04 <= fpr <= 0.06
         return
@@ -98,8 +109,15 @@ def test_threshold_and_fpr_checks_pass(tmp_path: Path):
 
 
 def test_fails_on_mismatch_or_out_of_window(tmp_path: Path):
-    cal = {"name": "toy_threshold", "threshold": 0.111, "fpr": 0.05,
-           "n_texts": 100, "alpha_cap": 0.05, "target_window": [0.04, 0.06], "timestamp": "Z"}
+    cal = {
+        "name": "toy_threshold",
+        "threshold": 0.111,
+        "fpr": 0.05,
+        "n_texts": 100,
+        "alpha_cap": 0.05,
+        "target_window": [0.04, 0.06],
+        "timestamp": "Z",
+    }
     cal_path = tmp_path / "calibration_summary.json"
     write_json(cal_path, cal)
 
@@ -116,7 +134,10 @@ def test_fails_on_mismatch_or_out_of_window(tmp_path: Path):
                 "world_1": {"tpr": 0.9, "fpr": 0.08},  # outside window
                 "world_0": {"tpr": 0.7, "fpr": 0.0},
             },
-            "j_statistic": {"empirical": 0.2, "confidence_interval": {"lower": 0.1, "upper": 0.3, "method": "bootstrap"}},
+            "j_statistic": {
+                "empirical": 0.2,
+                "confidence_interval": {"lower": 0.1, "upper": 0.3, "method": "bootstrap"},
+            },
             "composability_metrics": {"cc_max": 1.0, "delta_add": 0.0},
         },
     }
@@ -127,14 +148,22 @@ def test_fails_on_mismatch_or_out_of_window(tmp_path: Path):
 
     # Call checks; experiment run may fail, so we rely on pre-existing out_json
     cmd = [
-        PY, "scripts/run_with_checks.py",
-        "--config", str(tmp_path / "fake.yaml"),
-        "--out-json", str(out_json),
-        "--audit", str(audit),
-        "--seed", "123",
-        "--fpr-lo", "0.04",
-        "--fpr-hi", "0.06",
-        "--calibration", str(cal_path),
+        PY,
+        "scripts/run_with_checks.py",
+        "--config",
+        str(tmp_path / "fake.yaml"),
+        "--out-json",
+        str(out_json),
+        "--audit",
+        str(audit),
+        "--seed",
+        "123",
+        "--fpr-lo",
+        "0.04",
+        "--fpr-hi",
+        "0.06",
+        "--calibration",
+        str(cal_path),
     ]
     p = subprocess.run(cmd)
     assert p.returncode != 0

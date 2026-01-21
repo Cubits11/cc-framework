@@ -1,10 +1,11 @@
 # tests/performance/test_adapter_perf.py
 """Performance benchmarks for adapters (gated by env)."""
+
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
 import pytest
 
@@ -17,7 +18,6 @@ from cc.utils.artifacts import (
     write_json,
 )
 
-
 pytestmark = pytest.mark.perf
 
 
@@ -28,6 +28,7 @@ class _FastGuard:
         class Result:
             validation_passed = True
             is_valid = True
+
         return Result()
 
 

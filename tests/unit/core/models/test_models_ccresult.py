@@ -10,10 +10,10 @@ Scope:
 - Monte Carlo sanity check of bootstrap CI coverage (slow)
 """
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
-from cc.core.models import CCResult, NUMPY_AVAILABLE
+from cc.core.models import NUMPY_AVAILABLE, CCResult
 
 if NUMPY_AVAILABLE:  # type: ignore[truthy-bool]
     import numpy as np  # type: ignore[import]

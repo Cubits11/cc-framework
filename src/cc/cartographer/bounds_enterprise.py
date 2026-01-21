@@ -26,25 +26,33 @@ Version: 2.0 (Enterprise)
 from __future__ import annotations
 
 import warnings
-from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from math import ceil, exp, log, sqrt, pi
+from math import exp, log, pi, sqrt
 from typing import (
-    Callable, Dict, Iterable, List, Literal, Optional, Protocol, Sequence, 
-    Tuple, Union, Any, TypeVar
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
 )
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import stats, optimize
-from scipy.special import loggamma, gammaln
+from scipy import stats
 from typing_extensions import TypeAlias
 
 try:
     import torch
     import torch.nn.functional as F
+
     GPU_AVAILABLE = torch.cuda.is_available()
 except ImportError:
     torch = None
@@ -53,23 +61,44 @@ except ImportError:
 try:
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RBF, Matern, WhiteKernel
+
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
 
 __all__ = [
     # Original API (backward compatibility)
-    "ROCArrayLike", "frechet_upper", "frechet_upper_with_argmax",
-    "frechet_upper_with_argmax_points", "envelope_over_rocs", "ensure_anchors",
-    "fh_and_bounds_n", "fh_or_bounds_n", "fh_intervals", "fh_var_envelope",
-    "bernstein_tail", "invert_bernstein_eps", "cc_two_sided_bound",
-    "cc_confint", "needed_n_bernstein", "needed_n_bernstein_int",
-    
+    "ROCArrayLike",
+    "frechet_upper",
+    "frechet_upper_with_argmax",
+    "frechet_upper_with_argmax_points",
+    "envelope_over_rocs",
+    "ensure_anchors",
+    "fh_and_bounds_n",
+    "fh_or_bounds_n",
+    "fh_intervals",
+    "fh_var_envelope",
+    "bernstein_tail",
+    "invert_bernstein_eps",
+    "cc_two_sided_bound",
+    "cc_confint",
+    "needed_n_bernstein",
+    "needed_n_bernstein_int",
     # Enhanced API
-    "AdaptiveBounds", "BayesianBounds", "CausalBounds", "StreamingBounds",
-    "MultiObjectiveOptimizer", "BanditThresholdSelector", "GPBounds",
-    "DistributedROCAnalyzer", "ConfidenceSequence", "PredictionInterval",
-    "UncertaintyQuantifier", "AdaptiveStrategy", "BoundType", "OptimizationResult"
+    "AdaptiveBounds",
+    "BayesianBounds",
+    "CausalBounds",
+    "StreamingBounds",
+    "MultiObjectiveOptimizer",
+    "BanditThresholdSelector",
+    "GPBounds",
+    "DistributedROCAnalyzer",
+    "ConfidenceSequence",
+    "PredictionInterval",
+    "UncertaintyQuantifier",
+    "AdaptiveStrategy",
+    "BoundType",
+    "OptimizationResult",
 ]
 
 # ---- Enhanced Types --------------------------------------------------------
@@ -81,10 +110,12 @@ ROCArrayLike: TypeAlias = Union[
     NDArray[np.float64],
 ]
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class BoundType(Enum):
     """Types of statistical bounds"""
+
     FRECHET_HOEFFDING = "frechet_hoeffding"
     BERNSTEIN = "bernstein"
     BENNETT = "bennett"
@@ -96,6 +127,7 @@ class BoundType(Enum):
 
 class AdaptiveStrategy(Enum):
     """Adaptive sampling strategies"""
+
     THOMPSON_SAMPLING = "thompson_sampling"
     UCB = "upper_confidence_bound"
     EPSILON_GREEDY = "epsilon_greedy"
@@ -105,6 +137,7 @@ class AdaptiveStrategy(Enum):
 @dataclass
 class OptimizationResult:
     """Result from multi-objective optimization"""
+
     optimal_thresholds: Dict[str, float]
     pareto_front: NDArray[np.float64]
     objective_values: Dict[str, float]
@@ -115,16 +148,18 @@ class OptimizationResult:
 @dataclass
 class ConfidenceSequence:
     """Time-uniform confidence sequence"""
+
     lower_bounds: NDArray[np.float64]
     upper_bounds: NDArray[np.float64]
     confidence_level: float
     times: NDArray[np.float64]
     method: str
-    
+
 
 @dataclass
 class PredictionInterval:
     """Prediction interval with uncertainty quantification"""
+
     lower: float
     upper: float
     median: float
@@ -136,10 +171,14 @@ class PredictionInterval:
 
 # ---- Original Utilities (Enhanced for Performance) ------------------------
 
+
 def _to_array_roc(
-    arr: ROCArrayLike, *, clip: Literal["silent", "warn", "error"] = "silent",
-    validate_finite: bool = True, use_gpu: bool = False
-) -> Union[NDArray[np.float64], 'torch.Tensor']:
+    arr: ROCArrayLike,
+    *,
+    clip: Literal["silent", "warn", "error"] = "silent",
+    validate_finite: bool = True,
+    use_gpu: bool = False,
+) -> Union[NDArray[np.float64], "torch.Tensor"]:
     """
     Enhanced ROC array conversion with GPU support and validation
     """
@@ -178,7 +217,7 @@ def _to_array_roc(
     # GPU acceleration if requested and available
     if use_gpu and GPU_AVAILABLE and torch is not None:
         return torch.from_numpy(roc).cuda().float()
-    
+
     return roc
 
 
@@ -188,13 +227,13 @@ def ensure_anchors(
     preserve_order: bool = True,
     clip: Literal["silent", "warn", "error"] = "silent",
     use_gpu: bool = False,
-    remove_duplicates: bool = False
-) -> Union[NDArray[np.float64], 'torch.Tensor']:
+    remove_duplicates: bool = False,
+) -> Union[NDArray[np.float64], "torch.Tensor"]:
     """
     Enhanced anchor ensuring with deduplication and GPU support
     """
     R = _to_array_roc(roc, clip=clip, use_gpu=use_gpu)
-    
+
     if use_gpu and GPU_AVAILABLE and torch is not None:
         # GPU implementation
         anchors_to_add = []
@@ -202,14 +241,14 @@ def ensure_anchors(
             anchors_to_add.append([0.0, 0.0])
         if not torch.any((R[:, 0] == 1.0) & (R[:, 1] == 1.0)):
             anchors_to_add.append([1.0, 1.0])
-        
+
         if anchors_to_add:
             anchors_tensor = torch.tensor(anchors_to_add, device=R.device, dtype=R.dtype)
             R = torch.cat([R, anchors_tensor], dim=0)
-        
+
         if remove_duplicates:
             R = torch.unique(R, dim=0)
-        
+
         if not preserve_order and remove_duplicates:
             # Sort by FPR, then TPR
             sorted_indices = torch.lexsort([R[:, 1], R[:, 0]])
@@ -218,94 +257,92 @@ def ensure_anchors(
         # CPU implementation (original logic)
         has_00 = np.any((R[:, 0] == 0.0) & (R[:, 1] == 0.0))
         has_11 = np.any((R[:, 0] == 1.0) & (R[:, 1] == 1.0))
-        
+
         if not has_00:
             R = np.vstack([R, [0.0, 0.0]])
         if not has_11:
             R = np.vstack([R, [1.0, 1.0]])
-        
+
         if remove_duplicates:
             R = np.unique(R, axis=0)
-        
+
         if not preserve_order and remove_duplicates:
             order = np.lexsort((R[:, 1], R[:, 0]))
             R = R[order]
-    
+
     return R
 
 
 # ---- Advanced Statistical Bounds Classes -----------------------------------
+
 
 class AdaptiveBounds:
     """
     Adaptive confidence bounds with anytime validity
     Implements time-uniform concentration inequalities
     """
-    
+
     def __init__(
         self,
         confidence_level: float = 0.95,
         strategy: AdaptiveStrategy = AdaptiveStrategy.UCB,
-        exploration_bonus: float = 2.0
+        exploration_bonus: float = 2.0,
     ):
         self.confidence_level = confidence_level
         self.strategy = strategy
         self.exploration_bonus = exploration_bonus
         self.alpha = 1.0 - confidence_level
-        
+
     def time_uniform_bound(
-        self, 
-        n: int, 
-        variance_bound: float,
-        time_horizon: Optional[int] = None
+        self, n: int, variance_bound: float, time_horizon: Optional[int] = None
     ) -> float:
         """
         Compute time-uniform confidence radius using law of iterated logarithm
         """
         if time_horizon is None:
             time_horizon = max(100, 2 * n)
-        
+
         # Adaptive confidence radius with log log n scaling
         log_factor = log(max(2, log(max(2, n))))
         time_factor = log(max(1, time_horizon)) + log(pi**2 / (3 * self.alpha))
-        
+
         radius = sqrt(2 * variance_bound * (log_factor + time_factor) / n)
         return radius
-    
+
     def sequential_test(
         self,
         observations: NDArray[np.float64],
         null_value: float = 0.0,
-        alternative: Literal["two-sided", "greater", "less"] = "two-sided"
+        alternative: Literal["two-sided", "greater", "less"] = "two-sided",
     ) -> Tuple[bool, float, ConfidenceSequence]:
         """
         Sequential hypothesis test with anytime validity
         """
         n = len(observations)
         if n == 0:
-            return False, 1.0, ConfidenceSequence(
-                np.array([]), np.array([]), self.confidence_level, np.array([]), "adaptive"
+            return (
+                False,
+                1.0,
+                ConfidenceSequence(
+                    np.array([]), np.array([]), self.confidence_level, np.array([]), "adaptive"
+                ),
             )
-        
+
         # Compute running statistics
         cumsum = np.cumsum(observations)
         means = cumsum / np.arange(1, n + 1)
-        
+
         # Time-uniform bounds
         times = np.arange(1, n + 1)
-        variance_est = np.array([
-            np.var(observations[:t]) if t > 1 else 0.25 
-            for t in times
-        ])
-        
-        radii = np.array([
-            self.time_uniform_bound(t, variance_est[t-1], time_horizon=n)
-            for t in times
-        ])
-        
+        variance_est = np.array([np.var(observations[:t]) if t > 1 else 0.25 for t in times])
+
+        radii = np.array(
+            [self.time_uniform_bound(t, variance_est[t - 1], time_horizon=n) for t in times]
+        )
+
         lower_bounds = means - radii
         upper_bounds = means + radii
-        
+
         # Test decision
         if alternative == "two-sided":
             reject = np.any((upper_bounds < null_value) | (lower_bounds > null_value))
@@ -313,7 +350,7 @@ class AdaptiveBounds:
             reject = np.any(lower_bounds > null_value)
         else:  # less
             reject = np.any(upper_bounds < null_value)
-        
+
         # P-value approximation using running maximum
         if alternative == "two-sided":
             test_stats = np.abs(means - null_value) / (radii + 1e-10)
@@ -321,15 +358,18 @@ class AdaptiveBounds:
             test_stats = (means - null_value) / (radii + 1e-10)
         else:
             test_stats = (null_value - means) / (radii + 1e-10)
-        
+
         max_test_stat = np.max(test_stats) if len(test_stats) > 0 else 0.0
-        p_value = 2 * (1 - stats.norm.cdf(max_test_stat)) if alternative == "two-sided" else \
-                  1 - stats.norm.cdf(max_test_stat)
-        
+        p_value = (
+            2 * (1 - stats.norm.cdf(max_test_stat))
+            if alternative == "two-sided"
+            else 1 - stats.norm.cdf(max_test_stat)
+        )
+
         confidence_seq = ConfidenceSequence(
             lower_bounds, upper_bounds, self.confidence_level, times, "adaptive"
         )
-        
+
         return reject, p_value, confidence_seq
 
 
@@ -337,57 +377,51 @@ class BayesianBounds:
     """
     Bayesian nonparametric bounds using Gaussian process priors
     """
-    
+
     def __init__(
-        self,
-        kernel: Optional[Any] = None,
-        noise_level: float = 1e-10,
-        credible_level: float = 0.95
+        self, kernel: Optional[Any] = None, noise_level: float = 1e-10, credible_level: float = 0.95
     ):
         if not SKLEARN_AVAILABLE:
             raise ImportError("scikit-learn required for BayesianBounds")
-        
+
         if kernel is None:
             kernel = RBF(length_scale=1.0) + WhiteKernel(noise_level=noise_level)
-        
+
         self.gpr = GaussianProcessRegressor(
-            kernel=kernel,
-            alpha=noise_level,
-            n_restarts_optimizer=5
+            kernel=kernel, alpha=noise_level, n_restarts_optimizer=5
         )
         self.credible_level = credible_level
         self.is_fitted = False
-    
+
     def fit(self, X: NDArray[np.float64], y: NDArray[np.float64]):
         """Fit Gaussian process to observed data"""
         self.gpr.fit(X.reshape(-1, 1) if X.ndim == 1 else X, y)
         self.is_fitted = True
         return self
-    
+
     def predict_with_bounds(
-        self, 
-        X_test: NDArray[np.float64]
+        self, X_test: NDArray[np.float64]
     ) -> Tuple[NDArray[np.float64], PredictionInterval]:
         """
         Predict with Bayesian credible intervals
         """
         if not self.is_fitted:
             raise RuntimeError("Must fit model before prediction")
-        
+
         X_test_reshaped = X_test.reshape(-1, 1) if X_test.ndim == 1 else X_test
         y_pred, y_std = self.gpr.predict(X_test_reshaped, return_std=True)
-        
+
         # Credible intervals
         alpha = 1 - self.credible_level
-        z_score = stats.norm.ppf(1 - alpha/2)
-        
+        z_score = stats.norm.ppf(1 - alpha / 2)
+
         lower_bounds = y_pred - z_score * y_std
         upper_bounds = y_pred + z_score * y_std
-        
+
         # Uncertainty decomposition (approximate)
         epistemic_std = y_std * 0.7  # Approximate decomposition
         aleatoric_std = y_std * 0.3
-        
+
         prediction_intervals = [
             PredictionInterval(
                 lower=lower_bounds[i],
@@ -396,27 +430,29 @@ class BayesianBounds:
                 confidence_level=self.credible_level,
                 prediction_std=y_std[i],
                 epistemic_uncertainty=epistemic_std[i],
-                aleatoric_uncertainty=aleatoric_std[i]
+                aleatoric_uncertainty=aleatoric_std[i],
             )
             for i in range(len(y_pred))
         ]
-        
-        return y_pred, prediction_intervals[0] if len(prediction_intervals) == 1 else prediction_intervals
+
+        return y_pred, prediction_intervals[0] if len(
+            prediction_intervals
+        ) == 1 else prediction_intervals
 
 
 class CausalBounds:
     """
     Causal effect bounds with unmeasured confounding
     """
-    
+
     def __init__(self, sensitivity_parameter: float = 0.1):
         self.sensitivity_parameter = sensitivity_parameter
-    
+
     def partial_identification_bounds(
         self,
         treated_outcomes: NDArray[np.float64],
         control_outcomes: NDArray[np.float64],
-        confounding_strength: Optional[float] = None
+        confounding_strength: Optional[float] = None,
     ) -> Tuple[float, float, Dict[str, float]]:
         """
         Compute partial identification bounds for average treatment effect
@@ -424,41 +460,41 @@ class CausalBounds:
         """
         if confounding_strength is None:
             confounding_strength = self.sensitivity_parameter
-        
+
         # Observed data
         y1_obs = np.mean(treated_outcomes)
         y0_obs = np.mean(control_outcomes)
         naive_ate = y1_obs - y0_obs
-        
+
         # Bounds under confounding
         # Using Rosenbaum-style sensitivity analysis
         gamma = confounding_strength  # Odds ratio for hidden confounder
-        
+
         # Worst-case bounds
-        p_min = gamma / (1 + gamma)
-        p_max = 1 / (1 + gamma)
-        
+        gamma / (1 + gamma)
+        1 / (1 + gamma)
+
         # Conservative bounds (simplified version)
         worst_case_bias = abs(gamma - 1) / (1 + gamma)
-        
+
         lower_bound = naive_ate - worst_case_bias
         upper_bound = naive_ate + worst_case_bias
-        
+
         diagnostics = {
             "naive_ate": naive_ate,
             "confounding_strength": confounding_strength,
             "worst_case_bias": worst_case_bias,
-            "bound_width": upper_bound - lower_bound
+            "bound_width": upper_bound - lower_bound,
         }
-        
+
         return lower_bound, upper_bound, diagnostics
-    
+
     def sensitivity_analysis(
         self,
         treated_outcomes: NDArray[np.float64],
         control_outcomes: NDArray[np.float64],
         gamma_range: Tuple[float, float] = (1.0, 3.0),
-        n_points: int = 50
+        n_points: int = 50,
     ) -> Dict[str, NDArray[np.float64]]:
         """
         Perform sensitivity analysis across range of confounding strengths
@@ -466,18 +502,18 @@ class CausalBounds:
         gammas = np.linspace(gamma_range[0], gamma_range[1], n_points)
         lower_bounds = np.zeros(n_points)
         upper_bounds = np.zeros(n_points)
-        
+
         for i, gamma in enumerate(gammas):
             self.sensitivity_parameter = gamma
             lb, ub, _ = self.partial_identification_bounds(treated_outcomes, control_outcomes)
             lower_bounds[i] = lb
             upper_bounds[i] = ub
-        
+
         return {
             "gammas": gammas,
             "lower_bounds": lower_bounds,
             "upper_bounds": upper_bounds,
-            "bound_widths": upper_bounds - lower_bounds
+            "bound_widths": upper_bounds - lower_bounds,
         }
 
 
@@ -485,18 +521,18 @@ class StreamingBounds:
     """
     Real-time streaming bounds for online learning
     """
-    
+
     def __init__(
         self,
         window_size: Optional[int] = None,
         decay_factor: float = 0.99,
-        min_observations: int = 10
+        min_observations: int = 10,
     ):
         self.window_size = window_size
         self.decay_factor = decay_factor
         self.min_observations = min_observations
         self.reset()
-    
+
     def reset(self):
         """Reset streaming statistics"""
         self.n = 0
@@ -505,25 +541,25 @@ class StreamingBounds:
         self.buffer = [] if self.window_size else None
         self.weighted_mean = 0.0
         self.weighted_var = 0.0
-        
+
     def update(self, x: float) -> Tuple[float, float]:
         """
         Update with new observation and return (mean, confidence_radius)
         """
         self.n += 1
-        
+
         if self.window_size and self.buffer is not None:
             # Windowed statistics
             self.buffer.append(x)
             if len(self.buffer) > self.window_size:
                 self.buffer.pop(0)
-            
+
             if len(self.buffer) >= self.min_observations:
                 mean = np.mean(self.buffer)
                 var = np.var(self.buffer, ddof=1) if len(self.buffer) > 1 else 0.25
                 n_eff = len(self.buffer)
             else:
-                return 0.0, float('inf')
+                return 0.0, float("inf")
         else:
             # Exponentially weighted statistics
             if self.n == 1:
@@ -534,25 +570,24 @@ class StreamingBounds:
                 delta = x - self.weighted_mean
                 self.weighted_mean += (1 - self.decay_factor) * delta
                 self.weighted_var = (
-                    self.decay_factor * self.weighted_var + 
-                    (1 - self.decay_factor) * delta**2
+                    self.decay_factor * self.weighted_var + (1 - self.decay_factor) * delta**2
                 )
-            
+
             mean = self.weighted_mean
             var = self.weighted_var
             n_eff = min(self.n, 1 / (1 - self.decay_factor))
-        
+
         # Confidence radius using Bennett's inequality for bounded variables
         if n_eff >= self.min_observations:
             alpha = 0.05
             b = 1.0  # Assume bounded in [0,1]
-            
+
             def bennett_bound(t):
-                return var * ((exp(t * b / var) - 1 - t * b / var) / (t * b / var)**2)
-            
+                return var * ((exp(t * b / var) - 1 - t * b / var) / (t * b / var) ** 2)
+
             # Solve for confidence radius
             target = log(2 / alpha) / n_eff
-            
+
             # Binary search for t
             t_low, t_high = 1e-6, 10.0
             for _ in range(20):
@@ -561,11 +596,11 @@ class StreamingBounds:
                     t_high = t_mid
                 else:
                     t_low = t_mid
-            
+
             radius = t_low
         else:
-            radius = float('inf')
-        
+            radius = float("inf")
+
         return mean, radius
 
 
@@ -573,35 +608,36 @@ class MultiObjectiveOptimizer:
     """
     Multi-objective optimization for threshold selection
     """
-    
+
     def __init__(
         self,
         objectives: List[str] = None,
         constraints: List[Callable] = None,
-        method: str = "nsga2"
+        method: str = "nsga2",
     ):
         if objectives is None:
             objectives = ["sensitivity", "specificity", "precision", "f1"]
         self.objectives = objectives
         self.constraints = constraints or []
         self.method = method
-    
+
     def optimize_thresholds(
         self,
         roc_curves: Dict[str, NDArray[np.float64]],
         weights: Optional[Dict[str, float]] = None,
         n_generations: int = 100,
-        population_size: int = 50
+        population_size: int = 50,
     ) -> OptimizationResult:
         """
         Find Pareto-optimal thresholds for multiple objectives
         """
         import time
+
         start_time = time.time()
-        
+
         if weights is None:
             weights = {obj: 1.0 for obj in self.objectives}
-        
+
         # Define objective function
         def evaluate_objectives(thresholds: NDArray[np.float64]) -> NDArray[np.float64]:
             scores = []
@@ -609,71 +645,70 @@ class MultiObjectiveOptimizer:
                 if i < len(thresholds):
                     threshold = thresholds[i]
                     # Find closest ROC point
-                    distances = np.sum((roc - threshold)**2, axis=1)
+                    distances = np.sum((roc - threshold) ** 2, axis=1)
                     closest_idx = np.argmin(distances)
                     fpr, tpr = roc[closest_idx]
-                    
+
                     # Compute objectives
                     sensitivity = tpr
                     specificity = 1 - fpr
                     precision = tpr / (tpr + fpr) if (tpr + fpr) > 0 else 0
                     f1 = 2 * precision * tpr / (precision + tpr) if (precision + tpr) > 0 else 0
-                    
+
                     obj_values = {
                         "sensitivity": sensitivity,
                         "specificity": specificity,
                         "precision": precision,
-                        "f1": f1
+                        "f1": f1,
                     }
-                    
+
                     # Weighted combination
                     weighted_score = sum(
-                        weights.get(obj, 1.0) * obj_values.get(obj, 0.0)
-                        for obj in self.objectives
+                        weights.get(obj, 1.0) * obj_values.get(obj, 0.0) for obj in self.objectives
                     )
                     scores.append(weighted_score)
-            
+
             return np.array(scores)
-        
+
         # Simplified optimization (replace with proper NSGA-II if available)
         best_thresholds = {}
         best_objectives = {}
         pareto_front = []
-        
+
         # Grid search for simplicity (can be replaced with evolutionary algorithm)
         n_points = 20
         for name, roc in roc_curves.items():
             # Sample thresholds along ROC curve
-            indices = np.linspace(0, len(roc)-1, n_points, dtype=int)
+            indices = np.linspace(0, len(roc) - 1, n_points, dtype=int)
             best_score = -np.inf
             best_threshold = None
-            
+
             for idx in indices:
                 threshold = roc[idx]
                 scores = evaluate_objectives(np.array([threshold]))
                 if len(scores) > 0 and scores[0] > best_score:
                     best_score = scores[0]
                     best_threshold = threshold
-            
+
             if best_threshold is not None:
                 best_thresholds[name] = tuple(best_threshold)
                 best_objectives[name] = best_score
                 pareto_front.append(best_threshold)
-        
+
         # Convert to array
         if pareto_front:
             pareto_front_array = np.array(pareto_front)
         else:
             pareto_front_array = np.empty((0, 2))
-        
+
         end_time = time.time()
-        
+
         return OptimizationResult(
             optimal_thresholds=best_thresholds,
             pareto_front=pareto_front_array,
             objective_values=best_objectives,
             convergence_info={"converged": True, "n_evaluations": n_points * len(roc_curves)},
-            computational_time=end_time - start_time
+            computational_time=end_time - start_time,
         )
 
 
@@ -681,35 +716,32 @@ class BanditThresholdSelector:
     """
     Multi-armed bandit for adaptive threshold selection
     """
-    
+
     def __init__(
         self,
         strategy: AdaptiveStrategy = AdaptiveStrategy.UCB,
         exploration_bonus: float = 2.0,
-        window_size: int = 1000
+        window_size: int = 1000,
     ):
         self.strategy = strategy
         self.exploration_bonus = exploration_bonus
         self.window_size = window_size
         self.reset()
-    
+
     def reset(self):
         """Reset bandit state"""
         self.arm_counts = {}
         self.arm_rewards = {}
         self.total_count = 0
         self.recent_rewards = {}
-    
-    def select_threshold(
-        self, 
-        available_thresholds: List[Tuple[str, float]]
-    ) -> Tuple[str, float]:
+
+    def select_threshold(self, available_thresholds: List[Tuple[str, float]]) -> Tuple[str, float]:
         """
         Select threshold using bandit strategy
         """
         if not available_thresholds:
             raise ValueError("No thresholds available")
-        
+
         if self.strategy == AdaptiveStrategy.UCB:
             return self._select_ucb(available_thresholds)
         elif self.strategy == AdaptiveStrategy.THOMPSON_SAMPLING:
@@ -719,42 +751,42 @@ class BanditThresholdSelector:
         else:
             # Random fallback
             return available_thresholds[np.random.randint(len(available_thresholds))]
-    
+
     def _select_ucb(self, thresholds: List[Tuple[str, float]]) -> Tuple[str, float]:
         """Upper Confidence Bound selection"""
         if self.total_count == 0:
             return thresholds[0]  # Arbitrary choice for first selection
-        
+
         best_arm = None
         best_value = -np.inf
-        
+
         for name, threshold in thresholds:
             key = (name, threshold)
-            
+
             if key not in self.arm_counts:
                 # Unvisited arm gets infinite value
                 return name, threshold
-            
+
             mean_reward = self.arm_rewards[key] / self.arm_counts[key]
             confidence_bonus = sqrt(
                 self.exploration_bonus * log(self.total_count) / self.arm_counts[key]
             )
             ucb_value = mean_reward + confidence_bonus
-            
+
             if ucb_value > best_value:
                 best_value = ucb_value
                 best_arm = (name, threshold)
-        
+
         return best_arm if best_arm else thresholds[0]
-    
+
     def _select_thompson(self, thresholds: List[Tuple[str, float]]) -> Tuple[str, float]:
         """Thompson Sampling selection"""
         best_arm = None
         best_sample = -np.inf
-        
+
         for name, threshold in thresholds:
             key = (name, threshold)
-            
+
             if key not in self.arm_counts:
                 # Beta(1, 1) prior for new arms
                 alpha, beta = 1, 1
@@ -764,20 +796,18 @@ class BanditThresholdSelector:
                 failures = self.arm_counts[key] - successes
                 alpha = 1 + successes
                 beta = 1 + failures
-            
+
             # Sample from posterior
             sample = np.random.beta(alpha, beta)
-            
+
             if sample > best_sample:
                 best_sample = sample
                 best_arm = (name, threshold)
-        
+
         return best_arm if best_arm else thresholds[0]
-    
+
     def _select_epsilon_greedy(
-        self, 
-        thresholds: List[Tuple[str, float]], 
-        epsilon: float = 0.1
+        self, thresholds: List[Tuple[str, float]], epsilon: float = 0.1
     ) -> Tuple[str, float]:
         """Epsilon-greedy selection"""
         if np.random.random() < epsilon or self.total_count == 0:
@@ -787,7 +817,7 @@ class BanditThresholdSelector:
             # Exploit
             best_arm = None
             best_reward = -np.inf
-            
+
             for name, threshold in thresholds:
                 key = (name, threshold)
                 if key in self.arm_counts and self.arm_counts[key] > 0:
@@ -795,22 +825,22 @@ class BanditThresholdSelector:
                     if avg_reward > best_reward:
                         best_reward = avg_reward
                         best_arm = (name, threshold)
-            
+
             return best_arm if best_arm else thresholds[0]
-    
+
     def update_reward(self, arm: Tuple[str, float], reward: float):
         """Update bandit with observed reward"""
         key = arm
         self.total_count += 1
-        
+
         if key not in self.arm_counts:
             self.arm_counts[key] = 0
             self.arm_rewards[key] = 0.0
             self.recent_rewards[key] = []
-        
+
         self.arm_counts[key] += 1
         self.arm_rewards[key] += reward
-        
+
         # Maintain sliding window
         self.recent_rewards[key].append(reward)
         if len(self.recent_rewards[key]) > self.window_size:
@@ -821,51 +851,42 @@ class BanditThresholdSelector:
 
 class GPBounds:
     """Gaussian Process-based bounds for complex ROC surfaces"""
-    
+
     def __init__(
-        self,
-        kernel: Optional[Any] = None,
-        acquisition_function: str = "ucb",
-        beta: float = 2.0
+        self, kernel: Optional[Any] = None, acquisition_function: str = "ucb", beta: float = 2.0
     ):
         if not SKLEARN_AVAILABLE:
             raise ImportError("scikit-learn required for GPBounds")
-        
+
         if kernel is None:
             kernel = Matern(length_scale=1.0, nu=2.5) + WhiteKernel(noise_level=1e-6)
-        
+
         self.gpr = GaussianProcessRegressor(
-            kernel=kernel,
-            alpha=1e-10,
-            n_restarts_optimizer=10,
-            normalize_y=True
+            kernel=kernel, alpha=1e-10, n_restarts_optimizer=10, normalize_y=True
         )
         self.acquisition_function = acquisition_function
         self.beta = beta
         self.X_observed = None
         self.y_observed = None
-    
+
     def fit_roc_surface(
-        self, 
-        threshold_pairs: NDArray[np.float64], 
-        youden_values: NDArray[np.float64]
+        self, threshold_pairs: NDArray[np.float64], youden_values: NDArray[np.float64]
     ):
         """Fit GP to observed Youden's J values"""
         self.X_observed = threshold_pairs
         self.y_observed = youden_values
         self.gpr.fit(threshold_pairs, youden_values)
         return self
-    
+
     def predict_with_uncertainty(
-        self, 
-        X_test: NDArray[np.float64]
+        self, X_test: NDArray[np.float64]
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """Predict J values with uncertainty bounds"""
         if self.X_observed is None:
             raise RuntimeError("Must fit model before prediction")
-        
+
         y_mean, y_std = self.gpr.predict(X_test, return_std=True)
-        
+
         if self.acquisition_function == "ucb":
             upper_bounds = y_mean + self.beta * y_std
             lower_bounds = y_mean - self.beta * y_std
@@ -882,26 +903,22 @@ class GPBounds:
             ei = (y_mean - best_observed) * stats.norm.cdf(z) + y_std * stats.norm.pdf(z)
             upper_bounds = y_mean + ei
             lower_bounds = y_mean - ei
-        
+
         return y_mean, lower_bounds, upper_bounds
-    
+
     def suggest_next_evaluation(
-        self,
-        bounds: Tuple[Tuple[float, float], Tuple[float, float]],
-        n_candidates: int = 1000
+        self, bounds: Tuple[Tuple[float, float], Tuple[float, float]], n_candidates: int = 1000
     ) -> NDArray[np.float64]:
         """Suggest next threshold pair to evaluate using acquisition function"""
         # Generate candidate points
         (x1_min, x1_max), (x2_min, x2_max) = bounds
         candidates = np.random.uniform(
-            low=[x1_min, x2_min],
-            high=[x1_max, x2_max],
-            size=(n_candidates, 2)
+            low=[x1_min, x2_min], high=[x1_max, x2_max], size=(n_candidates, 2)
         )
-        
+
         # Evaluate acquisition function
         _, _, acq_values = self.predict_with_uncertainty(candidates)
-        
+
         # Return best candidate
         best_idx = np.argmax(acq_values)
         return candidates[best_idx]
@@ -909,53 +926,43 @@ class GPBounds:
 
 class DistributedROCAnalyzer:
     """Distributed computation for large-scale ROC analysis"""
-    
-    def __init__(
-        self,
-        n_workers: int = 4,
-        chunk_size: int = 1000,
-        use_gpu: bool = False
-    ):
+
+    def __init__(self, n_workers: int = 4, chunk_size: int = 1000, use_gpu: bool = False):
         self.n_workers = n_workers
         self.chunk_size = chunk_size
         self.use_gpu = use_gpu and GPU_AVAILABLE
         self.executor = ThreadPoolExecutor(max_workers=n_workers)
-    
+
     def parallel_frechet_bounds(
         self,
         roc_curves_a: List[NDArray[np.float64]],
         roc_curves_b: List[NDArray[np.float64]],
-        comp: Literal["AND", "OR"] = "AND"
+        comp: Literal["AND", "OR"] = "AND",
     ) -> List[float]:
         """Compute Fréchet bounds for multiple ROC curve pairs in parallel"""
         if len(roc_curves_a) != len(roc_curves_b):
             raise ValueError("Must have equal number of ROC curves")
-        
+
         # Create work chunks
         pairs = list(zip(roc_curves_a, roc_curves_b))
-        chunks = [
-            pairs[i:i + self.chunk_size] 
-            for i in range(0, len(pairs), self.chunk_size)
-        ]
-        
+        chunks = [pairs[i : i + self.chunk_size] for i in range(0, len(pairs), self.chunk_size)]
+
         # Submit work to thread pool
         futures = []
         for chunk in chunks:
             future = self.executor.submit(self._process_chunk, chunk, comp)
             futures.append(future)
-        
+
         # Collect results
         results = []
         for future in as_completed(futures):
             chunk_results = future.result()
             results.extend(chunk_results)
-        
+
         return results
-    
+
     def _process_chunk(
-        self,
-        roc_pairs: List[Tuple[NDArray[np.float64], NDArray[np.float64]]],
-        comp: str
+        self, roc_pairs: List[Tuple[NDArray[np.float64], NDArray[np.float64]]], comp: str
     ) -> List[float]:
         """Process a chunk of ROC pairs"""
         results = []
@@ -963,7 +970,7 @@ class DistributedROCAnalyzer:
             bound = frechet_upper(roc_a, roc_b, comp=comp, use_gpu=self.use_gpu)
             results.append(bound)
         return results
-    
+
     def shutdown(self):
         """Clean up resources"""
         self.executor.shutdown(wait=True)
@@ -971,90 +978,88 @@ class DistributedROCAnalyzer:
 
 class UncertaintyQuantifier:
     """Advanced uncertainty quantification for bounds"""
-    
+
     def __init__(self, method: str = "bootstrap"):
         self.method = method
         self.bootstrap_samples = None
-    
+
     def quantify_bound_uncertainty(
         self,
         roc_a: ROCArrayLike,
         roc_b: ROCArrayLike,
         comp: Literal["AND", "OR"] = "AND",
         n_bootstrap: int = 1000,
-        confidence_level: float = 0.95
+        confidence_level: float = 0.95,
     ) -> Dict[str, float]:
         """
         Quantify uncertainty in Fréchet bounds using bootstrap
         """
         roc_a_array = _to_array_roc(roc_a)
         roc_b_array = _to_array_roc(roc_b)
-        
+
         if self.method == "bootstrap":
             return self._bootstrap_uncertainty(
                 roc_a_array, roc_b_array, comp, n_bootstrap, confidence_level
             )
         elif self.method == "jackknife":
-            return self._jackknife_uncertainty(
-                roc_a_array, roc_b_array, comp, confidence_level
-            )
+            return self._jackknife_uncertainty(roc_a_array, roc_b_array, comp, confidence_level)
         else:
             raise ValueError(f"Unknown uncertainty method: {self.method}")
-    
+
     def _bootstrap_uncertainty(
         self,
         roc_a: NDArray[np.float64],
         roc_b: NDArray[np.float64],
         comp: str,
         n_bootstrap: int,
-        confidence_level: float
+        confidence_level: float,
     ) -> Dict[str, float]:
         """Bootstrap uncertainty estimation"""
         bootstrap_bounds = []
-        
+
         for _ in range(n_bootstrap):
             # Resample ROC points
             n_a, n_b = len(roc_a), len(roc_b)
             idx_a = np.random.choice(n_a, size=n_a, replace=True)
             idx_b = np.random.choice(n_b, size=n_b, replace=True)
-            
+
             roc_a_boot = roc_a[idx_a]
             roc_b_boot = roc_b[idx_b]
-            
+
             # Compute bound
             bound = frechet_upper(roc_a_boot, roc_b_boot, comp=comp)
             bootstrap_bounds.append(bound)
-        
+
         self.bootstrap_samples = np.array(bootstrap_bounds)
-        
+
         # Compute statistics
         alpha = 1 - confidence_level
         lower_percentile = 100 * alpha / 2
         upper_percentile = 100 * (1 - alpha / 2)
-        
+
         return {
             "mean": float(np.mean(self.bootstrap_samples)),
             "std": float(np.std(self.bootstrap_samples)),
             "confidence_interval": [
                 float(np.percentile(self.bootstrap_samples, lower_percentile)),
-                float(np.percentile(self.bootstrap_samples, upper_percentile))
+                float(np.percentile(self.bootstrap_samples, upper_percentile)),
             ],
             "confidence_level": confidence_level,
             "method": "bootstrap",
-            "n_samples": n_bootstrap
+            "n_samples": n_bootstrap,
         }
-    
+
     def _jackknife_uncertainty(
         self,
         roc_a: NDArray[np.float64],
         roc_b: NDArray[np.float64],
         comp: str,
-        confidence_level: float
+        confidence_level: float,
     ) -> Dict[str, float]:
         """Jackknife uncertainty estimation"""
         n_a, n_b = len(roc_a), len(roc_b)
         jackknife_bounds = []
-        
+
         # Leave-one-out for ROC A
         for i in range(n_a):
             mask = np.ones(n_a, dtype=bool)
@@ -1062,7 +1067,7 @@ class UncertaintyQuantifier:
             roc_a_jack = roc_a[mask]
             bound = frechet_upper(roc_a_jack, roc_b, comp=comp)
             jackknife_bounds.append(bound)
-        
+
         # Leave-one-out for ROC B
         for i in range(n_b):
             mask = np.ones(n_b, dtype=bool)
@@ -1070,33 +1075,31 @@ class UncertaintyQuantifier:
             roc_b_jack = roc_b[mask]
             bound = frechet_upper(roc_a, roc_b_jack, comp=comp)
             jackknife_bounds.append(bound)
-        
+
         jackknife_bounds = np.array(jackknife_bounds)
-        
+
         # Jackknife statistics
         mean_bound = np.mean(jackknife_bounds)
         jackknife_var = ((n_a + n_b - 1) / (n_a + n_b)) * np.var(jackknife_bounds)
         se = sqrt(jackknife_var)
-        
+
         # Confidence interval
         alpha = 1 - confidence_level
-        t_critical = stats.t.ppf(1 - alpha/2, df=n_a + n_b - 2)
+        t_critical = stats.t.ppf(1 - alpha / 2, df=n_a + n_b - 2)
         margin = t_critical * se
-        
+
         return {
             "mean": float(mean_bound),
             "std": float(se),
-            "confidence_interval": [
-                float(mean_bound - margin),
-                float(mean_bound + margin)
-            ],
+            "confidence_interval": [float(mean_bound - margin), float(mean_bound + margin)],
             "confidence_level": confidence_level,
             "method": "jackknife",
-            "n_samples": n_a + n_b
+            "n_samples": n_a + n_b,
         }
 
 
 # ---- Enhanced Versions of Original Functions -------------------------------
+
 
 def frechet_upper(
     roc_a: ROCArrayLike,
@@ -1107,7 +1110,7 @@ def frechet_upper(
     add_anchors: bool = False,
     use_gpu: bool = False,
     uncertainty: bool = False,
-    n_bootstrap: int = 1000
+    n_bootstrap: int = 1000,
 ) -> Union[float, Tuple[float, Dict[str, float]]]:
     """
     Enhanced Fréchet upper bound with optional uncertainty quantification
@@ -1125,7 +1128,7 @@ def frechet_upper(
             A = torch.from_numpy(A).cuda().float()
         if isinstance(B, np.ndarray):
             B = torch.from_numpy(B).cuda().float()
-        
+
         bound = _compute_frechet_gpu(A, B, comp)
     else:
         # CPU computation (original)
@@ -1133,16 +1136,14 @@ def frechet_upper(
             A = A.cpu().numpy()
         if torch is not None and isinstance(B, torch.Tensor):
             B = B.cpu().numpy()
-        
+
         bound = _compute_frechet_cpu(A, B, comp)
-    
+
     if uncertainty:
         uq = UncertaintyQuantifier()
-        uncertainty_info = uq.quantify_bound_uncertainty(
-            A, B, comp=comp, n_bootstrap=n_bootstrap
-        )
+        uncertainty_info = uq.quantify_bound_uncertainty(A, B, comp=comp, n_bootstrap=n_bootstrap)
         return bound, uncertainty_info
-    
+
     return bound
 
 
@@ -1167,17 +1168,17 @@ def _compute_frechet_cpu(A: NDArray[np.float64], B: NDArray[np.float64], comp: s
 
     if not Jgrid.size:
         return 0.0
-    
+
     Jgrid = np.nan_to_num(Jgrid, nan=-1.0, posinf=1.0, neginf=-1.0)
     jmax = float(np.max(Jgrid))
     return float(np.clip(jmax, -1.0, 1.0))
 
 
-def _compute_frechet_gpu(A: 'torch.Tensor', B: 'torch.Tensor', comp: str) -> float:
+def _compute_frechet_gpu(A: "torch.Tensor", B: "torch.Tensor", comp: str) -> float:
     """GPU implementation of Fréchet bound computation"""
     if not GPU_AVAILABLE or torch is None:
         raise RuntimeError("GPU computation requested but not available")
-    
+
     FPR_a = A[:, 0].unsqueeze(1)  # (Na, 1)
     TPR_a = A[:, 1].unsqueeze(1)  # (Na, 1)
     FPR_b = B[:, 0].unsqueeze(0)  # (1, Nb)
@@ -1197,7 +1198,7 @@ def _compute_frechet_gpu(A: 'torch.Tensor', B: 'torch.Tensor', comp: str) -> flo
 
     if Jgrid.numel() == 0:
         return 0.0
-    
+
     # Handle NaN/inf values
     Jgrid = torch.nan_to_num(Jgrid, nan=-1.0, posinf=1.0, neginf=-1.0)
     jmax = torch.max(Jgrid).item()
@@ -1205,6 +1206,7 @@ def _compute_frechet_gpu(A: 'torch.Tensor', B: 'torch.Tensor', comp: str) -> flo
 
 
 # ---- Backward Compatibility Preserved -------------------------------------
+
 
 # All original functions are preserved with their exact signatures
 def fh_and_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -1227,8 +1229,12 @@ def fh_or_bounds_n(alphas: NDArray[np.float64]) -> Tuple[NDArray[np.float64], ND
 
 
 def fh_intervals(
-    tpr_a: float, tpr_b: float, fpr_a: float, fpr_b: float,
-    *, alpha_cap: Optional[float] = None,
+    tpr_a: float,
+    tpr_b: float,
+    fpr_a: float,
+    fpr_b: float,
+    *,
+    alpha_cap: Optional[float] = None,
     cap_mode: Literal["error", "clip"] = "error",
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
     """Original FH intervals implementation (preserved)"""
@@ -1240,7 +1246,7 @@ def fh_intervals(
     U1 = min(tpr_a, tpr_b)
     L0 = max(fpr_a, fpr_b)
     U0 = min(1.0, fpr_a + fpr_b)
-    
+
     if alpha_cap is not None:
         if not (0.0 <= alpha_cap <= 1.0) or not np.isfinite(alpha_cap):
             raise ValueError(f"alpha_cap must be a finite probability in [0,1]. Got {alpha_cap}.")
@@ -1271,13 +1277,16 @@ def fh_var_envelope(interval: Tuple[float, float]) -> float:
 # cc_confint, needed_n_bernstein, needed_n_bernstein_int) are preserved as-is
 # but can be enhanced with the new classes for more advanced use cases.
 
+
 # Original implementations preserved exactly
 def bernstein_tail(*args, t=None, eps=None, n=None, vbar=None, D=1.0, two_sided=True) -> float:
     """Original Bernstein tail implementation (preserved)"""
     if args:
         if len(args) == 3 and all(a is not None for a in args):
             n_pos, eps_pos, vbar_pos = args
-            n = int(n_pos); eps = float(eps_pos); vbar = float(vbar_pos)
+            n = int(n_pos)
+            eps = float(eps_pos)
+            vbar = float(vbar_pos)
         else:
             raise TypeError("Legacy positional call must be bernstein_tail(n, eps, vbar).")
 
@@ -1307,7 +1316,7 @@ def bernstein_tail(*args, t=None, eps=None, n=None, vbar=None, D=1.0, two_sided=
     if denom <= 0.0:
         return 1.0
 
-    exponent = - (n * eps * eps) / denom
+    exponent = -(n * eps * eps) / denom
     base = exp(exponent)
     prob = (2.0 * base) if two_sided else base
     return float(0.0 if prob < 0.0 else (1.0 if prob > 1.0 else prob))
@@ -1344,9 +1353,14 @@ def invert_bernstein_eps(n: int, vbar: float, delta: float) -> float:
 
 
 def cc_two_sided_bound(
-    n1: int, n0: int, t: float, D: float,
-    I1: Tuple[float, float], I0: Tuple[float, float],
-    *, cap_at_one: bool = False,
+    n1: int,
+    n0: int,
+    t: float,
+    D: float,
+    I1: Tuple[float, float],
+    I0: Tuple[float, float],
+    *,
+    cap_at_one: bool = False,
 ) -> float:
     """Original CC two-sided bound implementation (preserved)"""
     if D <= 0.0:
@@ -1355,15 +1369,23 @@ def cc_two_sided_bound(
         raise ValueError("t must be >= 0.")
     v1 = fh_var_envelope(I1)
     v0 = fh_var_envelope(I0)
-    s = bernstein_tail(t=t, n=n1, vbar=v1, D=D, two_sided=True) + \
-        bernstein_tail(t=t, n=n0, vbar=v0, D=D, two_sided=True)
+    s = bernstein_tail(t=t, n=n1, vbar=v1, D=D, two_sided=True) + bernstein_tail(
+        t=t, n=n0, vbar=v0, D=D, two_sided=True
+    )
     return min(1.0, s) if cap_at_one else s
 
 
 def cc_confint(
-    n1: int, n0: int, p1_hat: float, p0_hat: float, D: float,
-    I1: Tuple[float, float], I0: Tuple[float, float],
-    *, delta: float = 0.05, split: Optional[Tuple[float, float]] = None,
+    n1: int,
+    n0: int,
+    p1_hat: float,
+    p0_hat: float,
+    D: float,
+    I1: Tuple[float, float],
+    I0: Tuple[float, float],
+    *,
+    delta: float = 0.05,
+    split: Optional[Tuple[float, float]] = None,
     clamp01: bool = False,
 ) -> Tuple[float, float]:
     """Original CC confidence interval implementation (preserved)"""
@@ -1374,7 +1396,7 @@ def cc_confint(
             raise ValueError(f"{nm} must be a finite probability in [0,1]. Got {x}.")
     if not (0.0 < delta < 1.0):
         raise ValueError("delta must be in (0,1).")
-    
+
     if split is None:
         d1 = d0 = 0.5 * delta
     else:
@@ -1395,15 +1417,20 @@ def cc_confint(
 
 
 def needed_n_bernstein(
-    t: float, D: float, I1: Tuple[float, float], I0: Tuple[float, float],
-    *, delta: float = 0.05, split: Optional[Tuple[float, float]] = None,
+    t: float,
+    D: float,
+    I1: Tuple[float, float],
+    I0: Tuple[float, float],
+    *,
+    delta: float = 0.05,
+    split: Optional[Tuple[float, float]] = None,
 ) -> Tuple[float, float]:
     """Original sample size calculation implementation (preserved)"""
     if t <= 0.0 or D <= 0.0:
         raise ValueError("t and D must be > 0.")
     if not (0.0 < delta < 1.0):
         raise ValueError("delta must be in (0,1).")
-    
+
     if split is None:
         d1 = d0 = 0.5 * delta
     else:
@@ -1411,8 +1438,8 @@ def needed_n_bernstein(
         if d1 <= 0.0 or d0 <= 0.0 or abs((d1 + d0) - delta) > 1e-12:
             raise ValueError("split must be positive and sum to delta.")
 
-    v1 = fh_var_envelope(I1)
-    v0 = fh_var_envelope(I0)
+    fh_var_envelope(I1)
+    fh_var_envelope(I0)
 
     def n_star(vbar: float, dely: float) -> float:
         num = 2.0 * vbar + (2.0 / 3.0) * t * D

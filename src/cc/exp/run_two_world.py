@@ -18,24 +18,27 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import yaml
 
-# Framework imports
-from ..core.attackers import GeneticAlgorithmAttacker, RandomInjectionAttacker
-from ..core.logging import ChainedJSONLLogger, audit_context
-from ..core.models import AttackResult, GuardrailSpec, WorldConfig
-from ..core.protocol import TwoWorldProtocol
-from ..core.stats import bootstrap_ci_j_statistic
 from ..analysis.ci import bootstrap_ci, wilson_ci
-from ..core.metrics import cc_max as cc_max_metric, delta_add as delta_add_metric, youden_j
-from ..io.storage import LocalStorageBackend, dataset_hash_from_config
 
 # Cartographer audit (tamper-evident chain helpers)
 from ..cartographer import audit as cart_audit
+
+# Framework imports
+from ..core.attackers import GeneticAlgorithmAttacker, RandomInjectionAttacker
+from ..core.logging import ChainedJSONLLogger, audit_context
+from ..core.metrics import cc_max as cc_max_metric
+from ..core.metrics import delta_add as delta_add_metric
+from ..core.metrics import youden_j
+from ..core.models import AttackResult, GuardrailSpec, WorldConfig
+from ..core.protocol import TwoWorldProtocol
+from ..io.storage import LocalStorageBackend, dataset_hash_from_config
 
 logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
 # Config utilities
 # --------------------------------------------------------------------------- #
+
 
 def load_config(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -83,6 +86,7 @@ def _sha256_hex(s: str) -> str:
 # Determinism & Env
 # --------------------------------------------------------------------------- #
 
+
 def _set_determinism(seed: int) -> None:
     """
     Make the run as deterministic as feasible:
@@ -95,13 +99,19 @@ def _set_determinism(seed: int) -> None:
     np.random.seed(seed)
 
     # Thread caps (avoid nondeterministic scheduling)
-    for var in ("OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "OMP_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    for var in (
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OMP_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    ):
         os.environ.setdefault(var, "1")
 
 
 # --------------------------------------------------------------------------- #
 # Factories (aligned to your YAML)
 # --------------------------------------------------------------------------- #
+
 
 def create_attacker(cfg: dict):
     a = cfg.get("attacker", {}) or {}
@@ -120,8 +130,9 @@ def create_attacker(cfg: dict):
 
     if a_type == "genetic_algorithm":
         # GeneticAlgorithmAttacker(vocab)
-        vocab = (a_params.get("vocab", []) or
-                 a_params.get("vocab_harmful", []) + a_params.get("vocab_benign", []))
+        vocab = a_params.get("vocab", []) or a_params.get("vocab_harmful", []) + a_params.get(
+            "vocab_benign", []
+        )
         if not vocab:
             vocab = ["attack", "hack", "exploit", "malicious", "test", "probe"]
         return GeneticAlgorithmAttacker(vocab)
@@ -142,7 +153,7 @@ def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
 
     # World 1 (guardrails)
     guardrail_specs: List[GuardrailSpec] = []
-    for g in (cfg.get("guardrails") or []):
+    for g in cfg.get("guardrails") or []:
         guardrail_specs.append(
             GuardrailSpec(
                 name=g["name"],
@@ -163,6 +174,7 @@ def create_world_configs(cfg: dict) -> Dict[int, WorldConfig]:
 # --------------------------------------------------------------------------- #
 # Analysis (maps to your memo/plots naming)
 # --------------------------------------------------------------------------- #
+
 
 def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int, float]:
     """Return world-indexed FPRs using calibration metadata when available."""
@@ -197,13 +209,15 @@ def _resolve_world_fprs(calibration_summary: Dict[str, Any] | None) -> Dict[int,
     for entry in guardrails:
         fpr = float(entry.get("fpr", 0.0))
         fpr = max(0.0, min(1.0, fpr))
-        comp_survival *= (1.0 - fpr)
+        comp_survival *= 1.0 - fpr
     world_fprs[1] = 1.0 - comp_survival
 
     return world_fprs
 
 
-def analyze_results(results: List[AttackResult], calibration_summary: Dict[str, Any] | None = None) -> dict:
+def analyze_results(
+    results: List[AttackResult], calibration_summary: Dict[str, Any] | None = None
+) -> dict:
     """Compute success rates, operating points, and CC metrics for the two worlds."""
     w0 = np.array([r.success for r in results if r.world_bit == 0], dtype=float)
     w1 = np.array([r.success for r in results if r.world_bit == 1], dtype=float)
@@ -220,7 +234,7 @@ def analyze_results(results: List[AttackResult], calibration_summary: Dict[str, 
     fpr_world0 = world_fprs.get(0, 0.0)
     fpr_world1 = world_fprs.get(1, 0.0)
 
-    j_emp = p0_hat - p1_hat      # reduction in attacker success (higher is better)
+    j_emp = p0_hat - p1_hat  # reduction in attacker success (higher is better)
 
     rng = np.random.default_rng(123)
     delta_samples = []
@@ -253,7 +267,11 @@ def analyze_results(results: List[AttackResult], calibration_summary: Dict[str, 
     }
 
     return {
-        "sample_sizes": {"world_0": int(w0.size), "world_1": int(w1.size), "total": int(w0.size + w1.size)},
+        "sample_sizes": {
+            "world_0": int(w0.size),
+            "world_1": int(w1.size),
+            "total": int(w0.size + w1.size),
+        },
         "success_rates": {"world_0_empirical": p0_hat, "world_1_empirical": p1_hat},
         "operating_points": {
             "world_0": {"tpr": tpr_world0, "fpr": fpr_world0},
@@ -268,7 +286,10 @@ def analyze_results(results: List[AttackResult], calibration_summary: Dict[str, 
         "metrics_for_audit": metrics,  # exact block to drop into the audit event
     }
 
-def _bootstrap_delta(arr0: np.ndarray, arr1: np.ndarray, alpha: float, seed: int = 2025) -> Tuple[float, float, float]:
+
+def _bootstrap_delta(
+    arr0: np.ndarray, arr1: np.ndarray, alpha: float, seed: int = 2025
+) -> Tuple[float, float, float]:
     """Bootstrap CI for difference in success rates."""
     if arr0.size == 0 or arr1.size == 0:
         return float("nan"), float("nan"), float("nan")
@@ -282,7 +303,9 @@ def _bootstrap_delta(arr0: np.ndarray, arr1: np.ndarray, alpha: float, seed: int
     return float(np.mean(reps)), float(ci_lo), float(ci_hi)
 
 
-def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _build_csv_rows(
+    results: List[AttackResult], alpha_cap: float, calibration: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     """Construct per-prefix metrics for scan.csv."""
     rows: List[Dict[str, Any]] = []
     world_fprs = _resolve_world_fprs(calibration)
@@ -360,11 +383,11 @@ def _build_csv_rows(results: List[AttackResult], alpha_cap: float, calibration: 
 # Provenance & audit helpers
 # --------------------------------------------------------------------------- #
 
+
 def _git_commit(repo_root: Path) -> str:
     try:
         out = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True, text=True, cwd=str(repo_root)
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=str(repo_root)
         )
         return out.stdout.strip() if out.returncode == 0 else "unknown"
     except Exception:
@@ -377,8 +400,8 @@ def _repo_root() -> Path:
 
 
 def _audit_cfg(full_cfg: dict, n_sessions: int, seed: int | None) -> dict:
-    exp = (full_cfg.get("experiment") or {})
-    proto = (full_cfg.get("protocol") or {})
+    exp = full_cfg.get("experiment") or {}
+    proto = full_cfg.get("protocol") or {}
     return {
         "A": "A",
         "B": "B",
@@ -394,8 +417,11 @@ def _audit_cfg(full_cfg: dict, n_sessions: int, seed: int | None) -> dict:
 # Main
 # --------------------------------------------------------------------------- #
 
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Run two-world experiment (deterministic, audit-logged)")
+    ap = argparse.ArgumentParser(
+        description="Run two-world experiment (deterministic, audit-logged)"
+    )
     ap.add_argument("--config", required=True, help="YAML config file")
     ap.add_argument("--n", type=int, help="Override number of sessions")
     ap.add_argument("--audit", help="Audit JSONL path (default: runs/audit.jsonl)")
@@ -404,7 +430,9 @@ def main() -> None:
     ap.add_argument("--out-csv", help="Write per-session metrics CSV here")
     ap.add_argument("--calibration-summary", help="Optional JSON file from calibration script")
     ap.add_argument("--seed", type=int, help="Override global seed")
-    ap.add_argument("--set", nargs="*", default=[], help="Overrides: key=val (e.g., protocol.epsilon=0.02)")
+    ap.add_argument(
+        "--set", nargs="*", default=[], help="Overrides: key=val (e.g., protocol.epsilon=0.02)"
+    )
     ap.add_argument("--experiment-id", default=None, help="Optional tag for this run")
     args = ap.parse_args()
 
@@ -477,15 +505,17 @@ def main() -> None:
     )
 
     # Audited operation
-    with audit_context(logger, "two_world_run",
-                       exp_id=exp_id,
-                       config_file=args.config,
-                       config_sha256=cfg_sha,
-                       git_commit=git_sha,
-                       n_sessions=n_sessions,
-                       seed=seed,
-                       calibration_summary=calibration_summary) as op_id:
-
+    with audit_context(
+        logger,
+        "two_world_run",
+        exp_id=exp_id,
+        config_file=args.config,
+        config_sha256=cfg_sha,
+        git_commit=git_sha,
+        n_sessions=n_sessions,
+        seed=seed,
+        calibration_summary=calibration_summary,
+    ):
         print(f"Starting experiment: n_sessions={n_sessions} (exp_id={exp_id})")
 
         # Run
@@ -549,7 +579,7 @@ def main() -> None:
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({k: row.get(k, "") for k in header})
-                           
+
         # Cartographer audit record (tamper-evident)
         decision = (
             f"DECISION: {'DEPLOY' if metrics_for_audit['CC_max'] >= 1.0 else 'REDESIGN'} "
@@ -573,11 +603,17 @@ def main() -> None:
             cfg=cfg_slice,
             cfg_full=cfg_full,
             j_a=float(metrics_for_audit["J_A"]),
-            j_a_ci=None if metrics_for_audit.get("J_A_CI") in (None, [], ()) else tuple(metrics_for_audit["J_A_CI"]),  # type: ignore
+            j_a_ci=None
+            if metrics_for_audit.get("J_A_CI") in (None, [], ())
+            else tuple(metrics_for_audit["J_A_CI"]),  # type: ignore
             j_b=float(metrics_for_audit["J_B"]),
-            j_b_ci=None if metrics_for_audit.get("J_B_CI") in (None, [], ()) else tuple(metrics_for_audit["J_B_CI"]),  # type: ignore
+            j_b_ci=None
+            if metrics_for_audit.get("J_B_CI") in (None, [], ())
+            else tuple(metrics_for_audit["J_B_CI"]),  # type: ignore
             j_comp=float(metrics_for_audit["J_comp"]),
-            j_comp_ci=None if metrics_for_audit.get("J_comp_CI") in (None, [], ()) else tuple(metrics_for_audit["J_comp_CI"]),  # type: ignore
+            j_comp_ci=None
+            if metrics_for_audit.get("J_comp_CI") in (None, [], ())
+            else tuple(metrics_for_audit["J_comp_CI"]),  # type: ignore
             cc_max=float(metrics_for_audit["CC_max"]),
             delta_add=float(metrics_for_audit["Delta_add"]),
             decision=decision,

@@ -9,7 +9,6 @@ from typing import List, Optional
 
 import matplotlib.pyplot as plt
 
-
 NUMERIC_FIELDS = {
     "tpr_a",
     "tpr_b",
@@ -65,8 +64,14 @@ def figure_ci_widths(row: dict, out_path: Path) -> None:
     ax.set_ylabel("Interval width")
     ax.set_title("Wilson vs Bootstrap CI width")
     for rect, width in zip(bars, widths):
-        ax.text(rect.get_x() + rect.get_width() / 2, rect.get_height(), f"{width:.3f}",
-                ha="center", va="bottom", fontsize=9)
+        ax.text(
+            rect.get_x() + rect.get_width() / 2,
+            rect.get_height(),
+            f"{width:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
     plt.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=200)
@@ -99,9 +104,15 @@ def figure_roc_slice(row: dict, out_path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create Week 5 diagnostic figures")
-    parser.add_argument("--scan", default="results/week5_scan/scan.csv", help="CSV produced by run_two_world")
-    parser.add_argument("--out-ci", default="figures/week5_ci_comparison.png", help="Path to CI comparison figure")
-    parser.add_argument("--out-roc", default="figures/week5_roc_slice.png", help="Path to ROC slice figure")
+    parser.add_argument(
+        "--scan", default="results/week5_scan/scan.csv", help="CSV produced by run_two_world"
+    )
+    parser.add_argument(
+        "--out-ci", default="figures/week5_ci_comparison.png", help="Path to CI comparison figure"
+    )
+    parser.add_argument(
+        "--out-roc", default="figures/week5_roc_slice.png", help="Path to ROC slice figure"
+    )
     args = parser.parse_args()
 
     scan_path = Path(args.scan)

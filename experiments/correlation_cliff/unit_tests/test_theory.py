@@ -28,20 +28,19 @@ Optional:
 from __future__ import annotations
 
 import math
-import os
 import time
 import warnings
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
 import pytest
 
 from . import theory as th
 
-
 # ---------------------------------------------------------------------
 # Fixtures: isolation
 # ---------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _restore_config():
@@ -59,6 +58,7 @@ def rng():
 # Helper utilities (test-local)
 # ---------------------------------------------------------------------
 
+
 def rand_marginals(rng: np.random.Generator, n: int) -> Tuple[np.ndarray, np.ndarray]:
     pA = rng.uniform(1e-6, 1 - 1e-6, size=n)
     pB = rng.uniform(1e-6, 1 - 1e-6, size=n)
@@ -70,7 +70,9 @@ def rand_feasible_joint(rng: np.random.Generator, pA: float, pB: float) -> float
     return float(lo if lo == hi else rng.uniform(lo, hi))
 
 
-def interval_gap_bruteforce(i0: Tuple[float, float], i1: Tuple[float, float], grid: int = 4001) -> Tuple[float, float]:
+def interval_gap_bruteforce(
+    i0: Tuple[float, float], i1: Tuple[float, float], grid: int = 4001
+) -> Tuple[float, float]:
     a, b = i0
     c, d = i1
     xs = np.linspace(a, b, grid)
@@ -92,6 +94,7 @@ def interval_gap_bruteforce(i0: Tuple[float, float], i1: Tuple[float, float], gr
 # ---------------------------------------------------------------------
 # Basic contract tests: config + errors
 # ---------------------------------------------------------------------
+
 
 def test_set_config_unknown_field_raises():
     with pytest.raises(th.InputValidationError):
@@ -121,6 +124,7 @@ def test_invariant_raise_raises():
 # ---------------------------------------------------------------------
 # FH bounds: golden + properties
 # ---------------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "pA,pB,lo,hi",
@@ -154,7 +158,7 @@ def test_validate_joint_rejects_infeasible():
     with pytest.raises(th.FeasibilityError):
         th.validate_joint(0.2, 0.3, 0.25)  # hi=min=0.2
     with pytest.raises(th.FeasibilityError):
-        th.validate_joint(0.9, 0.9, 0.7)   # lo=0.8
+        th.validate_joint(0.9, 0.9, 0.7)  # lo=0.8
 
 
 def test_validate_joint_clips_within_eps():
@@ -176,13 +180,14 @@ def test_prob_validation_rejects_bad(p):
 # Composition: exact identities + bounds are tight
 # ---------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "rule,pA,pB,p11,expected",
     [
         ("AND", 0.2, 0.3, 0.1, 0.1),
         ("AND", 0.9, 0.9, 0.85, 0.85),
-        ("OR",  0.2, 0.3, 0.1, 0.4),
-        ("OR",  0.2, 0.3, 0.0, 0.5),
+        ("OR", 0.2, 0.3, 0.1, 0.4),
+        ("OR", 0.2, 0.3, 0.0, 0.5),
         ("COND_OR", 0.2, 0.3, 0.0, 0.2 + (1 - 0.2) * 0.3),
         ("COND_OR", 0.2, 0.3, 0.2, 0.2 + (1 - 0.2) * 0.3),
     ],
@@ -240,6 +245,7 @@ def test_and_monotone_in_p11(pA, pB):
 # Dependence paths: FH family (golden + monotonicity + endpoints)
 # ---------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.9, 0.9), (0.1, 0.95), (0.55, 0.11)])
 def test_fh_linear_endpoints(pA, pB):
     lo, hi = th.fh_bounds(pA, pB)
@@ -247,7 +253,9 @@ def test_fh_linear_endpoints(pA, pB):
     assert th.p11_from_lambda("fh_linear", 1.0, pA, pB) == pytest.approx(hi)
 
 
-@pytest.mark.parametrize("pA,pB,power", [(0.2, 0.3, 0.5), (0.2, 0.3, 2.0), (0.9, 0.9, 3.0), (0.55, 0.11, 1.7)])
+@pytest.mark.parametrize(
+    "pA,pB,power", [(0.2, 0.3, 0.5), (0.2, 0.3, 2.0), (0.9, 0.9, 3.0), (0.55, 0.11, 1.7)]
+)
 def test_fh_power_endpoints(pA, pB, power):
     lo, hi = th.fh_bounds(pA, pB)
     assert th.p11_from_lambda("fh_power", 0.0, pA, pB, {"power": power}) == pytest.approx(lo)
@@ -262,7 +270,10 @@ def test_fh_scurve_midpoint(pA, pB, alpha):
     assert got == pytest.approx(mid, abs=1e-12)
 
 
-@pytest.mark.parametrize("path,params", [("fh_linear", None), ("fh_power", {"power": 2.3}), ("fh_scurve", {"alpha": 9.0})])
+@pytest.mark.parametrize(
+    "path,params",
+    [("fh_linear", None), ("fh_power", {"power": 2.3}), ("fh_scurve", {"alpha": 9.0})],
+)
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.9, 0.9), (0.33, 0.77)])
 def test_fh_paths_monotone_in_lambda(path, params, pA, pB):
     grid = np.linspace(0.0, 1.0, 101)
@@ -296,6 +307,7 @@ def test_p11_from_lambda_rejects_bad_lambda(bad_lam):
 # Clayton copula: limits + monotonicity + feasibility
 # ---------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.9, 0.9), (0.33, 0.77), (0.5, 0.5)])
 def test_clayton_theta0_is_independence(pA, pB):
     assert th.p11_clayton_copula(pA, pB, theta=0.0) == pytest.approx(pA * pB, abs=1e-12)
@@ -326,29 +338,42 @@ def test_clayton_output_is_fh_feasible(pA, pB, theta):
 # Gaussian copula: MC determinism + sanity + monotonic trend
 # ---------------------------------------------------------------------
 
+
 def test_gaussian_mc_deterministic_given_seed():
     with pytest.warns(RuntimeWarning):
-        a = th.p11_gaussian_copula(0.33, 0.77, rho=0.2, method="mc", n_mc=20000, seed=123, antithetic=True)
+        a = th.p11_gaussian_copula(
+            0.33, 0.77, rho=0.2, method="mc", n_mc=20000, seed=123, antithetic=True
+        )
     with pytest.warns(RuntimeWarning):
-        b = th.p11_gaussian_copula(0.33, 0.77, rho=0.2, method="mc", n_mc=20000, seed=123, antithetic=True)
+        b = th.p11_gaussian_copula(
+            0.33, 0.77, rho=0.2, method="mc", n_mc=20000, seed=123, antithetic=True
+        )
     assert a == pytest.approx(b, abs=1e-12)
 
 
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.33, 0.77), (0.5, 0.5)])
 def test_gaussian_mc_rho0_approx_independence(pA, pB):
     with pytest.warns(RuntimeWarning):
-        got = th.p11_gaussian_copula(pA, pB, rho=0.0, method="mc", n_mc=40000, seed=0, antithetic=True)
+        got = th.p11_gaussian_copula(
+            pA, pB, rho=0.0, method="mc", n_mc=40000, seed=0, antithetic=True
+        )
     assert got == pytest.approx(pA * pB, abs=0.02)
 
 
 @pytest.mark.parametrize("pA,pB", [(0.2, 0.3), (0.33, 0.77), (0.5, 0.5)])
 def test_gaussian_mc_monotone_in_rho(pA, pB):
     with pytest.warns(RuntimeWarning):
-        low = th.p11_gaussian_copula(pA, pB, rho=-0.6, method="mc", n_mc=50000, seed=1, antithetic=True)
+        low = th.p11_gaussian_copula(
+            pA, pB, rho=-0.6, method="mc", n_mc=50000, seed=1, antithetic=True
+        )
     with pytest.warns(RuntimeWarning):
-        mid = th.p11_gaussian_copula(pA, pB, rho=0.0, method="mc", n_mc=50000, seed=1, antithetic=True)
+        mid = th.p11_gaussian_copula(
+            pA, pB, rho=0.0, method="mc", n_mc=50000, seed=1, antithetic=True
+        )
     with pytest.warns(RuntimeWarning):
-        high = th.p11_gaussian_copula(pA, pB, rho=0.6, method="mc", n_mc=50000, seed=1, antithetic=True)
+        high = th.p11_gaussian_copula(
+            pA, pB, rho=0.6, method="mc", n_mc=50000, seed=1, antithetic=True
+        )
 
     assert low <= mid + 0.03
     assert mid <= high + 0.03
@@ -374,6 +399,7 @@ def test_gaussian_output_is_fh_feasible():
 # ---------------------------------------------------------------------
 # Two-worlds + JC/CC bounds: golden + brute checks
 # ---------------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "w,JA,JB,Jbest",
@@ -450,12 +476,18 @@ def test_jc_bounds_nonoverlap_case_positive_min():
 # compute_metrics_for_lambda: invariants + containment + degeneracy
 # ---------------------------------------------------------------------
 
-@pytest.mark.parametrize("path,params", [("fh_linear", None), ("fh_power", {"power": 2.0}), ("fh_scurve", {"alpha": 9.0})])
+
+@pytest.mark.parametrize(
+    "path,params",
+    [("fh_linear", None), ("fh_power", {"power": 2.0}), ("fh_scurve", {"alpha": 9.0})],
+)
 @pytest.mark.parametrize("rule", ["AND", "OR", "COND_OR"])
 @pytest.mark.parametrize("lam", [0.0, 0.2, 0.5, 0.8, 1.0])
 def test_compute_metrics_contains_bounds(path, params, rule, lam):
     w = th.TwoWorlds(0.2, 0.3, 0.6, 0.1)
-    row = th.compute_metrics_for_lambda(w, lam, path=path, rule=rule, path_params=params, return_diagnostics=True)
+    row = th.compute_metrics_for_lambda(
+        w, lam, path=path, rule=rule, path_params=params, return_diagnostics=True
+    )
 
     assert row["JC_min"] - 1e-12 <= row["JC"] <= row["JC_max"] + 1e-12
     if math.isfinite(row["CC"]):
@@ -465,7 +497,10 @@ def test_compute_metrics_contains_bounds(path, params, rule, lam):
 
 def test_compute_metrics_cond_or_invariant_wrt_lambda():
     w = th.TwoWorlds(0.2, 0.3, 0.6, 0.1)
-    rows = [th.compute_metrics_for_lambda(w, lam, path="fh_linear", rule="COND_OR") for lam in np.linspace(0, 1, 11)]
+    rows = [
+        th.compute_metrics_for_lambda(w, lam, path="fh_linear", rule="COND_OR")
+        for lam in np.linspace(0, 1, 11)
+    ]
     pC0 = [r["pC0"] for r in rows]
     pC1 = [r["pC1"] for r in rows]
     JC = [r["JC"] for r in rows]
@@ -488,6 +523,7 @@ def test_compute_metrics_jbest_zero_cc_zero():
 # ---------------------------------------------------------------------
 # theory_curve + lambda grid + pandas optional behavior
 # ---------------------------------------------------------------------
+
 
 def test_default_lambda_grid_basic():
     g = th.default_lambda_grid(11)
@@ -514,6 +550,7 @@ def test_theory_curve_returns_dataframe_if_pandas():
         assert "CC" in out[0]
     else:
         import pandas as pd  # type: ignore
+
         assert isinstance(out, pd.DataFrame)
         assert len(out) == 9
         assert "CC" in out.columns
@@ -522,6 +559,7 @@ def test_theory_curve_returns_dataframe_if_pandas():
 # ---------------------------------------------------------------------
 # sanity_check_worlds: degeneracy notes
 # ---------------------------------------------------------------------
+
 
 def test_sanity_check_worlds_cond_or_note():
     w = th.TwoWorlds(0.2, 0.3, 0.6, 0.1)
@@ -539,10 +577,13 @@ def test_sanity_check_worlds_jbest_zero_note():
 # Delta method CI: contract + sanity
 # ---------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("alpha", [0.01, 0.05, 0.1])
 def test_delta_method_ci_fields(alpha):
     w = th.TwoWorlds(0.2, 0.3, 0.6, 0.1)
-    out = th.delta_method_ci_for_cc(w, n0=1000, n1=900, alpha=alpha, rule="OR", path="fh_linear", lam=0.5)
+    out = th.delta_method_ci_for_cc(
+        w, n0=1000, n1=900, alpha=alpha, rule="OR", path="fh_linear", lam=0.5
+    )
     for k in ["CC_hat", "se", "z", "lo", "hi"]:
         assert k in out
     assert out["se"] >= 0.0
@@ -554,7 +595,9 @@ def test_delta_method_ci_fields(alpha):
 def test_delta_method_ci_rejects_bad_alpha(bad_alpha):
     w = th.TwoWorlds(0.2, 0.3, 0.6, 0.1)
     with pytest.raises(th.InputValidationError):
-        th.delta_method_ci_for_cc(w, n0=100, n1=100, alpha=bad_alpha, rule="OR", path="fh_linear", lam=0.5)
+        th.delta_method_ci_for_cc(
+            w, n0=100, n1=100, alpha=bad_alpha, rule="OR", path="fh_linear", lam=0.5
+        )
 
 
 @pytest.mark.parametrize("n0,n1", [(0, 10), (10, 0), (0, 0), (-5, 10)])
@@ -566,7 +609,9 @@ def test_delta_method_ci_rejects_bad_n(n0, n1):
 
 def test_delta_method_ci_jbest_zero_returns_zero():
     w = th.TwoWorlds(0.2, 0.3, 0.2, 0.3)
-    out = th.delta_method_ci_for_cc(w, n0=100, n1=100, alpha=0.05, rule="OR", path="fh_linear", lam=0.5)
+    out = th.delta_method_ci_for_cc(
+        w, n0=100, n1=100, alpha=0.05, rule="OR", path="fh_linear", lam=0.5
+    )
     assert out["CC_hat"] == pytest.approx(0.0)
     assert out["se"] == pytest.approx(0.0)
     assert out["lo"] == pytest.approx(0.0)
@@ -576,6 +621,7 @@ def test_delta_method_ci_jbest_zero_returns_zero():
 # ---------------------------------------------------------------------
 # Optional SciPy tests for deterministic Gaussian copula
 # ---------------------------------------------------------------------
+
 
 def test_gaussian_scipy_symmetry_if_available():
     pytest.importorskip("scipy", reason="SciPy not installed")
@@ -598,7 +644,8 @@ def test_gaussian_scipy_rho0_exact_if_available():
 # ---------------------------------------------------------------------
 
 hypothesis = pytest.importorskip("hypothesis", reason="Hypothesis not installed")
-from hypothesis import given, settings, strategies as st  # type: ignore
+from hypothesis import given, settings  # type: ignore
+from hypothesis import strategies as st
 
 
 @settings(max_examples=200, deadline=None)
@@ -660,6 +707,7 @@ def test_two_world_bounds_sane(pA0, pB0, pA1, pB1):
 # ---------------------------------------------------------------------
 # Slow / performance tests (explicit marker)
 # ---------------------------------------------------------------------
+
 
 @pytest.mark.slow
 def test_theory_curve_large_grid_perf_smoke():

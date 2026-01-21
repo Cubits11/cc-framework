@@ -1,15 +1,14 @@
 import json
-import os
-import io
-import pytest
+
 import numpy as np
+import pytest
 
 from cc.cartographer import audit
-
 
 # ---------------------------
 # JSONL audit chain tests
 # ---------------------------
+
 
 def test_append_strips_reserved_keys_and_links_correctly(tmp_path):
     p = tmp_path / "audit.jsonl"
@@ -125,8 +124,14 @@ def test_verify_chain_raises_on_missing_sha_field(tmp_path):
     audit.append_jsonl(str(p), {"ok": True})
     # Append a record missing sha256 manually
     with open(p, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"prev_sha256": "abc", "payload": {"oops": 1}},
-                           sort_keys=True, separators=(",", ":")) + "\n")
+        f.write(
+            json.dumps(
+                {"prev_sha256": "abc", "payload": {"oops": 1}},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+        )
     with pytest.raises(audit.AuditError):
         audit.verify_chain(str(p))
 
@@ -135,18 +140,25 @@ def test_verify_chain_raises_on_missing_sha_field(tmp_path):
 # FH ceiling auditor tests
 # ---------------------------
 
+
 def _tiny_rocs():
     # Simple monotone ROCs: diagonal + one interior point
-    A = np.array([
-        [0.0, 0.0],
-        [0.2, 0.8],
-        [1.0, 1.0],
-    ], dtype=float)
-    B = np.array([
-        [0.0, 0.0],
-        [0.3, 0.7],
-        [1.0, 1.0],
-    ], dtype=float)
+    A = np.array(
+        [
+            [0.0, 0.0],
+            [0.2, 0.8],
+            [1.0, 1.0],
+        ],
+        dtype=float,
+    )
+    B = np.array(
+        [
+            [0.0, 0.0],
+            [0.3, 0.7],
+            [1.0, 1.0],
+        ],
+        dtype=float,
+    )
     return A, B
 
 
@@ -169,19 +181,37 @@ def test_audit_fh_points_strict_and_tolerance():
     pb = (0.3, 0.7)
 
     # Gross violation
-    triples = [ (pa, pb, 1.5) ]
-    out = audit.audit_fh_ceiling_by_points(A, B, triples, comp="And", add_anchors=False, tol=1e-12, strict=True)
+    triples = [(pa, pb, 1.5)]
+    out = audit.audit_fh_ceiling_by_points(
+        A, B, triples, comp="And", add_anchors=False, tol=1e-12, strict=True
+    )
     assert len(out) == 1 and out[0][0] == pa and out[0][1] == pb
 
     # Slightly perturbed point: strict=False should skip silently, strict=True should raise
     pa_eps = (0.2 + 1e-9, 0.8)  # smaller than default point_tol? we'll set a tighter tol below
 
     # With strict=False and tight point_tol, this should be skipped (no exception, no output)
-    out2 = audit.audit_fh_ceiling_by_points(A, B, [ (pa_eps, pb, 1.5) ],
-                                            comp="OR", add_anchors=False, tol=1e-12, strict=False, point_tol=1e-12)
+    out2 = audit.audit_fh_ceiling_by_points(
+        A,
+        B,
+        [(pa_eps, pb, 1.5)],
+        comp="OR",
+        add_anchors=False,
+        tol=1e-12,
+        strict=False,
+        point_tol=1e-12,
+    )
     assert out2 == []
 
     # With strict=True and very tight point_tol, should raise because point isn't found
     with pytest.raises(audit.AuditError):
-        audit.audit_fh_ceiling_by_points(A, B, [ (pa_eps, pb, 1.5) ],
-                                         comp="OR", add_anchors=False, tol=1e-12, strict=True, point_tol=1e-12)
+        audit.audit_fh_ceiling_by_points(
+            A,
+            B,
+            [(pa_eps, pb, 1.5)],
+            comp="OR",
+            add_anchors=False,
+            tol=1e-12,
+            strict=True,
+            point_tol=1e-12,
+        )

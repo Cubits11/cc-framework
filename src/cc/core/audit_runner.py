@@ -15,17 +15,16 @@ artifacts that map to the broader Assurance Docker vision.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-from uuid import uuid4
-
 import csv
 import hashlib
 import json
 import os
 import subprocess
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from uuid import uuid4
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -38,7 +37,6 @@ from cc.core.manifest import (
     guardrail_versions_from_instances,
 )
 from cc.core.registry import build_guardrails
-from cc.guardrails.base import Guardrail
 
 
 def _utc_now() -> str:
@@ -210,7 +208,9 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
         line = json.dumps(record, sort_keys=True)
         results_lines.append(line)
 
-    results_path.write_text("\n".join(results_lines) + ("\n" if results_lines else ""), encoding="utf-8")
+    results_path.write_text(
+        "\n".join(results_lines) + ("\n" if results_lines else ""), encoding="utf-8"
+    )
 
     execution_manifest = {
         "run_id": run_id,
@@ -225,7 +225,9 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
         },
     }
     manifest_path = output_dir / "execution_manifest.json"
-    manifest_path.write_text(json.dumps(execution_manifest, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(execution_manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     config_payload = {
         "prompt_source": str(config.prompt_source),
@@ -267,7 +269,9 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
         "previous_attestation_hash": None,
         "public_key": public_key_bytes.hex(),
     }
-    attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     signature = private_key.sign(attestation_message).hex()
     attestation["signature"] = signature
 
@@ -286,7 +290,9 @@ def run_audit(config: AuditRunConfig) -> Dict[str, Any]:
     }
 
 
-def verify_attestation(attestation_path: Path, manifest_path: Path, results_path: Path) -> Tuple[bool, str]:
+def verify_attestation(
+    attestation_path: Path, manifest_path: Path, results_path: Path
+) -> Tuple[bool, str]:
     attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     results_lines = results_path.read_text(encoding="utf-8").splitlines()
@@ -299,7 +305,9 @@ def verify_attestation(attestation_path: Path, manifest_path: Path, results_path
     if attestation.get("results_merkle_root") != expected_merkle_root:
         return False, "results merkle root mismatch"
 
-    public_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(attestation["public_key"]))
+    public_key = ed25519.Ed25519PublicKey.from_public_bytes(
+        bytes.fromhex(attestation["public_key"])
+    )
     message = json.dumps(
         {
             "execution_manifest_hash": attestation["execution_manifest_hash"],

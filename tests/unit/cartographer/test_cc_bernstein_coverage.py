@@ -2,6 +2,7 @@ import numpy as np
 
 from cc.cartographer.bounds import cc_confint
 
+
 def test_fh_bernstein_coverage_on_toy_world():
     """
     Empirical coverage for FH–Bernstein CI on a toy Bernoulli world
@@ -27,9 +28,13 @@ def test_fh_bernstein_coverage_on_toy_world():
         I0 = (p0_true, p0_true)
 
         lo, hi = cc_confint(
-            n1=n1, n0=n0,
-            p1_hat=p1_hat, p0_hat=p0_hat,
-            D=D, I1=I1, I0=I0,
+            n1=n1,
+            n0=n0,
+            p1_hat=p1_hat,
+            p0_hat=p0_hat,
+            D=D,
+            I1=I1,
+            I0=I0,
             delta=delta,
         )
         cc_true = (1.0 - (p1_true - p0_true)) / D
@@ -37,6 +42,7 @@ def test_fh_bernstein_coverage_on_toy_world():
 
     # Allow Monte Carlo wiggle; nominal 95%, require ≥ 92%
     assert covered / trials >= 0.92
+
 
 def test_bernstein_tail_monotonicity():
     """

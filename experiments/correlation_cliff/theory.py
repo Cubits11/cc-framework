@@ -10,6 +10,7 @@ Design intent:
 - Optional SciPy support is detected precisely (ImportError only) and the failure is recorded.
 """
 
+import math
 from dataclasses import dataclass
 from importlib import import_module
 from typing import (
@@ -21,11 +22,9 @@ from typing import (
     Sequence,
     Tuple,
     TypedDict,
-    Union,
     cast,
 )
 
-import math
 import numpy as np
 import pandas as pd
 
@@ -77,8 +76,11 @@ __all__ = ["Rule", *_analysis_public]
 # but we record the import error so callers can decide whether to warn/fail.
 _SCIPY_IMPORT_ERROR: Optional[ImportError] = None
 try:
-    from scipy.stats import norm  # type: ignore[import-not-found]
-    from scipy.stats import multivariate_normal  # type: ignore[import-not-found]
+    from scipy.stats import (
+        multivariate_normal,  # type: ignore[import-not-found]
+        norm,  # type: ignore[import-not-found]
+    )
+
     _HAVE_SCIPY = True
 except ImportError as e:
     norm = None  # type: ignore[assignment]
@@ -196,6 +198,7 @@ What belongs here vs elsewhere
 # Typed outputs (optional)
 # =========================
 
+
 class MetricRow(TypedDict, total=False):
     lambda_: float
 
@@ -243,6 +246,7 @@ class MetricRow(TypedDict, total=False):
 # Data classes & validation
 # =========================
 
+
 @dataclass(frozen=True)
 class WorldMarginals:
     pA: float
@@ -283,6 +287,7 @@ class FHBounds:
 # Numerical helpers
 # =========================
 
+
 def _clip01(x: float) -> float:
     return float(min(1.0, max(0.0, x)))
 
@@ -303,6 +308,7 @@ def _safe_div(num: float, den: float, eps: float = 0.0) -> float:
 # =========================
 # FH bounds
 # =========================
+
 
 def fh_bounds(pA: float, pB: float) -> FHBounds:
     """
@@ -352,7 +358,7 @@ def p11_fh_power(pA: float, pB: float, lam: float, k: float = 2.0) -> float:
     """
     if k <= 0:
         raise ValueError(f"k must be > 0, got {k}")
-    return p11_fh_linear(pA, pB, lam ** k)
+    return p11_fh_linear(pA, pB, lam**k)
 
 
 def _sigmoid(x: float) -> float:
@@ -421,7 +427,9 @@ def p11_gaussian_copula(
 
     if method == "scipy":
         if not _HAVE_SCIPY:
-            raise RuntimeError("SciPy not available; cannot use method='scipy' for gaussian_copula.")
+            raise RuntimeError(
+                "SciPy not available; cannot use method='scipy' for gaussian_copula."
+            )
         tA = float(norm.ppf(pA))
         tB = float(norm.ppf(pB))
         cov = np.array([[1.0, rho], [rho, 1.0]], dtype=float)
@@ -520,6 +528,7 @@ def p11_path(
 # Joint table construction & checks
 # =========================
 
+
 def joint_cells_from_marginals(pA: float, pB: float, p11: float) -> Dict[str, float]:
     """
     Construct full 2×2 joint table given marginals and overlap p11.
@@ -539,8 +548,7 @@ def joint_cells_from_marginals(pA: float, pB: float, p11: float) -> Dict[str, fl
     eps = 1e-12
     if (p00 < -eps) or (p01 < -eps) or (p10 < -eps) or (p11 < -eps):
         raise ValueError(
-            f"Invalid joint probs: p00={p00}, p01={p01}, p10={p10}, p11={p11} "
-            f"(pA={pA}, pB={pB})"
+            f"Invalid joint probs: p00={p00}, p01={p01}, p10={p10}, p11={p11} (pA={pA}, pB={pB})"
         )
 
     p00 = _clip01(p00)
@@ -575,6 +583,7 @@ def validate_joint_cells(cells: Dict[str, float], tol: float = 1e-10) -> None:
 # Composition probabilities
 # =========================
 
+
 def pC_from_joint(rule: Rule, cells: Dict[str, float], pA: float, pB: float) -> float:
     """
     Compute pC given composition rule.
@@ -589,6 +598,7 @@ def pC_from_joint(rule: Rule, cells: Dict[str, float], pA: float, pB: float) -> 
 # =========================
 # Dependence summaries
 # =========================
+
 
 def phi_from_joint(pA: float, pB: float, p11: float) -> float:
     """
@@ -642,6 +652,7 @@ def avg_ignore_nan(x: float, y: float) -> float:
 # Leakage metrics & CC
 # =========================
 
+
 def leakage_J(p1: float, p0: float) -> float:
     return abs(p1 - p0)
 
@@ -659,6 +670,7 @@ def compute_singleton_Js(marg: TwoWorldMarginals) -> Tuple[float, float, float]:
 # =========================
 # Core metrics (single lambda)
 # =========================
+
 
 def compute_metrics_for_lambda(
     marg: TwoWorldMarginals,
@@ -713,13 +725,11 @@ def compute_metrics_for_lambda(
     row: MetricRow = {
         "lambda_": float(lam),
         "path_name": str(path),
-
         # bounds (diagnostics)
         "fh_L_0": float(b0.L),
         "fh_U_0": float(b0.U),
         "fh_L_1": float(b1.L),
         "fh_U_1": float(b1.U),
-
         # world 0
         "pA_0": float(marg.w0.pA),
         "pB_0": float(marg.w0.pB),
@@ -730,7 +740,6 @@ def compute_metrics_for_lambda(
         "pC_0": float(pC_0),
         "phi_0": float(phi0),
         "tau_0": float(tau0),
-
         # world 1
         "pA_1": float(marg.w1.pA),
         "pB_1": float(marg.w1.pB),
@@ -741,7 +750,6 @@ def compute_metrics_for_lambda(
         "pC_1": float(pC_1),
         "phi_1": float(phi1),
         "tau_1": float(tau1),
-
         # metrics
         "JA": float(JA),
         "JB": float(JB),
@@ -758,6 +766,7 @@ def compute_metrics_for_lambda(
 # =========================
 # Curve generation (vectorized where possible)
 # =========================
+
 
 def theory_curve(
     marg: TwoWorldMarginals,
@@ -777,7 +786,10 @@ def theory_curve(
     Returns DataFrame sorted by lambda_.
     """
     path_params = path_params or {}
-    rows = [compute_metrics_for_lambda(marg, rule, float(lam), path=path, path_params=path_params) for lam in lambdas]
+    rows = [
+        compute_metrics_for_lambda(marg, rule, float(lam), path=path, path_params=path_params)
+        for lam in lambdas
+    ]
     df = pd.DataFrame(rows).sort_values("lambda_").reset_index(drop=True)
     return df
 
@@ -785,6 +797,7 @@ def theory_curve(
 # =========================
 # Affine structure (FH-linear OR/AND) + closed form λ*
 # =========================
+
 
 def _affine_form_or_and_one_world(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
     """
@@ -941,6 +954,7 @@ def lambda_star_closed_form_fh_linear(
 # Root finding on a grid
 # =========================
 
+
 def find_all_roots_linear_interp(
     x: np.ndarray,
     y: np.ndarray,
@@ -963,7 +977,7 @@ def find_all_roots_linear_interp(
 
         if y0 * y1 < 0.0:
             # interpolate crossing
-            denom = (y[i + 1] - y[i])
+            denom = y[i + 1] - y[i]
             if denom == 0.0:
                 roots.append(float(x[i]))
             else:
@@ -1018,6 +1032,7 @@ def find_lambda_star_from_curve(
 # FH envelopes (sanity constraints)
 # =========================
 
+
 def fh_pC_interval(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
     """
     FH-induced feasible interval for pC in a single world.
@@ -1036,7 +1051,9 @@ def fh_pC_interval(pA: float, pB: float, rule: Rule) -> Tuple[float, float]:
     return (_clip01(lo), _clip01(hi))
 
 
-def jc_envelope_from_intervals(int0: Tuple[float, float], int1: Tuple[float, float]) -> Tuple[float, float]:
+def jc_envelope_from_intervals(
+    int0: Tuple[float, float], int1: Tuple[float, float]
+) -> Tuple[float, float]:
     """
     From I0=[a0,b0], I1=[a1,b1], derive feasible envelope for JC=|x-y| with x∈I1,y∈I0.
 
@@ -1073,6 +1090,7 @@ def compute_fh_jc_envelope(marg: TwoWorldMarginals, rule: Rule) -> Tuple[float, 
 # =========================
 # Dependence mapping at λ*
 # =========================
+
 
 def dependence_at_lambda(
     marg: TwoWorldMarginals,
@@ -1137,7 +1155,9 @@ def solve_lambda_star_and_dependence(
 
     lam_star: Optional[float] = None
     if prefer_closed_form_fh_linear and path == "fh_linear":
-        lam_star = lambda_star_closed_form_fh_linear(marg, rule, target_cc=target_cc, require_no_kink=True)
+        lam_star = lambda_star_closed_form_fh_linear(
+            marg, rule, target_cc=target_cc, require_no_kink=True
+        )
 
     if lam_star is None:
         lam_star = find_lambda_star_from_curve(df, target_cc=target_cc, prefer_first=True)
@@ -1162,6 +1182,7 @@ def solve_lambda_star_and_dependence(
 # =========================
 # Delta-method variance hooks (fast analytic SEs)
 # =========================
+
 
 def var_diff_of_props(p1: float, p0: float, n1: int, n0: int) -> float:
     """
@@ -1276,6 +1297,7 @@ def approx_cc_ci_normal(
 # Paper-writing diagnostics
 # =========================
 
+
 def summarize_cliff_conditions(
     marg: TwoWorldMarginals,
     rule: Rule,
@@ -1352,7 +1374,9 @@ if __name__ == "__main__":
 
         lambdas = np.linspace(0.0, 1.0, 21)
         df = theory_curve(marg, rule, lambdas, path="fh_linear")
-        lam_star = lambda_star_closed_form_fh_linear(marg, rule, target_cc=1.0, require_no_kink=True)
+        lam_star = lambda_star_closed_form_fh_linear(
+            marg, rule, target_cc=1.0, require_no_kink=True
+        )
         if lam_star is None:
             lam_star = find_lambda_star_from_curve(df, target_cc=1.0)
 

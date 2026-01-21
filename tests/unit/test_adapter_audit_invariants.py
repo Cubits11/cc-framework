@@ -1,5 +1,6 @@
 # tests/unit/test_adapter_audit_invariants.py
 """Audit invariants across adapters (leak-safe, deterministic, hashed)."""
+
 from __future__ import annotations
 
 import json
@@ -69,8 +70,10 @@ def test_adapter_audit_invariants(adapter) -> None:
     assert decision.audit["decision"] in {"allow", "block", "review"}
 
     _assert_no_leak(decision.audit, [prompt, response, "123-45-6789"])
-    _assert_no_leak(decision.raw if isinstance(decision.raw, dict) else {"raw": decision.raw},
-                    [prompt, response, "123-45-6789"])
+    _assert_no_leak(
+        decision.raw if isinstance(decision.raw, dict) else {"raw": decision.raw},
+        [prompt, response, "123-45-6789"],
+    )
 
     sha256_re = re.compile(r"^[a-f0-9]{64}$")
     assert sha256_re.match(decision.audit["prompt_hash"])

@@ -30,7 +30,9 @@ def generate_fh_bounds_plot(df: pd.DataFrame, output_path: Path) -> None:
         overlaps_ind = not (cc_upper < 0.95 or cc_lower > 1.05)
         color = "orange" if overlaps_ind else "steelblue"
 
-        ax.plot([cc_lower, cc_upper], [y, y], "o-", linewidth=3, markersize=8, color=color, alpha=0.7)
+        ax.plot(
+            [cc_lower, cc_upper], [y, y], "o-", linewidth=3, markersize=8, color=color, alpha=0.7
+        )
         ax.plot([cc_point], [y], "X", markersize=12, color="darkred", zorder=10)
         ax.text(-0.05, y, row.pair, ha="right", va="center", fontsize=11, fontweight="bold")
 
@@ -46,7 +48,7 @@ def generate_fh_bounds_plot(df: pd.DataFrame, output_path: Path) -> None:
     ax.set_ylim(-0.5, n_pairs - 0.5)
 
     ax.set_title(
-        "Regime Sensitivity via Fr\'echet--Hoeffding Bounds\n"
+        "Regime Sensitivity via Fr'echet--Hoeffding Bounds\n"
         "Intervals show range under unknown dependence",
         fontsize=16,
         fontweight="bold",
@@ -57,9 +59,35 @@ def generate_fh_bounds_plot(df: pd.DataFrame, output_path: Path) -> None:
         Patch(facecolor="green", alpha=0.1, label="Constructive"),
         Patch(facecolor="gray", alpha=0.1, label="Independent"),
         Patch(facecolor="red", alpha=0.1, label="Destructive"),
-        Line2D([0], [0], marker="o", color="steelblue", linestyle="-", markersize=8, linewidth=3, label="FH Envelope (certain)"),
-        Line2D([0], [0], marker="o", color="orange", linestyle="-", markersize=8, linewidth=3, label="FH Envelope (uncertain)"),
-        Line2D([0], [0], marker="X", color="darkred", linestyle="", markersize=12, label="Point Estimate"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="steelblue",
+            linestyle="-",
+            markersize=8,
+            linewidth=3,
+            label="FH Envelope (certain)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="orange",
+            linestyle="-",
+            markersize=8,
+            linewidth=3,
+            label="FH Envelope (uncertain)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="X",
+            color="darkred",
+            linestyle="",
+            markersize=12,
+            label="Point Estimate",
+        ),
     ]
     ax.legend(handles=legend_elements, loc="upper right", fontsize=10)
 
@@ -73,7 +101,9 @@ def generate_fh_bounds_plot(df: pd.DataFrame, output_path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate FH CC-interval plot from CSV.")
-    parser.add_argument("--input", required=True, help="CSV with pair, cc_lower, cc_point, cc_upper")
+    parser.add_argument(
+        "--input", required=True, help="CSV with pair, cc_lower, cc_point, cc_upper"
+    )
     parser.add_argument(
         "--output",
         default="paper/figures/figure2_fh_bounds.pdf",

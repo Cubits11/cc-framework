@@ -12,27 +12,24 @@ This file owns:
 - artifact bundle writing + stable JSON diagnostics
 """
 
-from typing import Any, Dict, Optional, Sequence
-
 import argparse
 import hashlib
 import json
 import logging
-import os
 import platform
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path as SysPath
+from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
-from .config import SimConfig
-from .config import validate_cfg
-from .core import simulate_grid, summarize_simulation
 from . import utils as U
+from .config import SimConfig, validate_cfg
+from .core import simulate_grid, summarize_simulation
 
 LOG = logging.getLogger(__name__)
 
@@ -137,10 +134,14 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         xs = [float(x) for x in lams]
         for i, x in enumerate(xs):
             if not (np.isfinite(x) and 0.0 <= x <= 1.0):
-                raise ValueError(f"lambda values must be finite and in [0,1]; bad lambdas[{i}]={x!r}")
+                raise ValueError(
+                    f"lambda values must be finite and in [0,1]; bad lambdas[{i}]={x!r}"
+                )
         for i in range(len(xs) - 1):
             if xs[i + 1] < xs[i]:
-                raise ValueError(f"lambdas must be non-decreasing; found lambdas[{i}]={xs[i]} > lambdas[{i+1}]={xs[i+1]}")
+                raise ValueError(
+                    f"lambdas must be non-decreasing; found lambdas[{i}]={xs[i]} > lambdas[{i + 1}]={xs[i + 1]}"
+                )
         return xs
 
     md = _require_dict(d.get("marginals", {}), "marginals")
@@ -154,7 +155,11 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         w1=U.WorldMarginals(pA=_p(w1["pA"], "marginals.w1.pA"), pB=_p(w1["pB"], "marginals.w1.pB")),
     )
 
-    has_pipeline = isinstance(d.get("composition"), dict) or isinstance(d.get("dependence_paths"), dict) or isinstance(d.get("sampling"), dict)
+    has_pipeline = (
+        isinstance(d.get("composition"), dict)
+        or isinstance(d.get("dependence_paths"), dict)
+        or isinstance(d.get("sampling"), dict)
+    )
 
     if has_pipeline:
         rule = str(_dget(d, "composition.primary_rule", "OR")).upper()
@@ -178,10 +183,14 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         if "lambdas" in d:
             lambdas = [float(x) for x in (d.get("lambdas") or [])]
         else:
-            grid = _dget(d, "dependence_paths.primary.lambda_grid_coarse", None) or _dget(d, "dependence_paths.primary.lambda_grid", None)
+            grid = _dget(d, "dependence_paths.primary.lambda_grid_coarse", None) or _dget(
+                d, "dependence_paths.primary.lambda_grid", None
+            )
             if grid is None:
                 grid = d.get("lambda_grid", {"num": 21})
-            lambdas = list(_parse_lambdas_from_grid(grid, where="dependence_paths.primary.lambda_grid_coarse"))
+            lambdas = list(
+                _parse_lambdas_from_grid(grid, where="dependence_paths.primary.lambda_grid_coarse")
+            )
 
         lambdas = list(_ensure_monotone_increasing(lambdas))
 
@@ -192,13 +201,27 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
         if seed_policy not in ("stable_per_cell", "sequential"):
             raise ValueError(f"sampling.seed_policy invalid: {seed_policy!r}")
 
-        envelope_tol = _f(_dget(d, "simulate.envelope_tol", d.get("envelope_tol", 5e-3)), "simulate.envelope_tol")
-        hard_fail_on_invalid = _b(_dget(d, "simulate.hard_fail_on_invalid", d.get("hard_fail_on_invalid", True)), "simulate.hard_fail_on_invalid")
-        include_theory_reference = _b(_dget(d, "simulate.include_theory_reference", d.get("include_theory_reference", True)), "simulate.include_theory_reference")
+        envelope_tol = _f(
+            _dget(d, "simulate.envelope_tol", d.get("envelope_tol", 5e-3)), "simulate.envelope_tol"
+        )
+        hard_fail_on_invalid = _b(
+            _dget(d, "simulate.hard_fail_on_invalid", d.get("hard_fail_on_invalid", True)),
+            "simulate.hard_fail_on_invalid",
+        )
+        include_theory_reference = _b(
+            _dget(d, "simulate.include_theory_reference", d.get("include_theory_reference", True)),
+            "simulate.include_theory_reference",
+        )
 
         prob_tol = _f(_dget(d, "simulate.prob_tol", d.get("prob_tol", 1e-12)), "simulate.prob_tol")
-        allow_tiny_negative = _b(_dget(d, "simulate.allow_tiny_negative", d.get("allow_tiny_negative", True)), "simulate.allow_tiny_negative")
-        tiny_negative_eps = _f(_dget(d, "simulate.tiny_negative_eps", d.get("tiny_negative_eps", 1e-15)), "simulate.tiny_negative_eps")
+        allow_tiny_negative = _b(
+            _dget(d, "simulate.allow_tiny_negative", d.get("allow_tiny_negative", True)),
+            "simulate.allow_tiny_negative",
+        )
+        tiny_negative_eps = _f(
+            _dget(d, "simulate.tiny_negative_eps", d.get("tiny_negative_eps", 1e-15)),
+            "simulate.tiny_negative_eps",
+        )
 
     else:
         rule = str(d.get("rule", "OR")).upper()
@@ -210,7 +233,11 @@ def _cfg_from_dict(d: Dict[str, Any]) -> SimConfig:
             raise ValueError(f"Invalid path: {path!r}")
 
         base_pp = d.get("path_params", {})
-        extra_pp = {"gamma": d.get("gamma", None), "k": d.get("k", None), "ppf_clip_eps": d.get("ppf_clip_eps", None)}
+        extra_pp = {
+            "gamma": d.get("gamma", None),
+            "k": d.get("k", None),
+            "ppf_clip_eps": d.get("ppf_clip_eps", None),
+        }
         path_params = _parse_path_params(base_pp, extra=extra_pp)
 
         if "lambdas" in d:
@@ -293,7 +320,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     def _maybe_git_commit(repo_root: SysPath) -> Optional[str]:
         try:
-            out = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=str(repo_root), stderr=subprocess.DEVNULL, text=True).strip()
+            out = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=str(repo_root),
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
             return out or None
         except Exception:
             return None
@@ -308,12 +340,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     ap = argparse.ArgumentParser(description="Run correlation cliff simulation grid.")
     ap.add_argument("--config", type=str, default=None, help="Path to YAML config.")
-    ap.add_argument("--out_dir", type=str, default=None, help="Write a full artifact bundle to this directory.")
-    ap.add_argument("--out_csv", type=str, default=None, help="Write replicate-level rows to CSV (legacy).")
-    ap.add_argument("--out_summary_csv", type=str, default=None, help="Write per-lambda summary to CSV (legacy).")
+    ap.add_argument(
+        "--out_dir", type=str, default=None, help="Write a full artifact bundle to this directory."
+    )
+    ap.add_argument(
+        "--out_csv", type=str, default=None, help="Write replicate-level rows to CSV (legacy)."
+    )
+    ap.add_argument(
+        "--out_summary_csv",
+        type=str,
+        default=None,
+        help="Write per-lambda summary to CSV (legacy).",
+    )
     ap.add_argument("--print_head", type=int, default=5, help="Print first N rows of summary.")
     ap.add_argument("--log_level", type=str, default="INFO", help="Logging level.")
-    ap.add_argument("--overwrite", action="store_true", help="Overwrite outputs in out_dir if non-empty.")
+    ap.add_argument(
+        "--overwrite", action="store_true", help="Overwrite outputs in out_dir if non-empty."
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     logging.basicConfig(
@@ -322,7 +365,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
 
     if args.config is None:
-        print("ERROR: Please provide --config path/to/config.yaml (or call simulate_grid() from Python).", file=sys.stderr)
+        print(
+            "ERROR: Please provide --config path/to/config.yaml (or call simulate_grid() from Python).",
+            file=sys.stderr,
+        )
         return 2
 
     run_started_utc = datetime.utcnow().isoformat() + "Z"
@@ -335,7 +381,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     out_dir: Optional[SysPath] = SysPath(args.out_dir).expanduser() if args.out_dir else None
     legacy_out_csv: Optional[SysPath] = SysPath(args.out_csv).expanduser() if args.out_csv else None
-    legacy_out_sum: Optional[SysPath] = SysPath(args.out_summary_csv).expanduser() if args.out_summary_csv else None
+    legacy_out_sum: Optional[SysPath] = (
+        SysPath(args.out_summary_csv).expanduser() if args.out_summary_csv else None
+    )
 
     if out_dir is None and legacy_out_csv is None and legacy_out_sum is None:
         out_dir = SysPath.cwd() / "artifacts" / _now_stamp()
@@ -355,8 +403,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     try:
-        LOG.info("Running simulate_grid: n=%s n_reps=%s lambdas=%s path=%s rule=%s seed_policy=%s",
-                 cfg.n, cfg.n_reps, len(cfg.lambdas), cfg.path, cfg.rule, cfg.seed_policy)
+        LOG.info(
+            "Running simulate_grid: n=%s n_reps=%s lambdas=%s path=%s rule=%s seed_policy=%s",
+            cfg.n,
+            cfg.n_reps,
+            len(cfg.lambdas),
+            cfg.path,
+            cfg.rule,
+            cfg.seed_policy,
+        )
         df_long = simulate_grid(cfg)
         df_sum = summarize_simulation(df_long)
     except Exception as e:
@@ -400,7 +455,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "tiny_negative_eps": float(cfg.tiny_negative_eps),
                 "include_theory_reference": bool(cfg.include_theory_reference),
             }
-            _atomic_write_text(out_dir / "config_resolved.json", json.dumps(cfg_snapshot, indent=2, sort_keys=True) + "\n")
+            _atomic_write_text(
+                out_dir / "config_resolved.json",
+                json.dumps(cfg_snapshot, indent=2, sort_keys=True) + "\n",
+            )
             outputs["config_resolved.json"] = str(out_dir / "config_resolved.json")
             file_hashes["config_resolved.json"] = _sha256_file(out_dir / "config_resolved.json")
 
@@ -418,7 +476,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"ERROR: writing outputs failed: {e}", file=sys.stderr)
         return 1
 
-    vio_rate = float(df_long["JC_env_violation"].mean()) if "JC_env_violation" in df_long.columns and not df_long.empty else float("nan")
+    vio_rate = (
+        float(df_long["JC_env_violation"].mean())
+        if "JC_env_violation" in df_long.columns and not df_long.empty
+        else float("nan")
+    )
     invalid_cols = [c for c in df_long.columns if c.startswith("invalid_joint_w")]
     invalid_rates = {c: float(df_long[c].fillna(False).astype(bool).mean()) for c in invalid_cols}
 
@@ -440,7 +502,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if out_dir is not None:
         try:
-            _atomic_write_text(out_dir / "diagnostics.json", json.dumps(diag, indent=2, sort_keys=True) + "\n")
+            _atomic_write_text(
+                out_dir / "diagnostics.json", json.dumps(diag, indent=2, sort_keys=True) + "\n"
+            )
             outputs["diagnostics.json"] = str(out_dir / "diagnostics.json")
             file_hashes["diagnostics.json"] = _sha256_file(out_dir / "diagnostics.json")
 
@@ -460,7 +524,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "file_sha256": file_hashes,
                 "diagnostics": diag,
             }
-            _atomic_write_text(out_dir / "manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+            _atomic_write_text(
+                out_dir / "manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+            )
             outputs["manifest.json"] = str(out_dir / "manifest.json")
             file_hashes["manifest.json"] = _sha256_file(out_dir / "manifest.json")
         except Exception:

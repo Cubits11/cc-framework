@@ -1,10 +1,12 @@
 # tests/unit/test_cc_coverage.py
 import numpy as np
 
+from cc.cartographer.bounds import cc_confint
 from cc.cartographer.intervals import (
-    wilson_ci_from_counts, wilson_ci, cc_ci_wilson, cc_ci_bootstrap
+    cc_ci_bootstrap,
+    wilson_ci,
+    wilson_ci_from_counts,
 )
-from cc.cartographer.bounds import cc_confint, fh_var_envelope
 
 
 def test_wilson_basic_sanity():
@@ -27,8 +29,10 @@ def test_cc_ci_wilson_propagation():
     lo, hi = cc_ci_from_known_intervals(D, (0.6, 0.7), (0.1, 0.2))
     assert abs(lo - 0.8) < 1e-9 and abs(hi - 1.2) < 1e-9
 
+
 def cc_ci_from_known_intervals(D, p1_iv, p0_iv):
     from cc.cartographer.intervals import _diff_interval, cc_ci_from_diff_interval
+
     dlo, dhi = _diff_interval(p1_iv[0], p1_iv[1], p0_iv[0], p0_iv[1])
     return cc_ci_from_diff_interval(D, dlo, dhi)
 
@@ -54,13 +58,10 @@ def test_fh_bernstein_coverage_toy_bernoulli():
         I0 = (p0_true, p0_true)
 
         lo, hi = cc_confint(
-            n1=n1, n0=n0,
-            p1_hat=p1_hat, p0_hat=p0_hat,
-            D=D, I1=I1, I0=I0,
-            delta=delta
+            n1=n1, n0=n0, p1_hat=p1_hat, p0_hat=p0_hat, D=D, I1=I1, I0=I0, delta=delta
         )
         cc_true = (1.0 - (p1_true - p0_true)) / D
-        cover += (lo <= cc_true <= hi)
+        cover += lo <= cc_true <= hi
 
     # Allow slight Monte Carlo fluctuation; require ≥ 92% for nominal 95%
     assert cover / trials >= 0.92

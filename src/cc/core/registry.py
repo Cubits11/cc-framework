@@ -19,7 +19,7 @@ Updated: 2025-09-28
 from __future__ import annotations
 
 import difflib
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Type, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Type
 
 # Core types
 from cc.core.attackers import AttackStrategy, RandomInjectionAttacker
@@ -68,10 +68,9 @@ _Attackers: Dict[str, Type[AttackStrategy]] = {
 _Guardrails: Dict[str, Optional[Type[Guardrail]]] = {
     # canonical names
     "keyword_blocker": KeywordBlocker,
-    "regex_filter": RegexFilter,   # preferred modern name
+    "regex_filter": RegexFilter,  # preferred modern name
     "semantic_filter": SemanticFilter,
     "toy_threshold": ToyThresholdGuardrail,
-
     # friendly aliases
     "keyword": KeywordBlocker,
     "regex": RegexFilter,
@@ -85,6 +84,7 @@ _KNOWN_GUARDRAIL_NAMES = tuple(_Guardrails.keys())
 # ------------------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------------------
+
 
 def _suggest_name(bad: str, known: Iterable[str]) -> str:
     """Return a short suggestion string for unknown names."""
@@ -137,6 +137,7 @@ def _resolve_guardrail_class(name: str) -> Type[Guardrail]:
 # Public builders
 # ------------------------------------------------------------------------------
 
+
 def build_attacker(cfg: Optional[Dict[str, Any]]) -> AttackStrategy:
     """
     Build an attacker from a dict config:
@@ -156,9 +157,7 @@ def build_attacker(cfg: Optional[Dict[str, Any]]) -> AttackStrategy:
     return cls(**params)  # type: ignore[call-arg]
 
 
-def build_guardrails(
-    cfg_list: Optional[List[Dict[str, Any]]]
-) -> List[Guardrail]:
+def build_guardrails(cfg_list: Optional[List[Dict[str, Any]]]) -> List[Guardrail]:
     """
     Build a list of guardrails from a list of dict configs:
 
@@ -174,7 +173,7 @@ def build_guardrails(
         TypeError if constructed instance fails interface validation.
     """
     out: List[Guardrail] = []
-    for cfg in (cfg_list or []):
+    for cfg in cfg_list or []:
         name = cfg.get("name")
         if not name:
             raise ValueError("Guardrail config missing 'name' field.")
@@ -191,7 +190,7 @@ def build_guardrail_stack_from_specs(specs: Optional[List[GuardrailSpec]]) -> Li
     Each GuardrailSpec carries `name`, `params`, and optional calibration hints.
     """
     out: List[Guardrail] = []
-    for spec in (specs or []):
+    for spec in specs or []:
         cls = _resolve_guardrail_class(spec.name)
         out.append(_instantiate_guardrail(cls, spec.params))
     return out
@@ -200,6 +199,7 @@ def build_guardrail_stack_from_specs(specs: Optional[List[GuardrailSpec]]) -> Li
 # ------------------------------------------------------------------------------
 # Introspection & registration (optional extension points)
 # ------------------------------------------------------------------------------
+
 
 def list_attackers() -> List[str]:
     """Return canonical attacker keys available in this registry."""

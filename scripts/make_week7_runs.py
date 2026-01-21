@@ -48,7 +48,9 @@ class RailParams:
 RAIL_LIBRARY: Dict[str, RailParams] = {
     "keyword": RailParams(base_tpr=0.82, base_fpr=0.052, slope_tpr=0.9, slope_fpr=1.2, anchor=0.65),
     "regex": RailParams(base_tpr=0.75, base_fpr=0.048, slope_tpr=0.7, slope_fpr=1.0, anchor=0.60),
-    "semantic": RailParams(base_tpr=0.88, base_fpr=0.055, slope_tpr=1.1, slope_fpr=1.4, anchor=0.75),
+    "semantic": RailParams(
+        base_tpr=0.88, base_fpr=0.055, slope_tpr=1.1, slope_fpr=1.4, anchor=0.75
+    ),
 }
 
 
@@ -66,7 +68,9 @@ def calibrate_rate(params: RailParams, threshold: float, jitter: float) -> Tuple
     return tpr, fpr
 
 
-def sample_guardrail(seed: int, episodes: int, rail: str, threshold: float) -> Tuple[np.ndarray, np.ndarray]:
+def sample_guardrail(
+    seed: int, episodes: int, rail: str, threshold: float
+) -> Tuple[np.ndarray, np.ndarray]:
     params = RAIL_LIBRARY.get(rail)
     if not params:
         raise ValueError(f"Unknown rail '{rail}'")
@@ -116,7 +120,9 @@ def compute_bca(world1: np.ndarray, world0: np.ndarray, *, rng_seed: int) -> Dic
     return {"delta": delta_interval, "j": j_interval}
 
 
-def classify_regime(j_obs: float, single_js: Sequence[float], independence_j: float) -> Tuple[str, float, bool]:
+def classify_regime(
+    j_obs: float, single_js: Sequence[float], independence_j: float
+) -> Tuple[str, float, bool]:
     best_single = max(single_js)
     delta_j = j_obs - best_single
     d_lamp = best_single < 0.10
@@ -173,7 +179,10 @@ def main() -> None:
             yield {rail: float(thr) for rail, thr in zip(rails, combo)}
 
     total_runs = 0
-    for topology, compositions in [("serial_or", or_compositions), ("parallel_and", and_compositions)]:
+    for topology, compositions in [
+        ("serial_or", or_compositions),
+        ("parallel_and", and_compositions),
+    ]:
         for rails in compositions:
             for thresholds in iter_thresholds(rails):
                 for seed in seeds:
@@ -188,7 +197,9 @@ def main() -> None:
 
                     for rail in rails:
                         key_seed = rng_seed + hash(rail) % 10_000
-                        world1, world0 = sample_guardrail(key_seed, episodes, rail, thresholds[rail])
+                        world1, world0 = sample_guardrail(
+                            key_seed, episodes, rail, thresholds[rail]
+                        )
                         world1_events.append(world1)
                         world0_events.append(world0)
                         metrics = compute_empirical_metrics(world1, world0)
@@ -205,7 +216,10 @@ def main() -> None:
                     empirical = compute_empirical_metrics(world1_comp, world0_comp)
 
                     independence = (
-                        independence_or([m["tpr"] for m in per_rail_metrics.values()], [m["fpr"] for m in per_rail_metrics.values()])
+                        independence_or(
+                            [m["tpr"] for m in per_rail_metrics.values()],
+                            [m["fpr"] for m in per_rail_metrics.values()],
+                        )
                         if topology == "serial_or"
                         else independence_and(
                             [m["tpr"] for m in per_rail_metrics.values()],
@@ -230,7 +244,9 @@ def main() -> None:
                         fh.tpr_lower - 1e-8 <= empirical["tpr"] <= fh.tpr_upper + 1e-8
                         and fh.fpr_lower - 1e-8 <= empirical["fpr"] <= fh.fpr_upper + 1e-8
                     )
-                    window_ok = empirical["fpr"] == 0.0 or (fpr_window[0] <= empirical["fpr"] <= fpr_window[1])
+                    window_ok = empirical["fpr"] == 0.0 or (
+                        fpr_window[0] <= empirical["fpr"] <= fpr_window[1]
+                    )
 
                     audit_entry = {
                         "topology": topology,
@@ -238,7 +254,9 @@ def main() -> None:
                         "thresholds": thresholds,
                         "seed": seed,
                         "episodes": episodes,
-                        "config_hash": hash_config({"topology": topology, "rails": rails, "thresholds": thresholds}),
+                        "config_hash": hash_config(
+                            {"topology": topology, "rails": rails, "thresholds": thresholds}
+                        ),
                         "fh_containment": fh_containment,
                         "fpr_window_ok": window_ok,
                     }

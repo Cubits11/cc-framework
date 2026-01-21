@@ -1,11 +1,9 @@
 # experiments/correlation_cliff/simulate/config.py
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Mapping, Protocol, Sequence, Tuple
-
-import math
-
 
 # ---------------------------------------------------------------------
 # Public types expected across simulate/*
@@ -62,7 +60,9 @@ def _strict_int(x: Any, name: str, *, min_value: int | None = None) -> int:
     return x
 
 
-def _canonical_lambda_keys(lambdas: Sequence[Any], *, decimals: int = 12) -> Tuple[List[float], List[float]]:
+def _canonical_lambda_keys(
+    lambdas: Sequence[Any], *, decimals: int = 12
+) -> Tuple[List[float], List[float]]:
     """
     Return (vals, keys) where:
       - vals are float-cast lambdas in original order
@@ -111,7 +111,9 @@ def _deep_no_nan_inf(x: Any, path: str) -> None:
     if isinstance(x, Mapping):
         for k, v in x.items():
             if not isinstance(k, str):
-                raise ConfigError(f"path_params keys must be str; found key={k!r} ({type(k).__name__}) at {path}")
+                raise ConfigError(
+                    f"path_params keys must be str; found key={k!r} ({type(k).__name__}) at {path}"
+                )
             _deep_no_nan_inf(v, f"{path}.{k}")
         return
     if isinstance(x, (list, tuple)):
@@ -147,7 +149,9 @@ def _coerce_marginals(m: Any) -> _TwoWorldMarginals:
                     raise ConfigError(f"marginals.{tag} missing attribute {key!r}")
                 val = getattr(w, key)
             if isinstance(val, bool):
-                raise ConfigError(f"marginals.{tag}.{key} must be finite in [0,1], got bool {val!r}")
+                raise ConfigError(
+                    f"marginals.{tag}.{key} must be finite in [0,1], got bool {val!r}"
+                )
             vf = float(val)
             if not math.isfinite(vf) or not (0.0 <= vf <= 1.0):
                 raise ConfigError(f"marginals.{tag}.{key} must be finite in [0,1], got {val!r}")
@@ -261,8 +265,14 @@ def validate_cfg(cfg: SimConfig) -> None:
     _strict_int(cfg.seed, "seed", min_value=0)
 
     # --- tolerances ---
-    if not _is_finite_real(cfg.envelope_tol) or float(cfg.envelope_tol) < 0.0 or float(cfg.envelope_tol) > 1e-1:
-        raise ConfigError(f"envelope_tol must be finite and reasonably small, got {cfg.envelope_tol!r}")
+    if (
+        not _is_finite_real(cfg.envelope_tol)
+        or float(cfg.envelope_tol) < 0.0
+        or float(cfg.envelope_tol) > 1e-1
+    ):
+        raise ConfigError(
+            f"envelope_tol must be finite and reasonably small, got {cfg.envelope_tol!r}"
+        )
 
     if not _is_finite_real(cfg.prob_tol) or float(cfg.prob_tol) < 0.0 or float(cfg.prob_tol) > 1e-3:
         raise ConfigError(f"prob_tol must be finite and reasonably small, got {cfg.prob_tol!r}")
@@ -270,13 +280,19 @@ def validate_cfg(cfg: SimConfig) -> None:
     if not isinstance(cfg.allow_tiny_negative, bool):
         raise ConfigError(f"allow_tiny_negative must be bool, got {cfg.allow_tiny_negative!r}")
     if cfg.allow_tiny_negative:
-        if not _is_finite_real(cfg.tiny_negative_eps) or not (0.0 < float(cfg.tiny_negative_eps) <= 1e-6):
-            raise ConfigError(f"tiny_negative_eps must be finite in (0,1e-6], got {cfg.tiny_negative_eps!r}")
+        if not _is_finite_real(cfg.tiny_negative_eps) or not (
+            0.0 < float(cfg.tiny_negative_eps) <= 1e-6
+        ):
+            raise ConfigError(
+                f"tiny_negative_eps must be finite in (0,1e-6], got {cfg.tiny_negative_eps!r}"
+            )
 
     if not isinstance(cfg.hard_fail_on_invalid, bool):
         raise ConfigError(f"hard_fail_on_invalid must be bool, got {cfg.hard_fail_on_invalid!r}")
     if not isinstance(cfg.include_theory_reference, bool):
-        raise ConfigError(f"include_theory_reference must be bool, got {cfg.include_theory_reference!r}")
+        raise ConfigError(
+            f"include_theory_reference must be bool, got {cfg.include_theory_reference!r}"
+        )
 
     # --- lambdas ---
     if not isinstance(cfg.lambdas, list) or len(cfg.lambdas) == 0:
@@ -289,7 +305,7 @@ def validate_cfg(cfg: SimConfig) -> None:
             if vals[i] < vals[i - 1]:
                 raise ConfigError(
                     f"lambdas must be non-decreasing for seed_policy='sequential'; "
-                    f"lambdas[{i-1}]={vals[i-1]} > lambdas[{i}]={vals[i]}"
+                    f"lambdas[{i - 1}]={vals[i - 1]} > lambdas[{i}]={vals[i]}"
                 )
 
     # --- marginals (already coerced/validated in __post_init__) ---
@@ -305,7 +321,9 @@ def validate_cfg(cfg: SimConfig) -> None:
 
     # --- path_params ---
     if not isinstance(cfg.path_params, Mapping):
-        raise ConfigError(f"path_params must be a dict-like mapping, got {type(cfg.path_params).__name__}")
+        raise ConfigError(
+            f"path_params must be a dict-like mapping, got {type(cfg.path_params).__name__}"
+        )
     _deep_no_nan_inf(cfg.path_params, "path_params")
 
 

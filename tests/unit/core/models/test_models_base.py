@@ -17,20 +17,20 @@ import concurrent.futures
 import json
 from typing import Any, Dict, Optional
 
-from hypothesis import given, strategies as st
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import Field, ValidationError, computed_field
 
 from cc.core.models import (
     AVRO_AVAILABLE,
+    MAX_REASONABLE_UNIX_TIMESTAMP,
     PROTO_AVAILABLE,
     SQLALCHEMY_AVAILABLE,
     AuditColumnsMixin,
-    MAX_REASONABLE_UNIX_TIMESTAMP,
     ModelBase,
     OrmBase,
 )
-
 
 # ---------------------------------------------------------------------
 # Shared helpers
@@ -336,6 +336,7 @@ def test_modelbase_openapi_schema_includes_field_description():
 # ---------------------------------------------------------------------
 # migrate() behaviour
 # ---------------------------------------------------------------------
+
 
 @given(st.dictionaries(st.text(min_size=1, max_size=10), st.text()))
 def test_modelbase_migrate_best_effort(old_data: Dict[str, str]):

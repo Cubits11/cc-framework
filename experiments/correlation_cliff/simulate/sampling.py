@@ -18,14 +18,13 @@ See:
 - numpy.random.Generator.multinomial docs (last entry ignored as leftover mass)  # documented behavior
 """
 
+import math
 from typing import Any, Dict, Tuple
 
-import math
 import numpy as np
 
-from .config import Rule
 from . import utils as U
-
+from .config import Rule
 
 _FLOAT64_EPS = float(np.finfo(np.float64).eps)
 # A "rounding-only" mismatch bound between p11 and 1 - sum(p00,p01,p10).
@@ -77,26 +76,36 @@ def validate_cell_probs(
         ) from e
 
     if not (math.isfinite(prob_tol_f) and prob_tol_f >= 0.0):
-        raise ProbabilityValidationError(f"prob_tol must be finite and >= 0, got {prob_tol_f}. {ctx}")
+        raise ProbabilityValidationError(
+            f"prob_tol must be finite and >= 0, got {prob_tol_f}. {ctx}"
+        )
     # Keep the "reasonably small" guard, but don't hardcode it to 1e-3 in a way that blocks experimentation.
     if prob_tol_f > 1e-2:
-        raise ProbabilityValidationError(f"prob_tol is suspiciously large (>1e-2): {prob_tol_f}. {ctx}")
+        raise ProbabilityValidationError(
+            f"prob_tol is suspiciously large (>1e-2): {prob_tol_f}. {ctx}"
+        )
 
     if allow_tiny_negative:
         if not (math.isfinite(eps_f) and 0.0 < eps_f <= 1e-4):
-            raise ProbabilityValidationError(f"tiny_negative_eps must be finite in (0, 1e-4], got {eps_f}. {ctx}")
+            raise ProbabilityValidationError(
+                f"tiny_negative_eps must be finite in (0, 1e-4], got {eps_f}. {ctx}"
+            )
 
     p_arr = np.asarray(p, dtype=np.float64)
     if p_arr.shape != (4,):
         if p_arr.size == 4:
-            p_arr = p_arr.reshape(4,)
+            p_arr = p_arr.reshape(
+                4,
+            )
         else:
             raise ProbabilityValidationError(
                 f"Expected p shape (4,), got {p_arr.shape} (size={p_arr.size}). {ctx}".strip()
             )
 
     if not np.all(np.isfinite(p_arr)):
-        raise ProbabilityValidationError(f"Non-finite probabilities: {p_arr.tolist()}. {ctx}".strip())
+        raise ProbabilityValidationError(
+            f"Non-finite probabilities: {p_arr.tolist()}. {ctx}".strip()
+        )
 
     pmin = float(p_arr.min())
     pmax = float(p_arr.max())
@@ -125,11 +134,15 @@ def validate_cell_probs(
             )
 
     if float(p_arr.min()) < 0.0 or float(p_arr.max()) > 1.0:
-        raise ProbabilityValidationError(f"Probabilities out of bounds after clipping: p={p_arr.tolist()}. {ctx}".strip())
+        raise ProbabilityValidationError(
+            f"Probabilities out of bounds after clipping: p={p_arr.tolist()}. {ctx}".strip()
+        )
 
     s = float(p_arr.sum())
     if not math.isfinite(s):
-        raise ProbabilityValidationError(f"Probability sum is non-finite: sum={s}, p={p_arr.tolist()}. {ctx}".strip())
+        raise ProbabilityValidationError(
+            f"Probability sum is non-finite: sum={s}, p={p_arr.tolist()}. {ctx}".strip()
+        )
 
     err = abs(s - 1.0)
     if err > prob_tol_f:
@@ -166,7 +179,9 @@ def draw_joint_counts(
     ctx = f" {context}".strip()
 
     if not isinstance(rng, np.random.Generator):
-        raise TypeError(f"rng must be a numpy.random.Generator, got {type(rng).__name__}. {ctx}".strip())
+        raise TypeError(
+            f"rng must be a numpy.random.Generator, got {type(rng).__name__}. {ctx}".strip()
+        )
 
     if isinstance(n, bool):
         raise TypeError(f"n must be an int > 0, got bool {n}. {ctx}".strip())
@@ -190,7 +205,9 @@ def draw_joint_counts(
 
     sum3 = float(p[0] + p[1] + p[2])
     if not math.isfinite(sum3):
-        raise RuntimeError(f"Non-finite partial sum for p00+p01+p10: {sum3}. p={p.tolist()}. {ctx}".strip())
+        raise RuntimeError(
+            f"Non-finite partial sum for p00+p01+p10: {sum3}. p={p.tolist()}. {ctx}".strip()
+        )
 
     remainder = 1.0 - sum3
 
@@ -222,12 +239,16 @@ def draw_joint_counts(
     counts = rng.multinomial(n_int, pvals=pvals, size=None)
 
     if counts.shape != (4,):
-        raise RuntimeError(f"Unexpected multinomial output shape: {counts.shape}, expected (4,). {ctx}".strip())
+        raise RuntimeError(
+            f"Unexpected multinomial output shape: {counts.shape}, expected (4,). {ctx}".strip()
+        )
 
     c0, c1, c2, c3 = (int(counts[0]), int(counts[1]), int(counts[2]), int(counts[3]))
     s = c0 + c1 + c2 + c3
     if s != n_int:
-        raise RuntimeError(f"Multinomial draw inconsistent: sum(counts)={s} != n={n_int}. {ctx}".strip())
+        raise RuntimeError(
+            f"Multinomial draw inconsistent: sum(counts)={s} != n={n_int}. {ctx}".strip()
+        )
 
     return c0, c1, c2, c3
 

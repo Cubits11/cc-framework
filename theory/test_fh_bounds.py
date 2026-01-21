@@ -2,9 +2,7 @@ import math
 from typing import Any, List, Sequence, Tuple
 
 import pytest
-
 from cc.theory import fh_bounds as fh
-
 
 # ---------------------------------------------------------------------
 # Helpers for constructing ComposedJBounds directly
@@ -226,9 +224,7 @@ def test_serial_or_composition_two_rails_bounds_are_sane() -> None:
     assert 0.0 <= bounds.fpr_bounds.lower <= bounds.fpr_bounds.upper <= 1.0
 
     # Individual J stats exist and match the per-rail formula
-    expected_individual = [
-        (1.0 - m) - f for m, f in zip(miss_rates, fpr_rates)
-    ]
+    expected_individual = [(1.0 - m) - f for m, f in zip(miss_rates, fpr_rates)]
     assert len(bounds.individual_j_stats) == 2
     for j_ind, j_exp in zip(bounds.individual_j_stats, expected_individual):
         assert j_ind == pytest.approx(j_exp)
@@ -247,12 +243,12 @@ def test_independence_serial_or_j_matches_manual_formula() -> None:
 
     miss_prod = 1.0
     for t in tprs:
-        miss_prod *= (1.0 - t)
+        miss_prod *= 1.0 - t
     tpr_expected = 1.0 - miss_prod
 
     no_fp_prod = 1.0
     for f in fprs:
-        no_fp_prod *= (1.0 - f)
+        no_fp_prod *= 1.0 - f
     fpr_expected = 1.0 - no_fp_prod
 
     j_expected = tpr_expected - fpr_expected
@@ -486,16 +482,14 @@ def test_stratified_bootstrap_j_statistic_respects_worlds(
     monkeypatch.setattr(fh, "compute_j_statistic", _fake_compute_j_statistic)
 
     # World 0: ~20% false positives
-    w0: List[_AttackResultStub] = (
-        [ _AttackResultStub(0, False) for _ in range(80) ] +
-        [ _AttackResultStub(0, True)  for _ in range(20) ]
-    )
+    w0: List[_AttackResultStub] = [_AttackResultStub(0, False) for _ in range(80)] + [
+        _AttackResultStub(0, True) for _ in range(20)
+    ]
 
     # World 1: ~90% true positives
-    w1: List[_AttackResultStub] = (
-        [ _AttackResultStub(1, True)  for _ in range(90) ] +
-        [ _AttackResultStub(1, False) for _ in range(10) ]
-    )
+    w1: List[_AttackResultStub] = [_AttackResultStub(1, True) for _ in range(90)] + [
+        _AttackResultStub(1, False) for _ in range(10)
+    ]
 
     bootstrap_j, ci = fh.stratified_bootstrap_j_statistic(
         w0,
@@ -520,13 +514,9 @@ def test_stratified_bootstrap_j_statistic_respects_worlds(
 
 def test_extract_rates_from_attack_results_basic() -> None:
     # 10 benign, 2 false positives
-    benign = [
-        _AttackResultStub(world_bit=0, success=(i < 2)) for i in range(10)
-    ]
+    benign = [_AttackResultStub(world_bit=0, success=(i < 2)) for i in range(10)]
     # 10 adversarial, 7 true positives
-    adv = [
-        _AttackResultStub(world_bit=1, success=(i < 7)) for i in range(10)
-    ]
+    adv = [_AttackResultStub(world_bit=1, success=(i < 7)) for i in range(10)]
 
     miss_rates, fpr_rates = fh.extract_rates_from_attack_results(benign + adv)
 

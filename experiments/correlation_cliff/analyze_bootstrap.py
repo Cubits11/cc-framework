@@ -141,20 +141,20 @@ def _norm_ppf(p: float) -> float:
 
     if p < plow:
         q = math.sqrt(-2 * math.log(p))
-        num = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
-        den = ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        num = ((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]
+        den = (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
         return num / den
 
     if p > phigh:
         q = math.sqrt(-2 * math.log(1 - p))
-        num = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
-        den = ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        num = ((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]
+        den = (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
         return -(num / den)
 
     q = p - 0.5
     r = q * q
     num = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
-    den = (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+    den = ((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0
     return num / den
 
 
@@ -190,8 +190,14 @@ def _pC_from_pA_pB_p11(rule: Rule, pA: float, pB: float, p11: float) -> float:
 def compute_metrics_from_counts(
     *,
     rule: Rule,
-    n00_0: int, n01_0: int, n10_0: int, n11_0: int,
-    n00_1: int, n01_1: int, n10_1: int, n11_1: int,
+    n00_0: int,
+    n01_0: int,
+    n10_0: int,
+    n11_0: int,
+    n00_1: int,
+    n01_1: int,
+    n10_1: int,
+    n11_1: int,
     eps: float = 1e-12,
 ) -> Dict[str, float]:
     """
@@ -338,13 +344,21 @@ def _jackknife_acceleration_multinomial(
     thetas: List[float] = []
     weights: List[int] = []
 
-    def add_pattern(weight: int, c0: Tuple[int, int, int, int], c1: Tuple[int, int, int, int]) -> None:
+    def add_pattern(
+        weight: int, c0: Tuple[int, int, int, int], c1: Tuple[int, int, int, int]
+    ) -> None:
         if weight <= 0:
             return
         m = compute_metrics_from_counts(
             rule=rule,
-            n00_0=c0[0], n01_0=c0[1], n10_0=c0[2], n11_0=c0[3],
-            n00_1=c1[0], n01_1=c1[1], n10_1=c1[2], n11_1=c1[3],
+            n00_0=c0[0],
+            n01_0=c0[1],
+            n10_0=c0[2],
+            n11_0=c0[3],
+            n00_1=c1[0],
+            n01_1=c1[1],
+            n10_1=c1[2],
+            n11_1=c1[3],
             eps=eps,
         )
         theta = float(m[stat_key])
@@ -353,39 +367,23 @@ def _jackknife_acceleration_multinomial(
 
     # World 0 removals
     if n00_0 > 0:
-        add_pattern(
-            n00_0, (n00_0 - 1, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1)
-        )
+        add_pattern(n00_0, (n00_0 - 1, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1))
     if n01_0 > 0:
-        add_pattern(
-            n01_0, (n00_0, n01_0 - 1, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1)
-        )
+        add_pattern(n01_0, (n00_0, n01_0 - 1, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1))
     if n10_0 > 0:
-        add_pattern(
-            n10_0, (n00_0, n01_0, n10_0 - 1, n11_0), (n00_1, n01_1, n10_1, n11_1)
-        )
+        add_pattern(n10_0, (n00_0, n01_0, n10_0 - 1, n11_0), (n00_1, n01_1, n10_1, n11_1))
     if n11_0 > 0:
-        add_pattern(
-            n11_0, (n00_0, n01_0, n10_0, n11_0 - 1), (n00_1, n01_1, n10_1, n11_1)
-        )
+        add_pattern(n11_0, (n00_0, n01_0, n10_0, n11_0 - 1), (n00_1, n01_1, n10_1, n11_1))
 
     # World 1 removals
     if n00_1 > 0:
-        add_pattern(
-            n00_1, (n00_0, n01_0, n10_0, n11_0), (n00_1 - 1, n01_1, n10_1, n11_1)
-        )
+        add_pattern(n00_1, (n00_0, n01_0, n10_0, n11_0), (n00_1 - 1, n01_1, n10_1, n11_1))
     if n01_1 > 0:
-        add_pattern(
-            n01_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1 - 1, n10_1, n11_1)
-        )
+        add_pattern(n01_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1 - 1, n10_1, n11_1))
     if n10_1 > 0:
-        add_pattern(
-            n10_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1 - 1, n11_1)
-        )
+        add_pattern(n10_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1 - 1, n11_1))
     if n11_1 > 0:
-        add_pattern(
-            n11_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1 - 1)
-        )
+        add_pattern(n11_1, (n00_0, n01_0, n10_0, n11_0), (n00_1, n01_1, n10_1, n11_1 - 1))
 
     if not thetas:
         return 0.0
@@ -402,7 +400,7 @@ def _jackknife_acceleration_multinomial(
     s2 = float(np.sum(w * dif * dif))
     s3 = float(np.sum(w * dif * dif * dif))
 
-    den = 6.0 * (s2 ** 1.5)
+    den = 6.0 * (s2**1.5)
     if den <= 0.0 or not math.isfinite(den):
         return 0.0
 
@@ -515,8 +513,14 @@ def bca_for_one_lambda(
     # Original stat
     m0 = compute_metrics_from_counts(
         rule=rule,
-        n00_0=n00_0, n01_0=n01_0, n10_0=n10_0, n11_0=n11_0,
-        n00_1=n00_1, n01_1=n01_1, n10_1=n10_1, n11_1=n11_1,
+        n00_0=n00_0,
+        n01_0=n01_0,
+        n10_0=n10_0,
+        n11_0=n11_0,
+        n00_1=n00_1,
+        n01_1=n01_1,
+        n10_1=n10_1,
+        n11_1=n11_1,
         eps=cfg.eps,
     )
 
@@ -557,8 +561,14 @@ def bca_for_one_lambda(
             c1 = _multinomial_draw(rng, n1, p1)
             mb = compute_metrics_from_counts(
                 rule=rule,
-                n00_0=int(c0[0]), n01_0=int(c0[1]), n10_0=int(c0[2]), n11_0=int(c0[3]),
-                n00_1=int(c1[0]), n01_1=int(c1[1]), n10_1=int(c1[2]), n11_1=int(c1[3]),
+                n00_0=int(c0[0]),
+                n01_0=int(c0[1]),
+                n10_0=int(c0[2]),
+                n11_0=int(c0[3]),
+                n00_1=int(c1[0]),
+                n01_1=int(c1[1]),
+                n10_1=int(c1[2]),
+                n11_1=int(c1[3]),
                 eps=cfg.eps,
             )
             boots[b] = float(mb[key])
@@ -600,8 +610,14 @@ def bca_table_for_curve(
     """
     required = [
         "lambda",
-        "n00_0", "n01_0", "n10_0", "n11_0",
-        "n00_1", "n01_1", "n10_1", "n11_1",
+        "n00_0",
+        "n01_0",
+        "n10_0",
+        "n11_0",
+        "n00_1",
+        "n01_1",
+        "n10_1",
+        "n11_1",
     ]
     missing = [c for c in required if c not in df_counts.columns]
     if missing:
@@ -615,7 +631,9 @@ def bca_table_for_curve(
         lam = float(r["lambda"])
         counts0 = (int(r["n00_0"]), int(r["n01_0"]), int(r["n10_0"]), int(r["n11_0"]))
         counts1 = (int(r["n00_1"]), int(r["n01_1"]), int(r["n10_1"]), int(r["n11_1"]))
-        rows.append(bca_for_one_lambda(lam=lam, rule=rule, counts0=counts0, counts1=counts1, cfg=cfg))
+        rows.append(
+            bca_for_one_lambda(lam=lam, rule=rule, counts0=counts0, counts1=counts1, cfg=cfg)
+        )
 
     return pd.DataFrame(rows).sort_values("lambda").reset_index(drop=True)
 
@@ -639,7 +657,9 @@ def select_observed_counts_from_sim_long(
             rep_col = c
             break
     if rep_col is None:
-        raise ValueError("sim_long DataFrame must include a replicate id column (rep/replicate/rep_id/replicate_id).")
+        raise ValueError(
+            "sim_long DataFrame must include a replicate id column (rep/replicate/rep_id/replicate_id)."
+        )
 
     d = df_long[df_long[rep_col].astype(int) == int(rep)].copy()
     if d.empty:
@@ -648,8 +668,14 @@ def select_observed_counts_from_sim_long(
 
     needed = [
         "lambda",
-        "n00_0", "n01_0", "n10_0", "n11_0",
-        "n00_1", "n01_1", "n10_1", "n11_1",
+        "n00_0",
+        "n01_0",
+        "n10_0",
+        "n11_0",
+        "n00_1",
+        "n01_1",
+        "n10_1",
+        "n11_1",
     ]
     missing = [c for c in needed if c not in d.columns]
     if missing:
@@ -703,8 +729,14 @@ def threshold_bootstrap_percentile(
     """
     required = [
         "lambda",
-        "n00_0", "n01_0", "n10_0", "n11_0",
-        "n00_1", "n01_1", "n10_1", "n11_1",
+        "n00_0",
+        "n01_0",
+        "n10_0",
+        "n11_0",
+        "n00_1",
+        "n01_1",
+        "n10_1",
+        "n11_1",
     ]
     missing = [c for c in required if c not in df_counts.columns]
     if missing:
@@ -716,8 +748,18 @@ def threshold_bootstrap_percentile(
     n0 = (d["n00_0"] + d["n01_0"] + d["n10_0"] + d["n11_0"]).to_numpy(dtype=int)
     n1 = (d["n00_1"] + d["n01_1"] + d["n10_1"] + d["n11_1"]).to_numpy(dtype=int)
 
-    p0s = np.vstack([_counts_to_probs_4(int(r.n00_0), int(r.n01_0), int(r.n10_0), int(r.n11_0)) for r in d.itertuples(index=False)])
-    p1s = np.vstack([_counts_to_probs_4(int(r.n00_1), int(r.n01_1), int(r.n10_1), int(r.n11_1)) for r in d.itertuples(index=False)])
+    p0s = np.vstack(
+        [
+            _counts_to_probs_4(int(r.n00_0), int(r.n01_0), int(r.n10_0), int(r.n11_0))
+            for r in d.itertuples(index=False)
+        ]
+    )
+    p1s = np.vstack(
+        [
+            _counts_to_probs_4(int(r.n00_1), int(r.n01_1), int(r.n10_1), int(r.n11_1))
+            for r in d.itertuples(index=False)
+        ]
+    )
 
     rng = np.random.default_rng(int(seed))
 
@@ -731,8 +773,14 @@ def threshold_bootstrap_percentile(
             c1 = rng.multinomial(int(n1[i]), p1s[i])
             mb = compute_metrics_from_counts(
                 rule=rule,
-                n00_0=int(c0[0]), n01_0=int(c0[1]), n10_0=int(c0[2]), n11_0=int(c0[3]),
-                n00_1=int(c1[0]), n01_1=int(c1[1]), n10_1=int(c1[2]), n11_1=int(c1[3]),
+                n00_0=int(c0[0]),
+                n01_0=int(c0[1]),
+                n10_0=int(c0[2]),
+                n11_0=int(c0[3]),
+                n00_1=int(c1[0]),
+                n01_1=int(c1[1]),
+                n10_1=int(c1[2]),
+                n11_1=int(c1[3]),
                 eps=eps,
             )
             CCs[i] = float(mb["CC_hat"])
@@ -777,15 +825,33 @@ def _write_json(path: Path, obj: Dict[str, Any]) -> None:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     import argparse
 
-    ap = argparse.ArgumentParser(description="Compute BCa bootstrap CIs for correlation_cliff outputs.")
-    ap.add_argument("--sim_long", type=str, required=True, help="Path to sim_long.csv (from run_all.py / simulate_grid).")
+    ap = argparse.ArgumentParser(
+        description="Compute BCa bootstrap CIs for correlation_cliff outputs."
+    )
+    ap.add_argument(
+        "--sim_long",
+        type=str,
+        required=True,
+        help="Path to sim_long.csv (from run_all.py / simulate_grid).",
+    )
     ap.add_argument("--out", type=str, required=True, help="Output directory for BCa artifacts.")
-    ap.add_argument("--rep", type=int, default=0, help="Which replicate to treat as the observed curve for BCa.")
-    ap.add_argument("--rule", type=str, default=None, help="Override rule (OR/AND). If None, tries to read from CSV.")
+    ap.add_argument(
+        "--rep", type=int, default=0, help="Which replicate to treat as the observed curve for BCa."
+    )
+    ap.add_argument(
+        "--rule",
+        type=str,
+        default=None,
+        help="Override rule (OR/AND). If None, tries to read from CSV.",
+    )
     ap.add_argument("--B", type=int, default=2000, help="Bootstrap replications per lambda.")
     ap.add_argument("--alpha", type=float, default=0.05, help="Two-sided alpha (0.05 => 95%% CI).")
     ap.add_argument("--seed", type=int, default=123, help="RNG seed.")
-    ap.add_argument("--do_threshold_boot", action="store_true", help="Also run curve-level threshold bootstrap (percentile).")
+    ap.add_argument(
+        "--do_threshold_boot",
+        action="store_true",
+        help="Also run curve-level threshold bootstrap (percentile).",
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     sim_long_path = Path(args.sim_long)
@@ -803,7 +869,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         rule = rule  # type: ignore[assignment]
     else:
         if "rule" not in df_long.columns:
-            raise ValueError("Could not infer rule from sim_long.csv (missing 'rule'). Provide --rule OR/AND.")
+            raise ValueError(
+                "Could not infer rule from sim_long.csv (missing 'rule'). Provide --rule OR/AND."
+            )
         rule_val = str(df_long["rule"].iloc[0]).strip().upper()
         if rule_val not in ("OR", "AND"):
             raise ValueError(f"Invalid rule in sim_long.csv: {rule_val}")

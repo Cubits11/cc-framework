@@ -47,6 +47,9 @@ framework’s guardrail-composition analyses, including:
 
 from __future__ import annotations
 
+import math
+import random
+import warnings
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -58,10 +61,6 @@ from typing import (
     Tuple,
     Union,
 )
-
-import math
-import random
-import warnings
 
 import numpy as np
 
@@ -96,8 +95,8 @@ DEFAULT_CC_RELATIVE_MARGIN: float = 0.05
 DEFAULT_CC_ABSOLUTE_MARGIN: float = 0.0
 DEFAULT_CC_UNCERTAINTY_MULTIPLIER: float = 0.5
 
-Probability = float   # in [0, 1]
-JStatistic = float    # in [-1, 1]
+Probability = float  # in [0, 1]
+JStatistic = float  # in [-1, 1]
 Bounds = Tuple[float, float]
 CopulaFamily = Literal[
     "independence",
@@ -391,6 +390,7 @@ class FHBounds:
             return (float(self.lower) + EPSILON) < v < (float(self.upper) - EPSILON)
         return (float(self.lower) - EPSILON) <= v <= (float(self.upper) + EPSILON)
 
+
 @dataclass(frozen=True, slots=True)
 class ComposedJBounds:
     """
@@ -414,6 +414,7 @@ class ComposedJBounds:
     - composition type (e.g., "serial_or" or "parallel_and"),
     - number of rails.
     """
+
     j_lower: JStatistic
     j_upper: JStatistic
     tpr_bounds: FHBounds
@@ -426,7 +427,12 @@ class ComposedJBounds:
 
     def __post_init__(self) -> None:
         # Check basic J ordering and range
-        if not (-1.0 - MATHEMATICAL_TOLERANCE <= self.j_lower <= self.j_upper <= 1.0 + MATHEMATICAL_TOLERANCE):
+        if not (
+            -1.0 - MATHEMATICAL_TOLERANCE
+            <= self.j_lower
+            <= self.j_upper
+            <= 1.0 + MATHEMATICAL_TOLERANCE
+        ):
             raise FHBoundViolationError(
                 f"Invalid J bounds: [{self.j_lower:.12f}, {self.j_upper:.12f}]. "
                 f"Must satisfy -1 ≤ lower ≤ upper ≤ 1 (up to tolerance)."
@@ -620,9 +626,7 @@ def validate_probability_vector(probs: Sequence[float], name: str) -> None:
         # Build a detailed multi-line error message for debugging
         details_lines = []
         for idx, original, info in invalid_values:
-            details_lines.append(
-                f"  - index {idx}: value={original!r}, info={info!r}"
-            )
+            details_lines.append(f"  - index {idx}: value={original!r}, info={info!r}")
         details = "\n".join(details_lines)
 
         raise ValueError(
@@ -630,6 +634,7 @@ def validate_probability_vector(probs: Sequence[float], name: str) -> None:
             f"Each probability must be a finite real number in [0, 1].\n"
             f"Offending entries:\n{details}"
         )
+
 
 # ---------------------------------------------------------------------
 # Core FH / Hoeffding bounds
@@ -701,6 +706,7 @@ def frechet_intersection_lower_bound(marginals: Sequence[Probability]) -> Probab
 
     # 4) Final safety clamp to enforce ≤ min(pᵢ) numerically.
     return float(min(bound, min_p))
+
 
 def hoeffding_intersection_upper_bound(marginals: Sequence[Probability]) -> Probability:
     """
@@ -834,6 +840,7 @@ def hoeffding_union_upper_bound(marginals: Sequence[Probability]) -> Probability
 
     return upper
 
+
 def intersection_bounds(marginals: Sequence[Probability]) -> FHBounds:
     """
     Compute Fréchet–Hoeffding bounds for the intersection probability P(⋂ Aᵢ).
@@ -908,6 +915,7 @@ def intersection_bounds(marginals: Sequence[Probability]) -> FHBounds:
         ),
     )
 
+
 def union_bounds(marginals: Sequence[Probability]) -> FHBounds:
     """
     Compute Fréchet–Hoeffding bounds for the union probability P(⋃ Aᵢ).
@@ -975,10 +983,10 @@ def union_bounds(marginals: Sequence[Probability]) -> FHBounds:
         bound_type="union",
         k_rails=len(p),
         construction_proof=(
-            "Fréchet–Hoeffding union bounds: "
-            "lower = max_i p_i; upper = min(1, Σ p_i)."
+            "Fréchet–Hoeffding union bounds: lower = max_i p_i; upper = min(1, Σ p_i)."
         ),
     )
+
 
 # ---------------------------------------------------------------------
 # Composition: serial OR / parallel AND
@@ -1144,10 +1152,7 @@ def serial_or_composition_bounds(
         )
 
     # Per-rail J statistics for comparison / CC metrics
-    individual_j_stats = tuple(
-        (max(0.0, min(1.0, 1.0 - m))) - f
-        for m, f in zip(miss, fa)
-    )
+    individual_j_stats = tuple((max(0.0, min(1.0, 1.0 - m))) - f for m, f in zip(miss, fa))
 
     return ComposedJBounds(
         j_lower=j_lower,
@@ -1160,6 +1165,7 @@ def serial_or_composition_bounds(
         composition_type="serial_or",
         k_rails=k,
     )
+
 
 def parallel_and_composition_bounds(
     miss_rates: Sequence[Probability],
@@ -1313,10 +1319,7 @@ def parallel_and_composition_bounds(
             f"j_lower={j_lower:.12f} > j_upper={j_upper:.12f}"
         )
 
-    individual_j_stats = tuple(
-        (max(0.0, min(1.0, 1.0 - m))) - f
-        for m, f in zip(miss, fa)
-    )
+    individual_j_stats = tuple((max(0.0, min(1.0, 1.0 - m))) - f for m, f in zip(miss, fa))
 
     return ComposedJBounds(
         j_lower=j_lower,
@@ -1330,9 +1333,11 @@ def parallel_and_composition_bounds(
         k_rails=k,
     )
 
+
 # ---------------------------------------------------------------------
 # Independence-based composition
 # ---------------------------------------------------------------------
+
 
 def _stable_product(values: Sequence[float]) -> float:
     """Compute ∏ values in log space to avoid underflow."""
@@ -1353,6 +1358,8 @@ def _stable_product_complement(values: Sequence[float]) -> float:
             return 0.0
         log_sum += math.log1p(-value)
     return float(math.exp(log_sum))
+
+
 def independence_serial_or_j(
     tprs: Sequence[Probability],
     fprs: Sequence[Probability],
@@ -1442,6 +1449,7 @@ def independence_serial_or_j(
     # Final clamp into [-1, 1] to protect downstream code from tiny drift.
     return max(-1.0, min(1.0, float(j)))
 
+
 def independence_parallel_and_j(
     tprs: Sequence[Probability],
     fprs: Sequence[Probability],
@@ -1521,9 +1529,11 @@ def independence_parallel_and_j(
     # Final clamp into [-1, 1] for robustness.
     return max(-1.0, min(1.0, float(j)))
 
+
 # ---------------------------------------------------------------------
 # Copula-based visualization helpers
 # ---------------------------------------------------------------------
+
 
 def copula_cdf(
     family: CopulaFamily,
@@ -1560,7 +1570,7 @@ def copula_cdf(
             raise ValueError("Gumbel copula requires theta >= 1.")
         log_u = -np.log(u)
         log_v = -np.log(v)
-        return np.exp(-((log_u ** theta + log_v ** theta) ** (1.0 / theta)))
+        return np.exp(-((log_u**theta + log_v**theta) ** (1.0 / theta)))
 
     if family == "frank":
         if theta is None or abs(theta) < EPSILON:
@@ -1646,9 +1656,11 @@ def copula_experiment_plan() -> List[Dict[str, str]]:
         },
     ]
 
+
 # ---------------------------------------------------------------------
 # Composability Interference Index (CII)
 # ---------------------------------------------------------------------
+
 
 def compute_composability_interference_index(
     observed_j: float,
@@ -1688,9 +1700,7 @@ def compute_composability_interference_index(
     """
     # Sanity check on the bounds width (should be non-negative by construction).
     if bounds.width < -MATHEMATICAL_TOLERANCE:
-        raise FHBoundViolationError(
-            f"ComposedJBounds has negative width: {bounds.width}"
-        )
+        raise FHBoundViolationError(f"ComposedJBounds has negative width: {bounds.width}")
 
     # 0. Validate observed_j as a finite J in [-1, 1] (up to tolerance).
     try:
@@ -1741,7 +1751,11 @@ def compute_composability_interference_index(
         else:
             # Extremely defensive fallback (should not occur if ComposedJBounds
             # enforces composition_type).
-            j_baseline = float(np.mean(list(bounds.individual_j_stats))) if bounds.individual_j_stats else 0.0
+            j_baseline = (
+                float(np.mean(list(bounds.individual_j_stats)))
+                if bounds.individual_j_stats
+                else 0.0
+            )
 
         baseline_type = "independence"
     else:
@@ -1756,15 +1770,11 @@ def compute_composability_interference_index(
     j_best = float(bounds.j_upper)
 
     baseline_within_bounds = (
-        j_worst - MATHEMATICAL_TOLERANCE
-        <= j_baseline
-        <= j_best + MATHEMATICAL_TOLERANCE
+        j_worst - MATHEMATICAL_TOLERANCE <= j_baseline <= j_best + MATHEMATICAL_TOLERANCE
     )
 
     observed_within_bounds = (
-        j_worst - MATHEMATICAL_TOLERANCE
-        <= observed_j_f
-        <= j_best + MATHEMATICAL_TOLERANCE
+        j_worst - MATHEMATICAL_TOLERANCE <= observed_j_f <= j_best + MATHEMATICAL_TOLERANCE
     )
 
     # 3. Compute κ with careful handling of degeneracy
@@ -1827,6 +1837,7 @@ def compute_composability_interference_index(
         "composition_type": bounds.composition_type,
     }
 
+
 # ---------------------------------------------------------------------
 # Statistical helpers: Wilson CI & inverse normal
 # ---------------------------------------------------------------------
@@ -1866,6 +1877,7 @@ def robust_inverse_normal(p: float) -> float:
     # 1. Try math.erfcinv if available (fast, no heavy deps)
     try:  # pragma: no cover - platform dependent
         from math import erfcinv
+
         return math.sqrt(2.0) * erfcinv(2.0 * (1.0 - p_clipped))
     except Exception:
         pass
@@ -1873,6 +1885,7 @@ def robust_inverse_normal(p: float) -> float:
     # 2. Try SciPy if available
     try:  # pragma: no cover - optional dependency
         import scipy.stats  # type: ignore
+
         return float(scipy.stats.norm.ppf(p_clipped))
     except Exception:
         pass
@@ -1880,6 +1893,7 @@ def robust_inverse_normal(p: float) -> float:
     # 3. Try Python's statistics.NormalDist (stdlib, 3.8+)
     try:  # pragma: no cover - environment dependent
         from statistics import NormalDist  # type: ignore
+
         return float(NormalDist().inv_cdf(p_clipped))
     except Exception:
         pass
@@ -1905,11 +1919,13 @@ def robust_inverse_normal(p: float) -> float:
         b4 = 6.680131188771972e01
 
         y = math.sqrt(-2.0 * math.log(pc))
-        x = y + ((((y * a3 + a2) * y + a1) * y + a0) /
-                 ((((y * b4 + b3) * y + b2) * y + b1) * y + 1.0))
+        x = y + (
+            (((y * a3 + a2) * y + a1) * y + a0) / ((((y * b4 + b3) * y + b2) * y + b1) * y + 1.0)
+        )
         return sign * x
 
     return _bsm_inverse_normal(p_clipped)
+
 
 def wilson_score_interval(
     successes: int,
@@ -1950,8 +1966,7 @@ def wilson_score_interval(
         t_float = float(trials)
     except (TypeError, ValueError) as e:
         raise ValueError(
-            f"successes={successes!r} or trials={trials!r} "
-            f"cannot be interpreted as numeric: {e}"
+            f"successes={successes!r} or trials={trials!r} cannot be interpreted as numeric: {e}"
         ) from e
 
     if not t_float.is_integer() or not s_float.is_integer():
@@ -1966,9 +1981,7 @@ def wilson_score_interval(
     if trials_i <= 0:
         raise ValueError("trials must be a positive integer")
     if not (0 <= successes_i <= trials_i):
-        raise ValueError(
-            f"successes {successes_i} must be in [0, {trials_i}]"
-        )
+        raise ValueError(f"successes {successes_i} must be in [0, {trials_i}]")
 
     # --- 1. Validate alpha --------------------------------------------------
     try:
@@ -2008,8 +2021,7 @@ def wilson_score_interval(
     # Final sanity: enforce lower <= upper within tolerance.
     if lower > upper + MATHEMATICAL_TOLERANCE:
         raise NumericalInstabilityError(
-            f"Wilson interval numerically inverted: lower={lower:.12f}, "
-            f"upper={upper:.12f}"
+            f"Wilson interval numerically inverted: lower={lower:.12f}, upper={upper:.12f}"
         )
 
     return float(lower), float(upper)
@@ -2105,9 +2117,11 @@ def propagate_marginal_uncertainty_to_composed_bounds(
 
     return result
 
+
 # ---------------------------------------------------------------------
 # Stratified bootstrap for J-statistic
 # ---------------------------------------------------------------------
+
 
 def stratified_bootstrap_j_statistic(
     results_world_0: Sequence[Any],
@@ -2236,7 +2250,9 @@ def stratified_bootstrap_j_statistic(
             j_boot, *_ = compute_j_statistic(combined)
             j_val = float(j_boot)
         except Exception as exc:  # pragma: no cover - defensive
-            warnings.warn(f"Bootstrap iteration {i} failed in compute_j_statistic: {exc}", UserWarning)
+            warnings.warn(
+                f"Bootstrap iteration {i} failed in compute_j_statistic: {exc}", UserWarning
+            )
             continue
 
         # Validate J value: finite and within [-1, 1] up to a small tolerance.
@@ -2309,6 +2325,7 @@ def stratified_bootstrap_j_statistic(
 
     return bootstrap_j_stats, (ci_lower, ci_upper)
 
+
 # ---------------------------------------------------------------------
 # Integration helpers with AttackResult
 # ---------------------------------------------------------------------
@@ -2379,8 +2396,7 @@ def extract_rates_from_attack_results(
         # Missing world_bit → default to baseline (benign) but warn.
         if wb is None:
             warnings.warn(
-                f"Result at index {idx} missing world_bit; "
-                "defaulting to world_bit=0 (benign).",
+                f"Result at index {idx} missing world_bit; defaulting to world_bit=0 (benign).",
                 UserWarning,
             )
             wb = 0
@@ -2448,6 +2464,7 @@ def extract_rates_from_attack_results(
     miss_rate = max(0.0, min(1.0, float(miss_rate)))
 
     return [miss_rate], [fpr]
+
 
 def validate_fh_bounds_against_empirical(
     bounds: ComposedJBounds,
@@ -2557,7 +2574,12 @@ def validate_fh_bounds_against_empirical(
         ci_lower = float(ci_lower_raw)
         ci_upper = float(ci_upper_raw)
 
-        if math.isnan(ci_lower) or math.isnan(ci_upper) or math.isinf(ci_lower) or math.isinf(ci_upper):
+        if (
+            math.isnan(ci_lower)
+            or math.isnan(ci_upper)
+            or math.isinf(ci_lower)
+            or math.isinf(ci_upper)
+        ):
             raise ValueError(
                 f"confidence_interval must contain finite values; got ({ci_lower_raw!r}, {ci_upper_raw!r})"
             )
@@ -2620,6 +2642,7 @@ def validate_fh_bounds_against_empirical(
 
     return report
 
+
 # ---------------------------------------------------------------------
 # Advanced analyses
 # ---------------------------------------------------------------------
@@ -2679,9 +2702,7 @@ def sensitivity_analysis_fh_bounds(
     validate_probability_vector(nominal_fpr_rates, "nominal_fpr_rates")
 
     if len(nominal_miss_rates) != len(nominal_fpr_rates):
-        raise ValueError(
-            "nominal_miss_rates and nominal_fpr_rates must have the same length"
-        )
+        raise ValueError("nominal_miss_rates and nominal_fpr_rates must have the same length")
 
     if not (0.0 < perturbation_size <= 0.1):
         raise ValueError("perturbation_size should be in (0, 0.1]")
@@ -2729,9 +2750,7 @@ def sensitivity_analysis_fh_bounds(
             perturbed_fpr.append(max(0.0, min(1.0, float(f) + delta)))
 
         try:
-            perturbed_bounds = serial_or_composition_bounds(
-                perturbed_miss, perturbed_fpr
-            )
+            perturbed_bounds = serial_or_composition_bounds(perturbed_miss, perturbed_fpr)
         except Exception as exc:  # pragma: no cover - defensive
             n_fail += 1
             warnings.warn(
@@ -2796,6 +2815,7 @@ def sensitivity_analysis_fh_bounds(
         "n_failed_perturbations": int(n_fail),
         "sensitivity_interpretation": interpretation,
     }
+
 
 # ---------------------------------------------------------------------
 # Internal mathematical self-tests
@@ -2915,11 +2935,19 @@ def verify_fh_bound_properties() -> Dict[str, bool]:
             p_int_indep *= float(pi)
         p_uni_indep = 1.0
         for pi in p:
-            p_uni_indep *= (1.0 - float(pi))
+            p_uni_indep *= 1.0 - float(pi)
         p_uni_indep = 1.0 - p_uni_indep
 
-        assert int_b.lower - MATHEMATICAL_TOLERANCE <= p_int_indep <= int_b.upper + MATHEMATICAL_TOLERANCE
-        assert uni_b.lower - MATHEMATICAL_TOLERANCE <= p_uni_indep <= uni_b.upper + MATHEMATICAL_TOLERANCE
+        assert (
+            int_b.lower - MATHEMATICAL_TOLERANCE
+            <= p_int_indep
+            <= int_b.upper + MATHEMATICAL_TOLERANCE
+        )
+        assert (
+            uni_b.lower - MATHEMATICAL_TOLERANCE
+            <= p_uni_indep
+            <= uni_b.upper + MATHEMATICAL_TOLERANCE
+        )
 
         tests_passed["fh_vs_independence_envelope"] = True
     except Exception:
@@ -3086,6 +3114,7 @@ def verify_fh_bound_properties() -> Dict[str, bool]:
 
     return tests_passed
 
+
 # ---------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------
@@ -3182,12 +3211,6 @@ if __name__ == "__main__":  # pragma: no cover - manual verification
     all_passed = results.get("all_passed", passed == total)
 
     if all_passed:
-        print(
-            "\n🎉 ALL MATHEMATICAL PROPERTIES VERIFIED – "
-            "implementation is research-ready."
-        )
+        print("\n🎉 ALL MATHEMATICAL PROPERTIES VERIFIED – implementation is research-ready.")
     else:
-        print(
-            "\n⚠️  Some tests failed – investigate before relying on these "
-            "bounds in production."
-        )
+        print("\n⚠️  Some tests failed – investigate before relying on these bounds in production.")

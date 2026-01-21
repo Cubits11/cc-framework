@@ -16,9 +16,10 @@ Specifically, it implements:
   * An information-gain policy that chooses the next query type to
     maximise expected log-likelihood ratio gain, contrasting with
     simple ε-greedy exploration.
-  * End-of-game summary including Youden’s Ĵ statistic and a 95 % 
+  * End-of-game summary including Youden’s Ĵ statistic and a 95 %
     bootstrap confidence interval for attack success rates.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -87,7 +88,9 @@ class TwoWorldGamePhD:
             self.world_configs[1].extra_delay_ms = 12.0
 
         self.secret_world = random.choice([0, 1])
-        self.label_map: Dict[str, int] = {"A": 0, "B": 1} if random.choice([True, False]) else {"A": 1, "B": 0}
+        self.label_map: Dict[str, int] = (
+            {"A": 0, "B": 1} if random.choice([True, False]) else {"A": 1, "B": 0}
+        )
 
         self.sprt_A = math.log((1.0 - sprt_beta) / sprt_alpha)
         self.sprt_B = math.log(sprt_beta / (1.0 - sprt_alpha))
@@ -170,8 +173,12 @@ class TwoWorldGamePhD:
             llr = 0.0
             for respA in ("Allowed", "Blocked"):
                 for respB in ("Allowed", "Blocked"):
-                    pH0 = self._p_outcome("A", qtype, respA, "H0") * self._p_outcome("B", qtype, respB, "H0")
-                    pH1 = self._p_outcome("A", qtype, respA, "H1") * self._p_outcome("B", qtype, respB, "H1")
+                    pH0 = self._p_outcome("A", qtype, respA, "H0") * self._p_outcome(
+                        "B", qtype, respB, "H0"
+                    )
+                    pH1 = self._p_outcome("A", qtype, respA, "H1") * self._p_outcome(
+                        "B", qtype, respB, "H1"
+                    )
                     if pH0 > 0.0 and pH1 > 0.0:
                         llr += pH0 * math.log(pH0 / pH1)
             return llr
@@ -224,16 +231,22 @@ class TwoWorldGamePhD:
                 print(f"  logLR = {self.log_lr:+.3f}, posterior(H₀) = {self.posterior_H0():.3f}")
 
             if self.log_lr >= self.sprt_A:
-                print("\nSPRT decision: Evidence favors H₀ → predict A=W0 (safe) and B=W1 (secret).")
+                print(
+                    "\nSPRT decision: Evidence favors H₀ → predict A=W0 (safe) and B=W1 (secret)."
+                )
                 break
             if self.log_lr <= self.sprt_B:
-                print("\nSPRT decision: Evidence favors H₁ → predict A=W1 (secret) and B=W0 (safe).")
+                print(
+                    "\nSPRT decision: Evidence favors H₁ → predict A=W1 (secret) and B=W0 (safe)."
+                )
                 break
             print()
 
         if self.sprt_B < self.log_lr < self.sprt_A and not self.bot:
             while True:
-                guess = input("Final guess — which hides the secret? ('A' or 'B'): ").strip().upper()
+                guess = (
+                    input("Final guess — which hides the secret? ('A' or 'B'): ").strip().upper()
+                )
                 if guess in {"A", "B"}:
                     break
             guessed_world = self.label_map[guess]
@@ -246,7 +259,7 @@ class TwoWorldGamePhD:
 
     def _attack_pairs(self) -> List[Tuple[int, int]]:
         pairs: List[Tuple[int, int]] = []
-        for (_i, qtype, respA, respB) in self.history:
+        for _i, qtype, respA, respB in self.history:
             if qtype != "attack":
                 continue
             outcomeA = 1 if respA == "Allowed" else 0
@@ -315,16 +328,29 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Play the PhD-level two-world attack game with SPRT and information design"
     )
-    parser.add_argument("-n", "--rounds", type=int, default=20, help="Maximum number of query rounds")
+    parser.add_argument(
+        "-n", "--rounds", type=int, default=20, help="Maximum number of query rounds"
+    )
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    parser.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal",
-                        help="Attack block gap preset")
-    parser.add_argument("--leaky-timing", action="store_true", help="Introduce timing side-channel in secret world")
+    parser.add_argument(
+        "--difficulty",
+        choices=["easy", "normal", "hard"],
+        default="normal",
+        help="Attack block gap preset",
+    )
+    parser.add_argument(
+        "--leaky-timing", action="store_true", help="Introduce timing side-channel in secret world"
+    )
     parser.add_argument("--bot", action="store_true", help="Use an automated attacker")
-    parser.add_argument("--epsilon", type=float, default=0.15, help="ε for ε-greedy when strategy='epsilon'")
-    parser.add_argument("--strategy", choices=["epsilon", "info"], default="info",
-                        help="Query selection strategy")
-    parser.add_argument("--online", action="store_true", help="Print logLR and posterior after each round")
+    parser.add_argument(
+        "--epsilon", type=float, default=0.15, help="ε for ε-greedy when strategy='epsilon'"
+    )
+    parser.add_argument(
+        "--strategy", choices=["epsilon", "info"], default="info", help="Query selection strategy"
+    )
+    parser.add_argument(
+        "--online", action="store_true", help="Print logLR and posterior after each round"
+    )
     parser.add_argument("--sprt-alpha", type=float, default=0.05, help="Type I error (α) for SPRT")
     parser.add_argument("--sprt-beta", type=float, default=0.05, help="Type II error (β) for SPRT")
     parser.add_argument("--log", type=str, default=None, help="CSV log path (optional)")

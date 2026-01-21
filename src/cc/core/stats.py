@@ -102,7 +102,7 @@ import json
 import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import stats as scipy_stats
@@ -116,9 +116,11 @@ ConfidenceInterval = Tuple[float, float]
 # Public result types
 # =============================================================================
 
+
 @dataclass
 class JBootstrapCI:
     """Minimal return type for the runner's import (used in analysis + logging)."""
+
     ci_lower: float
     ci_upper: float
     method: str = "percentile"
@@ -191,11 +193,16 @@ class BootstrapResult:
             "p1": float(self.p1),
             "cc_max": float(self.cc_max) if np.isfinite(self.cc_max) else None,
             "delta_add": float(self.delta_add),
-            "cc_multiplicative": float(self.cc_multiplicative) if self.cc_multiplicative is not None else None,
+            "cc_multiplicative": float(self.cc_multiplicative)
+            if self.cc_multiplicative is not None
+            else None,
             "confidence_intervals": {
                 "j": {"lower": float(self.ci_j[0]), "upper": float(self.ci_j[1])},
                 "cc_max": {"lower": float(self.ci_cc_max[0]), "upper": float(self.ci_cc_max[1])},
-                "delta_add": {"lower": float(self.ci_delta_add[0]), "upper": float(self.ci_delta_add[1])},
+                "delta_add": {
+                    "lower": float(self.ci_delta_add[0]),
+                    "upper": float(self.ci_delta_add[1]),
+                },
             },
             "diagnostics": {
                 "n_sessions": int(self.n_sessions),
@@ -229,6 +236,7 @@ class BootstrapResult:
 @dataclass
 class CCInterpretation:
     """Interpretation of CC results"""
+
     regime: str  # "constructive", "independent", "destructive"
     confidence: float
     recommendation: str
@@ -238,6 +246,7 @@ class CCInterpretation:
 # =============================================================================
 # Public API (kept compatible)
 # =============================================================================
+
 
 def bootstrap_ci_j_statistic(
     w0: np.ndarray,
@@ -344,9 +353,7 @@ def compute_j_statistic(results: AttackResults) -> Tuple[float, float, float]:
     n0 = int(mask0.sum())
     n1 = int(mask1.sum())
     if n0 == 0 or n1 == 0:
-        raise ValueError(
-            f"compute_j_statistic: Need both worlds. Got n0={n0}, n1={n1}."
-        )
+        raise ValueError(f"compute_j_statistic: Need both worlds. Got n0={n0}, n1={n1}.")
 
     p0 = float(y[mask0].mean())
     p1 = float(y[mask1].mean())
@@ -486,7 +493,9 @@ def bootstrap_ci_with_cc(
 
     n_total = len(results)
     if n_total < 50:
-        warnings.warn(f"bootstrap_ci_with_cc: small sample size (n={n_total}). Inference may be unstable.")
+        warnings.warn(
+            f"bootstrap_ci_with_cc: small sample size (n={n_total}). Inference may be unstable."
+        )
 
     # --------- Extract arrays / metadata ---------
     world = np.array([_get_world_bit(r) for r in results], dtype=int)
@@ -505,13 +514,17 @@ def bootstrap_ci_with_cc(
             raise ValueError("bootstrap_ci_with_cc: cluster_ids length must match results length")
         cluster_key_used = "cluster_ids"
     elif cluster_key is not None:
-        cluster_vec = np.array([_safe_to_str(getattr(r, cluster_key, None)) for r in results], dtype=object)
+        cluster_vec = np.array(
+            [_safe_to_str(getattr(r, cluster_key, None)) for r in results], dtype=object
+        )
         cluster_key_used = cluster_key
 
     # pairing ids
     pair_vec: Optional[np.ndarray] = None
     if pair_key is not None:
-        pair_vec = np.array([_safe_to_str(getattr(r, pair_key, None)) for r in results], dtype=object)
+        pair_vec = np.array(
+            [_safe_to_str(getattr(r, pair_key, None)) for r in results], dtype=object
+        )
 
     # stratify
     idx0 = np.where(world == 0)[0]
@@ -530,7 +543,11 @@ def bootstrap_ci_with_cc(
         cc_max_emp = float(cc_metrics["cc_max"])
         delta_add_emp = float(cc_metrics["delta_add"])
         cc_mult_emp = cc_metrics.get("cc_multiplicative", None)
-        j_max_individual = float(cc_metrics["j_max_individual"]) if np.isfinite(cc_metrics["j_max_individual"]) else float("nan")
+        j_max_individual = (
+            float(cc_metrics["j_max_individual"])
+            if np.isfinite(cc_metrics["j_max_individual"])
+            else float("nan")
+        )
         cc_defined = bool(cc_metrics.get("cc_defined", False))
         cc_reason = str(cc_metrics.get("reason", ""))
     else:
@@ -574,7 +591,9 @@ def bootstrap_ci_with_cc(
     block_size_used: Optional[int] = None
     if resample_mode == "block":
         if not ordered_final:
-            warnings.warn("Requested/selected block bootstrap but ordered=False; falling back to iid.")
+            warnings.warn(
+                "Requested/selected block bootstrap but ordered=False; falling back to iid."
+            )
             resample_mode = "iid"
         else:
             if block_size is None:
@@ -608,7 +627,9 @@ def bootstrap_ci_with_cc(
     if resample_mode == "pair" and pair_vec is not None:
         pair_struct = _build_pairs(idx0, idx1, y, pair_vec)
         if pair_struct is None:
-            warnings.warn("pair bootstrap requested/selected but pairs are invalid; falling back to iid.")
+            warnings.warn(
+                "pair bootstrap requested/selected but pairs are invalid; falling back to iid."
+            )
             resample_mode = "iid"
 
     # cluster structures
@@ -617,7 +638,9 @@ def bootstrap_ci_with_cc(
         cluster_struct0 = _build_clusters(idx0, cluster_vec)
         cluster_struct1 = _build_clusters(idx1, cluster_vec)
         if cluster_struct0 is None or cluster_struct1 is None:
-            warnings.warn("cluster bootstrap requested/selected but clusters are invalid; falling back to iid.")
+            warnings.warn(
+                "cluster bootstrap requested/selected but clusters are invalid; falling back to iid."
+            )
             resample_mode = "iid"
 
     # ordered indices within each world for block bootstrap
@@ -663,7 +686,11 @@ def bootstrap_ci_with_cc(
                         cc_b = float(j_b / j_max_individual)
                     else:
                         cc_b = float("nan")
-                    d_b = float(j_b - j_max_individual) if np.isfinite(j_max_individual) else float("nan")
+                    d_b = (
+                        float(j_b - j_max_individual)
+                        if np.isfinite(j_max_individual)
+                        else float("nan")
+                    )
                 else:
                     cc_b = float("nan")
                     d_b = float("nan")
@@ -788,11 +815,15 @@ def bootstrap_ci_with_cc(
         p1=float(p1_emp),
         cc_max=float(cc_max_emp) if np.isfinite(cc_max_emp) else float("nan"),
         delta_add=float(delta_add_emp) if np.isfinite(delta_add_emp) else float("nan"),
-        cc_multiplicative=float(cc_mult_emp) if isinstance(cc_mult_emp, (int, float)) and np.isfinite(cc_mult_emp) else None,
+        cc_multiplicative=float(cc_mult_emp)
+        if isinstance(cc_mult_emp, (int, float)) and np.isfinite(cc_mult_emp)
+        else None,
         ci_j=ci_j,
         ci_cc_max=ci_cc,
         ci_delta_add=ci_delta,
-        ci_width=float(ci_j[1] - ci_j[0]) if np.isfinite(ci_j[0]) and np.isfinite(ci_j[1]) else math.nan,
+        ci_width=float(ci_j[1] - ci_j[0])
+        if np.isfinite(ci_j[0]) and np.isfinite(ci_j[1])
+        else math.nan,
         bootstrap_samples=(boot_j_arr.copy() if (return_bootstrap_samples and valid) else None),
         n_sessions=int(n_total),
         n_bootstrap=int(B),
@@ -805,7 +836,9 @@ def bootstrap_ci_with_cc(
         valid=bool(valid),
         resample=resample_mode,
         ordered=ordered_final,
-        block_size=block_size_used if resample_mode == "block" else block_size,  # preserve caller's view
+        block_size=block_size_used
+        if resample_mode == "block"
+        else block_size,  # preserve caller's view
         cluster_key=cluster_key_used,
         n_clusters_world0=ncl0,
         n_clusters_world1=ncl1,
@@ -830,7 +863,9 @@ def dkw_confidence_bound(n: int, alpha: float = 0.05) -> float:
     return math.sqrt(math.log(2 / alpha) / (2 * max(n, 1)))
 
 
-def analytical_j_ci(results: AttackResults, alpha: float = 0.05) -> Tuple[float, ConfidenceInterval]:
+def analytical_j_ci(
+    results: AttackResults, alpha: float = 0.05
+) -> Tuple[float, ConfidenceInterval]:
     """
     Analytical CI for J via normal approximation (unpaired, iid-ish).
 
@@ -845,7 +880,11 @@ def analytical_j_ci(results: AttackResults, alpha: float = 0.05) -> Tuple[float,
     # avoid div-by-zero
     se_p0 = math.sqrt(p0 * (1 - p0) / n0) if n0 > 0 else float("nan")
     se_p1 = math.sqrt(p1 * (1 - p1) / n1) if n1 > 0 else float("nan")
-    se_j = math.sqrt(se_p0 ** 2 + se_p1 ** 2) if np.isfinite(se_p0) and np.isfinite(se_p1) else float("nan")
+    se_j = (
+        math.sqrt(se_p0**2 + se_p1**2)
+        if np.isfinite(se_p0) and np.isfinite(se_p1)
+        else float("nan")
+    )
 
     z = float(scipy_stats.norm.ppf(1 - alpha / 2))
     ci = (float(j - z * se_j), float(j + z * se_j)) if np.isfinite(se_j) else (math.nan, math.nan)
@@ -934,22 +973,37 @@ def interpret_cc_results(
 
     if cc > threshold_constructive:
         regime = "constructive"
-        confidence = 1.0 if (np.isfinite(ci[0]) and ci[0] > threshold_constructive) else max(0.0, float((cc - threshold_constructive) / ci_width))
+        confidence = (
+            1.0
+            if (np.isfinite(ci[0]) and ci[0] > threshold_constructive)
+            else max(0.0, float((cc - threshold_constructive) / ci_width))
+        )
         recommendation = "Deploy composition - synergistic protection detected"
     elif cc < threshold_destructive:
         regime = "destructive"
-        confidence = 1.0 if (np.isfinite(ci[1]) and ci[1] < threshold_destructive) else max(0.0, float((threshold_destructive - cc) / ci_width))
+        confidence = (
+            1.0
+            if (np.isfinite(ci[1]) and ci[1] < threshold_destructive)
+            else max(0.0, float((threshold_destructive - cc) / ci_width))
+        )
         recommendation = "Avoid composition - interference detected"
     else:
         regime = "independent"
         # confidence is "CI contained inside [destructive, constructive]" if possible
         if np.isfinite(ci[0]) and np.isfinite(ci[1]):
-            confidence = 1.0 if (ci[0] >= threshold_destructive and ci[1] <= threshold_constructive) else 0.5
+            confidence = (
+                1.0 if (ci[0] >= threshold_destructive and ci[1] <= threshold_constructive) else 0.5
+            )
         else:
             confidence = 0.5
         recommendation = "Use single best guardrail - no interaction benefit"
 
-    return CCInterpretation(regime=regime, confidence=float(confidence), recommendation=recommendation, evidence=evidence)
+    return CCInterpretation(
+        regime=regime,
+        confidence=float(confidence),
+        recommendation=recommendation,
+        evidence=evidence,
+    )
 
 
 # =============================================================================
@@ -968,6 +1022,7 @@ _ALLOWED_PROVENANCE_FIELDS = (
     "cluster_id",
 )
 
+
 def _get_world_bit(r: Any) -> int:
     w = getattr(r, "world_bit", None)
     if w is None:
@@ -979,6 +1034,7 @@ def _get_world_bit(r: Any) -> int:
     if wi not in (0, 1):
         raise ValueError(f"world_bit must be 0 or 1; got {wi}")
     return wi
+
 
 def _get_success(r: Any) -> int:
     s = getattr(r, "success", None)
@@ -993,6 +1049,7 @@ def _get_success(r: Any) -> int:
         raise ValueError(f"success must be binary (0/1); got {si}")
     return si
 
+
 def _coerce_binary_array(arr: np.ndarray, name: str) -> np.ndarray:
     try:
         out = arr.astype(int)
@@ -1003,6 +1060,7 @@ def _coerce_binary_array(arr: np.ndarray, name: str) -> np.ndarray:
         raise ValueError(f"{name}: non-binary values found, e.g. {bad!r}")
     return out
 
+
 def _safe_to_str(x: Any) -> str:
     if x is None:
         return ""
@@ -1012,6 +1070,7 @@ def _safe_to_str(x: Any) -> str:
         return json.dumps(x, sort_keys=True, default=str)
     except Exception:
         return str(x)
+
 
 def _infer_ordering(results: AttackResults) -> bool:
     """
@@ -1029,9 +1088,11 @@ def _infer_ordering(results: AttackResults) -> bool:
             return False
     return all(ts[i] <= ts[i + 1] for i in range(len(ts) - 1))
 
+
 def _estimate_block_size(n: int) -> int:
     # rule of thumb: n^(1/3)
     return max(1, int(round(n ** (1.0 / 3.0))))
+
 
 def _choose_resample_mode(
     requested: str,
@@ -1046,10 +1107,14 @@ def _choose_resample_mode(
             warnings.warn("block resampling requested but ordered=False; will fall back to iid.")
             return "iid"
         if req == "cluster" and cluster_vec is None:
-            warnings.warn("cluster resampling requested but no cluster labels provided; falling back to iid.")
+            warnings.warn(
+                "cluster resampling requested but no cluster labels provided; falling back to iid."
+            )
             return "iid"
         if req == "pair" and pair_vec is None:
-            warnings.warn("pair resampling requested but no pair_key provided; falling back to iid.")
+            warnings.warn(
+                "pair resampling requested but no pair_key provided; falling back to iid."
+            )
             return "iid"
         return req
 
@@ -1062,12 +1127,16 @@ def _choose_resample_mode(
         return "block"
     return "iid"
 
-def _infer_tier_label(tier: str, cluster_vec: Optional[np.ndarray], pair_vec: Optional[np.ndarray]) -> str:
+
+def _infer_tier_label(
+    tier: str, cluster_vec: Optional[np.ndarray], pair_vec: Optional[np.ndarray]
+) -> str:
     if tier and tier != "auto":
         return str(tier)
     if pair_vec is not None or cluster_vec is not None:
         return "Tier 1"
     return "Tier 0"
+
 
 def _compute_provenance_hashes(results: AttackResults, config: Dict[str, Any]) -> Tuple[str, str]:
     """
@@ -1084,19 +1153,29 @@ def _compute_provenance_hashes(results: AttackResults, config: Dict[str, Any]) -
 
     # order-sensitive
     order_payload = {"rows": rows, "config": config}
-    order_bytes = json.dumps(order_payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    order_bytes = json.dumps(
+        order_payload, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
     order_hash = hashlib.sha256(order_bytes).hexdigest()[:16]
 
     # order-insensitive (multiset): sort rows by stable tuple (attack_id, world_bit, timestamp, index)
     def sort_key(d: Dict[str, Any]) -> Tuple[str, str, str, int]:
-        return (d.get("attack_id", ""), d.get("world_bit", ""), d.get("timestamp", ""), int(d["_i"]))
+        return (
+            d.get("attack_id", ""),
+            d.get("world_bit", ""),
+            d.get("timestamp", ""),
+            int(d["_i"]),
+        )
 
     rows_sorted = sorted(rows, key=sort_key)
     multiset_payload = {"rows": rows_sorted, "config": config}
-    multiset_bytes = json.dumps(multiset_payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    multiset_bytes = json.dumps(
+        multiset_payload, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
     input_hash = hashlib.sha256(multiset_bytes).hexdigest()[:16]
 
     return input_hash, order_hash
+
 
 def _resample_blocks(indices: np.ndarray, block_size: int, rng: np.random.Generator) -> np.ndarray:
     """
@@ -1119,7 +1198,10 @@ def _resample_blocks(indices: np.ndarray, block_size: int, rng: np.random.Genera
             break
     return np.array(out, dtype=int)
 
-def _build_clusters(world_indices: np.ndarray, cluster_vec: np.ndarray) -> Optional[List[np.ndarray]]:
+
+def _build_clusters(
+    world_indices: np.ndarray, cluster_vec: np.ndarray
+) -> Optional[List[np.ndarray]]:
     """
     Build list of arrays, each containing indices belonging to a cluster.
     Returns None if clusters degenerate.
@@ -1139,6 +1221,7 @@ def _build_clusters(world_indices: np.ndarray, cluster_vec: np.ndarray) -> Optio
         return None
     return clusters
 
+
 def _resample_clusters(clusters: List[np.ndarray], rng: np.random.Generator) -> np.ndarray:
     """
     Resample clusters with replacement, include all members of selected clusters.
@@ -1150,7 +1233,10 @@ def _resample_clusters(clusters: List[np.ndarray], rng: np.random.Generator) -> 
     out = np.concatenate([clusters[i] for i in picks], axis=0)
     return out.astype(int)
 
-def _build_pairs(idx0: np.ndarray, idx1: np.ndarray, y: np.ndarray, pair_vec: np.ndarray) -> Optional[np.ndarray]:
+
+def _build_pairs(
+    idx0: np.ndarray, idx1: np.ndarray, y: np.ndarray, pair_vec: np.ndarray
+) -> Optional[np.ndarray]:
     """
     Build array of shape (n_pairs, 2): [y0, y1] aligned by pair_id.
     Requires complete pairs (one obs per world per pair).
@@ -1181,6 +1267,7 @@ def _build_pairs(idx0: np.ndarray, idx1: np.ndarray, y: np.ndarray, pair_vec: np
         return None
     return np.array(pairs, dtype=int)
 
+
 def _bootstrap_stat_pair(
     pair_struct: np.ndarray,
     rng: np.random.Generator,
@@ -1204,6 +1291,7 @@ def _bootstrap_stat_pair(
         d = float("nan")
     return j, cc, d
 
+
 def _jackknife_unit(mode: str) -> str:
     # used to choose jackknife scheme
     if mode == "pair":
@@ -1211,6 +1299,7 @@ def _jackknife_unit(mode: str) -> str:
     if mode == "cluster":
         return "cluster"
     return "observation"
+
 
 def _jackknife_data_for_mode(
     mode: str,
@@ -1239,6 +1328,7 @@ def _jackknife_data_for_mode(
         "j_max_individual": j_max_individual,
     }
 
+
 def _compute_ci(
     samples: np.ndarray,
     theta_hat: float,
@@ -1260,6 +1350,7 @@ def _compute_ci(
 
     raise ValueError(f"bootstrap_ci_with_cc: unknown CI method={method!r}")
 
+
 def _percentile_ci(samples: np.ndarray, alpha: float) -> ConfidenceInterval:
     if samples.size == 0:
         return (math.nan, math.nan)
@@ -1267,11 +1358,13 @@ def _percentile_ci(samples: np.ndarray, alpha: float) -> ConfidenceInterval:
     hi = float(np.quantile(samples, 1.0 - alpha / 2.0))
     return (lo, hi)
 
+
 def _basic_ci(samples: np.ndarray, theta_hat: float, alpha: float) -> ConfidenceInterval:
     if samples.size == 0 or not np.isfinite(theta_hat):
         return (math.nan, math.nan)
     p_lo, p_hi = _percentile_ci(samples, alpha)
     return (float(2 * theta_hat - p_hi), float(2 * theta_hat - p_lo))
+
 
 def _bca_ci_full(
     samples: np.ndarray,
@@ -1330,18 +1423,20 @@ def _bca_ci_full(
     hi = float(np.quantile(samples, a2))
     return (lo, hi)
 
+
 def _bca_alpha(z0: float, a: float, z_alpha: float) -> float:
-    denom = (1.0 - a * (z0 + z_alpha))
+    denom = 1.0 - a * (z0 + z_alpha)
     if denom == 0:
         return float(scipy_stats.norm.cdf(z0 + z0 + z_alpha))
     adj = z0 + (z0 + z_alpha) / denom
     return float(scipy_stats.norm.cdf(adj))
 
+
 def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[np.ndarray]:
     """
     Compute jackknife leave-one-unit-out estimates of the requested statistic.
     """
-    mode = data["mode"]
+    data["mode"]
     stat_kind = data.get("stat_kind", "j")
     y = data["y"]
     idx0 = data["idx0"]
@@ -1384,9 +1479,15 @@ def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[
             if stat_kind == "j":
                 out[i] = j
             elif stat_kind == "cc":
-                out[i] = float(j / j_max) if (j_max is not None and np.isfinite(j_max) and j_max > 0) else float("nan")
+                out[i] = (
+                    float(j / j_max)
+                    if (j_max is not None and np.isfinite(j_max) and j_max > 0)
+                    else float("nan")
+                )
             elif stat_kind == "delta":
-                out[i] = float(j - j_max) if (j_max is not None and np.isfinite(j_max)) else float("nan")
+                out[i] = (
+                    float(j - j_max) if (j_max is not None and np.isfinite(j_max)) else float("nan")
+                )
             else:
                 out[i] = float("nan")
         return out
@@ -1435,6 +1536,7 @@ def _jackknife_estimates(jackknife_unit: str, data: Dict[str, Any]) -> Optional[
         out[t] = stat_from_masks(m0, m1)
     return out
 
+
 def _compute_convergence_diagnostic(samples: np.ndarray) -> float:
     """Coefficient of variation (std / |mean|) for bootstrap statistic."""
     if samples.size == 0:
@@ -1444,7 +1546,10 @@ def _compute_convergence_diagnostic(samples: np.ndarray) -> float:
         return float("inf")
     return float(np.std(samples, ddof=1) / abs(mu))
 
-def _icc_and_ess(y: np.ndarray, clusters: np.ndarray) -> Tuple[Optional[float], Optional[int], Optional[float]]:
+
+def _icc_and_ess(
+    y: np.ndarray, clusters: np.ndarray
+) -> Tuple[Optional[float], Optional[int], Optional[float]]:
     """
     One-way random-effects ICC (ANOVA-style) + Kish ESS for clustered samples.
 
@@ -1500,8 +1605,9 @@ def _icc_and_ess(y: np.ndarray, clusters: np.ndarray) -> Tuple[Optional[float], 
         icc = max(0.0, min(1.0, (msb - msw) / denom))
 
     # Kish ESS for cluster sampling: (sum w)^2 / sum w^2 with w=cluster size
-    ess = float((n ** 2) / sum_sq) if sum_sq > 0 else float(n)
+    ess = float((n**2) / sum_sq) if sum_sq > 0 else float(n)
     return float(icc), k, ess
+
 
 def _global_ess(
     mode: str,
@@ -1525,6 +1631,7 @@ def _global_ess(
         return float((n0 + n1) / block_size)
     # iid/pair fallback
     return float(1.0 / (1.0 / max(n0, 1e-9) + 1.0 / max(n1, 1e-9)))
+
 
 def _run_hypothesis_tests_enterprise(
     y0: np.ndarray,
@@ -1560,7 +1667,10 @@ def _run_hypothesis_tests_enterprise(
     # Fisher exact (two-sided)
     try:
         _, p_fisher = scipy_stats.fisher_exact([[s0, f0], [s1, f1]], alternative="two-sided")
-        tests["fisher_exact"] = {"p_value": float(p_fisher), "note": "Unpaired 2x2 Fisher exact, two-sided."}
+        tests["fisher_exact"] = {
+            "p_value": float(p_fisher),
+            "note": "Unpaired 2x2 Fisher exact, two-sided.",
+        }
     except Exception as e:
         tests["fisher_exact"] = {"p_value": None, "error": type(e).__name__}
 
@@ -1570,7 +1680,11 @@ def _run_hypothesis_tests_enterprise(
         se = math.sqrt(p_pool * (1 - p_pool) * (1 / max(y0.size, 1) + 1 / max(y1.size, 1)))
         z = (float(y0.mean()) - float(y1.mean())) / se if se > 0 else float("inf")
         p_z = 2 * (1 - float(scipy_stats.norm.cdf(abs(z))))
-        tests["z_test_diff_proportions"] = {"z": float(z), "p_value": float(p_z), "note": "Asymptotic z-test for p0-p1."}
+        tests["z_test_diff_proportions"] = {
+            "z": float(z),
+            "p_value": float(p_z),
+            "note": "Asymptotic z-test for p0-p1.",
+        }
     except Exception as e:
         tests["z_test_diff_proportions"] = {"p_value": None, "error": type(e).__name__}
 

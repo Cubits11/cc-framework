@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
-import json
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -12,8 +13,8 @@ from theory.fh_bounds import (
     ComposedJBounds,
     compute_cc_bounds,
     default_cc_regime_thresholds,
-    serial_or_composition_bounds,
     parallel_and_composition_bounds,
+    serial_or_composition_bounds,
 )
 
 
@@ -44,7 +45,9 @@ def plot_fh_envelope(
         alpha=0.2,
         label="FH envelope",
     )
-    ax.plot(thetas, [j_independence] * len(thetas), color="black", linestyle="--", label="Independence")
+    ax.plot(
+        thetas, [j_independence] * len(thetas), color="black", linestyle="--", label="Independence"
+    )
     ax.plot(thetas, observed_j, color="tab:orange", marker="o", label="Observed J")
     lower = [ci[0] for ci in observed_ci]
     upper = [ci[1] for ci in observed_ci]

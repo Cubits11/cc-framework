@@ -8,6 +8,7 @@ Outputs columns expected by scripts/rails_compare.py:
 - rail_a_score
 - rail_b_score
 """
+
 from __future__ import annotations
 
 import argparse

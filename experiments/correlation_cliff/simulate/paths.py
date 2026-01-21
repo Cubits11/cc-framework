@@ -14,12 +14,13 @@ Exports:
 Research-OS invariants:
 - meta is NUMERIC-ONLY by design (floats)
 - required meta keys ALWAYS present:
-    L, U, FH_width, lam, lam_eff, raw_p11, clip_amt, clipped
-- p11 returned ALWAYS satisfies L <= p11 <= U (unless clip_policy='raise' and violation exceeds clip_tol)
+    L, U, FH_width, lam, lam_eff, raw_p11, clip_amt, clipped,
+    fh_violation, fh_violation_amt
+- p11 returned ALWAYS satisfies L <= p11 <= U
+  (unless clip_policy='raise' and violation exceeds clip_tol, in which case raises)
 """
 
 from typing import Any, Dict, Mapping, Tuple
-
 import math
 import numpy as np
 
@@ -75,7 +76,6 @@ def _finite_pos(x: Any, name: str) -> float:
 
 def _mapping(path_params: Any) -> Mapping[str, Any]:
     if isinstance(path_params, Mapping):
-        # Require string keys for OS hygiene.
         for k in path_params.keys():
             if not isinstance(k, str):
                 raise InputValidationError(f"path_params keys must be str; got key={k!r} ({type(k).__name__})")
@@ -99,7 +99,6 @@ def _lam_scurve(lam: float, k: float) -> float:
     lam = _finite_in_unit(lam, "lam")
     k = _finite_pos(k, "k")
 
-    # Numerically stable sigmoid
     def _sigmoid(z: float) -> float:
         z = float(z)
         if z >= 0.0:
@@ -124,6 +123,18 @@ def _lam_scurve(lam: float, k: float) -> float:
     s_raw = _sigmoid(k * (lam - 0.5))
     s = (s_raw - a) / denom
     return float(min(max(s, 0.0), 1.0))
+
+
+def _lam_to_tau(lam: float) -> float:
+    """
+    Canonical mapping for gaussian_tau path.
+
+    lam in [0,1] -> tau in [-1, +1] linearly:
+        tau = 2*lam - 1
+    Ensures endpoints map to tau=-1,+1 exactly.
+    """
+    lam = _finite_in_unit(lam, "lam")
+    return float(2.0 * lam - 1.0)
 
 
 # -----------------------------------------------------------------------------
@@ -220,7 +231,6 @@ def p11_from_path(
 
     pp = _mapping(path_params)
 
-    # Normalize path name (config already normalizes, but callers may not).
     path_s = str(path).lower().strip()
     if path_s not in ("fh_linear", "fh_power", "fh_scurve", "gaussian_tau"):
         raise InputValidationError(f"Unknown path: {path!r}")
@@ -233,7 +243,6 @@ def p11_from_path(
 
     width = float(Uu - L)
 
-    # Base meta: numeric-only, always present keys
     meta: Dict[str, float] = {
         "L": float(L),
         "U": float(Uu),
@@ -263,14 +272,12 @@ def p11_from_path(
         meta["lam_eff"] = float(lam_eff)
         meta["raw_p11"] = float(raw)
 
-        # Compute violation magnitude beyond bounds
         below = max(0.0, (L - raw))
         above = max(0.0, (raw - Uu))
         viol_amt = max(below, above)
         meta["fh_violation_amt"] = float(viol_amt)
         meta["fh_violation"] = float(1.0 if viol_amt > 0.0 else 0.0)
 
-        # Policy: raise if outside [L,U] more than clip_tol
         if raw < L - clip_tol or raw > Uu + clip_tol:
             if clip_policy == "raise":
                 raise FeasibilityError(
@@ -292,5 +299,43 @@ def p11_from_path(
 
         return float(clipped), meta
 
+    # ---- FH envelope paths (all routed through p11_fh_linear for testability)
     if path_s == "fh_linear":
-        raw = float(U.p11_fh_linear(
+        lam_eff = lam_f
+        raw = float(U.p11_fh_linear(pA_f, pB_f, lam_eff))
+        return _finalize(raw, lam_eff)
+
+    if path_s == "fh_power":
+        gamma = _finite_pos(pp.get("gamma", None), "gamma")
+        lam_eff = _lam_power(lam_f, gamma)
+        raw = float(U.p11_fh_linear(pA_f, pB_f, lam_eff))
+        meta["gamma"] = float(gamma)
+        return _finalize(raw, lam_eff)
+
+    if path_s == "fh_scurve":
+        k = _finite_pos(pp.get("k", None), "k")
+        lam_eff = _lam_scurve(lam_f, k)
+        raw = float(U.p11_fh_linear(pA_f, pB_f, lam_eff))
+        meta["k"] = float(k)
+        return _finalize(raw, lam_eff)
+
+    # ---- Gaussian copula path (parameterized by Kendall's tau via lam)
+    # Endpoints should not require SciPy: tau=-1 -> L, tau=+1 -> U.
+    tau = _lam_to_tau(lam_f)
+    meta["tau"] = float(tau)
+
+    if tau <= -1.0:
+        meta["rho"] = float(-1.0)
+        return _finalize(float(L), float(lam_f))
+    if tau >= 1.0:
+        meta["rho"] = float(1.0)
+        return _finalize(float(Uu), float(lam_f))
+
+    # interior requires SciPy
+    ppf_clip_eps = _as_float(pp.get("ppf_clip_eps", 1e-12), "ppf_clip_eps")
+    p11_raw, gmeta = _p11_gaussian_tau(pA_f, pB_f, tau, ppf_clip_eps=ppf_clip_eps)
+    for k, v in gmeta.items():
+        meta[k] = float(v)
+    meta["ppf_clip_eps"] = float(ppf_clip_eps)
+
+    return _finalize(float(p11_raw), float(lam_f))

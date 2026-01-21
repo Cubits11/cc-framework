@@ -16,8 +16,10 @@ ADAPTER_REGISTRY: Dict[str, Type[GuardrailAdapter]] = {
     "guardrails_ai": GuardrailsAIAdapter,
 }
 
+
 def list_adapters() -> Dict[str, Type[GuardrailAdapter]]:
     return dict(ADAPTER_REGISTRY)
+
 
 def get_adapter_class(name: str) -> Type[GuardrailAdapter]:
     key = (name or "").strip()

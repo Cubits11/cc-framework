@@ -22,11 +22,10 @@ Conventions
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional, Tuple, cast
+from typing import Any, Dict, Mapping, Optional, cast
 
-import yaml
 import numpy as np
-
+import yaml
 
 # =============================================================================
 # Config loading

@@ -25,18 +25,28 @@ import numpy as np
 from cc.analysis.week7_utils import BCaInterval, bca_bootstrap
 
 
-def compute_interval(values: Sequence[float], alpha: float, n_bootstrap: int, seed: int | None) -> BCaInterval:
+def compute_interval(
+    values: Sequence[float], alpha: float, n_bootstrap: int, seed: int | None
+) -> BCaInterval:
     arr = np.asarray(values, dtype=float)
-    return bca_bootstrap(arr, lambda xs: float(np.mean(xs[0])), alpha=alpha, n_bootstrap=n_bootstrap, rng=seed)
+    return bca_bootstrap(
+        arr, lambda xs: float(np.mean(xs[0])), alpha=alpha, n_bootstrap=n_bootstrap, rng=seed
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compute BCa intervals for toy samples")
     parser.add_argument("--samples", nargs="+", type=float, required=True, help="Sample values")
-    parser.add_argument("--alpha", type=float, default=0.05, help="Two-sided error rate (default 0.05)")
-    parser.add_argument("--bootstrap", type=int, default=2000, help="Number of bootstrap replicates")
+    parser.add_argument(
+        "--alpha", type=float, default=0.05, help="Two-sided error rate (default 0.05)"
+    )
+    parser.add_argument(
+        "--bootstrap", type=int, default=2000, help="Number of bootstrap replicates"
+    )
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
-    parser.add_argument("--json", type=Path, default=None, help="Optional output path for JSON interval")
+    parser.add_argument(
+        "--json", type=Path, default=None, help="Optional output path for JSON interval"
+    )
     args = parser.parse_args()
 
     interval = compute_interval(args.samples, args.alpha, args.bootstrap, args.seed)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Correlation Cliff — Run-All Orchestrator
 =======================================
@@ -13,9 +14,6 @@ This script orchestrates the full correlation cliff experiment pipeline:
 
 Supports both legacy single-run schema and enterprise matrix schema.
 """
-from dataclasses import asdict, dataclass
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 import hashlib
 import json
 import logging
@@ -23,9 +21,15 @@ import platform
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
 import numpy as np
 import pandas as pd
+
+
 # ----------------------------
 # Local imports
 # ----------------------------
@@ -38,17 +42,23 @@ def _import_local():
     surface immediately.
     """
     try:
-        from .simulate import SimConfig, simulate_grid, summarize_simulation, p11_from_path # type: ignore
-        from .figures import FigureStyle, make_all_figures # type: ignore
-        from .theory import ( # type: ignore
+        from .figures import FigureStyle, make_all_figures  # type: ignore
+        from .simulate import (  # type: ignore
+            SimConfig,
+            p11_from_path,
+            simulate_grid,
+            summarize_simulation,
+        )
+        from .theory import (  # type: ignore
             TwoWorldMarginals,
             WorldMarginals,
             compute_fh_jc_envelope,
             joint_cells_from_marginals,
+            kendall_tau_a_from_joint,
             pC_from_joint,
             phi_from_joint,
-            kendall_tau_a_from_joint,
         )
+
         return (
             SimConfig,
             simulate_grid,
@@ -65,17 +75,24 @@ def _import_local():
             kendall_tau_a_from_joint,
         )
     except ImportError:
-        from simulate import SimConfig, simulate_grid, summarize_simulation, p11_from_path # type: ignore
-        from figures import FigureStyle, make_all_figures # type: ignore
-        from theory import ( # type: ignore
+        from simulate import (  # type: ignore
+            SimConfig,
+            p11_from_path,
+            simulate_grid,
+            summarize_simulation,
+        )
+
+        from figures import FigureStyle, make_all_figures  # type: ignore
+        from theory import (  # type: ignore
             TwoWorldMarginals,
             WorldMarginals,
             compute_fh_jc_envelope,
             joint_cells_from_marginals,
+            kendall_tau_a_from_joint,
             pC_from_joint,
             phi_from_joint,
-            kendall_tau_a_from_joint,
         )
+
         return (
             SimConfig,
             simulate_grid,
@@ -116,9 +133,13 @@ LOG = logging.getLogger("correlation_cliff.run_all")
 
 def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
+
+
 def _now_stamp() -> str:
     # Deterministic enough for file naming; not used for RNG.
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
 def _atomic_write_text(path: Path, text: str) -> None:
     _ensure_dir(path.parent)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -129,6 +150,8 @@ def _atomic_write_text(path: Path, text: str) -> None:
 
 def _write_json(path: Path, obj: Dict[str, Any]) -> None:
     _atomic_write_text(path, json.dumps(obj, indent=2, sort_keys=True) + "\n")
+
+
 def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> Optional[float]:
     if len(x) < 2:
         return None
@@ -142,6 +165,8 @@ def _interp_root(x: np.ndarray, y: np.ndarray, target: float) -> Optional[float]
             t = (target - y0) / (y1 - y0)
             return float(x[i] + t * (x[i + 1] - x[i]))
     return None
+
+
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -217,10 +242,12 @@ class RunSpec:
     refine_enabled: bool
     refine_half_width: float
     refine_num: int
-    refine_method: str # "uniform" | "none" (reserved for adaptive later)
+    refine_method: str  # "uniform" | "none" (reserved for adaptive later)
 
 
-def _resolve_runs(cfg: Mapping[str, Any]) -> Tuple[TwoWorldMarginals, List[RunSpec], Dict[str, Any]]:
+def _resolve_runs(
+    cfg: Mapping[str, Any],
+) -> Tuple[TwoWorldMarginals, List[RunSpec], Dict[str, Any]]:
     """
     Resolve a pipeline config into:
     - TwoWorldMarginals
@@ -240,15 +267,25 @@ def _resolve_runs(cfg: Mapping[str, Any]) -> Tuple[TwoWorldMarginals, List[RunSp
     w0 = _require_mapping(md.get("w0", {}), "marginals.w0")
     w1 = _require_mapping(md.get("w1", {}), "marginals.w1")
     marg = TwoWorldMarginals(
-        w0=WorldMarginals(pA=_validate_probability(w0["pA"], "marginals.w0.pA"), pB=_validate_probability(w0["pB"], "marginals.w0.pB")),
-        w1=WorldMarginals(pA=_validate_probability(w1["pA"], "marginals.w1.pA"), pB=_validate_probability(w1["pB"], "marginals.w1.pB")),
+        w0=WorldMarginals(
+            pA=_validate_probability(w0["pA"], "marginals.w0.pA"),
+            pB=_validate_probability(w0["pB"], "marginals.w0.pB"),
+        ),
+        w1=WorldMarginals(
+            pA=_validate_probability(w1["pA"], "marginals.w1.pA"),
+            pB=_validate_probability(w1["pB"], "marginals.w1.pB"),
+        ),
     )
 
     # Determine if pipeline schema exists
-    has_pipeline = isinstance(cfg.get("dependence_paths"), Mapping) or isinstance(cfg.get("composition"), Mapping)
+    has_pipeline = isinstance(cfg.get("dependence_paths"), Mapping) or isinstance(
+        cfg.get("composition"), Mapping
+    )
 
     rules: List[str] = []
-    paths: List[Tuple[str, Dict[str, Any], Mapping[str, Any]]] = [] # (path, params, primary_cfg_for_refine)
+    paths: List[
+        Tuple[str, Dict[str, Any], Mapping[str, Any]]
+    ] = []  # (path, params, primary_cfg_for_refine)
 
     if has_pipeline:
         comp = _require_mapping(cfg.get("composition", {}), "composition")
@@ -266,7 +303,11 @@ def _resolve_runs(cfg: Mapping[str, Any]) -> Tuple[TwoWorldMarginals, List[RunSp
         dep = _require_mapping(cfg.get("dependence_paths", {}), "dependence_paths")
         primary = _require_mapping(dep.get("primary", {}), "dependence_paths.primary")
         primary_type = str(primary.get("type", "fh_linear"))
-        primary_params = dict(primary.get("path_params", {})) if isinstance(primary.get("path_params", {}), Mapping) else {}
+        primary_params = (
+            dict(primary.get("path_params", {}))
+            if isinstance(primary.get("path_params", {}), Mapping)
+            else {}
+        )
         # also accept direct params like gamma/k/ppf_clip_eps for convenience
         for k in ("gamma", "k", "ppf_clip_eps"):
             if k in primary and k not in primary_params:
@@ -309,14 +350,20 @@ def _resolve_runs(cfg: Mapping[str, Any]) -> Tuple[TwoWorldMarginals, List[RunSp
         rules = [rule]
 
         path = str(cfg.get("path", "fh_linear"))
-        path_params = dict(cfg.get("path_params", {})) if isinstance(cfg.get("path_params", {}), Mapping) else {}
+        path_params = (
+            dict(cfg.get("path_params", {}))
+            if isinstance(cfg.get("path_params", {}), Mapping)
+            else {}
+        )
         paths = [(path, path_params, {})]
 
         if "lambdas" in cfg:
             lambdas_coarse = [float(x) for x in (cfg.get("lambdas") or [])]
         else:
             lg = _require_mapping(cfg.get("lambda_grid", {"num": 21}), "lambda_grid")
-            lambdas_coarse = _linspace_grid(float(lg.get("start", 0.0)), float(lg.get("stop", 1.0)), int(lg.get("num", 21)))
+            lambdas_coarse = _linspace_grid(
+                float(lg.get("start", 0.0)), float(lg.get("stop", 1.0)), int(lg.get("num", 21))
+            )
 
         refine_enabled = False
         refine_half_width = 0.08
@@ -326,7 +373,7 @@ def _resolve_runs(cfg: Mapping[str, Any]) -> Tuple[TwoWorldMarginals, List[RunSp
     # Produce cartesian product of rules × paths
     runs: List[RunSpec] = []
     for r in rules:
-        for (ptype, pparams, primary_cfg_for_refine) in paths:
+        for ptype, pparams, primary_cfg_for_refine in paths:
             runs.append(
                 RunSpec(
                     rule=r,
@@ -363,8 +410,16 @@ def _resolve_output_base(cfg: Mapping[str, Any], config_path: Path) -> Tuple[Pat
     """
     out_dir_cfg = _get(cfg, "output.out_dir", None)
     out_dir_legacy = cfg.get("output_dir", None)
-    overwrite = bool(_get(cfg, "output.overwrite", False)) if isinstance(_get(cfg, "output", None), Mapping) else bool(cfg.get("overwrite", False))
-    save_hashes = bool(_get(cfg, "output.save_hashes", True)) if isinstance(_get(cfg, "output", None), Mapping) else bool(cfg.get("save_hashes", False))
+    overwrite = (
+        bool(_get(cfg, "output.overwrite", False))
+        if isinstance(_get(cfg, "output", None), Mapping)
+        else bool(cfg.get("overwrite", False))
+    )
+    save_hashes = (
+        bool(_get(cfg, "output.save_hashes", True))
+        if isinstance(_get(cfg, "output", None), Mapping)
+        else bool(cfg.get("save_hashes", False))
+    )
 
     if out_dir_cfg:
         base = Path(str(out_dir_cfg))
@@ -438,6 +493,8 @@ def population_curve_from_path(cfg: SimConfig) -> pd.DataFrame:
         row["tau_pop_avg"] = float(0.5 * (tau0_true + tau1_true))
         rows.append(row)
     return pd.DataFrame(rows).sort_values("lambda").reset_index(drop=True)
+
+
 def estimate_thresholds(
     df_pop: pd.DataFrame,
     df_sum: pd.DataFrame,
@@ -464,6 +521,8 @@ def estimate_thresholds(
         out["phi_star_emp"] = _map_at_lambda(df_sum, out["lambda_star_emp"], "phi_hat_avg_mean")
         out["tau_star_emp"] = _map_at_lambda(df_sum, out["lambda_star_emp"], "tau_hat_avg_mean")
     return out
+
+
 def write_manifest(
     *,
     out_dir: Path,
@@ -477,7 +536,11 @@ def write_manifest(
     """
     Write a reproducibility manifest capturing config + environment + outputs.
     """
-    repo_root = Path(__file__).resolve().parents[2] if len(Path(__file__).resolve().parents) >= 3 else Path(__file__).resolve().parent
+    repo_root = (
+        Path(__file__).resolve().parents[2]
+        if len(Path(__file__).resolve().parents) >= 3
+        else Path(__file__).resolve().parent
+    )
     manifest: Dict[str, Any] = {
         "run_started_utc": run_meta.get("run_started_utc"),
         "run_finished_utc": datetime.utcnow().isoformat() + "Z",
@@ -494,6 +557,8 @@ def write_manifest(
         "file_sha256": files_hashed,
     }
     _write_json(out_dir / "manifest.json", manifest)
+
+
 # ----------------------------
 # Main runner
 # ----------------------------
@@ -502,7 +567,7 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
     YAML loader (explicit dependency).
     """
     try:
-        import yaml # type: ignore
+        import yaml  # type: ignore
     except Exception as e:
         raise ImportError("pyyaml is required to run run_all.py with a YAML config") from e
     with open(path, "r", encoding="utf-8") as f:
@@ -514,7 +579,9 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
     return dict(obj)
 
 
-def _build_sim_config(cfg: Mapping[str, Any], marg: TwoWorldMarginals, run: RunSpec, lambdas: List[float]) -> SimConfig:
+def _build_sim_config(
+    cfg: Mapping[str, Any], marg: TwoWorldMarginals, run: RunSpec, lambdas: List[float]
+) -> SimConfig:
     """
     Build SimConfig from either:
     - simulate.* (preferred)
@@ -536,10 +603,20 @@ def _build_sim_config(cfg: Mapping[str, Any], marg: TwoWorldMarginals, run: RunS
         n = int(_get(cfg, "sampling.n_per_world", cfg.get("n", 0)))
         n_reps = int(_get(cfg, "sampling.n_reps", cfg.get("n_reps", 1)))
         seed = int(_get(cfg, "sampling.seed", cfg.get("seed", 0)))
-        seed_policy = str(_get(cfg, "sampling.seed_policy", _get(cfg, "seed_policy", "stable_per_cell")))
+        seed_policy = str(
+            _get(cfg, "sampling.seed_policy", _get(cfg, "seed_policy", "stable_per_cell"))
+        )
         envelope_tol = float(_get(cfg, "simulate.envelope_tol", _get(cfg, "envelope_tol", 5e-3)))
-        hard_fail = bool(_get(cfg, "simulate.hard_fail_on_invalid", _get(cfg, "hard_fail_on_invalid", True)))
-        include_theory_reference = bool(_get(cfg, "simulate.include_theory_reference", _get(cfg, "include_theory_reference", True)))
+        hard_fail = bool(
+            _get(cfg, "simulate.hard_fail_on_invalid", _get(cfg, "hard_fail_on_invalid", True))
+        )
+        include_theory_reference = bool(
+            _get(
+                cfg,
+                "simulate.include_theory_reference",
+                _get(cfg, "include_theory_reference", True),
+            )
+        )
 
     if n <= 0:
         raise ValueError("Sample size n_per_world (n) must be positive.")
@@ -553,14 +630,14 @@ def _build_sim_config(cfg: Mapping[str, Any], marg: TwoWorldMarginals, run: RunS
 
     return SimConfig(
         marginals=marg,
-        rule=run.rule, # type: ignore
+        rule=run.rule,  # type: ignore
         lambdas=lambdas,
         n=n,
         n_reps=n_reps,
         seed=seed,
-        path=run.path, # type: ignore
+        path=run.path,  # type: ignore
         path_params=dict(run.path_params),
-        seed_policy=seed_policy, # type: ignore
+        seed_policy=seed_policy,  # type: ignore
         envelope_tol=envelope_tol,
         hard_fail_on_invalid=hard_fail,
         prob_tol=prob_tol,
@@ -586,7 +663,13 @@ def _maybe_refine_grid(
     return sorted({float(x) for x in (list(lambdas_coarse) + fine)})
 
 
-def run(config_path: Path, out_dir: Optional[Path] = None, *, skip_sim: bool = False, skip_figures: bool = False) -> Path:
+def run(
+    config_path: Path,
+    out_dir: Optional[Path] = None,
+    *,
+    skip_sim: bool = False,
+    skip_figures: bool = False,
+) -> Path:
     """
     Execute the full pipeline.
     Returns the output directory used.
@@ -610,9 +693,17 @@ def run(config_path: Path, out_dir: Optional[Path] = None, *, skip_sim: bool = F
     _ensure_dir(out_dir)
 
     # Execution options
-    dependence_x = str(_get(cfg_map, "reporting.dependence_x", cfg_map.get("dependence_x", "lambda")))
+    dependence_x = str(
+        _get(cfg_map, "reporting.dependence_x", cfg_map.get("dependence_x", "lambda"))
+    )
     title_prefix = str(_get(cfg_map, "experiment.name", _get(cfg_map, "title_prefix", "")))
-    neutrality_eta = float(_get(cfg_map, "bootstrap.threshold.neutrality_eta", _get(cfg_map, "reporting.neutrality_band_eta", _get(cfg_map, "neutrality_eta", 0.05))))
+    neutrality_eta = float(
+        _get(
+            cfg_map,
+            "bootstrap.threshold.neutrality_eta",
+            _get(cfg_map, "reporting.neutrality_band_eta", _get(cfg_map, "neutrality_eta", 0.05)),
+        )
+    )
     figure_formats = _get(cfg_map, "reporting.figure_formats", None)
     also_png = True
     if isinstance(figure_formats, list):
@@ -625,7 +716,9 @@ def run(config_path: Path, out_dir: Optional[Path] = None, *, skip_sim: bool = F
 
     # Run each (rule × path) combo into its own subdir for hygiene
     for rs in runs:
-        subdir = out_dir / f"rule_{_safe_subdir_name(rs.rule)}" / f"path_{_safe_subdir_name(rs.path)}"
+        subdir = (
+            out_dir / f"rule_{_safe_subdir_name(rs.rule)}" / f"path_{_safe_subdir_name(rs.path)}"
+        )
         _ensure_dir(subdir)
 
         LOG.info("Running: rule=%s path=%s out=%s", rs.rule, rs.path, subdir)
@@ -751,24 +844,47 @@ def run(config_path: Path, out_dir: Optional[Path] = None, *, skip_sim: bool = F
         run_meta=run_meta,
     )
     return out_dir
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     import argparse
+
     ap = argparse.ArgumentParser(description="Run the full correlation_cliff experiment pipeline.")
-    ap.add_argument("--config", type=str, default=None, help="Path to YAML config (default: config_s1.yaml next to this file).")
+    ap.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to YAML config (default: config_s1.yaml next to this file).",
+    )
     ap.add_argument("--out_dir", type=str, default=None, help="Override output directory.")
-    ap.add_argument("--skip_sim", action="store_true", help="Skip Monte Carlo simulation; only compute population curves + thresholds.")
+    ap.add_argument(
+        "--skip_sim",
+        action="store_true",
+        help="Skip Monte Carlo simulation; only compute population curves + thresholds.",
+    )
     ap.add_argument("--skip_figures", action="store_true", help="Skip figure rendering.")
-    ap.add_argument("--log_level", type=str, default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR).")
+    ap.add_argument(
+        "--log_level", type=str, default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)."
+    )
     args = ap.parse_args(list(argv) if argv is not None else None)
     logging.basicConfig(
         level=getattr(logging, str(args.log_level).upper(), logging.INFO),
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
-    config_path = Path(args.config) if args.config else (Path(__file__).resolve().parent / "config_s1.yaml")
+    config_path = (
+        Path(args.config) if args.config else (Path(__file__).resolve().parent / "config_s1.yaml")
+    )
     out_dir = Path(args.out_dir) if args.out_dir else None
-    used_out = run(config_path=config_path, out_dir=out_dir, skip_sim=bool(args.skip_sim), skip_figures=bool(args.skip_figures))
+    used_out = run(
+        config_path=config_path,
+        out_dir=out_dir,
+        skip_sim=bool(args.skip_sim),
+        skip_figures=bool(args.skip_figures),
+    )
     print(f"[correlation_cliff] done. outputs written to: {used_out}")
     return 0
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

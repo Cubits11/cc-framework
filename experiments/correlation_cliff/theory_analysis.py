@@ -55,32 +55,30 @@ Dependencies
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
-from typing import Any, Dict, Iterable, Literal, Mapping, Optional, Sequence, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, Literal, Mapping, Optional, Tuple
 
 import numpy as np
 
 from .theory_core import (
     CONFIG,
-    TwoWorldMarginals,
+    InputValidationError,
     Rule,
-    _require_rule,               # internal; used only for strict validation here
-    _require_prob,               # internal; used only for strict validation here
-    fh_bounds,
-    validate_joint,
+    TwoWorldMarginals,
+    _require_prob,  # internal; used only for strict validation here
+    _require_rule,  # internal; used only for strict validation here
+    cc_bounds,
     composed_rate,
     composed_rate_bounds,
+    fh_bounds,
     jc_bounds,
-    cc_bounds,
-    joint_cells_from_marginals,
-    phi_from_joint,
-    kendall_tau_a_from_cells,
-    p11_from_lambda,
     p11_clayton_copula,
+    p11_from_lambda,
     p11_gaussian_copula,
+    phi_from_joint,
     singleton_gaps,
-    InputValidationError,
+    validate_joint,
 )
 
 # =============================================================================
@@ -103,6 +101,7 @@ class Grid1D:
       - 1D numpy array, finite
       - strictly increasing
     """
+
     values: np.ndarray
     name: str
 
@@ -125,6 +124,7 @@ class CurveResult:
 
     Arrays all have length N=len(grid).
     """
+
     family: DependenceFamily
     rule: Rule
     grid: Grid1D
@@ -205,6 +205,7 @@ class SurfaceResult:
       - axis 0 indexes parameter for world0
       - axis 1 indexes parameter for world1
     """
+
     family: DependenceFamily
     rule: Rule
     grid0: Grid1D
@@ -242,6 +243,7 @@ class BoundsSummary:
     You can use this to prevent yourself from accidentally claiming robustness
     when you only scanned an assumption family that under-covers FH extremes.
     """
+
     rule: Rule
 
     # FH worst-case
@@ -257,10 +259,12 @@ class BoundsSummary:
     CC_scan_max: float
 
     # coverage diagnostics
-    JC_undercoverage_low: float   # max(0, FH_min - scan_min)
+    JC_undercoverage_low: float  # max(0, FH_min - scan_min)
     JC_undercoverage_high: float  # max(0, scan_max - FH_max) but typically 0; kept for symmetry
-    JC_missing_extremes: float    # (FH_range - scan_range)+, i.e., how much of FH range you didn't cover
-    JC_range_ratio: float         # scan_range / FH_range (NaN if FH_range==0)
+    JC_missing_extremes: (
+        float  # (FH_range - scan_range)+, i.e., how much of FH range you didn't cover
+    )
+    JC_range_ratio: float  # scan_range / FH_range (NaN if FH_range==0)
 
     CC_missing_extremes: float
     CC_range_ratio: float
@@ -272,6 +276,7 @@ class BoundsSummary:
 # =============================================================================
 # Small utilities
 # =============================================================================
+
 
 def default_lambda_grid(n: int = 201) -> Grid1D:
     """
@@ -369,6 +374,7 @@ def _compute_optional_stats(
 # FH-path scans (lambda parameterization)
 # =============================================================================
 
+
 def scan_fh_path_tied_lambda(
     w: TwoWorldMarginals,
     rule: Any,
@@ -412,8 +418,12 @@ def scan_fh_path_tied_lambda(
 
     lam = grid.values
     # Generate p11 arrays via scalar path mapping (robust > micro-optimized)
-    p11_0 = np.array([p11_from_lambda(path, float(l), w.pA0, w.pB0, path_params) for l in lam], dtype=float)
-    p11_1 = np.array([p11_from_lambda(path, float(l), w.pA1, w.pB1, path_params) for l in lam], dtype=float)
+    p11_0 = np.array(
+        [p11_from_lambda(path, float(l), w.pA0, w.pB0, path_params) for l in lam], dtype=float
+    )
+    p11_1 = np.array(
+        [p11_from_lambda(path, float(l), w.pA1, w.pB1, path_params) for l in lam], dtype=float
+    )
 
     # Compose
     if r == "COND_OR":
@@ -474,8 +484,12 @@ def scan_fh_path_surface(
     lam0 = grid0.values
     lam1 = grid1.values
 
-    p11_0 = np.array([p11_from_lambda(path, float(l), w.pA0, w.pB0, path_params) for l in lam0], dtype=float)
-    p11_1 = np.array([p11_from_lambda(path, float(l), w.pA1, w.pB1, path_params) for l in lam1], dtype=float)
+    p11_0 = np.array(
+        [p11_from_lambda(path, float(l), w.pA0, w.pB0, path_params) for l in lam0], dtype=float
+    )
+    p11_1 = np.array(
+        [p11_from_lambda(path, float(l), w.pA1, w.pB1, path_params) for l in lam1], dtype=float
+    )
 
     if r == "COND_OR":
         pC0 = np.full_like(lam0, w.pA0 + (1.0 - w.pA0) * w.pB0, dtype=float)
@@ -501,6 +515,7 @@ def scan_fh_path_surface(
 # =============================================================================
 # Copula scans (tied dependence parameters)
 # =============================================================================
+
 
 def scan_clayton_theta_tied(
     w: TwoWorldMarginals,
@@ -589,8 +604,12 @@ def scan_gaussian_rho_tied(
     p11_1 = np.empty_like(rho, dtype=float)
     for i, rr in enumerate(rho):
         sd = None if base_seed is None else (base_seed + 7919 * i)
-        p11_0[i] = p11_gaussian_copula(w.pA0, w.pB0, float(rr), method=method, n_mc=n_mc, seed=sd, antithetic=antithetic)
-        p11_1[i] = p11_gaussian_copula(w.pA1, w.pB1, float(rr), method=method, n_mc=n_mc, seed=sd, antithetic=antithetic)
+        p11_0[i] = p11_gaussian_copula(
+            w.pA0, w.pB0, float(rr), method=method, n_mc=n_mc, seed=sd, antithetic=antithetic
+        )
+        p11_1[i] = p11_gaussian_copula(
+            w.pA1, w.pB1, float(rr), method=method, n_mc=n_mc, seed=sd, antithetic=antithetic
+        )
 
     if r == "COND_OR":
         pC0 = np.full_like(rho, w.pA0 + (1.0 - w.pA0) * w.pB0, dtype=float)
@@ -625,6 +644,7 @@ def scan_gaussian_rho_tied(
 # =============================================================================
 # Bounds comparison and reporting
 # =============================================================================
+
 
 def bounds_summary(
     w: TwoWorldMarginals,
@@ -662,12 +682,18 @@ def bounds_summary(
     JC_under_high = max(0.0, JC_scan_max - JC_FH_max)
 
     JC_missing_extremes = max(0.0, FH_range - scan_range)
-    JC_range_ratio = float("nan") if abs(FH_range) <= float(CONFIG.eps_prob) else (scan_range / FH_range)
+    JC_range_ratio = (
+        float("nan") if abs(FH_range) <= float(CONFIG.eps_prob) else (scan_range / FH_range)
+    )
 
     FH_range_CC = CC_FH_max - CC_FH_min
     scan_range_CC = CC_scan_max - CC_scan_min
     CC_missing_extremes = max(0.0, FH_range_CC - scan_range_CC)
-    CC_range_ratio = float("nan") if abs(FH_range_CC) <= float(CONFIG.eps_prob) else (scan_range_CC / FH_range_CC)
+    CC_range_ratio = (
+        float("nan")
+        if abs(FH_range_CC) <= float(CONFIG.eps_prob)
+        else (scan_range_CC / FH_range_CC)
+    )
 
     return BoundsSummary(
         rule=r,
@@ -729,16 +755,24 @@ def format_bounds_report(
     lines.append(f"  JC undercoverage (low end):  {summary.JC_undercoverage_low:.{d}f}")
     lines.append(f"  JC undercoverage (high end): {summary.JC_undercoverage_high:.{d}f}")
     lines.append(f"  JC missing extremes (range): {summary.JC_missing_extremes:.{d}f}")
-    lines.append(f"  JC range ratio (scan/FH):    {summary.JC_range_ratio:.{d}f}" if not math.isnan(summary.JC_range_ratio) else
-                 "  JC range ratio (scan/FH):    NaN (FH range ~0)")
+    lines.append(
+        f"  JC range ratio (scan/FH):    {summary.JC_range_ratio:.{d}f}"
+        if not math.isnan(summary.JC_range_ratio)
+        else "  JC range ratio (scan/FH):    NaN (FH range ~0)"
+    )
     lines.append(f"  CC missing extremes (range): {summary.CC_missing_extremes:.{d}f}")
-    lines.append(f"  CC range ratio (scan/FH):    {summary.CC_range_ratio:.{d}f}" if not math.isnan(summary.CC_range_ratio) else
-                 "  CC range ratio (scan/FH):    NaN (FH range ~0)")
+    lines.append(
+        f"  CC range ratio (scan/FH):    {summary.CC_range_ratio:.{d}f}"
+        if not math.isnan(summary.CC_range_ratio)
+        else "  CC range ratio (scan/FH):    NaN (FH range ~0)"
+    )
     lines.append("")
     if summary.JC_missing_extremes > 0:
         lines.append("Verdict:")
         lines.append("  Your dependence family/path did NOT span the FH worst-case JC range.")
-        lines.append("  Any claim of robustness must be labeled as 'conditional on dependence assumption'.")
+        lines.append(
+            "  Any claim of robustness must be labeled as 'conditional on dependence assumption'."
+        )
     else:
         lines.append("Verdict:")
         lines.append("  Your scan covered the FH JC range (at least at the grid resolution used).")
@@ -749,6 +783,7 @@ def format_bounds_report(
 # =============================================================================
 # Calibration / inversion helpers (FH paths)
 # =============================================================================
+
 
 def find_lambda_for_target_p11(
     path: str,
@@ -866,7 +901,9 @@ def find_lambda_for_extreme_JC(
     """
     r = _require_rule(rule)
     lam_grid = Grid1D(values=np.linspace(0.0, 1.0, int(grid_n), dtype=float), name="lambda")
-    curve = scan_fh_path_tied_lambda(w, r, path=path, grid=lam_grid, path_params=path_params, want_phi=False, want_tau=False)
+    curve = scan_fh_path_tied_lambda(
+        w, r, path=path, grid=lam_grid, path_params=path_params, want_phi=False, want_tau=False
+    )
 
     if extreme == "max":
         i = curve.argmax_JC()
@@ -881,6 +918,7 @@ def find_lambda_for_extreme_JC(
 # =============================================================================
 # Optional: "single world" sanity utilities
 # =============================================================================
+
 
 def world_interval_summary(pA: float, pB: float, rule: Any) -> Dict[str, float]:
     """

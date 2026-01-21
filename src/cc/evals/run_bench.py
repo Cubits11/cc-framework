@@ -21,9 +21,9 @@ from cc.core.manifest import RunManifest, emit_run_manifest
 from cc.core.metrics import (
     cc_max,
     cc_rel,
+    confusion_from_labels,
     delta_add,
     delta_mult,
-    confusion_from_labels,
     rates_from_confusion,
     youden_j,
 )
@@ -101,7 +101,9 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         git_sha=run_meta["git_sha"],
     )
     emit_run_manifest(run_manifest)
-    audit_out_path = Path(args.audit_out) if args.audit_out else Path(args.out).with_suffix(".audit.jsonl")
+    audit_out_path = (
+        Path(args.audit_out) if args.audit_out else Path(args.out).with_suffix(".audit.jsonl")
+    )
 
     results = run_benchmark(
         dataset=dataset,
@@ -192,7 +194,11 @@ def run_benchmark(
 
     for idx, item in enumerate(dataset):
         prompt = str(item.get(prompt_field, ""))
-        response = str(item.get(response_field)) if response_field and item.get(response_field) is not None else None
+        response = (
+            str(item.get(response_field))
+            if response_field and item.get(response_field) is not None
+            else None
+        )
         label = _normalize_label(item.get(label_field))
         y_true.append(label)
 

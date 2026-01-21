@@ -8,8 +8,8 @@ hold. It also includes negative controls (independent and shuffled labels).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import argparse
+from dataclasses import dataclass
 from typing import Iterable, List, Optional
 
 import numpy as np

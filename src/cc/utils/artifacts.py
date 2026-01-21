@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import platform
-from pathlib import Path
 import subprocess
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Iterable, Tuple
 
 
@@ -54,7 +54,9 @@ def detect_git_commit() -> str | None:
         return None
 
 
-def build_manifest(run_id: str, rerun_command: str, adapter_versions: Dict[str, str]) -> ArtifactManifest:
+def build_manifest(
+    run_id: str, rerun_command: str, adapter_versions: Dict[str, str]
+) -> ArtifactManifest:
     """Build a manifest for artifact directories."""
     return ArtifactManifest(
         run_id=run_id,
@@ -94,9 +96,11 @@ def summarize_latency(samples_ms: Iterable[float]) -> Dict[str, float]:
     if not values:
         return {"mean": 0.0, "p50": 0.0, "p95": 0.0, "p99": 0.0}
     mean = sum(values) / len(values)
+
     def percentile(p: float) -> float:
         idx = int(round((p / 100) * (len(values) - 1)))
         return values[idx]
+
     return {
         "mean": mean,
         "p50": percentile(50),

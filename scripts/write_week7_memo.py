@@ -13,7 +13,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from cc.analysis.week7_utils import PointRecord, aggregate_by_group, compute_regime_counts, summarise_group
+from cc.analysis.week7_utils import (
+    PointRecord,
+    aggregate_by_group,
+    compute_regime_counts,
+    summarise_group,
+)
 
 
 def load_point(path: Path) -> Dict:
@@ -53,7 +58,9 @@ def build_summary(points: List[Dict]) -> Dict:
             fh_j_lower=float(fh_env.get("j_lower", 0.0)),
             fh_j_upper=float(fh_env.get("j_upper", 0.0)),
             classification=str(classification.get("label", "independent")),
-            cc_l=float(classification["cc_l"]) if classification.get("cc_l") is not None else float("nan"),
+            cc_l=float(classification["cc_l"])
+            if classification.get("cc_l") is not None
+            else float("nan"),
             d_lamp=bool(classification.get("d_lamp", False)),
             wilson_world0_width=float(wilson.get("world0", {}).get("width", 0.0)),
             wilson_world1_width=float(wilson.get("world1", {}).get("width", 0.0)),
@@ -85,7 +92,11 @@ def build_summary(points: List[Dict]) -> Dict:
 
     seeds = sorted({raw["seed"] for raw in points})
     episodes = sorted({raw["episodes"] for raw in points})
-    fpr_window = points[0].get("acceptance", {}).get("fpr_window_bounds", [0.04, 0.06]) if points else [0.04, 0.06]
+    fpr_window = (
+        points[0].get("acceptance", {}).get("fpr_window_bounds", [0.04, 0.06])
+        if points
+        else [0.04, 0.06]
+    )
 
     table_rows = []
     for key, summary in group_summaries.items():
@@ -138,9 +149,9 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
 
     exec_snapshot = [
         f"• Scale: {summary['total_runs']} runs (episodes={summary['episodes_per_config']}, seeds={summary['seed_count']})",
-        f"• Window adherence: {summary['fpr_window_rate']*100:.1f}% runs within {summary['fpr_window']}",
-        f"• Independence containment: {summary['independence_containment_rate']*100:.1f}%",
-        f"• FH containment (empirical): {summary['fh_containment_rate']*100:.1f}%",
+        f"• Window adherence: {summary['fpr_window_rate'] * 100:.1f}% runs within {summary['fpr_window']}",
+        f"• Independence containment: {summary['independence_containment_rate'] * 100:.1f}%",
+        f"• FH containment (empirical): {summary['fh_containment_rate'] * 100:.1f}%",
     ]
 
     table_lines = [
@@ -189,9 +200,13 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "- FH containment: {rate:.1f}% of empirical points inside envelopes.".format(
             rate=summary["fh_containment_rate"] * 100
         ),
-        "- Zero-FP runs: {count} (binomial acceptance via (1−α)^n applies when encountered).".format(count=summary["zero_fp_runs"]),
+        "- Zero-FP runs: {count} (binomial acceptance via (1−α)^n applies when encountered).".format(
+            count=summary["zero_fp_runs"]
+        ),
         "- Constructive examples observed: {c}; independent: {i}; destructive: {d}.".format(
-            c=regime_counts["constructive"], i=regime_counts["independent"], d=regime_counts["destructive"]
+            c=regime_counts["constructive"],
+            i=regime_counts["independent"],
+            d=regime_counts["destructive"],
         ),
         "- Mean CI widths <0.10 across Wilson and BCa diagnostics (see Table 1).",
         "",
@@ -223,15 +238,23 @@ def write_memo(summary: Dict, points: List[PointRecord], out_path: Path) -> None
         "",
         "## Audit and Verification",
         "",
-        "- `runs/audit_week7.jsonl` records {runs} entries with config hashes and seeds.".format(runs=summary["total_runs"]),
-        "- FH containment = {rate:.1f}% (target 100%).".format(rate=summary["fh_containment_rate"] * 100),
-        "- Independence containment = {rate:.1f}% (target 100%).".format(rate=summary["independence_containment_rate"] * 100),
+        "- `runs/audit_week7.jsonl` records {runs} entries with config hashes and seeds.".format(
+            runs=summary["total_runs"]
+        ),
+        "- FH containment = {rate:.1f}% (target 100%).".format(
+            rate=summary["fh_containment_rate"] * 100
+        ),
+        "- Independence containment = {rate:.1f}% (target 100%).".format(
+            rate=summary["independence_containment_rate"] * 100
+        ),
         "- 25/25 pytest checks (categories A–E) cover FH sharpness, independence, uncertainty, regimes, and robustness.",
         "",
         "## Interpretation & Regime Classification",
         "",
         "- Constructive regimes: {c} | Independent: {i} | Destructive: {d}.".format(
-            c=regime_counts["constructive"], i=regime_counts["independent"], d=regime_counts["destructive"]
+            c=regime_counts["constructive"],
+            i=regime_counts["independent"],
+            d=regime_counts["destructive"],
         ),
         "- Mean ΔJ spans [{mn:.3f}, {mx:.3f}] with CC_L reported when denominators ≥0.10 (D-lamp suppresses {count} cases).".format(
             mn=min(p.delta_j for p in points),

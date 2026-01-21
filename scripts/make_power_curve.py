@@ -8,13 +8,13 @@
 
 import argparse
 import math
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
-import numpy as np
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 # ----------------------------- math utils ----------------------------- #
+
 
 def var_envelope(lo: float, hi: float) -> float:
     """
@@ -33,11 +33,10 @@ def bernstein_tail(eps: float, n: int, vbar: float) -> float:
     if eps <= 0 or n <= 0 or vbar < 0:
         return 1.0
     denom = 2.0 * vbar + (2.0 / 3.0) * eps
-    return 2.0 * math.exp(-n * (eps ** 2) / denom)
+    return 2.0 * math.exp(-n * (eps**2) / denom)
 
 
-def invert_bernstein_for_eps(n: int, vbar: float, delta: float,
-                             eps_hi: float = 1.0) -> float:
+def invert_bernstein_for_eps(n: int, vbar: float, delta: float, eps_hi: float = 1.0) -> float:
     """
     Solve for eps >= 0 such that bernstein_tail(eps, n, vbar) == delta
     using monotone bisection. Returns the *smallest* eps satisfying tail <= delta.
@@ -76,6 +75,7 @@ def cc_halfwidth(n1: int, n0: int, v1: float, v0: float, D: float, delta: float)
 
 # ------------------------------ plotting ------------------------------ #
 
+
 def make_levels(minv: float, maxv: float) -> np.ndarray:
     """
     Choose a reasonable set of increasing contour levels within [minv, maxv].
@@ -90,15 +90,16 @@ def make_levels(minv: float, maxv: float) -> np.ndarray:
     return np.unique(np.sort(levels))
 
 
-def find_recommendation(H: np.ndarray, n1_vals: np.ndarray, n0_vals: np.ndarray,
-                        target_t: Optional[float]) -> Optional[Tuple[int, int, float]]:
+def find_recommendation(
+    H: np.ndarray, n1_vals: np.ndarray, n0_vals: np.ndarray, target_t: Optional[float]
+) -> Optional[Tuple[int, int, float]]:
     """
     If target_t is provided, find the (n1, n0) with minimal n1 + n0
     such that half-width <= target_t. Returns (n1*, n0*, t*), or None.
     """
     if target_t is None:
         return None
-    mask = (H <= target_t)
+    mask = H <= target_t
     if not mask.any():
         return None
     # Among feasible grid cells, minimize total samples (n1 + n0).
@@ -110,7 +111,11 @@ def find_recommendation(H: np.ndarray, n1_vals: np.ndarray, n0_vals: np.ndarray,
             if not mask[i, j]:
                 continue
             cost = n1_vals[i] + n0_vals[j]
-            if (best_cost is None) or (cost < best_cost) or (cost == best_cost and H[i, j] < best_t):
+            if (
+                (best_cost is None)
+                or (cost < best_cost)
+                or (cost == best_cost and H[i, j] < best_t)
+            ):
                 best_cost = cost
                 best_idx = (i, j)
                 best_t = H[i, j]
@@ -120,6 +125,7 @@ def find_recommendation(H: np.ndarray, n1_vals: np.ndarray, n0_vals: np.ndarray,
 
 # ------------------------------ main CLI ------------------------------ #
 
+
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(
         description="Power curve heatmap: FH–Bernstein CC half-width vs (n1, n0)."
@@ -127,9 +133,15 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--I1", required=True, help="lo,hi for Y=1 (e.g., 0.37,0.65)")
     ap.add_argument("--I0", required=True, help="lo,hi for Y=0 (e.g., 0.05,0.05)")
     ap.add_argument("--D", type=float, required=True, help="Normalization constant D > 0")
-    ap.add_argument("--delta", type=float, default=0.05, help="Two-sided failure prob (default 0.05)")
-    ap.add_argument("--target-t", type=float, default=None,
-                    help="Optional target half-width to highlight/annotate (e.g., 0.10)")
+    ap.add_argument(
+        "--delta", type=float, default=0.05, help="Two-sided failure prob (default 0.05)"
+    )
+    ap.add_argument(
+        "--target-t",
+        type=float,
+        default=None,
+        help="Optional target half-width to highlight/annotate (e.g., 0.10)",
+    )
     ap.add_argument("--out", default="paper/figures/fig_week3_power_curve.png")
     ap.add_argument("--n1min", type=int, default=100)
     ap.add_argument("--n1max", type=int, default=1500)
@@ -183,15 +195,36 @@ def main() -> None:
     rec = find_recommendation(H, n1_vals, n0_vals, args.target_t)
     if rec is not None:
         n1_star, n0_star, t_star = rec
-        ax.scatter([n0_star], [n1_star], s=55, marker="*", color="white",
-                   edgecolor="black", linewidths=0.7, zorder=5)
-        ax.text(n0_star + 6, n1_star + 6, f"(n1*={n1_star}, n0*={n0_star})\n t≈{t_star:.3f}",
-                fontsize=8, color="black", bbox=dict(facecolor="white", alpha=0.6, lw=0.0))
+        ax.scatter(
+            [n0_star],
+            [n1_star],
+            s=55,
+            marker="*",
+            color="white",
+            edgecolor="black",
+            linewidths=0.7,
+            zorder=5,
+        )
+        ax.text(
+            n0_star + 6,
+            n1_star + 6,
+            f"(n1*={n1_star}, n0*={n0_star})\n t≈{t_star:.3f}",
+            fontsize=8,
+            color="black",
+            bbox=dict(facecolor="white", alpha=0.6, lw=0.0),
+        )
         # Highlight the target contour if it exists
         if args.target_t is not None:
             try:
-                ax.contour(n0_vals, n1_vals, H, levels=[args.target_t],
-                           colors="magenta", linewidths=1.6, linestyles="--")
+                ax.contour(
+                    n0_vals,
+                    n1_vals,
+                    H,
+                    levels=[args.target_t],
+                    colors="magenta",
+                    linewidths=1.6,
+                    linestyles="--",
+                )
             except Exception:
                 pass
 
@@ -208,8 +241,10 @@ def main() -> None:
         print(f"Target t={args.target_t:.3f}: no feasible (n1,n0) in the scanned grid.")
     elif rec is not None:
         n1_star, n0_star, t_star = rec
-        print(f"Recommended (min n1+n0) for t ≤ {args.target_t:.3f}: "
-              f"n1*={n1_star}, n0*={n0_star}, achieved t≈{t_star:.3f}")
+        print(
+            f"Recommended (min n1+n0) for t ≤ {args.target_t:.3f}: "
+            f"n1*={n1_star}, n0*={n0_star}, achieved t≈{t_star:.3f}"
+        )
 
 
 if __name__ == "__main__":

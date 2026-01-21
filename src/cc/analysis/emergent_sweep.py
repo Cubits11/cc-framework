@@ -52,14 +52,15 @@ import numpy as np
 
 from cc.core.metrics import cc_max, delta_add, youden_j
 
-
 # -------------------------
 # Data models
 # -------------------------
 
+
 @dataclass(frozen=True)
 class GuardrailSpec:
     """Guardrail operating point in (TPR, FPR)."""
+
     tpr: float
     fpr: float
 
@@ -67,6 +68,7 @@ class GuardrailSpec:
 @dataclass(frozen=True)
 class SweepConfig:
     """Sweep configuration."""
+
     n_samples: int
     rho_grid: np.ndarray
     tpr_b_grid: np.ndarray
@@ -84,6 +86,7 @@ class SweepConfig:
 @dataclass(frozen=True)
 class RunMetadata:
     """Reproducibility + provenance details for a sweep."""
+
     run_id: str
     created_utc: str
     python: str
@@ -97,6 +100,7 @@ class RunMetadata:
 # -------------------------
 # Validation helpers
 # -------------------------
+
 
 def _clip_prob(p: float, eps: float = 1e-9) -> float:
     return float(min(max(float(p), eps), 1.0 - eps))
@@ -144,6 +148,7 @@ def _validate_executor(executor: str) -> str:
 # Copula calibration
 # -------------------------
 
+
 def _threshold_from_fpr(fpr: float) -> float:
     """
     For negative class score ~ N(0,1), threshold t is chosen so:
@@ -168,6 +173,7 @@ def _mu_pos_from_tpr(tpr: float, threshold: float) -> float:
 # -------------------------
 # Simulation core
 # -------------------------
+
 
 def _bvn_scores(n: int, rho: float, rng: np.random.Generator) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -317,13 +323,11 @@ def _measure_one(
         "fpr_b_target": float(b.fpr),
         "comp": comp_u,
         "n_samples": int(n_samples),
-
         # calibrated latent params
         "thr_a": float(thr_a),
         "thr_b": float(thr_b),
         "mu_a": float(mu_a),
         "mu_b": float(mu_b),
-
         # empirical marginals
         "tpr_a": float(tpr_a),
         "fpr_a": float(fpr_a),
@@ -331,14 +335,12 @@ def _measure_one(
         "fpr_b": float(fpr_b),
         "tpr_comp": float(tpr_c),
         "fpr_comp": float(fpr_c),
-
         # framework metrics
         "j_a": float(j_a),
         "j_b": float(j_b),
         "j_comp": float(j_comp),
         "cc_max": float(cc),
         "delta_add": float(d_add),
-
         # dependence sanity
         "rho_score_neg_hat": float(rho_score_neg_hat),
         "rho_score_pos_hat": float(rho_score_pos_hat),
@@ -350,6 +352,7 @@ def _measure_one(
 # -------------------------
 # Replicate aggregation
 # -------------------------
+
 
 def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -364,10 +367,19 @@ def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     # Deterministic identifiers (should be identical across replicates)
     keep = [
-        "rho", "rho_neg", "rho_pos",
-        "tpr_a_target", "fpr_a_target", "tpr_b_target", "fpr_b_target",
-        "comp", "n_samples",
-        "thr_a", "thr_b", "mu_a", "mu_b",
+        "rho",
+        "rho_neg",
+        "rho_pos",
+        "tpr_a_target",
+        "fpr_a_target",
+        "tpr_b_target",
+        "fpr_b_target",
+        "comp",
+        "n_samples",
+        "thr_a",
+        "thr_b",
+        "mu_a",
+        "mu_b",
     ]
     for k in keep:
         if k in base:
@@ -375,9 +387,21 @@ def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     # Numeric metrics to aggregate (can vary slightly across replicates)
     agg = [
-        "tpr_a", "fpr_a", "tpr_b", "fpr_b", "tpr_comp", "fpr_comp",
-        "j_a", "j_b", "j_comp", "cc_max", "delta_add",
-        "rho_score_neg_hat", "rho_score_pos_hat", "rho_dec_neg_hat", "rho_dec_pos_hat",
+        "tpr_a",
+        "fpr_a",
+        "tpr_b",
+        "fpr_b",
+        "tpr_comp",
+        "fpr_comp",
+        "j_a",
+        "j_b",
+        "j_comp",
+        "cc_max",
+        "delta_add",
+        "rho_score_neg_hat",
+        "rho_score_pos_hat",
+        "rho_dec_neg_hat",
+        "rho_dec_pos_hat",
     ]
     for k in agg:
         vals = np.array([float(r[k]) for r in rows], dtype=float)
@@ -391,6 +415,7 @@ def _aggregate_replicates(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 # -------------------------
 # Parallel-safe worker (must be top-level for ProcessPool pickling)
 # -------------------------
+
 
 def _run_one_cell_worker(
     i: int,
@@ -436,6 +461,7 @@ def _run_one_cell_worker(
 # Sweep runner
 # -------------------------
 
+
 def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
     """
     Run the sweep over rho_grid x tpr_b_grid with deterministic per-cell seeding.
@@ -457,7 +483,10 @@ def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
             for j, tpr_b in enumerate(tpr_vals):
                 rows.append(
                     _run_one_cell_worker(
-                        i, j, rho, tpr_b,
+                        i,
+                        j,
+                        rho,
+                        tpr_b,
                         n_samples=cfg.n_samples,
                         comp=comp_u,
                         tpr_a=cfg.guardrail_a.tpr,
@@ -474,9 +503,11 @@ def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
 
     # Parallel path
     if ex == "thread":
-        from concurrent.futures import ThreadPoolExecutor as Executor, as_completed
+        from concurrent.futures import ThreadPoolExecutor as Executor
+        from concurrent.futures import as_completed
     else:
-        from concurrent.futures import ProcessPoolExecutor as Executor, as_completed
+        from concurrent.futures import ProcessPoolExecutor as Executor
+        from concurrent.futures import as_completed
 
     tasks: List[Tuple[int, int, float, float]] = []
     for i, rho in enumerate(rho_vals):
@@ -488,7 +519,10 @@ def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
         futs = [
             pool.submit(
                 _run_one_cell_worker,
-                i, j, rho, tpr_b,
+                i,
+                j,
+                rho,
+                tpr_b,
                 n_samples=cfg.n_samples,
                 comp=comp_u,
                 tpr_a=cfg.guardrail_a.tpr,
@@ -512,6 +546,7 @@ def run_sweep(cfg: SweepConfig) -> List[Dict[str, Any]]:
 # Output helpers
 # -------------------------
 
+
 def _coerce_csv_value(v: Any) -> Any:
     """Convert numpy scalars / odd types into CSV-friendly python types."""
     if isinstance(v, (np.floating,)):
@@ -530,19 +565,50 @@ def _write_csv(rows: Iterable[Dict[str, Any]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     preferred = [
-        "rho", "rho_neg", "rho_pos",
-        "tpr_b_target", "fpr_b_target", "tpr_a_target", "fpr_a_target",
-        "comp", "n_samples", "replicates",
-        "thr_a", "thr_b", "mu_a", "mu_b",
-        "tpr_a", "tpr_a_std", "fpr_a", "fpr_a_std",
-        "tpr_b", "tpr_b_std", "fpr_b", "fpr_b_std",
-        "tpr_comp", "tpr_comp_std", "fpr_comp", "fpr_comp_std",
-        "j_a", "j_a_std", "j_b", "j_b_std", "j_comp", "j_comp_std",
-        "cc_max", "cc_max_std", "delta_add", "delta_add_std",
-        "rho_score_neg_hat", "rho_score_neg_hat_std",
-        "rho_score_pos_hat", "rho_score_pos_hat_std",
-        "rho_dec_neg_hat", "rho_dec_neg_hat_std",
-        "rho_dec_pos_hat", "rho_dec_pos_hat_std",
+        "rho",
+        "rho_neg",
+        "rho_pos",
+        "tpr_b_target",
+        "fpr_b_target",
+        "tpr_a_target",
+        "fpr_a_target",
+        "comp",
+        "n_samples",
+        "replicates",
+        "thr_a",
+        "thr_b",
+        "mu_a",
+        "mu_b",
+        "tpr_a",
+        "tpr_a_std",
+        "fpr_a",
+        "fpr_a_std",
+        "tpr_b",
+        "tpr_b_std",
+        "fpr_b",
+        "fpr_b_std",
+        "tpr_comp",
+        "tpr_comp_std",
+        "fpr_comp",
+        "fpr_comp_std",
+        "j_a",
+        "j_a_std",
+        "j_b",
+        "j_b_std",
+        "j_comp",
+        "j_comp_std",
+        "cc_max",
+        "cc_max_std",
+        "delta_add",
+        "delta_add_std",
+        "rho_score_neg_hat",
+        "rho_score_neg_hat_std",
+        "rho_score_pos_hat",
+        "rho_score_pos_hat_std",
+        "rho_dec_neg_hat",
+        "rho_dec_neg_hat_std",
+        "rho_dec_pos_hat",
+        "rho_dec_pos_hat_std",
     ]
 
     all_keys = list(rows_l[0].keys())
@@ -606,6 +672,7 @@ def _hash_config_for_run_id(cfg: SweepConfig, argv: Sequence[str]) -> str:
     h.update(json.dumps(asdict(cfg), sort_keys=True, default=str).encode("utf-8"))
     return h.hexdigest()
 
+
 def _to_jsonable(obj: Any) -> Any:
     """Recursively convert objects into JSON-serializable Python types."""
     # numpy
@@ -638,9 +705,11 @@ def _save_metadata(meta: RunMetadata, out_path: Path) -> None:
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=True)
 
+
 # -------------------------
 # Self-checks (rigorous sanity)
 # -------------------------
+
 
 def _approx(a: float, b: float, tol: float) -> bool:
     return abs(a - b) <= tol
@@ -734,6 +803,7 @@ def run_self_checks() -> None:
 # CLI
 # -------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Run emergent composition sweep (Gaussian copula).")
 
@@ -751,20 +821,39 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--comp", type=str, default="AND", choices=["AND", "OR"])
     p.add_argument("--seed", type=int, default=7)
-    p.add_argument("--replicates", type=int, default=1, help="Repeat each cell and aggregate mean/std.")
-    p.add_argument("--jobs", type=int, default=1, help="Parallel workers. Use >1 for faster sweeps.")
-    p.add_argument("--executor", type=str, default="process", choices=["process", "thread"],
-                   help="Parallel backend. 'process' is fastest; 'thread' avoids pickling issues.")
+    p.add_argument(
+        "--replicates", type=int, default=1, help="Repeat each cell and aggregate mean/std."
+    )
+    p.add_argument(
+        "--jobs", type=int, default=1, help="Parallel workers. Use >1 for faster sweeps."
+    )
+    p.add_argument(
+        "--executor",
+        type=str,
+        default="process",
+        choices=["process", "thread"],
+        help="Parallel backend. 'process' is fastest; 'thread' avoids pickling issues.",
+    )
 
     # advanced: allow different dependence in pos vs neg classes
-    p.add_argument("--rho-neg", type=float, default=None, help="Override rho for negative class only.")
-    p.add_argument("--rho-pos", type=float, default=None, help="Override rho for positive class only.")
+    p.add_argument(
+        "--rho-neg", type=float, default=None, help="Override rho for negative class only."
+    )
+    p.add_argument(
+        "--rho-pos", type=float, default=None, help="Override rho for positive class only."
+    )
 
     p.add_argument("--out-csv", type=Path, default=Path("results/emergent/sweep.csv"))
-    p.add_argument("--out-meta", type=Path, default=Path("results/emergent/run_meta.json"),
-                   help="Write run metadata JSON for reproducibility.")
+    p.add_argument(
+        "--out-meta",
+        type=Path,
+        default=Path("results/emergent/run_meta.json"),
+        help="Write run metadata JSON for reproducibility.",
+    )
     p.add_argument("--out-fig", type=Path, default=Path("figures/emergent/cc_max_heatmap.png"))
-    p.add_argument("--out-fig-delta", type=Path, default=Path("figures/emergent/delta_add_heatmap.png"))
+    p.add_argument(
+        "--out-fig-delta", type=Path, default=Path("figures/emergent/delta_add_heatmap.png")
+    )
     p.add_argument("--no-plots", action="store_true", help="Skip figure generation.")
     p.add_argument("--self-check", action="store_true", help="Run rigorous sanity checks and exit.")
     return p
@@ -778,8 +867,16 @@ def main() -> None:
         return
 
     # Build grids
-    rho_grid = np.linspace(float(args.rho_min), float(args.rho_max), _validate_positive_int(args.rho_steps, "rho_steps", 1))
-    tpr_b_grid = np.linspace(float(args.tprb_min), float(args.tprb_max), _validate_positive_int(args.tprb_steps, "tprb_steps", 1))
+    rho_grid = np.linspace(
+        float(args.rho_min),
+        float(args.rho_max),
+        _validate_positive_int(args.rho_steps, "rho_steps", 1),
+    )
+    tpr_b_grid = np.linspace(
+        float(args.tprb_min),
+        float(args.tprb_max),
+        _validate_positive_int(args.tprb_steps, "tprb_steps", 1),
+    )
 
     cfg = SweepConfig(
         n_samples=_validate_positive_int(args.n_samples, "n_samples", 1),

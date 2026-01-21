@@ -31,8 +31,8 @@ Minimal deps: `numpy` (no plotting). Designed for CPU-cheap, deterministic smoke
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import erf, sqrt, isnan, isfinite
-from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
+from math import sqrt
+from typing import Any, Callable, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -77,6 +77,7 @@ EPS = 1e-12
 # Core legacy API (vectorized, but backward compatible for scalars)
 # =============================================================================
 
+
 def youden_j(tpr: ArrayLike, fpr: ArrayLike) -> Union[float, np.ndarray]:
     """
     Youden’s J = TPR − FPR, clipped to [-1, 1].
@@ -120,6 +121,7 @@ def cc_max(j_comp: float, j_a: float, j_b: float) -> float:
 # Additional composability metrics
 # =============================================================================
 
+
 def cc_rel(j_comp: float, j_a: float, j_b: float) -> float:
     """
     Relative composition coefficient:
@@ -151,6 +153,7 @@ def delta_mult(j_comp: float, j_a: float, j_b: float) -> float:
 # =============================================================================
 # Confusion and derived rates
 # =============================================================================
+
 
 @dataclass(frozen=True)
 class Confusion:
@@ -268,6 +271,7 @@ def likelihood_ratios(tpr: float, fpr: float) -> Tuple[float, float]:
 # ROC / AUC / Optimal thresholds
 # =============================================================================
 
+
 def roc_curve(
     scores: Sequence[float],
     labels: Sequence[int],
@@ -322,7 +326,7 @@ def roc_curve(
         # Enforce monotonic, remove points that don't contribute to the convex hull stepwise plot
         keep = np.ones_like(fpr, dtype=bool)
         # Simple thinning: keep strict increases in either axis
-        keep[1:-1] = ((np.diff(fpr) != 0) | (np.diff(tpr) != 0))
+        keep[1:-1] = (np.diff(fpr) != 0) | (np.diff(tpr) != 0)
         fpr, tpr, thresholds = fpr[keep], tpr[keep], thresholds[keep]
 
     return fpr, tpr, thresholds
@@ -401,6 +405,7 @@ def optimal_threshold_f1(
 # Confidence intervals
 # =============================================================================
 
+
 def wilson_ci(k: int, n: int, level: float = 0.95) -> Tuple[float, float]:
     """
     Wilson score interval for a binomial proportion with success count k and trials n.
@@ -412,7 +417,12 @@ def wilson_ci(k: int, n: int, level: float = 0.95) -> Tuple[float, float]:
     p = k / n
     # z from inverse erf: z = sqrt(2) * erfinv(level) for two-sided; approximate via binary search or use 1.96 at 95%
     # We'll use a simple mapping for common levels; otherwise fall back to normal approximation.
-    z_table = {0.90: 1.6448536269514722, 0.95: 1.959963984540054, 0.975: 2.241402727, 0.99: 2.5758293035489004}
+    z_table = {
+        0.90: 1.6448536269514722,
+        0.95: 1.959963984540054,
+        0.975: 2.241402727,
+        0.99: 2.5758293035489004,
+    }
     z = float(z_table.get(level, 1.959963984540054))
     denom = 1.0 + (z**2) / n
     center = (p + (z**2) / (2 * n)) / denom
@@ -436,7 +446,12 @@ def binomial_ci(
     if n <= 0:
         return (0.0, 1.0)
     p = k / n
-    z_table = {0.90: 1.6448536269514722, 0.95: 1.959963984540054, 0.975: 2.241402727, 0.99: 2.5758293035489004}
+    z_table = {
+        0.90: 1.6448536269514722,
+        0.95: 1.959963984540054,
+        0.975: 2.241402727,
+        0.99: 2.5758293035489004,
+    }
     z = float(z_table.get(level, 1.959963984540054))
     half = z * sqrt(max(p * (1 - p) / n, 0.0))
     return float(max(0.0, p - half)), float(min(1.0, p + half))
@@ -445,6 +460,7 @@ def binomial_ci(
 # =============================================================================
 # Bootstrap utilities
 # =============================================================================
+
 
 def bootstrap_ci(
     data: Sequence[Any],

@@ -61,9 +61,9 @@ to bridge the data-model spec into a runtime AttackStrategy instance.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -88,6 +88,7 @@ class AttackDifficulty(str, Enum):
 @dataclass
 class AttackEvent:
     """Helper container for building the standard dict response."""
+
     attack_id: str
     prompt: str
     tokens: List[str]
@@ -136,7 +137,9 @@ class AttackStrategy(ABC):
         raise NotImplementedError
 
     # ----- optional niceties (implemented here for convenience) -----
-    def batch_generate(self, n: int, history: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    def batch_generate(
+        self, n: int, history: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
         """Vector-friendly: generate n attacks. Default loops over `generate_attack`."""
         history = history or []
         return [self.generate_attack(history) for _ in range(max(0, int(n)))]
@@ -146,7 +149,9 @@ class AttackStrategy(ABC):
         """Return minimal state required to restore the strategy."""
         return {}
 
-    def load_state_dict(self, state: Dict[str, Any]) -> None:  # pragma: no cover - trivial by default
+    def load_state_dict(
+        self, state: Dict[str, Any]
+    ) -> None:  # pragma: no cover - trivial by default
         """Restore minimal state previously returned by `state_dict`."""
         return
 
@@ -493,7 +498,9 @@ class TemplatePromptAttacker(AttackStrategy):
         noun = self.rng.choice(self.cfg.nouns_harmful) if self.cfg.nouns_harmful else "guardrail"
 
         # Optionally blend benign fillers at the end to reduce obviousness
-        fillers = _safe_choice(self.rng, self.cfg.benign_fillers, size=self.rng.integers(0, 2), replace=True)
+        fillers = _safe_choice(
+            self.rng, self.cfg.benign_fillers, size=self.rng.integers(0, 2), replace=True
+        )
         prompt = tpl.format(verb=verb, noun=noun)
         if fillers:
             prompt = f"{prompt} {' '.join(fillers)}"
@@ -509,7 +516,9 @@ class TemplatePromptAttacker(AttackStrategy):
             meta={"difficulty": self.cfg.difficulty.value},
         ).to_dict()
 
-    def update_strategy(self, attack: Dict[str, Any], result: Dict[str, Any]) -> None:  # pragma: no cover
+    def update_strategy(
+        self, attack: Dict[str, Any], result: Dict[str, Any]
+    ) -> None:  # pragma: no cover
         # Stateless aside from counters; no-op for now.
         return
 
@@ -546,8 +555,8 @@ class GAConfig:
     min_len: int = 2
     max_len: int = 8
     elitism_frac: float = 0.12  # a touch more elitism
-    evolve_every: int = 10      # evolve after this many fitness updates
-    ema_beta: float = 0.0       # EMA smoothing for fitness updates
+    evolve_every: int = 10  # evolve after this many fitness updates
+    ema_beta: float = 0.0  # EMA smoothing for fitness updates
     diversity_weight: float = 0.05  # novelty/diversity pressure
     seed: int = 42
     # ID
@@ -809,7 +818,9 @@ def make_attacker_from_config(
         # allow passing cfg overrides
         cfg_kwargs = {k: v for k, v in params.items() if k not in ("vocab_harmful", "vocab_benign")}
         cfg = RandomInjectionConfig(**cfg_kwargs) if cfg_kwargs else RandomInjectionConfig()
-        return RandomInjectionAttacker(vocab_harmful=vocab_harmful, vocab_benign=vocab_benign, cfg=cfg)
+        return RandomInjectionAttacker(
+            vocab_harmful=vocab_harmful, vocab_benign=vocab_benign, cfg=cfg
+        )
 
     if t == "template_prompt":
         cfg = TemplateAttackerConfig(**params) if params else TemplateAttackerConfig()
@@ -843,7 +854,9 @@ def make_attacker_from_spec(spec: AttackStrategySpec) -> AttackStrategy:
         vocab_harmful = params.pop("vocab_harmful", spec.vocabulary)
         vocab_benign = params.pop("vocab_benign", [])
         cfg = RandomInjectionConfig(**params) if params else RandomInjectionConfig()
-        return RandomInjectionAttacker(vocab_harmful=vocab_harmful, vocab_benign=vocab_benign, cfg=cfg)
+        return RandomInjectionAttacker(
+            vocab_harmful=vocab_harmful, vocab_benign=vocab_benign, cfg=cfg
+        )
 
     if t == "template_prompt":
         cfg = TemplateAttackerConfig(**params) if params else TemplateAttackerConfig()

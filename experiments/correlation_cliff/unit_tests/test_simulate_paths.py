@@ -121,4 +121,22 @@ def test_gaussian_tau_endpoints_do_not_require_scipy():
     L, Uu = _bounds(pA, pB)
 
     # lam=0 => tau=-1 => lower FH bound, no SciPy
-    p11_0, meta0 = p11_from_path(pA, pB, 0.0, path="gaussian_tau",
+    p11_0, meta0 = p11_from_path(pA, pB, 0.0, path="gaussian_tau", path_params={})
+    # lam=1 => tau=+1 => upper FH bound, no SciPy
+    p11_1, meta1 = p11_from_path(pA, pB, 1.0, path="gaussian_tau", path_params={})
+
+    assert abs(p11_0 - L) < 1e-12
+    assert abs(p11_1 - Uu) < 1e-12
+    _assert_meta_required(meta0)
+    _assert_meta_required(meta1)
+
+
+def test_gaussian_tau_interior_requires_scipy_or_skips():
+    pA, pB = 0.2, 0.7
+
+    scipy = pytest.importorskip("scipy")  # noqa: F841
+
+    p11, meta = p11_from_path(pA, pB, 0.5, path="gaussian_tau", path_params={})
+    L, Uu = _bounds(pA, pB)
+    assert L <= p11 <= Uu
+    _assert_meta_required(meta)
