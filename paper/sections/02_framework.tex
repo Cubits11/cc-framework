@@ -1,0 +1,125 @@
+\section{The CC-Framework}
+\label{sec:framework}
+
+\subsection{Guardrail Model}
+
+\begin{definition}[Guardrail]
+\label{def:guardrail}
+A guardrail $R$ is a binary classifier mapping inputs to accept/reject decisions:
+\[
+R: \mathcal{X} \to \{0, 1\}
+\]
+where $R(x) = 1$ indicates the input is allowed (passed) and $R(x) = 0$ indicates it is blocked (rejected).
+\end{definition}
+
+\begin{definition}[Two-World Protocol]
+\label{def:two-world}
+Define two distributions over inputs:
+\begin{itemize}
+    \item $\mathcal{D}_0$: benign/legitimate user inputs
+    \item $\mathcal{D}_1$: adversarial/harmful inputs (threats)
+\end{itemize}
+A guardrail is evaluated on test sets $S_0 \sim \mathcal{D}_0$ and $S_1 \sim \mathcal{D}_1$ to measure:
+\begin{align*}
+\text{TPR}(R) &= \Pr_{x \sim \mathcal{D}_1}[R(x) = 0] \quad \text{(threats blocked)} \\
+\text{FPR}(R) &= \Pr_{x \sim \mathcal{D}_0}[R(x) = 0] \quad \text{(benign blocked)}
+\end{align*}
+\end{definition}
+
+\begin{definition}[Youden's $J$ Statistic]
+\label{def:youden}
+For a guardrail $R$, Youden's $J$ is:
+\[
+J(R) = \text{TPR}(R) - \text{FPR}(R)
+\]
+Range: $J \in [-1, 1]$ where:
+\begin{itemize}
+    \item $J = 1$: perfect classifier (all threats blocked, no benign blocked)
+    \item $J = 0$: random classifier
+    \item $J = -1$: adversarial classifier (inverted behavior)
+\end{itemize}
+\end{definition}
+
+\subsection{Composition}
+
+\begin{definition}[Boolean Composition]
+\label{def:composition}
+For guardrails $R_1, \ldots, R_n$, a composition rule is a Boolean function:
+\[
+g: \{0,1\}^n \to \{0,1\}
+\]
+The composed system outputs:
+\[
+Z = g(R_1, \ldots, R_n)
+\]
+Common rules:
+\begin{itemize}
+    \item AND: $g_\land(r_1, \ldots, r_n) = \min(r_1, \ldots, r_n)$ (all must pass)
+    \item OR: $g_\lor(r_1, \ldots, r_n) = \max(r_1, \ldots, r_n)$ (any can pass)
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Independence Baseline]
+\label{def:independence}
+Under the assumption that $R_1$ and $R_2$ make independent errors, the composed Youden's $J$ satisfies:
+\[
+J_{\text{ind}}(R_1 \land R_2) = J(R_1) + J(R_2) - J(R_1) \cdot J(R_2).
+\]
+We define the additive deviation as
+\[
+\Delta_{\text{add}} = J_{\text{actual}} - J_{\text{ind}},
+\]
+which measures synergy (positive) or interference (negative).
+\end{definition}
+
+\subsection{The CC Metric}
+
+\begin{definition}[Compositional Coupling Coefficient]
+\label{def:cc-max}
+For a composition of guardrails, the compositional coupling coefficient is:
+\[
+\mathrm{CC}_{\max} = \frac{J_{\text{actual}}}{\max\{J(R_1), J(R_2)\}}
+\]
+where $J_{\text{actual}}$ is the measured Youden's $J$ of the composed system.
+\end{definition}
+
+\subsection{Regime Taxonomy}
+
+\begin{definition}[Dependence Regimes]
+\label{def:regimes}
+Based on $\mathrm{CC}_{\max}$, we classify compositions into three regimes:
+\begin{itemize}
+    \item \textbf{Constructive} ($\mathrm{CC}_{\max} < 0.95$): composition improves beyond the best single guardrail.
+    \item \textbf{Independent} ($0.95 \le \mathrm{CC}_{\max} \le 1.05$): composition matches the best single guardrail within a tolerance band.
+    \item \textbf{Destructive} ($\mathrm{CC}_{\max} > 1.05$): composition underperforms relative to the best single guardrail.
+\end{itemize}
+The $\pm 5\%$ band is a conservative policy margin to account for sampling variability.
+\end{definition}
+
+\subsection{Unknown Dependence Analysis}
+
+When the joint distribution of guardrail errors is unknown, we employ Fr\'echet--Hoeffding bounds to characterize worst-case and best-case dependence.
+
+\begin{theorem}[Fr\'echet--Hoeffding Envelope]
+\label{thm:fh-bounds}
+For random variables $X_1, X_2$ with marginal CDFs $F_1, F_2$, their joint CDF $F$ satisfies:
+\[
+F^-(x_1, x_2) \le F(x_1, x_2) \le F^+(x_1, x_2)
+\]
+where:
+\begin{align*}
+F^-(x_1, x_2) &= \max(0, F_1(x_1) + F_2(x_2) - 1) \quad \text{(countermonotonic)}, \\
+F^+(x_1, x_2) &= \min(F_1(x_1), F_2(x_2)) \quad \text{(comonotonic)}.
+\end{align*}
+\end{theorem}
+
+\begin{definition}[Regime Uncertainty]
+\label{def:uncertainty}
+A composition exhibits \textbf{regime uncertainty} if the interval
+$[\mathrm{CC}^-_{\max}, \mathrm{CC}^+_{\max}]$ computed via FH bounds overlaps the independence band $[0.95, 1.05]$.
+In such cases, the true regime cannot be determined without additional information about the dependence structure.
+\end{definition}
+
+\begin{remark}
+This framework explicitly acknowledges epistemic uncertainty: when dependence is unmeasured, we bound the range of possible outcomes rather than assuming independence by default.
+\end{remark}
