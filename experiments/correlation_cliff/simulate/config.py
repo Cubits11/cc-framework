@@ -210,6 +210,7 @@ class SimConfig:
     tiny_negative_eps: float = 1e-15
 
     include_theory_reference: bool = True
+    batch_sampling: bool = True
 
     # internal cache for stable_per_cell mapping
     _lambda_index_map: Dict[float, int] = field(default_factory=dict, init=False, repr=False)
@@ -293,6 +294,8 @@ def validate_cfg(cfg: SimConfig) -> None:
         raise ConfigError(
             f"include_theory_reference must be bool, got {cfg.include_theory_reference!r}"
         )
+    if not isinstance(cfg.batch_sampling, bool):
+        raise ConfigError(f"batch_sampling must be bool, got {cfg.batch_sampling!r}")
 
     # --- lambdas ---
     if not isinstance(cfg.lambdas, list) or len(cfg.lambdas) == 0:
