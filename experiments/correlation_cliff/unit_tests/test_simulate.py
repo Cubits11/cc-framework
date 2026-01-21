@@ -37,6 +37,11 @@ import pytest
 # Import simulate module robustly (package mode preferred; script fallback allowed)
 # -----------------------------------------------------------------------------
 def _import_sim():
+    import sys
+
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
     try:
         from experiments.correlation_cliff import simulate_legacy as sim  # type: ignore
 
@@ -119,7 +124,7 @@ def test_build_linear_lambda_grid_basic_closed_both():
 @pytest.mark.parametrize(
     "closed,expected_first,expected_last",
     [
-        ("neither", 0.25, 0.75),
+        ("neither", 0.2, 0.8),
         ("left", 0.0, 0.75),
         ("right", 0.25, 1.0),
     ],

@@ -138,15 +138,15 @@ def _normalize_path(path: Path | str) -> str:
       - Enum Path values or names
       - strings like "fh_linear", "FH_LINEAR", "Path.FH_LINEAR", "path.fh_linear"
     """
-    if isinstance(path, Path):
+    if isinstance(path, str):
+        s = path
+    else:
         # Prefer `.value` if it is a string-like; else fall back to `.name`.
         val = getattr(path, "value", None)
         if isinstance(val, str) and val.strip():
             s = val
         else:
             s = getattr(path, "name", str(path))
-    else:
-        s = str(path)
 
     s = s.strip().lower()
 
@@ -338,6 +338,8 @@ def p11_from_path(
     b = U.fh_bounds(pA_f, pB_f)
     L = float(b.L)
     Uu = float(b.U)
+    if math.isfinite(L) and math.isfinite(Uu) and L > Uu and (L - Uu) <= 1e-12:
+        L = Uu
     if not (math.isfinite(L) and math.isfinite(Uu) and 0.0 <= L <= Uu <= 1.0):
         raise NumericalError(f"FH bounds invalid for pA={pA_f}, pB={pB_f}: L={L}, U={Uu}")
 

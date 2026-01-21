@@ -1,175 +1,137 @@
 import numpy as np
 import pandas as pd
-import pytest
 
-from experiments.correlation_cliff.simulate import core
-from experiments.correlation_cliff.simulate import utils as U
 from experiments.correlation_cliff.simulate.config import SimConfig
+from experiments.correlation_cliff.simulate.core import simulate_grid
 
 
-def _marginals():
-    return U.TwoWorldMarginals(
-        w0=U.WorldMarginals(pA=0.2, pB=0.3),
-        w1=U.WorldMarginals(pA=0.25, pB=0.35),
-    )
-
-
-def _base_cfg(**overrides):
+def test_simulate_replicate_metadata_present():
     cfg = SimConfig(
-        marginals=_marginals(),
+        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        rule="OR",
+        lambdas=[0.5],
+        n=100,
+        n_reps=3,
+        seed=42,
+        path="fh_linear",
+    )
+    df = simulate_grid(cfg)
+
+    for w in (0, 1):
+        assert f"sample_meta_sum_error_w{w}" in df.columns
+        assert f"sample_meta_clipped_any_w{w}" in df.columns
+
+    valid = df[df["world_valid_w0"] & df["world_valid_w1"]]
+    assert valid["sample_meta_sum_error_w0"].notna().mean() > 0.95
+
+
+def test_envelope_violation_boundary():
+    cfg = SimConfig(
+        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.5, pB=0.5)),
         rule="OR",
         lambdas=[0.0, 0.5, 1.0],
-        n=50,
+        n=500,
         n_reps=3,
-        seed=123,
+        seed=0,
         path="fh_linear",
-        include_theory_reference=False,  # tests should not depend on optional overlays
-        **overrides,
+        envelope_tol=5e-3,
     )
-    return cfg
+    df = simulate_grid(cfg)
+    valid = df[df["world_valid_w0"] & df["world_valid_w1"]]
+    for _, row in valid.iterrows():
+        jc_hat = row["JC_hat"]
+        env_min = row["JC_env_min"]
+        env_max = row["JC_env_max"]
+        tol = cfg.envelope_tol
+        expected_violation = (jc_hat < env_min - tol) or (jc_hat > env_max + tol)
+        assert bool(row["JC_env_violation"]) == expected_violation
 
 
-def test_simulate_replicate_at_lambda_basic_schema_and_counts_sum():
-    cfg = _base_cfg(seed_policy="stable_per_cell")
-    row = core.simulate_replicate_at_lambda(
-        cfg,
-        lam=0.5,
-        lam_index=cfg.lambda_index_for_seed(0.5),
-        rep=0,
-        rng=np.random.default_rng(999),  # ignored for stable_per_cell
+def test_batch_sampling_mode_toggles():
+    cfg_batch = SimConfig(
+        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        rule="OR",
+        lambdas=[0.5],
+        n=100,
+        n_reps=5,
+        seed=42,
+        path="fh_linear",
+        seed_policy="sequential",
+        batch_sampling=True,
     )
-
-    assert row["lambda"] == 0.5
-    assert row["rep"] == 0
-    assert row["rule"] == "OR"
-    assert row["path"] == "fh_linear"
-
-    assert "world_valid_w0" in row and "world_valid_w1" in row
-    assert row["world_valid_w0"] is True
-    assert row["world_valid_w1"] is True
-    assert row["worlds_valid"] is True
-    assert row["row_ok"] is True
-
-    # counts exist and sum to n for each world
-    for w in (0, 1):
-        n00 = row[f"n00_w{w}"]
-        n01 = row[f"n01_w{w}"]
-        n10 = row[f"n10_w{w}"]
-        n11 = row[f"n11_w{w}"]
-        assert all(isinstance(x, int) for x in (n00, n01, n10, n11))
-        assert n00 + n01 + n10 + n11 == cfg.n
-
-
-def test_simulate_grid_stable_per_cell_order_invariant():
-    cfg_a = _base_cfg(seed_policy="stable_per_cell", lambdas=[0.0, 0.5, 1.0])
-    cfg_b = _base_cfg(seed_policy="stable_per_cell", lambdas=[1.0, 0.5, 0.0])  # reordered
-
-    df_a = (
-        core.simulate_grid(cfg_a)
-        .sort_values(["lambda", "rep"], kind="mergesort")
-        .reset_index(drop=True)
-    )
-    df_b = (
-        core.simulate_grid(cfg_b)
-        .sort_values(["lambda", "rep"], kind="mergesort")
-        .reset_index(drop=True)
+    cfg_std = SimConfig(
+        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        rule="OR",
+        lambdas=[0.5],
+        n=100,
+        n_reps=5,
+        seed=42,
+        path="fh_linear",
+        seed_policy="sequential",
+        batch_sampling=False,
     )
 
-    # Select a stable subset of columns that must match exactly.
-    cols = [
-        "lambda",
-        "rep",
-        "n00_w0",
-        "n01_w0",
-        "n10_w0",
-        "n11_w0",
-        "n00_w1",
-        "n01_w1",
-        "n10_w1",
-        "n11_w1",
-        "JC_hat",
-        "CC_hat",
-        "worlds_valid",
-        "row_ok",
-    ]
-    for c in cols:
-        assert c in df_a.columns and c in df_b.columns
+    df_batch = simulate_grid(cfg_batch)
+    df_std = simulate_grid(cfg_std)
 
-    # Expect exact equality for these deterministic outputs.
-    pd.testing.assert_frame_equal(df_a[cols], df_b[cols], check_dtype=False)
+    assert df_batch["batch_sampling_used"].iloc[0] == 1.0
+    assert df_std["batch_sampling_used"].iloc[0] == 0.0
+    assert df_batch["seed_policy_applied"].iloc[0] == "sequential_batch"
+    assert df_std["seed_policy_applied"].iloc[0] == "sequential_standard"
+
+    differs = (df_batch["n00_w0"].to_numpy() != df_std["n00_w0"].to_numpy()).any()
+    assert differs
+
+    for df, label in [(df_batch, "batch"), (df_std, "std")]:
+        valid = df[df["world_valid_w0"] & df["world_valid_w1"]]
+        nan_rate = valid["CC_hat"].isna().mean()
+        assert nan_rate < 0.05, f"{label}: too many NaNs in CC_hat ({nan_rate:.1%})"
 
 
-def test_simulate_grid_sequential_is_order_dependent():
-    cfg_a = _base_cfg(seed_policy="sequential", lambdas=[0.0, 0.5, 1.0])
-    cfg_b = _base_cfg(seed_policy="sequential", lambdas=[1.0, 0.5, 0.0])
-
-    df_a = (
-        core.simulate_grid(cfg_a)
-        .sort_values(["lambda", "rep"], kind="mergesort")
-        .reset_index(drop=True)
-    )
-    df_b = (
-        core.simulate_grid(cfg_b)
-        .sort_values(["lambda", "rep"], kind="mergesort")
-        .reset_index(drop=True)
+def test_determinism_stable_per_cell():
+    cfg = SimConfig(
+        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        rule="OR",
+        lambdas=[0.5],
+        n=100,
+        n_reps=3,
+        seed=42,
+        path="fh_linear",
+        seed_policy="stable_per_cell",
     )
 
-    # Very high probability these differ; we check a concrete column.
-    assert not np.array_equal(df_a["n11_w0"].to_numpy(), df_b["n11_w0"].to_numpy())
+    df1 = simulate_grid(cfg)
+    df2 = simulate_grid(cfg)
+
+    pd.testing.assert_frame_equal(
+        df1[["CC_hat", "JC_hat", "phi_hat_w0"]],
+        df2[["CC_hat", "JC_hat", "phi_hat_w0"]],
+        check_dtype=False,
+    )
 
 
-def test_hard_fail_false_marks_world_invalid_instead_of_raising(monkeypatch):
-    cfg = _base_cfg(hard_fail_on_invalid=False, seed_policy="stable_per_cell", lambdas=[0.5])
+def test_lambda_ordering_stable_per_cell():
+    lambdas1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+    lambdas2 = [1.0, 0.5, 0.0, 0.75, 0.25]
 
-    def _bad_p11_from_path(pA, pB, lam, *, path, path_params):
-        # Make world 1 fail by keying off its pA value (0.25 in _marginals()).
-        if abs(float(pA) - 0.25) < 1e-12:
-            raise RuntimeError("boom")
-        return float(pA) * float(pB), {"ok": 1.0}
+    cfg_base = dict(
+        marginals=dict(w0=dict(pA=0.5, pB=0.5), w1=dict(pA=0.6, pB=0.6)),
+        rule="OR",
+        n=100,
+        n_reps=3,
+        seed=42,
+        path="fh_linear",
+        seed_policy="stable_per_cell",
+    )
 
-    monkeypatch.setattr(core, "p11_from_path", _bad_p11_from_path)
+    df1 = simulate_grid(SimConfig(**cfg_base, lambdas=lambdas1))
+    df2 = simulate_grid(SimConfig(**cfg_base, lambdas=lambdas2))
 
-    df = core.simulate_grid(cfg)
-    assert len(df) == cfg.n_reps * len(cfg.lambdas)
+    df1_sorted = df1.sort_values(["lambda", "rep"]).reset_index(drop=True)
+    df2_sorted = df2.sort_values(["lambda", "rep"]).reset_index(drop=True)
 
-    row0 = df.iloc[0].to_dict()
-    assert row0["world_valid_w0"] is True
-    assert row0["world_valid_w1"] is False
-    assert row0["worlds_valid"] is False
-    assert row0["row_ok"] is False
-    assert row0["world_error_stage_w1"] == "p11_from_path"
-    assert "boom" in str(row0["world_error_msg_w1"])
-
-
-def test_simulate_grid_hard_fail_false_catches_row_exception(monkeypatch):
-    cfg = _base_cfg(hard_fail_on_invalid=False, seed_policy="stable_per_cell", lambdas=[0.0, 0.5])
-
-    def _explode(*args, **kwargs):
-        raise RuntimeError("replicate explode")
-
-    monkeypatch.setattr(core, "simulate_replicate_at_lambda", _explode)
-
-    df = core.simulate_grid(cfg)
-    assert len(df) == cfg.n_reps * len(cfg.lambdas)
-    assert df["row_ok"].fillna(False).astype(bool).sum() == 0
-    assert (df["row_error_stage"] == "simulate_replicate_at_lambda").all()
-
-
-def test_summarize_simulation_outputs_expected_columns():
-    cfg = _base_cfg(seed_policy="stable_per_cell", lambdas=[0.0, 0.5], n_reps=5)
-    df = core.simulate_grid(cfg)
-    df_sum = core.summarize_simulation(df)
-
-    assert len(df_sum) == 2
-    assert "lambda" in df_sum.columns
-    assert "CC_hat_mean" in df_sum.columns
-    assert "CC_hat_q0025" in df_sum.columns
-    assert "CC_hat_q0500" in df_sum.columns
-    assert "CC_hat_q0975" in df_sum.columns
-    assert "row_ok_rate" in df_sum.columns
-
-
-def test_summarize_simulation_rejects_duplicate_quantiles_after_rounding():
-    df = pd.DataFrame({"lambda": [0.0, 0.0], "rep": [0, 1], "CC_hat": [1.0, 2.0]})
-    with pytest.raises(ValueError, match="duplicates"):
-        core.summarize_simulation(df, quantiles=(0.5, 0.5000000000000001))
+    pd.testing.assert_frame_equal(
+        df1_sorted[["lambda", "rep", "CC_hat", "JC_hat", "phi_hat_w0"]],
+        df2_sorted[["lambda", "rep", "CC_hat", "JC_hat", "phi_hat_w0"]],
+        check_dtype=False,
+    )

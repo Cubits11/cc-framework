@@ -37,6 +37,3 @@ def test_cfg_from_dict_pipeline_schema():
     assert cfg.n == 50
     assert cfg.n_reps == 2
     assert len(cfg.lambdas) == 5
-
-
-py

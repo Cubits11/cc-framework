@@ -57,6 +57,16 @@ Path = Literal["fh_linear", "fh_power", "fh_scurve", "gaussian_tau"]
 SeedPolicy = Literal["sequential", "stable_per_cell"]
 
 
+def _rng_for_cell(seed: int, rep: int, lam_index: int, world: int) -> np.random.Generator:
+    """
+    Stable-per-cell RNG keyed by (seed, rep, lambda_index, world).
+    """
+    if not all(isinstance(x, int) for x in (seed, rep, lam_index, world)):
+        raise TypeError("seed/rep/lam_index/world must all be ints.")
+    ss = np.random.SeedSequence([seed, rep, lam_index, world])
+    return np.random.default_rng(ss)
+
+
 # -----------------------------------------------------------------------------
 # Import theory without hiding bugs (and without trusting a wrong shadow module)
 # -----------------------------------------------------------------------------
@@ -1249,9 +1259,13 @@ def _draw_joint_counts(
             f"rng must be a numpy.random.Generator, got {type(rng).__name__}.{(' ' + context) if context else ''}"
         )
 
-    # n must be an integer-like positive
+    # n must be a strict integer (no silent coercion)
     if isinstance(n, bool):
         raise TypeError(f"n must be an int > 0, got bool {n}.{(' ' + context) if context else ''}")
+    if isinstance(n, (float, np.floating)):
+        raise TypeError(
+            f"n must be an integer (no silent coercion), got {n!r}.{(' ' + context) if context else ''}"
+        )
     try:
         n_int = int(n)
     except Exception as e:
@@ -1812,7 +1826,8 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
     rows_extend = rows.append  # tiny speed win in hot loops
 
     for rep in range(int(cfg.n_reps)):
-        for lam_index, lam in enumerate(lambdas_list):
+        for lam in lambdas_list:
+            lam_index = cfg.lambda_index_for_seed(lam)
             try:
                 row = simulate_replicate_at_lambda(
                     cfg,
