@@ -261,6 +261,10 @@ def simulate_replicate_at_lambda(
         "path": cfg.path,
         "seed": int(cfg.seed),
         "seed_policy": cfg.seed_policy,
+        "seed_policy_applied": "stable_per_cell"
+        if cfg.seed_policy == "stable_per_cell"
+        else "sequential_standard",
+        "batch_sampling_used": 0.0,
         "n_per_world": int(cfg.n),
         "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
         "row_ok": True,  # refined after world runs
@@ -425,9 +429,9 @@ def simulate_replicate_at_lambda(
         if isinstance(sample_meta, dict):
             for mk, mv in sample_meta.items():
                 try:
-                    out[f"samplemeta_{mk}_w{w}"] = float(mv)
+                    out[f"sample_meta_{mk}_w{w}"] = float(mv)
                 except Exception:
-                    out[f"samplemeta_{mk}_w{w}"] = float("nan")
+                    out[f"sample_meta_{mk}_w{w}"] = float("nan")
 
         n00, n01, n10, n11 = counts
 
@@ -548,6 +552,12 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
             "path": cfg.path,
             "seed": int(cfg.seed),
             "seed_policy": cfg.seed_policy,
+            "seed_policy_applied": "sequential_batch"
+            if (cfg.seed_policy == "sequential" and cfg.batch_sampling)
+            else "sequential_standard"
+            if cfg.seed_policy == "sequential"
+            else "stable_per_cell",
+            "batch_sampling_used": 1.0 if (cfg.seed_policy == "sequential" and cfg.batch_sampling) else 0.0,
             "n_per_world": int(cfg.n),
             "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
             "row_ok": True,
@@ -737,9 +747,9 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                     if isinstance(cache.get("sample_meta"), dict):
                         for mk, mv in cache["sample_meta"].items():
                             try:
-                                out[f"samplemeta_{mk}_w{w}"] = float(mv)
+                                out[f"sample_meta_{mk}_w{w}"] = float(mv)
                             except Exception:
-                                out[f"samplemeta_{mk}_w{w}"] = float("nan")
+                                out[f"sample_meta_{mk}_w{w}"] = float("nan")
 
                     counts = cache["counts"][rep]
                     n00, n01, n10, n11 = (int(counts[0]), int(counts[1]), int(counts[2]), int(counts[3]))
@@ -824,6 +834,10 @@ def simulate_grid(cfg: SimConfig) -> pd.DataFrame:
                         "path": cfg.path,
                         "seed": int(cfg.seed),
                         "seed_policy": cfg.seed_policy,
+                        "seed_policy_applied": "stable_per_cell"
+                        if cfg.seed_policy == "stable_per_cell"
+                        else "sequential_standard",
+                        "batch_sampling_used": 0.0,
                         "n_per_world": int(cfg.n),
                         "hard_fail_on_invalid": bool(cfg.hard_fail_on_invalid),
                         "worlds_valid": False,
@@ -1023,6 +1037,18 @@ def summarize_simulation(
             v = g[c].fillna(False).astype(bool)
             row[f"{c}_rate"] = float(v.mean()) if len(v) > 0 else float("nan")
             row[f"{c}_n"] = int(v.sum())
+
+        # Sampling diagnostics (clipping rates per lambda/world)
+        clip_cols = [c for c in g.columns if c.startswith("sample_meta_clipped_any_w")]
+        for c in clip_cols:
+            s = pd.to_numeric(g[c], errors="coerce")
+            s_valid = s.dropna()
+            if s_valid.empty:
+                row[f"{c}_rate"] = float("nan")
+                row[f"{c}_n"] = 0
+            else:
+                row[f"{c}_rate"] = float((s_valid > 0.5).mean())
+                row[f"{c}_n"] = int((s_valid > 0.5).sum())
 
         # Population constancy / drift diagnostics
         for col in pop_cols:

@@ -38,6 +38,21 @@ def test_validate_cell_probs_with_meta_tracks_clipping():
     assert meta["clipped_any"] == 1.0
     assert meta["clipped_low"] == 1.0
     assert meta["clipped_high"] in (0.0, 1.0)
+    assert meta["sum_error"] <= 1e-6
+
+
+def test_validate_cell_probs_with_meta_returns_metadata_fields():
+    p = np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float64)
+    _, meta = sampling.validate_cell_probs_with_meta(
+        p,
+        prob_tol=1e-12,
+        allow_tiny_negative=True,
+        tiny_negative_eps=1e-15,
+    )
+    assert "sum_p" in meta
+    assert "sum_error" in meta
+    assert "clipped_any" in meta
+    assert meta["sum_p"] == pytest.approx(1.0)
 
 
 def test_validate_cell_probs_sum_tolerance_boundary():
@@ -57,6 +72,28 @@ def test_validate_cell_probs_sum_tolerance_boundary():
             prob_tol=1e-6,
             allow_tiny_negative=False,
             tiny_negative_eps=1e-6,
+        )
+
+
+def test_tiny_clipping_boundary():
+    eps = 1e-8
+    p_at = np.array([-eps, 0.5, 0.25, 0.25 + eps], dtype=np.float64)
+    out, meta = sampling.validate_cell_probs_with_meta(
+        p_at,
+        prob_tol=1e-6,
+        allow_tiny_negative=True,
+        tiny_negative_eps=eps,
+    )
+    assert out[0] == 0.0
+    assert meta["clipped_any"] == 1.0
+
+    p_beyond = np.array([-eps * 1.1, 0.5, 0.25, 0.25 + eps * 1.1], dtype=np.float64)
+    with pytest.raises(ValueError, match="Negative"):
+        sampling.validate_cell_probs_with_meta(
+            p_beyond,
+            prob_tol=1e-6,
+            allow_tiny_negative=True,
+            tiny_negative_eps=eps,
         )
 
 
@@ -122,6 +159,8 @@ def test_draw_joint_counts_deterministic_single_cell():
     assert (n00, n01, n10, n11) == (0, 0, 0, 5)
     assert np.isclose(meta["p11_used"], 1.0)
     assert meta["p11_mismatch"] <= meta["p11_mismatch_tol"]
+    assert "sum_p" in meta
+    assert "clipped_any" in meta
 
 
 def test_draw_joint_counts_counts_sum_to_n():
@@ -167,6 +206,22 @@ def test_draw_joint_counts_rejects_bad_n(bad_n):
         sampling.draw_joint_counts(
             rng,
             n=bad_n,  # type: ignore[arg-type]
+            p00=0.25,
+            p01=0.25,
+            p10=0.25,
+            p11=0.25,
+            prob_tol=1e-12,
+            allow_tiny_negative=False,
+            tiny_negative_eps=1e-6,
+        )
+
+
+def test_draw_joint_counts_rejects_float_n_strict():
+    rng = np.random.default_rng(0)
+    with pytest.raises(TypeError, match="no silent coercion"):
+        sampling.draw_joint_counts(
+            rng,
+            n=100.0,
             p00=0.25,
             p01=0.25,
             p10=0.25,

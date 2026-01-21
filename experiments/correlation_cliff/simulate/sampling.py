@@ -222,6 +222,8 @@ def draw_joint_counts(
 
     if isinstance(n, bool):
         raise TypeError(f"n must be an int > 0, got bool {n}. {ctx}".strip())
+    if isinstance(n, (float, np.floating)):
+        raise TypeError(f"n must be an integer (no silent coercion), got {n!r}. {ctx}".strip())
     try:
         n_int = int(n)
     except Exception as e:
@@ -412,6 +414,10 @@ def draw_joint_counts_batch(
     if not np.all(counts_arr.sum(axis=1) == n_int):
         raise RuntimeError(
             f"Multinomial batch draw inconsistent: some rows do not sum to n={n_int}. {ctx}".strip()
+        )
+    if np.any(counts_arr < 0):
+        raise RuntimeError(
+            f"Multinomial batch draw inconsistent: negative counts detected. {ctx}".strip()
         )
 
     if return_meta:

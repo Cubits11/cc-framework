@@ -185,6 +185,8 @@ def build_linear_lambda_grid(
     """
     if isinstance(num, bool):
         raise TypeError(f"num must be an int, got bool {num!r}")
+    if isinstance(num, (float, np.floating)):
+        raise TypeError(f"num must be an integer (no silent coercion), got {num!r}")
     try:
         num_i = int(num)
     except Exception as e:
