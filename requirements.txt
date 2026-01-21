@@ -1,16 +1,116 @@
-numpy>=1.26
-scipy>=1.11
-pandas>=2.2
-matplotlib>=3.8
-pyyaml>=6.0.1
-scikit-learn>=1.3
-seaborn>=0.12
-plotly>=5.0
-jsonlines>=3.0
-cryptography>=41.0
-pydantic>=2.0
-blake3>=0.3
-statsmodels
-pytest>=7.4
-hypothesis>=6.90
-pytest-asyncio>=0.23
+# =============================================================================
+# CC-Framework / ResearchOS - Enterprise Requirements
+# =============================================================================
+# Policy:
+# - Keep this file as MINIMUM COMPATIBLE versions (not a lockfile).
+# - Use a separate lock workflow (pip-tools/uv/poetry) for exact pinning in CI.
+# - Prefer binary wheels; avoid unneeded heavyweight deps in runtime.
+#
+# Python: 3.11+ recommended (3.10+ acceptable).
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Core numerical / scientific stack (runtime)
+# -----------------------------------------------------------------------------
+numpy>=1.26,<3.0
+scipy>=1.11,<2.0
+pandas>=2.2,<3.0
+matplotlib>=3.8,<4.0
+
+# Optional plotting layer (runtime)
+plotly>=5.0,<6.0
+seaborn>=0.12,<1.0          # optional; remove if you want "matplotlib-only" policy
+
+# ML utilities (runtime)
+scikit-learn>=1.3,<2.0
+statsmodels>=0.14,<1.0
+
+
+# -----------------------------------------------------------------------------
+# Config / serialization / I/O (runtime)
+# -----------------------------------------------------------------------------
+pyyaml>=6.0.1,<7.0
+jsonlines>=3.0,<5.0
+
+# Faster JSON is useful for large runs; safe to include
+orjson>=3.9,<4.0
+
+# Modern CLI ergonomics + validation-friendly config
+typer>=0.12,<1.0
+rich>=13.7,<14.0
+tqdm>=4.66,<5.0
+
+# File/path safety
+platformdirs>=4.2,<5.0
+
+
+# -----------------------------------------------------------------------------
+# Security / integrity primitives (runtime)
+# -----------------------------------------------------------------------------
+cryptography>=41.0,<43.0
+blake3>=0.3,<1.0
+
+
+# -----------------------------------------------------------------------------
+# Data validation / schemas (runtime)
+# -----------------------------------------------------------------------------
+pydantic>=2.5,<3.0
+pydantic-settings>=2.2,<3.0
+
+
+# -----------------------------------------------------------------------------
+# Performance / stability helpers (runtime)
+# -----------------------------------------------------------------------------
+typing-extensions>=4.9,<5.0   # safe backport for typing features
+
+
+# -----------------------------------------------------------------------------
+# Testing / QA (dev/test)
+# -----------------------------------------------------------------------------
+pytest>=7.4,<9.0
+pytest-asyncio>=0.23,<1.0
+hypothesis>=6.90,<7.0
+pytest-cov>=4.1,<6.0
+coverage[toml]>=7.4,<8.0
+
+# Property-based + numerical testing helpers
+pytest-xdist>=3.5,<4.0        # parallel tests (optional but useful)
+pytest-timeout>=2.2,<3.0      # prevent hangs (optional but valuable)
+freezegun>=1.4,<2.0           # time-freezing for deterministic tests (optional)
+
+
+# -----------------------------------------------------------------------------
+# Linting / formatting / type checking (dev)
+# -----------------------------------------------------------------------------
+ruff>=0.6,<1.0
+mypy>=1.8,<2.0
+types-PyYAML>=6.0.12.20240808
+types-tqdm>=4.66.0.20240106
+types-requests>=2.32.0.20240907  # only if you use requests anywhere
+typing-inspect>=0.9,<1.0         # optional; helps some typing patterns
+
+
+# -----------------------------------------------------------------------------
+# Packaging / build (dev but often required in CI)
+# -----------------------------------------------------------------------------
+build>=1.2,<2.0
+packaging>=23.2,<25.0
+setuptools>=69.0,<76.0
+wheel>=0.42,<1.0
+
+
+# -----------------------------------------------------------------------------
+# Optional heavy deps (commented; enable only when needed)
+# -----------------------------------------------------------------------------
+# torch>=2.2,<3.0              # only if you actually run GPU adapters locally/CI
+# transformers>=4.41,<5.0      # only if you use HF models
+# accelerate>=0.30,<1.0        # only if using HF + torch acceleration
+# sentencepiece>=0.2,<1.0      # tokenizer backend
+# tokenizers>=0.19,<1.0        # fast tokenizers
+
+# -----------------------------------------------------------------------------
+# Optional notebook stack (dev)
+# -----------------------------------------------------------------------------
+# jupyterlab>=4.1,<5.0
+# ipykernel>=6.29,<7.0

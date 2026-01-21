@@ -35,7 +35,7 @@ from typing import Tuple
 import numpy as np
 import pytest
 
-from . import theory as th
+from experiemnts.correaltion_cliff import theory as th
 
 # ---------------------------------------------------------------------
 # Fixtures: isolation

@@ -15,35 +15,15 @@ Core design goals:
 - Supports FH-path lambda parameterization *and* copula families.
 
 -------------------------------------------------------------------------------
-What this module gives you
--------------------------------------------------------------------------------
-1) Dependence scans (FH paths):
-   - `scan_fh_path_tied_lambda`: λ shared across both worlds
-   - `scan_fh_path_surface`:    λ0 and λ1 free -> JC/CC surface
-
-2) Dependence scans (copula families):
-   - `scan_clayton_theta_tied`: θ shared across both worlds
-   - `scan_gaussian_rho_tied`:  ρ shared across both worlds (SciPy or MC)
-
-3) Bounds & comparisons:
-   - `bounds_summary`: compare FH worst-case vs chosen path/coplan family
-   - inflation / contraction metrics: does your chosen family under-cover FH?
-
-4) Inversion / calibration helpers:
-   - `find_lambda_for_target_p11` (monotone along FH paths)
-   - `find_lambda_for_target_phi`  (typically monotone-ish but not guaranteed)
-   - `find_lambda_for_extreme_JC`  (grid argmin/argmax and refine)
-
--------------------------------------------------------------------------------
-Important interpretability note (non-negotiable)
+Interpretability note (non-negotiable)
 -------------------------------------------------------------------------------
 - FH bounds are *axiomatic* given only marginals.
-- Any path/coplan family is an *assumption* that chooses a subset of feasible joints.
-- Your analysis must always report whether results depend on:
+- Any path/copula family is an *assumption* that chooses a subset of feasible joints.
+- Analysis MUST report whether a claim depends on:
     (a) FH worst-case, or
     (b) assumed dependence family/path.
 
-This module makes that distinction explicit in structures and reporting.
+This module encodes that distinction in result structures and reporting.
 
 -------------------------------------------------------------------------------
 Dependencies
@@ -69,14 +49,13 @@ from .theory_core import (
     _require_prob,  # internal; used only for strict validation here
     _require_rule,  # internal; used only for strict validation here
     cc_bounds,
-    composed_rate,
+    composed_rate,  # fallback for unknown future rules
     composed_rate_bounds,
     fh_bounds,
     jc_bounds,
     p11_clayton_copula,
     p11_from_lambda,
     p11_gaussian_copula,
-    phi_from_joint,
     singleton_gaps,
     validate_joint,
 )
@@ -198,9 +177,6 @@ class SurfaceResult:
     """
     2D scan result where dependence parameters can differ across worlds.
 
-    Useful when you refuse the (often implicit) assumption that dependence is
-    "stable" across worlds.
-
     Output matrices are shape (N0, N1), where:
       - axis 0 indexes parameter for world0
       - axis 1 indexes parameter for world1
@@ -235,13 +211,10 @@ class SurfaceResult:
 @dataclass(frozen=True, slots=True)
 class BoundsSummary:
     """
-    A structured comparison between:
+    Comparison between FH worst-case bounds and realized scan extrema.
 
-      A) FH worst-case (dependence-agnostic) bounds from theory_core
-      B) Bounds actually realized under a chosen path/coplan family scan
-
-    You can use this to prevent yourself from accidentally claiming robustness
-    when you only scanned an assumption family that under-covers FH extremes.
+    Prevents the classic failure mode:
+      "I scanned an assumption family and called it worst-case."
     """
 
     rule: Rule
@@ -259,11 +232,9 @@ class BoundsSummary:
     CC_scan_max: float
 
     # coverage diagnostics
-    JC_undercoverage_low: float  # max(0, FH_min - scan_min)
-    JC_undercoverage_high: float  # max(0, scan_max - FH_max) but typically 0; kept for symmetry
-    JC_missing_extremes: (
-        float  # (FH_range - scan_range)+, i.e., how much of FH range you didn't cover
-    )
+    JC_undercoverage_low: float
+    JC_undercoverage_high: float
+    JC_missing_extremes: float
     JC_range_ratio: float  # scan_range / FH_range (NaN if FH_range==0)
 
     CC_missing_extremes: float
@@ -274,23 +245,19 @@ class BoundsSummary:
 
 
 # =============================================================================
-# Small utilities
+# Small utilities (strict + fast)
 # =============================================================================
 
 
 def default_lambda_grid(n: int = 201) -> Grid1D:
-    """
-    Default λ grid for FH scans.
-    """
+    """Default λ grid for FH scans."""
     if not isinstance(n, int) or n < 2:
         raise InputValidationError("n must be an int >= 2")
     return Grid1D(values=np.linspace(0.0, 1.0, n, dtype=float), name="lambda")
 
 
 def default_rho_grid(n: int = 201) -> Grid1D:
-    """
-    Default ρ grid for Gaussian copula scans.
-    """
+    """Default ρ grid for Gaussian copula scans."""
     if not isinstance(n, int) or n < 2:
         raise InputValidationError("n must be an int >= 2")
     return Grid1D(values=np.linspace(-1.0, 1.0, n, dtype=float), name="rho")
@@ -306,33 +273,30 @@ def default_theta_grid(
     Default θ grid for Clayton copula scans.
 
     θ=0 is independence.
-    Large θ approaches comonotone-like dependence (for continuous margins).
-    For Bernoulli margins, this is still a smooth dependence family, not FH-extreme scanner.
-
-    theta_max should be chosen based on how "strong" you want to probe.
+    Large θ increases positive dependence in this family, but does NOT guarantee FH extremes.
     """
-    theta_max = float(theta_max)
-    if not math.isfinite(theta_max) or theta_max <= 0:
+    theta_max_f = float(theta_max)
+    if not math.isfinite(theta_max_f) or theta_max_f <= 0.0:
         raise InputValidationError("theta_max must be finite and > 0")
     if not isinstance(n, int) or n < 2:
         raise InputValidationError("n must be an int >= 2")
 
     if include_zero:
-        vals = np.linspace(0.0, theta_max, n, dtype=float)
+        vals = np.linspace(0.0, theta_max_f, n, dtype=float)
     else:
-        vals = np.linspace(theta_max / (n + 1), theta_max, n, dtype=float)
-    # Ensure strictly increasing
-    vals = np.unique(vals)
+        vals = np.linspace(theta_max_f / (n + 1), theta_max_f, n, dtype=float)
+
+    vals = np.unique(vals)  # enforces strictly increasing after floating artifacts
     if vals.size < 2:
         raise InputValidationError("theta grid collapsed; choose larger n or different theta_max")
     return Grid1D(values=vals, name="theta")
 
 
 def _safe_divide(num: np.ndarray, den: float) -> np.ndarray:
-    den = float(den)
-    if abs(den) <= float(CONFIG.eps_prob):
+    den_f = float(den)
+    if abs(den_f) <= float(CONFIG.eps_prob):
         return np.zeros_like(num, dtype=float)
-    return num / den
+    return np.asarray(num, dtype=float) / den_f
 
 
 def _compute_CC(JC: np.ndarray, w: TwoWorldMarginals) -> np.ndarray:
@@ -348,26 +312,77 @@ def _compute_optional_stats(
     want_phi: bool,
     want_tau: bool,
 ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
-    phi_arr = None
-    tau_arr = None
+    """
+    Compute interpretability stats in a vectorized way.
+
+    φ (phi coefficient):
+      φ = (p11 - pA*pB) / sqrt(pA(1-pA)pB(1-pB))
+
+    τ_a (Kendall tau-a for 2x2):
+      τ_a = 2(p00*p11 - p01*p10)
+    """
+    p11 = np.asarray(p11_arr, dtype=float)
+
+    phi_arr: Optional[np.ndarray] = None
+    tau_arr: Optional[np.ndarray] = None
+
     if want_phi:
-        # vectorized phi
         denom = pA * (1.0 - pA) * pB * (1.0 - pB)
         if denom <= 0.0:
-            phi_arr = np.full_like(p11_arr, np.nan, dtype=float)
+            phi_arr = np.full_like(p11, np.nan, dtype=float)
         else:
-            phi_arr = (p11_arr - pA * pB) / math.sqrt(denom)
+            phi_arr = (p11 - pA * pB) / math.sqrt(denom)
 
     if want_tau:
-        # tau_a from cells: 2(p00*p11 - p01*p10)
-        # build cells analytically for speed (still feasible due to FH validation in generators)
-        p11 = p11_arr
         p10 = pA - p11
         p01 = pB - p11
         p00 = 1.0 - pA - pB + p11
         tau_arr = 2.0 * (p00 * p11 - p01 * p10)
 
     return phi_arr, tau_arr
+
+
+def _compose_rate_vec(rule: Rule, pA: float, pB: float, p11: np.ndarray) -> np.ndarray:
+    """
+    Fast vectorized composition for the known rule set.
+
+    Falls back to scalar composed_rate if a new rule is introduced.
+    """
+    p11_arr = np.asarray(p11, dtype=float)
+
+    if rule == "AND":
+        return p11_arr
+    if rule == "OR":
+        return (pA + pB) - p11_arr
+    if rule == "COND_OR":
+        # independent conditional OR form used in theory_core
+        return np.full_like(p11_arr, pA + (1.0 - pA) * pB, dtype=float)
+
+    # Future-proof fallback (rare path)
+    return np.fromiter(
+        (composed_rate(rule, pA, pB, float(x)) for x in p11_arr), dtype=float, count=p11_arr.size
+    )
+
+
+def _p11_vec_fh_path(
+    path: str,
+    lam_grid: np.ndarray,
+    pA: float,
+    pB: float,
+    path_params: Optional[Mapping[str, Any]],
+) -> np.ndarray:
+    """
+    Fast scalar->vector wrapper around theory_core.p11_from_lambda.
+
+    Uses np.fromiter to keep overhead low and determinism high.
+    """
+    params = {} if path_params is None else dict(path_params)
+    lam_arr = np.asarray(lam_grid, dtype=float)
+    return np.fromiter(
+        (p11_from_lambda(path, float(lam_val), pA, pB, params) for lam_val in lam_arr),
+        dtype=float,
+        count=lam_arr.size,
+    )
 
 
 # =============================================================================
@@ -390,49 +405,20 @@ def scan_fh_path_tied_lambda(
 
     This is an *assumption*: that the dependence rank-position in the FH envelope
     is stable across worlds.
-
-    Parameters
-    ----------
-    w:
-        Two-world marginals.
-    rule:
-        Composition rule ("AND", "OR", "COND_OR").
-    path:
-        One of: "fh_linear", "fh_power", "fh_scurve" (see theory_core.p11_from_lambda)
-    grid:
-        Grid1D over λ; defaults to default_lambda_grid(201).
-    path_params:
-        Optional parameters for the FH path:
-          - fh_power:  {"power": >0}
-          - fh_scurve: {"alpha": >0}
-    want_phi, want_tau:
-        Compute interpretability stats for each world.
-
-    Returns
-    -------
-    CurveResult
     """
     r = _require_rule(rule)
     if grid is None:
         grid = default_lambda_grid()
 
-    lam = grid.values
-    # Generate p11 arrays via scalar path mapping (robust > micro-optimized)
-    p11_0 = np.array(
-        [p11_from_lambda(path, float(l), w.pA0, w.pB0, path_params) for l in lam], dtype=float
-    )
-    p11_1 = np.array(
-        [p11_from_lambda(path, float(l), w.pA1, w.pB1, path_params) for l in lam], dtype=float
-    )
+    lam_grid = grid.values
 
-    # Compose
-    if r == "COND_OR":
-        # COND_OR ignores p11; still fill p11 arrays for interpretability, but pC is constant.
-        pC0 = np.full_like(lam, w.pA0 + (1.0 - w.pA0) * w.pB0, dtype=float)
-        pC1 = np.full_like(lam, w.pA1 + (1.0 - w.pA1) * w.pB1, dtype=float)
-    else:
-        pC0 = np.array([composed_rate(r, w.pA0, w.pB0, float(x)) for x in p11_0], dtype=float)
-        pC1 = np.array([composed_rate(r, w.pA1, w.pB1, float(x)) for x in p11_1], dtype=float)
+    # p11 arrays (robust > micro-optimized), but implemented with low-overhead fromiter
+    p11_0 = _p11_vec_fh_path(path, lam_grid, w.pA0, w.pB0, path_params)
+    p11_1 = _p11_vec_fh_path(path, lam_grid, w.pA1, w.pB1, path_params)
+
+    # Compose (vectorized for known rules)
+    pC0 = _compose_rate_vec(r, w.pA0, w.pB0, p11_0)
+    pC1 = _compose_rate_vec(r, w.pA1, w.pB1, p11_1)
 
     JC = np.abs(pC1 - pC0)
     CC = _compute_CC(JC, w)
@@ -469,9 +455,6 @@ def scan_fh_path_surface(
     """
     2D surface scan of FH paths allowing λ0 and λ1 to vary independently.
 
-    This is the "no hidden stability assumption" version: dependence can change
-    across worlds arbitrarily within the chosen FH path family.
-
     Output:
       JC[i,j] = |pC(world1; λ1_j) - pC(world0; λ0_i)|
     """
@@ -481,22 +464,14 @@ def scan_fh_path_surface(
     if grid1 is None:
         grid1 = default_lambda_grid()
 
-    lam0 = grid0.values
-    lam1 = grid1.values
+    lam0_grid = grid0.values
+    lam1_grid = grid1.values
 
-    p11_0 = np.array(
-        [p11_from_lambda(path, float(l), w.pA0, w.pB0, path_params) for l in lam0], dtype=float
-    )
-    p11_1 = np.array(
-        [p11_from_lambda(path, float(l), w.pA1, w.pB1, path_params) for l in lam1], dtype=float
-    )
+    p11_0 = _p11_vec_fh_path(path, lam0_grid, w.pA0, w.pB0, path_params)
+    p11_1 = _p11_vec_fh_path(path, lam1_grid, w.pA1, w.pB1, path_params)
 
-    if r == "COND_OR":
-        pC0 = np.full_like(lam0, w.pA0 + (1.0 - w.pA0) * w.pB0, dtype=float)
-        pC1 = np.full_like(lam1, w.pA1 + (1.0 - w.pA1) * w.pB1, dtype=float)
-    else:
-        pC0 = np.array([composed_rate(r, w.pA0, w.pB0, float(x)) for x in p11_0], dtype=float)
-        pC1 = np.array([composed_rate(r, w.pA1, w.pB1, float(x)) for x in p11_1], dtype=float)
+    pC0 = _compose_rate_vec(r, w.pA0, w.pB0, p11_0)
+    pC1 = _compose_rate_vec(r, w.pA1, w.pB1, p11_1)
 
     # Broadcast to surface
     JC = np.abs(pC1.reshape(1, -1) - pC0.reshape(-1, 1))
@@ -530,23 +505,28 @@ def scan_clayton_theta_tied(
 
     θ=0 corresponds to independence in this family.
 
-    This is *not* guaranteed to span FH extremes, but provides a structured,
-    smooth dependence sensitivity curve.
+    This is *not* guaranteed to span FH extremes, but provides a smooth dependence curve.
     """
     r = _require_rule(rule)
     if grid is None:
         grid = default_theta_grid()
 
-    th = grid.values
-    p11_0 = np.array([p11_clayton_copula(w.pA0, w.pB0, float(t)) for t in th], dtype=float)
-    p11_1 = np.array([p11_clayton_copula(w.pA1, w.pB1, float(t)) for t in th], dtype=float)
+    theta_grid = grid.values
 
-    if r == "COND_OR":
-        pC0 = np.full_like(th, w.pA0 + (1.0 - w.pA0) * w.pB0, dtype=float)
-        pC1 = np.full_like(th, w.pA1 + (1.0 - w.pA1) * w.pB1, dtype=float)
-    else:
-        pC0 = np.array([composed_rate(r, w.pA0, w.pB0, float(x)) for x in p11_0], dtype=float)
-        pC1 = np.array([composed_rate(r, w.pA1, w.pB1, float(x)) for x in p11_1], dtype=float)
+    # fromiter is faster than Python lists then np.array for large grids
+    p11_0 = np.fromiter(
+        (p11_clayton_copula(w.pA0, w.pB0, float(theta_val)) for theta_val in theta_grid),
+        dtype=float,
+        count=theta_grid.size,
+    )
+    p11_1 = np.fromiter(
+        (p11_clayton_copula(w.pA1, w.pB1, float(theta_val)) for theta_val in theta_grid),
+        dtype=float,
+        count=theta_grid.size,
+    )
+
+    pC0 = _compose_rate_vec(r, w.pA0, w.pB0, p11_0)
+    pC1 = _compose_rate_vec(r, w.pA1, w.pB1, p11_1)
 
     JC = np.abs(pC1 - pC0)
     CC = _compute_CC(JC, w)
@@ -590,33 +570,42 @@ def scan_gaussian_rho_tied(
       - "scipy" (exact-ish) if SciPy installed
       - "mc" Monte Carlo, deterministic with seed
 
-    NOTE: MC scanning can be expensive. Use fewer grid points or SciPy.
+    NOTE: MC scanning can be expensive. Reduce grid size, reduce n_mc, or use SciPy.
     """
     r = _require_rule(rule)
     if grid is None:
         grid = default_rho_grid()
 
-    rho = grid.values
-    # Use distinct seeds per rho to reduce accidental correlation in the estimate series
+    rho_grid = grid.values
     base_seed = None if seed is None else int(seed)
 
-    p11_0 = np.empty_like(rho, dtype=float)
-    p11_1 = np.empty_like(rho, dtype=float)
-    for i, rr in enumerate(rho):
+    p11_0 = np.empty_like(rho_grid, dtype=float)
+    p11_1 = np.empty_like(rho_grid, dtype=float)
+
+    # Use distinct seeds per rho to reduce accidental correlation across the estimate series
+    for i, rho_val in enumerate(rho_grid):
         sd = None if base_seed is None else (base_seed + 7919 * i)
         p11_0[i] = p11_gaussian_copula(
-            w.pA0, w.pB0, float(rr), method=method, n_mc=n_mc, seed=sd, antithetic=antithetic
+            w.pA0,
+            w.pB0,
+            float(rho_val),
+            method=method,
+            n_mc=n_mc,
+            seed=sd,
+            antithetic=antithetic,
         )
         p11_1[i] = p11_gaussian_copula(
-            w.pA1, w.pB1, float(rr), method=method, n_mc=n_mc, seed=sd, antithetic=antithetic
+            w.pA1,
+            w.pB1,
+            float(rho_val),
+            method=method,
+            n_mc=n_mc,
+            seed=sd,
+            antithetic=antithetic,
         )
 
-    if r == "COND_OR":
-        pC0 = np.full_like(rho, w.pA0 + (1.0 - w.pA0) * w.pB0, dtype=float)
-        pC1 = np.full_like(rho, w.pA1 + (1.0 - w.pA1) * w.pB1, dtype=float)
-    else:
-        pC0 = np.array([composed_rate(r, w.pA0, w.pB0, float(x)) for x in p11_0], dtype=float)
-        pC1 = np.array([composed_rate(r, w.pA1, w.pB1, float(x)) for x in p11_1], dtype=float)
+    pC0 = _compose_rate_vec(r, w.pA0, w.pB0, p11_0)
+    pC1 = _compose_rate_vec(r, w.pA1, w.pB1, p11_1)
 
     JC = np.abs(pC1 - pC0)
     CC = _compute_CC(JC, w)
@@ -656,9 +645,6 @@ def bounds_summary(
 
     This prevents the classic error:
       "I scanned a dependence family and called it worst-case."
-    when the family fails to span FH extremes.
-
-    Returns a BoundsSummary with explicit undercoverage metrics.
     """
     r = _require_rule(rule)
     if curve.rule != r:
@@ -723,13 +709,14 @@ def format_bounds_report(
     digits: int = 6,
 ) -> str:
     """
-    Human-readable report suitable for logs / papers / your own sanity.
+    Human-readable report suitable for logs / papers / sanity checks.
 
     It is intentionally explicit and slightly brutal.
     """
     d = int(digits)
     jA, jB, jbest = singleton_gaps(w)
-    lines = []
+
+    lines: list[str] = []
     lines.append("=== Theory Analysis Report (Dependence Coverage) ===")
     lines.append(f"Rule: {summary.rule}")
     lines.append("")
@@ -750,7 +737,6 @@ def format_bounds_report(
     lines.append(f"  JC ∈ [{summary.JC_scan_min:.{d}f}, {summary.JC_scan_max:.{d}f}]")
     lines.append(f"  CC ∈ [{summary.CC_scan_min:.{d}f}, {summary.CC_scan_max:.{d}f}]")
     lines.append("")
-    # Coverage diagnostics
     lines.append("Coverage diagnostics (if nonzero, your scan is NOT worst-case):")
     lines.append(f"  JC undercoverage (low end):  {summary.JC_undercoverage_low:.{d}f}")
     lines.append(f"  JC undercoverage (high end): {summary.JC_undercoverage_high:.{d}f}")
@@ -767,16 +753,22 @@ def format_bounds_report(
         else "  CC range ratio (scan/FH):    NaN (FH range ~0)"
     )
     lines.append("")
-    if summary.JC_missing_extremes > 0:
+
+    if (
+        summary.JC_missing_extremes > 0.0
+        or summary.JC_undercoverage_low > 0.0
+        or summary.JC_undercoverage_high > 0.0
+    ):
         lines.append("Verdict:")
         lines.append("  Your dependence family/path did NOT span the FH worst-case JC range.")
         lines.append(
-            "  Any claim of robustness must be labeled as 'conditional on dependence assumption'."
+            "  Any claim of robustness must be labeled 'conditional on dependence assumption'."
         )
     else:
         lines.append("Verdict:")
-        lines.append("  Your scan covered the FH JC range (at least at the grid resolution used).")
+        lines.append("  Your scan covered the FH JC range (at this grid resolution).")
         lines.append("  Still: verify at higher resolution if this matters for a proof/claim.")
+
     return "\n".join(lines)
 
 
@@ -796,7 +788,7 @@ def find_lambda_for_target_p11(
     """
     Invert p11_from_lambda for FH paths to find λ producing a desired p11.
 
-    This is only guaranteed well-behaved for monotone FH paths:
+    Guaranteed well-behaved for monotone FH paths:
       - fh_linear: monotone
       - fh_power:  monotone
       - fh_scurve: monotone
@@ -804,42 +796,44 @@ def find_lambda_for_target_p11(
     Returns λ in [0,1]. If target is outside FH, raises.
     If target equals a boundary, returns 0 or 1.
     """
-    pA = _require_prob(pA, "pA")
-    pB = _require_prob(pB, "pB")
-    target_p11 = _require_prob(target_p11, "target_p11")
-    target_p11 = validate_joint(pA, pB, target_p11)
+    pA_v = _require_prob(pA, "pA")
+    pB_v = _require_prob(pB, "pB")
+    target = _require_prob(target_p11, "target_p11")
+    target = validate_joint(pA_v, pB_v, target)
 
-    L, U = fh_bounds(pA, pB)
-    W = U - L
+    L, U = fh_bounds(pA_v, pB_v)
+    width = U - L
     eps = float(CONFIG.eps_prob)
-    if W <= eps:
+    if width <= eps:
         # degenerate: any lambda maps to same p11
         return 0.0
 
-    # Normalize within envelope:
-    t = (target_p11 - L) / W
+    # normalize within envelope:
+    t = (target - L) / width
     t = min(max(t, 0.0), 1.0)
 
     name = path.strip().lower()
+    params = {} if path_params is None else dict(path_params)
+
     if name == "fh_linear":
         return float(t)
 
     if name == "fh_power":
-        power = float((path_params or {}).get("power", 1.0))
+        power = float(params.get("power", 1.0))
         if not math.isfinite(power) or power <= 0.0:
             raise InputValidationError("fh_power inversion requires power>0")
         return float(t ** (1.0 / power))
 
     if name == "fh_scurve":
-        # Use bisection on lambda since the normalization is not analytically invertible in a clean way
-        def f(lam: float) -> float:
-            return p11_from_lambda("fh_scurve", lam, pA, pB, path_params)
+        # bisection on lambda (clean, robust, deterministic)
+        def f(lam_val: float) -> float:
+            return float(p11_from_lambda("fh_scurve", lam_val, pA_v, pB_v, params))
 
         lo, hi = 0.0, 1.0
         for _ in range(80):
             mid = 0.5 * (lo + hi)
             val = f(mid)
-            if val < target_p11:
+            if val < target:
                 lo = mid
             else:
                 hi = mid
@@ -861,23 +855,30 @@ def find_lambda_for_target_phi(
     Find λ that makes φ approximately match target_phi for a given world.
 
     WARNING:
-      φ(λ) is often monotone for FH paths when margins are interior, but not a theorem
-      you should bet your life on. So we do a dense grid search + local refine.
+      φ(λ) is often monotone-ish for FH paths with interior margins,
+      but this is not a theorem to rely on. We do dense grid search.
 
     Returns λ in [0,1] that minimizes |phi(λ)-target_phi|.
     """
-    if not math.isfinite(float(target_phi)):
+    target_phi_f = float(target_phi)
+    if not math.isfinite(target_phi_f):
         raise InputValidationError("target_phi must be finite")
 
-    pA = _require_prob(pA, "pA")
-    pB = _require_prob(pB, "pB")
-    lam = np.linspace(0.0, 1.0, int(grid_n), dtype=float)
+    pA_v = _require_prob(pA, "pA")
+    pB_v = _require_prob(pB, "pB")
 
-    p11 = np.array([p11_from_lambda(path, float(l), pA, pB, path_params) for l in lam], dtype=float)
-    phi = np.array([phi_from_joint(pA, pB, float(x)) for x in p11], dtype=float)
+    grid_n_i = int(grid_n)
+    if grid_n_i < 2:
+        raise InputValidationError("grid_n must be >= 2")
 
-    idx = int(np.nanargmin(np.abs(phi - float(target_phi))))
-    return float(lam[idx])
+    lam_grid = np.linspace(0.0, 1.0, grid_n_i, dtype=float)
+    p11 = _p11_vec_fh_path(path, lam_grid, pA_v, pB_v, path_params)
+
+    phi_arr, _ = _compute_optional_stats(pA_v, pB_v, p11, want_phi=True, want_tau=False)
+    assert phi_arr is not None  # by construction
+
+    idx = int(np.nanargmin(np.abs(phi_arr - target_phi_f)))
+    return float(lam_grid[idx])
 
 
 def find_lambda_for_extreme_JC(
@@ -896,11 +897,13 @@ def find_lambda_for_extreme_JC(
       (lambda_star, JC(lambda_star))
 
     No promise of global optimality beyond grid resolution.
-    If you need proof-level extremality, you must analyze the piecewise-linear
-    structure for AND/OR explicitly and/or increase resolution.
     """
     r = _require_rule(rule)
-    lam_grid = Grid1D(values=np.linspace(0.0, 1.0, int(grid_n), dtype=float), name="lambda")
+    grid_n_i = int(grid_n)
+    if grid_n_i < 2:
+        raise InputValidationError("grid_n must be >= 2")
+
+    lam_grid = Grid1D(values=np.linspace(0.0, 1.0, grid_n_i, dtype=float), name="lambda")
     curve = scan_fh_path_tied_lambda(
         w, r, path=path, grid=lam_grid, path_params=path_params, want_phi=False, want_tau=False
     )
@@ -927,13 +930,13 @@ def world_interval_summary(pA: float, pB: float, rule: Any) -> Dict[str, float]:
       - implied bounds for pC under rule
     """
     r = _require_rule(rule)
-    pA = _require_prob(pA, "pA")
-    pB = _require_prob(pB, "pB")
-    lo11, hi11 = fh_bounds(pA, pB)
-    loC, hiC = composed_rate_bounds(r, pA, pB)
+    pA_v = _require_prob(pA, "pA")
+    pB_v = _require_prob(pB, "pB")
+    lo11, hi11 = fh_bounds(pA_v, pB_v)
+    loC, hiC = composed_rate_bounds(r, pA_v, pB_v)
     return {
-        "pA": float(pA),
-        "pB": float(pB),
+        "pA": float(pA_v),
+        "pB": float(pB_v),
         "p11_lo": float(lo11),
         "p11_hi": float(hi11),
         "pC_lo": float(loC),
