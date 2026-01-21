@@ -18,6 +18,7 @@ Updated: 2025-09-28
 
 from __future__ import annotations
 
+import contextlib
 import difflib
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Type
 
@@ -238,11 +239,8 @@ def register_guardrail(name: str, cls: Type[Guardrail]) -> None:
     key = name.lower().strip()
     _Guardrails[key] = cls
     # lightweight interface check (best-effort)
-    try:
+    with contextlib.suppress(Exception):
         _ensure_guardrail_interface(cls(**{}))  # type: ignore[misc]
-    except Exception:
-        # Defer strict checks until actual instantiation with params.
-        pass
 
 
 __all__ = [

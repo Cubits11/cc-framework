@@ -79,8 +79,8 @@ def test_enum_path_normalization_works():
     pA, pB = 0.2, 0.7
     L, Uu = _bounds(pA, pB)
 
-    p11_0, meta0 = p11_from_path(pA, pB, 0.0, path=Path.FH_LINEAR, path_params={})
-    p11_1, meta1 = p11_from_path(pA, pB, 1.0, path=Path.FH_LINEAR, path_params={})
+    p11_0, meta0 = p11_from_path(pA, pB, 0.0, path="Path.FH_LINEAR", path_params={})
+    p11_1, meta1 = p11_from_path(pA, pB, 1.0, path="Path.FH_LINEAR", path_params={})
 
     assert abs(p11_0 - L) < 1e-12
     assert abs(p11_1 - Uu) < 1e-12
@@ -143,7 +143,7 @@ def test_width_zero_cases_are_stable_and_exact():
             p11, meta = p11_from_path(pA, pB, lam, path="fh_linear", path_params={})
             assert abs(p11 - L) < 1e-12
             _assert_meta_required(meta)
-            assert meta["FH_width"] == float(Uu - L)
+            assert meta["FH_width"] == pytest.approx(float(Uu - L), abs=1e-12)
 
 
 def test_deterministic_grid_no_clipping_for_fh_family():

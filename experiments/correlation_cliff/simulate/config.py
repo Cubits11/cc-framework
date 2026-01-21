@@ -5,6 +5,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Mapping, Protocol, Sequence, Tuple
 
+import numpy as np
+
 # ---------------------------------------------------------------------
 # Public types expected across simulate/*
 # ---------------------------------------------------------------------
@@ -38,11 +40,21 @@ class _CoercedWorldMarginals:
     pA: float
     pB: float
 
+    def validate(self) -> None:
+        if not math.isfinite(self.pA) or not (0.0 <= self.pA <= 1.0):
+            raise ConfigError(f"marginals.pA must be finite in [0,1], got {self.pA!r}")
+        if not math.isfinite(self.pB) or not (0.0 <= self.pB <= 1.0):
+            raise ConfigError(f"marginals.pB must be finite in [0,1], got {self.pB!r}")
+
 
 @dataclass(frozen=True)
 class _CoercedTwoWorldMarginals:
     w0: _CoercedWorldMarginals
     w1: _CoercedWorldMarginals
+
+    def validate(self) -> None:
+        self.w0.validate()
+        self.w1.validate()
 
 
 def _is_finite_real(x: Any) -> bool:
@@ -53,11 +65,13 @@ def _strict_int(x: Any, name: str, *, min_value: int | None = None) -> int:
     # Reject bool explicitly (bool is subclass of int).
     if isinstance(x, bool):
         raise ConfigError(f"{name} must be an int, got bool {x!r}")
-    if not isinstance(x, int):
+    if isinstance(x, (float, np.floating)):
+        raise ConfigError(f"{name} must be an int (no silent coercion), got {x!r}")
+    if not isinstance(x, (int, np.integer)):
         raise ConfigError(f"{name} must be an int, got {type(x).__name__}={x!r}")
-    if min_value is not None and x < min_value:
+    if min_value is not None and int(x) < min_value:
         raise ConfigError(f"{name} must be >= {min_value}, got {x}")
-    return x
+    return int(x)
 
 
 def _canonical_lambda_keys(
@@ -189,6 +203,15 @@ def _coerce_marginals(m: Any) -> _TwoWorldMarginals:
 # ---------------------------------------------------------------------
 @dataclass
 class SimConfig:
+    """
+    Simulation configuration for Correlation Cliff experiments.
+
+    batch_sampling:
+      - If True and seed_policy == "sequential", draws all reps at once per lambda/world.
+        This is faster but produces a different RNG stream than sequential per-rep sampling.
+      - Ignored for seed_policy == "stable_per_cell".
+      - Set to False to preserve legacy sequential stream behavior.
+    """
     marginals: _TwoWorldMarginals
     rule: Rule
     lambdas: List[float]
@@ -210,6 +233,7 @@ class SimConfig:
     tiny_negative_eps: float = 1e-15
 
     include_theory_reference: bool = True
+    batch_sampling: bool = True
 
     # internal cache for stable_per_cell mapping
     _lambda_index_map: Dict[float, int] = field(default_factory=dict, init=False, repr=False)
@@ -293,6 +317,8 @@ def validate_cfg(cfg: SimConfig) -> None:
         raise ConfigError(
             f"include_theory_reference must be bool, got {cfg.include_theory_reference!r}"
         )
+    if not isinstance(cfg.batch_sampling, bool):
+        raise ConfigError(f"batch_sampling must be bool, got {cfg.batch_sampling!r}")
 
     # --- lambdas ---
     if not isinstance(cfg.lambdas, list) or len(cfg.lambdas) == 0:
