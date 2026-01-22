@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/cartographer/bounds.py
-# hypothesis_version: 6.147.0
-
-[-1.0, 0.0, 1e-12, 0.05, 0.25, 0.5, 1.0, 2.0, 3.0, 1000000.0, 1000, 'AND', 'AdaptiveBounds', 'AdaptiveStrategy', 'BayesianBounds', 'BoundType', 'CausalBounds', 'ConfidenceSequence', 'D must be > 0.', 'GPBounds', 'OR', 'PredictionInterval', 'ROCArrayLike', 'StreamingBounds', 'alpha_cap', 'and', 'bernstein_tail', 'cc_confint', 'cc_two_sided_bound', 'clip', 'ensure_anchors', 'envelope_over_rocs', 'error', 'fh_and_bounds_n', 'fh_intervals', 'fh_or_bounds_n', 'fh_var_envelope', 'fpr_a', 'fpr_b', 'frechet_upper', 'invert_bernstein_eps', 'n must be positive.', 'n_bootstrap', 'needed_n_bernstein', 'or', 'p0_hat', 'p1_hat', 'silent', 't and D must be > 0.', 't must be >= 0.', 'tpr_a', 'tpr_b', 'uncertainty', 'use_gpu', 'warn']

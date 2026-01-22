@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/core/attackers.py
-# hypothesis_version: 6.147.0
-
-[0.0, 0.05, 0.1, 0.12, 0.15, 0.3, 0.5, 0.7, 1.0, 123, 12648430, '$', '+', '0', '1', '3', '@', 'AttackDifficulty', 'AttackEvent', 'AttackStrategy', 'GAConfig', '_', 'a', 'assist', 'attack_id', 'attacker', 'attempt_counts', 'breach', 'bypass', 'cfg', 'counter', 'difficulty', 'e', 'easy', 'exploit', 'filter', 'fitness_cache', 'ga', 'generation', 'genetic_algorithm', 'guardrail', 'hard', 'i', 'info', 'medium', 'meta', 'model', 'o', 'override', 'please', 'poison', 'policy', 'population', 'prompt', 'random', 'random_injection', 's', 'score', 'strategy', 'success', 'success_counts', 'system', 't', 'template_prompt', 'thanks', 'tokens', 'updates_since_evolve', 'vocab', 'vocab_benign', 'vocab_harmful']

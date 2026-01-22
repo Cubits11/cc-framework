@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/analysis/reporting.py
-# hypothesis_version: 6.147.0
-
-[0.95, 1.05, '*.csv', 'CC', 'CC Readiness Report', 'CCC', 'CCC Readiness Report', 'CCC_CI95_hi', 'CCC_CI95_lo', 'CCC_score', 'CC_CI95', 'CC_CI95_hi', 'CC_CI95_lo', 'CC_CI95_width', 'CC_max', 'CI_hi', 'CI_lo', 'J_comp', 'J_single_best', 'addenda', 'all', 'artifact_dir', 'audit.jsonl', 'cc', 'ccc', 'ccc_hi', 'ccc_lo', 'constructive', 'decision', 'delta_J', 'destructive', 'evaluation', 'figs', 'flavor', 'fpr_cap', 'git_sha', 'id', 'label', 'meta.json', 'metric,value', 'neutral', 'notes', 'pair', 'path', 'policy', 'policy_fpr_cap', 'raw.jsonl', 'raw_hash', 'rb', 'readiness_all.md', 'readiness_cc.md', 'readiness_ccc.md', 'reports', 'results', 'run_id', 'runs', 'score', 'source_file', 'summary_all.csv', 'summary_cc.csv', 'summary_ccc.csv', 'unknown', 'w', '| --- | --- |', '| Metric | Value |']

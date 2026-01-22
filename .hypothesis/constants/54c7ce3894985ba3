@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/adapters/nemo_guardrails.py
-# hypothesis_version: 6.147.0
-
-[b'\x00', '*', 'adapter_error', 'allow', 'assistant', 'block', 'blocked', 'cannot assist', 'category', 'content', 'context', 'error', 'events', 'guardrail', "i can't", 'i cannot', "i'm sorry", 'id', 'input_block', 'input_blocked', 'metadata', 'minimal', 'nemo_configs', 'nemo_guardrails', 'not able to help', 'output_blocked', 'policy', 'rail', 'rail_events', 'rails_config_path', 'refuse', 'reply_summary', 'request_id', 'review', 'role', 'trace_id', 'type', 'unknown', 'user', 'utf-8', 'version']

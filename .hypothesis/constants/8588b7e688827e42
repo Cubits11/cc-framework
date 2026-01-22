@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/cartographer/planner.py
-# hypothesis_version: 6.147.0
-
-[0.0, 1.0, 2.0, 3.0, 4.0, 'needed_n_bernstein', 't and D must be > 0.']

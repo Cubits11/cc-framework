@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/guardrails/semantic_filter.py
-# hypothesis_version: 6.147.0
-
-[0.0, 0.05, 0.1, 0.8, 0.99, 5000, 'english', 'max_features', 'ngram_range', 'stop_words']

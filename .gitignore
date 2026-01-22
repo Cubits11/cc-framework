@@ -27,6 +27,8 @@ runs/*.jsonl.bak
 # OS
 .DS_Store
 
+.hypothesis/
+
 # Node
 node_modules/
 

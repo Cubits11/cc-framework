@@ -1,4 +1,0 @@
-round,query_type,response_A,response_B,logLR,posterior_H0
-1,attack,Blocked,Allowed,-1.694596,0.155172
-2,attack,Blocked,Blocked,-1.694596,0.155172
-3,attack,Blocked,Allowed,-3.389191,0.032635

@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/core/metrics.py
-# hypothesis_version: 6.147.0
-
-[-1.0, 0.0, 1e-12, 0.5, 0.9, 0.95, 0.975, 0.99, 1.0, 1.6448536269514722, 1.959963984540054, 2.0, 2.241402727, 2.5758293035489004, 123, 1000, 12648430, 'Confusion', 'Rates', 'auc_trapezoid', 'balanced_accuracy', 'binomial_ci', 'bootstrap_ci', 'bootstrap_ci_youden', 'cc_max', 'cc_rel', 'delta_add', 'delta_mult', 'f1', 'f1_score', 'inf', 'likelihood_ratios', 'mcc', 'nan', 'normal', 'optimal_threshold_f1', 'rates_from_confusion', 'roc_curve', 'wilson', 'wilson_ci', 'youden', 'youden_j']

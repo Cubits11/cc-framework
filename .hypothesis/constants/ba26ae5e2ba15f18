@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/experiments/correlation_cliff/simulate/paths.py
-# hypothesis_version: 6.147.0
-
-[-1.0, -0.5, 0.0, 1e-12, 1e-08, 1e-06, 0.5, 1.0, 2.0, '-', '.', 'FH_width', 'FeasibilityError', 'InputValidationError', 'L', 'NumericalError', 'P11FromPathError', 'U', '_', 'clip', 'clip_amt', 'clip_policy', 'clip_tol', 'clipped', 'fh_linear', 'fh_power', 'fh_scurve', 'fh_violation', 'fh_violation_amt', 'gamma', 'gaussian_tau', 'k', 'lam', 'lam_eff', 'name', 'nan', 'p11_from_path', 'pA', 'pA_used', 'pB', 'pB_used', 'path.', 'ppf_clip_eps', 'raise', 'raw_p11', 'rho', 'tau', 'value', 'x', 'y']

@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/adapters/guardrails_ai.py
-# hypothesis_version: 6.147.0
-
-['adapter_error', 'allow', 'block', 'error', 'error_type', 'guardrails.validate', 'guardrails_ai', 'id', 'is_valid', 'metadata', 'request_id', 'result', 'review', 'trace_id', 'unknown', 'validation_passed', 'validation_score', 'validators', 'version']

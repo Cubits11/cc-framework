@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/src/cc/cartographer/audit.py
-# hypothesis_version: 6.147.0
-
-[0.0, 1e-12, ',', ':', 'A', 'AND', 'AuditError', 'B', 'CC_max', 'CC_max_CI', 'Delta_add', 'Delta_add_CI', 'J_A', 'J_A_CI', 'J_B', 'J_B_CI', 'J_comp', 'J_comp_CI', 'OR', 'T', 'a', 'and', 'append_jsonl', 'append_record', 'cfg', 'cfg_full', 'comp', 'decision', 'epsilon', 'figures', 'make_record', 'meta', 'metrics', 'or', 'prev_hash', 'prev_sha256', 'r+', 'record_hash', 'rehash_file', 'samples', 'schema', 'seed', 'sha256', 'tail_sha', 'ts', 'utf-8', 'verify_chain', 'w']

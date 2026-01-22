@@ -1,4 +1,0 @@
-# file: /Users/ananyasingh/cc_project/cc-framework/experiments/correlation_cliff/theory_analysis.py
-# hypothesis_version: 6.147.0
-
-[-1.0, 0.0, 0.5, 1.0, 2.0, 20.0, 201, 2001, 7919, 100000, 'AND', 'BoundsSummary', 'CC', 'COND_OR', 'CurveResult', 'Grid1D', 'JC', 'OR', 'Singleton gaps:', 'SurfaceResult', 'Two-world marginals:', 'Verdict:', 'bounds_summary', 'clayton', 'default_lambda_grid', 'default_rho_grid', 'default_theta_grid', 'fh_linear', 'fh_path', 'fh_power', 'fh_scurve', 'format_bounds_report', 'gaussian', 'grid_n must be >= 2', 'lambda', 'max', 'mc', 'min', 'name', 'nan', 'p11_0', 'p11_1', 'p11_hi', 'p11_lo', 'p11_width', 'pA', 'pB', 'pC0', 'pC1', 'pC_hi', 'pC_lo', 'pC_width', 'phi0', 'phi1', 'power', 'rho', 'scan_fh_path_surface', 'target_p11', 'tau0', 'tau1', 'theta', 'values']
