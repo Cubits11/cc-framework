@@ -1,23 +1,66 @@
-"""
-Pytest bootstrap for src/ layout.
-
-Why:
-- Repo uses ./src for packages.
-- Some tests spawn pytest in a subprocess without PYTHONPATH=src.
-- Without this, imports like `from cc.adapters...` can fail during collection.
-
-This ensures ./src is always on sys.path for any pytest invocation.
-"""
-
+# tests/conftest.py
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import time
+import pytest
 
-repo_root = Path(__file__).resolve().parents[1]
-src = repo_root / "src"
-if src.is_dir():
-    src_str = str(src)
-    if src_str not in sys.path:
-        # Put first so local src wins over any installed package named `cc`.
-        sys.path.insert(0, src_str)
+
+def _has_pytest_benchmark() -> bool:
+    try:
+        import pytest_benchmark  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+class _NoOpBenchmark:
+    """
+    Minimal stub compatible with common pytest-benchmark usage patterns.
+    - benchmark(fn, *args, **kwargs)
+    - benchmark.pedantic(fn, args=..., kwargs=..., rounds=..., iterations=...)
+    - benchmark.extra_info (dict)
+    - benchmark.stats (None)
+    """
+
+    def __init__(self) -> None:
+        self.extra_info: dict[str, object] = {}
+        self.stats = None
+
+    def __call__(self, func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    def pedantic(
+        self,
+        func,
+        args=(),
+        kwargs=None,
+        rounds: int = 1,
+        iterations: int = 1,
+        warmup_rounds: int = 0,
+    ):
+        if kwargs is None:
+            kwargs = {}
+
+        # Warmup (do nothing special, just execute)
+        for _ in range(max(0, int(warmup_rounds))):
+            for _ in range(max(1, int(iterations))):
+                func(*args, **kwargs)
+
+        # Timed runs (kept lightweight)
+        start = time.perf_counter()
+        last = None
+        for _ in range(max(1, int(rounds))):
+            for _ in range(max(1, int(iterations))):
+                last = func(*args, **kwargs)
+        end = time.perf_counter()
+
+        self.extra_info["noop_total_seconds"] = end - start
+        self.extra_info["noop_rounds"] = int(rounds)
+        self.extra_info["noop_iterations"] = int(iterations)
+        return last
+
+
+if not _has_pytest_benchmark():
+    @pytest.fixture
+    def benchmark():
+        return _NoOpBenchmark()

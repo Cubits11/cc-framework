@@ -65,6 +65,7 @@ Important safety notes
 
 import importlib.util
 import io
+import types
 import json
 import math
 import threading
@@ -674,6 +675,12 @@ class ModelBase(BaseModel):
                 cached = ModelBase._PROTO_MESSAGE_CACHE.get(cache_key)
                 if cached is None:
                     dropped_fields: list[str] = []
+                    # typing.get_origin(str | None) returns types.UnionType on Py3.10+
+                    # but typing.get_origin(Optional[str]) returns typing.Union
+                    _UNION_ORIGINS = {Union}
+                    union_type = getattr(types, "UnionType", None)
+                    if union_type is not None:
+                        _UNION_ORIGINS.add(union_type)
 
                     fd_proto = descriptor_pb2.FileDescriptorProto()
                     fd_proto.name = f"{cls.__module__}.{cls.__name__}.dynamic.proto"
@@ -684,7 +691,7 @@ class ModelBase(BaseModel):
 
                     def _unwrap_optional(t: Any) -> Any:
                         origin = get_origin(t)
-                        if origin is Union:
+                        if origin in _UNION_ORIGINS:
                             args = get_args(t)
                             non_none = [a for a in args if a is not type(None)]
                             if len(non_none) == 1:
@@ -747,8 +754,13 @@ class ModelBase(BaseModel):
                     fd_proto.message_type.add().CopyFrom(msg_proto)
                     pool = descriptor_pool.DescriptorPool()
                     fd = pool.AddSerializedFile(fd_proto.SerializeToString())
-                    factory = message_factory.MessageFactory(pool=pool)
-                    msg_cls = factory.GetPrototype(fd.message_types_by_name[cls.__name__])
+                    full_name = f"{fd_proto.package}.{cls.__name__}"
+                    desc = pool.FindMessageTypeByName(full_name)
+                    if hasattr(message_factory, "GetMessageClass"):
+                        msg_cls = message_factory.GetMessageClass(desc)
+                    else:  # pragma: no cover (older protobuf)
+                        factory = message_factory.MessageFactory(pool=pool)
+                        msg_cls = factory.GetPrototype(desc)
 
                     # Cache both the Message class and the dropped fields.
                     ModelBase._PROTO_MESSAGE_CACHE[cache_key] = (
