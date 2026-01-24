@@ -95,7 +95,8 @@ Integrate into experiments and always report order effects (A→B vs B→A).
 - Add `pyproject.toml` configuring Poetry metadata, dependencies, Black, Ruff, Mypy (strict), Pytest coverage.
 - Add `.pre-commit-config.yaml` hooking Black, Ruff, Mypy.
 - Enforce strict typing + docstrings in NumPy style.
-- Run `pre-commit run --all-files`, `mypy src/ --strict`, `pytest --cov=src/cc --cov-report=html` (target ≥85%).
+- Run `pre-commit run --all-files`, `mypy src/ --strict`, `make test-cov` (target ≥85%).
+- If you run `pytest` directly with `--cov`, ensure `pytest-cov` is installed; otherwise use the coverage-aware Makefile target.
 
 ---
 
