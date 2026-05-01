@@ -1,0 +1,22 @@
+site_name: CC Framework
+site_description: Composability Coefficient framework documentation
+repo_url: https://github.com/Cubits11/cc-framework
+repo_name: Cubits11/cc-framework
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences

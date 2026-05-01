@@ -24,9 +24,7 @@ Table 1 summarises the Week 5 pilot results once the pipeline is executed. Fill 
 
 Figure 1 compares Wilson and bootstrap confidence interval widths, highlighting the guardrail-induced shrinkage after calibration. Figure 2 displays a ROC slice anchored by the calibrated false positive ceiling.
 
-![CI comparison](../figures/week5_ci_comparison.png)
-
-![ROC slice](../figures/week5_roc_slice.png)
+The corresponding Week 5 diagnostic figures are generated artifacts produced by `scripts/make_week5_figs.py` during the pilot pipeline. They are intentionally not required for the strict documentation build.
 
 ## 3. Reflection
 
