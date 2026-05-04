@@ -8,7 +8,7 @@
 ![Status](https://img.shields.io/badge/status-research%20prototype-orange)
 ![Research Area](https://img.shields.io/badge/research-AI%20safety%20evaluation-purple)
 
-> **Research status:** CC-Framework is an active research prototype. A formal preprint and archival release may be added later, but this README intentionally avoids placeholder arXiv, DOI, or publication badges until those records exist.
+> **Research status:** CC-Framework is an active research prototype. A formal preprint and archival release may be added later. This README intentionally avoids placeholder arXiv, DOI, publication, or certification badges until those records exist.
 
 ---
 
@@ -17,6 +17,12 @@
 - [Research Statement](#research-statement)
 - [Why This Matters](#why-this-matters)
 - [Core Concept](#core-concept)
+- [Kernel Contract](#kernel-contract)
+- [Mathematical Invariants](#mathematical-invariants)
+- [Assumptions Registry](#assumptions-registry)
+- [Audit Packet v1](#audit-packet-v1)
+- [Determinism and Reproducibility Contract](#determinism-and-reproducibility-contract)
+- [Privacy-Auditing Extension Point](#privacy-auditing-extension-point)
 - [What CC-Framework Provides](#what-cc-framework-provides)
 - [Repository Structure](#repository-structure)
 - [Key Modules](#key-modules)
@@ -24,7 +30,6 @@
 - [Quick Start](#quick-start)
 - [Example Workflow](#example-workflow)
 - [Interpreting Results](#interpreting-results)
-- [Reproducibility and Auditability](#reproducibility-and-auditability)
 - [Research Provenance](#research-provenance)
 - [Limitations](#limitations)
 - [Roadmap](#roadmap)
@@ -121,6 +126,344 @@ What does the composed system actually add under shift?
 
 ---
 
+## Kernel Contract
+
+CC-Framework separates **stable research-kernel surfaces** from **experimental surfaces**.
+
+This distinction matters because safety, privacy, or audit claims should depend only on explicitly documented contract surfaces, not on exploratory scripts.
+
+### Contract levels
+
+| Level | Meaning | Examples |
+|---|---|---|
+| **Kernel** | Intended stable research logic. Changes should preserve documented invariants. | Fréchet-Hoeffding bounds, probability validation, composition metrics, audit-chain verification |
+| **Protocol** | Research workflow logic that may evolve but should preserve documented output semantics. | two-world protocol, ICC-aware evaluation, Bayesian sequential testing, ATE summaries |
+| **Experimental** | Exploration code, notebooks, simulations, and analysis scripts. APIs may change. | correlation-cliff experiments, atlas generation, path sensitivity studies |
+| **Application** | Adapters, demos, toy guardrails, dashboards, and user-facing workflows. APIs may change fastest. | guardrail adapters, CLI demos, visualization scripts |
+
+### Current kernel candidates
+
+The following modules are the main public contract candidates:
+
+```text
+src/cc/cartographer/bounds.py
+src/cc/cartographer/audit.py
+src/cc/cartographer/intervals.py
+src/cc/core/stats.py
+src/cc/core/models.py
+src/cc/core/evidence_bundle.py
+theory/fh_bounds.py
+```
+
+The following modules are protocol or workflow surfaces:
+
+```text
+src/cc/core/protocol.py
+src/cc/core/attackers.py
+src/cc/core/audit_runner.py
+src/cc/exp/run_two_world.py
+experiments/correlation_cliff/
+```
+
+### Contract promise
+
+A result should be described as **kernel-supported** only if it satisfies all of the following:
+
+1. It is produced through a documented module or workflow.
+2. It records its assumptions.
+3. It passes probability and feasibility validation.
+4. It has explicit uncertainty or a stated reason uncertainty is unavailable.
+5. It can be reproduced or audited from saved artifacts.
+6. It does not rely on undocumented notebook state or one-off manual edits.
+
+This README defines the contract intent. A future release should promote this into a versioned machine-readable contract such as:
+
+```text
+docs/contracts/kernel_v1.yaml
+```
+
+Until that file exists, the README is the human-readable contract source.
+
+---
+
+## Mathematical Invariants
+
+CC-Framework is built around invariants that should hold regardless of experiment framing.
+
+### Probability invariants
+
+| ID | Invariant |
+|---|---|
+| `INV-PROB-001` | All probabilities must be finite real numbers in `[0, 1]`. |
+| `INV-PROB-002` | Marginal probabilities must be validated before bound computation. |
+| `INV-PROB-003` | Degenerate cases must return explicit decisions, not silent misleading metrics. |
+
+### Fréchet-Hoeffding invariants
+
+For binary events `A` and `B`:
+
+```text
+max(0, pA + pB - 1) <= P(A and B) <= min(pA, pB)
+```
+
+| ID | Invariant |
+|---|---|
+| `INV-FH-001` | The lower FH bound must never exceed the upper FH bound. |
+| `INV-FH-002` | Any observed joint probability must be inside the FH envelope or be flagged. |
+| `INV-FH-003` | AND composition must be bounded by feasible intersection bounds. |
+| `INV-FH-004` | OR composition must be bounded by feasible union bounds. |
+| `INV-FH-005` | Bound calculations must not assume independence unless explicitly marked as an independence baseline. |
+
+### Composition invariants
+
+| ID | Invariant |
+|---|---|
+| `INV-COMP-001` | Composition rules must be declared explicitly: `AND`, `OR`, or documented custom rule. |
+| `INV-COMP-002` | `CC` must be finite or explicitly marked degenerate when `J_best = 0`. |
+| `INV-COMP-003` | Marginal behavior and joint behavior must be reported separately. |
+| `INV-COMP-004` | Aggregate composition metrics must not be treated as subgroup guarantees. |
+
+### Statistical invariants
+
+| ID | Invariant |
+|---|---|
+| `INV-STAT-001` | Confidence intervals must state their method or be marked unavailable. |
+| `INV-STAT-002` | Clustered or repeated attack trials should be corrected or explicitly marked as uncorrected. |
+| `INV-STAT-003` | Sequential stopping must state its stopping rule. |
+| `INV-STAT-004` | Effect sizes should be reported alongside binary significance claims where available. |
+
+These invariants are intentionally conservative. If an experiment violates one, that does not automatically make the experiment useless, but it does downgrade the strength of the claim.
+
+---
+
+## Assumptions Registry
+
+Every serious audit claim depends on assumptions. CC-Framework makes those assumptions explicit.
+
+### Core assumptions
+
+| ID | Assumption | Risk if false |
+|---|---|---|
+| `ASSUMP-001` | Guardrail outputs can be represented as binary events for the selected analysis. | Bounds may not reflect true continuous-score behavior. |
+| `ASSUMP-002` | World 0 and World 1 are meaningfully comparable distributions. | Composition jump may reflect dataset mismatch rather than system behavior. |
+| `ASSUMP-003` | The selected composition rule matches the deployed or simulated system. | AND/OR conclusions may not apply to the actual pipeline. |
+| `ASSUMP-004` | Marginal rates are estimated from representative samples. | Bounds may be numerically valid but operationally misleading. |
+| `ASSUMP-005` | Attack trials are either independent or corrected for dependence. | Uncertainty may be understated. |
+| `ASSUMP-006` | Subgroup claims require subgroup-conditioned evaluation, not only aggregate metrics. | Concentrated failures may remain hidden. |
+| `ASSUMP-007` | Audit-chain integrity preserves records after creation; it does not certify that the original experiment was correct. | Hashes can prove tampering, not truth. |
+| `ASSUMP-008` | Fréchet-Hoeffding bounds are model-free but may be wide. | Conservative envelopes may be decision-inconclusive. |
+| `ASSUMP-009` | Synthetic or toy guardrails are useful for validation but not evidence of production behavior. | Prototype demos may be overgeneralized. |
+
+### Assumption-to-risk traceability
+
+Audit reports should map each major conclusion to assumption IDs.
+
+Example:
+
+```yaml
+claim: "OR composition remains inside the FH envelope under World 1 shift."
+depends_on:
+  - ASSUMP-001
+  - ASSUMP-002
+  - ASSUMP-003
+  - ASSUMP-004
+  - ASSUMP-008
+risk_if_false:
+  - "The binary reduction may hide score-level instability."
+  - "The selected worlds may not represent deployment drift."
+```
+
+A future release should mirror this registry into a machine-readable file such as:
+
+```text
+docs/assumptions.yaml
+```
+
+---
+
+## Audit Packet v1
+
+An **Audit Packet** is the minimum evidence bundle needed to support a CC-Framework evaluation claim.
+
+### Purpose
+
+The audit packet answers:
+
+```text
+What was evaluated?
+Under what assumptions?
+With what configuration?
+Using what code version?
+With what random seeds?
+What metrics were produced?
+What uncertainty was reported?
+What artifacts prove the run can be inspected?
+```
+
+### Minimum packet fields
+
+```yaml
+audit_packet_version: "v1"
+run_id: string
+created_at_utc: string
+
+code:
+  repository: string
+  commit: string
+  branch: string
+  dirty_worktree: boolean
+
+environment:
+  python_version: string
+  platform: string
+  dependency_snapshot: string | null
+
+experiment:
+  worlds:
+    world_0: object
+    world_1: object
+  guardrails: list
+  composition_rule: string
+  attacker: object | null
+  sample_sizes: object
+  seeds: object
+
+assumptions:
+  ids: list
+  notes: object | null
+
+metrics:
+  marginals: object
+  joint: object | null
+  composition: object
+  uncertainty: object | null
+  alternative_metrics: object | null
+
+validation:
+  probability_checks: pass | fail | warning
+  fh_envelope_checks: pass | fail | warning
+  degeneracy_policy: string
+  invariant_status: object
+
+artifacts:
+  raw_outputs: list
+  summaries: list
+  figures: list
+  manifest: string | null
+  audit_chain: string | null
+  file_hashes: object
+```
+
+### Guarantees
+
+Audit Packet v1 guarantees only the following:
+
+1. The run configuration is inspectable.
+2. The assumptions are stated.
+3. The output artifacts are named.
+4. File hashes can detect artifact modification after packet creation.
+5. The audit-chain can detect tampering with appended JSONL records.
+
+Audit Packet v1 does **not** guarantee:
+
+1. The experiment design is correct.
+2. The dataset is representative.
+3. The guardrails are production-realistic.
+4. The causal interpretation is valid.
+5. The result certifies a deployed system as safe.
+
+This distinction is critical. Auditability is not the same as correctness; it is the ability to inspect and challenge a claim.
+
+---
+
+## Determinism and Reproducibility Contract
+
+CC-Framework treats reproducibility as part of the research claim.
+
+### Determinism policy
+
+A reproducible run should define:
+
+| Field | Requirement |
+|---|---|
+| `seed` | All stochastic components must receive explicit seeds. |
+| `seed_scope` | Seeds should specify whether they apply globally, per world, per attack strategy, or per cell. |
+| `environment` | Python version and dependency versions should be recorded. |
+| `config_hash` | Experiment configuration should be hashable or stored as an artifact. |
+| `artifact_hashes` | Output files should be hashable and listed in the audit packet. |
+| `git_commit` | The code commit should be recorded whenever available. |
+| `dirty_worktree` | Runs from uncommitted local changes should be marked. |
+
+### Reproducibility levels
+
+| Level | Meaning |
+|---|---|
+| **R0: Narrative reproducibility** | The README or paper describes the method, but no run packet is available. |
+| **R1: Script reproducibility** | Commands and scripts are available, but environment and artifacts are incomplete. |
+| **R2: Artifact reproducibility** | Config, seeds, summaries, and output hashes are available. |
+| **R3: Exact reproducibility** | Same commit, same environment, same config, same seeds, same outputs. |
+| **R4: Independent reproducibility** | A separate environment or researcher reproduces the substantive result. |
+
+Most current experiments should be treated as **R1-R2** unless an audit packet, environment snapshot, and artifact hashes are present.
+
+### Golden artifact discipline
+
+For publication-grade results, the repository should maintain:
+
+```text
+results/
+├── golden/
+│   ├── manifest.json
+│   ├── audit_packet.yaml
+│   ├── summary.csv
+│   ├── figures/
+│   └── hashes.json
+```
+
+A result should not be described as publication-grade unless the relevant golden artifact packet exists.
+
+---
+
+## Privacy-Auditing Extension Point
+
+CC-Framework is not currently an ML privacy auditing framework. Its primary domain is composed AI safety guardrail evaluation.
+
+However, its methodology transfers naturally to privacy-auditing research because both settings involve hidden risk beneath aggregate metrics.
+
+### Methodological bridge
+
+| CC-Framework concept | Privacy-auditing analogue |
+|---|---|
+| Guardrail failure under distribution shift | Privacy leakage under deployment or query shift |
+| Marginal guardrail rates | Aggregate attack success rates |
+| Unknown joint dependence | Hidden dependence between risk factors |
+| Correlation cliffs | Sudden leakage increases under access or subgroup changes |
+| Two-world evaluation | Baseline model vs. defended model, or score-access vs. label-only access |
+| Subpopulation-concentrated failures | Group-specific privacy vulnerability |
+| Audit packet | Privacy report with assumptions, threat model, metrics, artifacts |
+
+### Example privacy-audit adaptation
+
+A future privacy-audit module could evaluate:
+
+```text
+World 0: baseline model access
+World 1: changed access regime or defended model
+
+Metric A: membership inference risk
+Metric B: attribute inference risk
+Subgroups: demographic or feature-defined slices
+Composition question: where do aggregate metrics hide concentrated privacy exposure?
+```
+
+This is not implemented as a complete privacy framework in the current repository. It is a research extension path.
+
+### Why this matters
+
+In privacy auditing, aggregate attack success can appear manageable while specific groups face higher exposure. CC-Framework's central discipline — separating aggregate behavior from hidden concentrated failure modes — is directly relevant to that kind of audit design.
+
+---
+
 ## What CC-Framework Provides
 
 ### 1. Dependence-aware composition analysis
@@ -155,7 +498,7 @@ Examples of two-world setups:
 
 ### 3. Adaptive statistical evaluation
 
-The protocol layer includes research-grade statistical components such as:
+The protocol layer includes statistical components such as:
 
 - ICC-aware correction for clustered attack trials
 - one-way random-effects ANOVA for ICC estimation
@@ -510,6 +853,8 @@ A typical CC-Framework workflow looks like this:
 7. Report uncertainty and alternative metrics
 
 8. Save evidence bundle, manifest, and audit-chain records
+
+9. Map conclusions to assumptions and invariants
 ```
 
 ---
@@ -554,30 +899,9 @@ A serious interpretation should include:
 - guardrail calibration details
 - attack strategy assumptions
 - world definition
-
----
-
-## Reproducibility and Auditability
-
-CC-Framework treats reproducibility as part of the research claim.
-
-A strong experiment should record:
-
-- git commit
-- Python version
-- dependency versions
-- random seeds
-- world definitions
-- guardrail specifications
-- attacker configuration
-- composition rule
-- raw outputs
-- summary metrics
-- confidence intervals
-- generated figures
-- audit record hashes
-
-The audit layer supports chained JSONL records where each record points to the previous record's SHA-256 hash. This makes tampering detectable and helps preserve a transparent experiment trail.
+- subgroup or slice analysis where relevant
+- assumption IDs
+- invariant status
 
 ---
 
@@ -612,6 +936,8 @@ CC-Framework is an active research prototype. Important limitations remain:
 - Causal claims require assumptions beyond the framework's core dependence bounds.
 - Real guardrail validation requires careful calibration, dataset design, and threat modeling.
 - Some APIs and module boundaries may change as the framework matures.
+- The current README defines the public contract intent, but a full machine-readable contract registry is still a roadmap item.
+- Privacy-audit applications are currently an extension direction, not a completed module.
 
 These limitations are not hidden. They define the next stage of the research.
 
@@ -622,6 +948,9 @@ These limitations are not hidden. They define the next stage of the research.
 ### Near-term
 
 - Freeze the stable public API boundary
+- Add `docs/contracts/kernel_v1.yaml`
+- Add `docs/assumptions.yaml`
+- Add `docs/audit_packet_v1.schema.json`
 - Add tutorial notebooks
 - Add clearer end-to-end examples
 - Improve documentation for audit-chain verification
@@ -636,6 +965,8 @@ These limitations are not hidden. They define the next stage of the research.
 - Add reproducibility bundles for key figures
 - Expand alternative metrics and disagreement analysis
 - Add more tests for edge cases and degeneracy policies
+- Add golden artifact packets for flagship experiments
+- Add subgroup/slice analysis templates
 
 ### Long-term
 
@@ -643,7 +974,7 @@ These limitations are not hidden. They define the next stage of the research.
 - Create an archival reproducibility release
 - Add Zenodo DOI only after release stabilization
 - Extend pairwise composition analysis to broader n-way systems
-- Explore links to privacy auditing, subgroup vulnerability, and safety assurance
+- Explore formal links to privacy auditing, subgroup vulnerability, and safety assurance
 
 ---
 
@@ -666,6 +997,7 @@ Use CC-Framework to:
 - identify dependence-driven failure modes
 - compare composed safety systems responsibly
 - build reproducible research evidence
+- design more honest audit reports
 
 ---
 
