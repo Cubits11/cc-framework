@@ -22,9 +22,9 @@ Tip: For power users, you can import the advanced classes directly:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from math import ceil, exp, log
-from typing import Any, Literal, Union
+from typing import Any, Literal, Union, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -36,7 +36,7 @@ from typing_extensions import TypeAlias
 _HAS_ENTERPRISE = False
 try:
     # Local sibling file expected at: src/cc/cartographer/bounds_enterprise.py
-    from . import bounds_enterprise as _be  # type: ignore
+    from . import bounds_enterprise as _be
 
     # Re-export enterprise classes & enums if available
     AdaptiveBounds = _be.AdaptiveBounds
@@ -228,7 +228,7 @@ def fh_or_bounds_n(alphas: NDArray[np.float64]) -> tuple[NDArray[np.float64], ND
 # ---- Public API: FH ceilings over ROC curves -------------------------------
 
 
-def _maybe_delegate_to_enterprise(fname: str, **kw: Any):
+def _maybe_delegate_to_enterprise(fname: str, **kw: Any) -> Callable[..., Any] | None:
     """
     Internal: If enterprise has a same-named function and non-core options were
     provided, delegate to it. Otherwise return None to signal 'use core'.
@@ -241,7 +241,7 @@ def _maybe_delegate_to_enterprise(fname: str, **kw: Any):
     # If caller passed any enterprise-only options, prefer enterprise path.
     enterprise_flags = {"use_gpu", "uncertainty", "n_bootstrap"}
     if enterprise_flags & set(kw):
-        return f
+        return cast(Callable[..., Any], f)
     # Even without flags, delegating is safe & feature-equivalent; but we keep
     # core-by-default for maximal determinism unless flags are present.
     return None
@@ -273,15 +273,18 @@ def frechet_upper(
     )
     if maybe is not None:
         # Delegate entirely; enterprise variant matches this signature.
-        return maybe(
-            roc_a,
-            roc_b,
-            comp=comp,
-            clip=clip,
-            add_anchors=add_anchors,
-            use_gpu=use_gpu,
-            uncertainty=uncertainty,
-            n_bootstrap=n_bootstrap,
+        return cast(
+            float | tuple[float, dict[str, float]],
+            maybe(
+                roc_a,
+                roc_b,
+                comp=comp,
+                clip=clip,
+                add_anchors=add_anchors,
+                use_gpu=use_gpu,
+                uncertainty=uncertainty,
+                n_bootstrap=n_bootstrap,
+            ),
         )
 
     # ---- Core implementation (numpy-only) ---------------------------------
@@ -476,7 +479,7 @@ def fh_var_envelope(interval: tuple[float, float]) -> float:
 
 
 def bernstein_tail(
-    *args,
+    *args: Any,
     t: float | None = None,
     eps: float | None = None,
     n: int | None = None,
@@ -501,7 +504,7 @@ def bernstein_tail(
     # legacy positional (n, eps, vbar)
     if args:
         if len(args) == 3 and all(a is not None for a in args):
-            n_pos, eps_pos, vbar_pos = args  # type: ignore
+            n_pos, eps_pos, vbar_pos = args
             n = int(n_pos)
             eps = float(eps_pos)
             vbar = float(vbar_pos)

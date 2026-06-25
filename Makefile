@@ -18,6 +18,14 @@ EXTRAS    := '.[dev,docs,notebooks]'
 PKG_NAME  := cc
 SRC_DIR   := src/cc
 COV_MIN   ?= 80
+TYPE_TARGETS ?= \
+	src/cc/adapters/base.py \
+	src/cc/cartographer/audit.py \
+	src/cc/cartographer/bounds.py \
+	src/cc/cartographer/intervals.py \
+	src/cc/io/storage.py \
+	src/cc/utils/artifacts.py \
+	src/cc/utils/timing.py
 
 # Experiments (Tier A only)
 SESS_SMOKE ?= 200
@@ -54,7 +62,7 @@ W6_FIG_DIR  := figures/week6
 W6_RAILS    := keyword regex semantic and or
 
 # -------- Phony ----------
-.PHONY: help dev install setup lock deps fmt lint type test test-week3 test-unit test-int cov bench \
+.PHONY: help dev install setup lock deps fmt lint type security test test-week3 test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
@@ -85,6 +93,7 @@ help:
 	@echo "demo                Run lightweight rails baseline demo"
 	@echo "lock                Freeze deps -> requirements.lock.txt"
 	@echo "fmt / lint / type   Code quality: ruff/isort/black/mypy"
+	@echo "security            Run Bandit and pip-audit"
 	@echo "test                Unit+integration + coverage >= $(COV_MIN)%"
 	@echo "test-week3          Run Week-3 unit tests only"
 	@echo "reproduce-smoke     $(SESS_SMOKE) sessions quick run + CSV + figs"
@@ -134,7 +143,12 @@ lint: install
 	$(ACT); black --check .
 
 type: install
-	$(ACT); mypy $(SRC_DIR)
+	$(ACT); mypy $(TYPE_TARGETS)
+
+security: install
+	$(ACT); $(PIP) install -e '.[security]'
+	$(ACT); bandit -q -r $(SRC_DIR) -x src/cc/_legacy --severity-level medium
+	$(ACT); pip-audit --skip-editable
 
 # -------- Tests -----------
 test: install
@@ -320,7 +334,7 @@ $(addprefix week6-rail-,$(W6_RAILS)): install
 		--out-json "$${outdir}/analysis.json" \
 		--audit "$(W6_AUDIT)" \
 		--seed 123 \
-		----fpr-lo 0.00 --fpr-hi 0.08 \
+		--fpr-lo 0.00 --fpr-hi 0.08 \
 		--calibration "$${outdir}/calibration_summary.json"; \
 	echo "==> [Figures] $${rail}"; \
 	$(ACT); python scripts/make_week6_figs.py \

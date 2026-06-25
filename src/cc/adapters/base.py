@@ -16,7 +16,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Literal, TypedDict, Union
+from typing import Any, Literal, TypedDict, Union, cast
 
 # ----------------------------
 # Public contract
@@ -211,8 +211,8 @@ def sanitize_value(
     if isinstance(value, (bytes, bytearray)):
         return {"__bytes_hex__": bytes(value).hex()}
 
-    if is_dataclass(value):
-        return sanitize_value(asdict(value), policy, key=key, depth=depth + 1)
+    if not isinstance(value, type) and is_dataclass(value):
+        return sanitize_value(asdict(cast(Any, value)), policy, key=key, depth=depth + 1)
 
     if isinstance(value, Mapping):
         out: dict[str, JsonValue] = {}
@@ -266,8 +266,8 @@ def sanitize_vendor_payload(payload: Any) -> JsonValue:
     policy = SanitizationPolicy(max_string_length=0)
     if payload is None:
         return {}
-    if is_dataclass(payload):
-        return sanitize_value(asdict(payload), policy)
+    if not isinstance(payload, type) and is_dataclass(payload):
+        return sanitize_value(asdict(cast(Any, payload)), policy)
     if isinstance(payload, Mapping):
         return sanitize_value(payload, policy)
     if hasattr(payload, "__dict__"):
@@ -290,8 +290,8 @@ def _to_jsonable(obj: Any, *, strict: bool) -> JsonValue:
         return {"__bytes_hex__": bytes(obj).hex()}
 
     # dataclasses -> asdict recursively
-    if is_dataclass(obj):
-        return _to_jsonable(asdict(obj), strict=strict)
+    if not isinstance(obj, type) and is_dataclass(obj):
+        return _to_jsonable(asdict(cast(Any, obj)), strict=strict)
 
     # mappings -> dict with string keys
     if isinstance(obj, Mapping):
@@ -378,7 +378,7 @@ def build_audit_payload(
     duration_ms = max(0.0, (completed - started) * 1000.0)
 
     # Redact secrets *before* fingerprinting.
-    safe_parameters = sanitize_value(_redact(parameters))
+    safe_parameters = cast(dict[str, Any], sanitize_value(_redact(parameters)))
     metadata_summary = sanitize_metadata(meta)
 
     # Deterministic fingerprints (strict=False so logging cannot crash a run).
@@ -436,7 +436,7 @@ def build_audit_payload(
         "metadata_fingerprint": metadata_fp,
         "chain_prev_hash": chain_prev_hash,
         "chain_seq": chain_seq,
-        "error_summary": error_summary,
+        "error_summary": error_summary or {},
     }
 
     # event_hash excludes itself; binds the entire event deterministically.

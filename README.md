@@ -3,7 +3,7 @@
 **Dependence-aware evaluation of composed AI safety guardrails under uncertainty.**
 
 [![Tests](https://github.com/Cubits11/cc-framework/actions/workflows/tests.yml/badge.svg)](https://github.com/Cubits11/cc-framework/actions/workflows/tests.yml)
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Status](https://img.shields.io/badge/status-research%20prototype-orange)
 ![Research Area](https://img.shields.io/badge/research-AI%20safety%20evaluation-purple)

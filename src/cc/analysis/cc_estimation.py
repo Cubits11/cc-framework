@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from statistics import NormalDist
 
 # Week-3 methods (FH-Bernstein)
 from cc.cartographer.bounds import (
@@ -312,8 +313,6 @@ def cc_ci_bootstrap_from_samples(
 # ---------------------------------------------------------------------------
 # Wilson / Newcombe helpers (exported for direct import)
 # ---------------------------------------------------------------------------
-
-from statistics import NormalDist
 
 
 def _z_for(alpha: float = 0.05) -> float:

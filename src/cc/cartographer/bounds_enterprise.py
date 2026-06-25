@@ -46,7 +46,6 @@ from typing_extensions import TypeAlias
 
 try:
     import torch
-    import torch.nn.functional as F
 
     GPU_AVAILABLE = torch.cuda.is_available()
 except ImportError:
@@ -83,17 +82,13 @@ __all__ = [
     "cc_confint",
     "cc_two_sided_bound",
     "ensure_anchors",
-    "envelope_over_rocs",
     "fh_and_bounds_n",
     "fh_intervals",
     "fh_or_bounds_n",
     "fh_var_envelope",
     "frechet_upper",
-    "frechet_upper_with_argmax",
-    "frechet_upper_with_argmax_points",
     "invert_bernstein_eps",
     "needed_n_bernstein",
-    "needed_n_bernstein_int",
 ]
 
 # ---- Enhanced Types --------------------------------------------------------

@@ -369,11 +369,8 @@ def _acquire_lock(
 
 
 def _release_lock(lockfile: Path) -> None:
-    try:
+    with suppress(Exception):
         lockfile.unlink(missing_ok=True)
-    except Exception:
-        # best-effort; do not propagate
-        pass
 
 
 def _deep_redact(
@@ -445,7 +442,7 @@ def _compile_patterns(pats: Sequence[str] | None, strict_mode: bool) -> list[re.
             out.append(re.compile(p, re.IGNORECASE))
         except re.error as e:
             if strict_mode:
-                raise LoggingError(f"Invalid redaction regex '{p}': {e}")
+                raise LoggingError(f"Invalid redaction regex '{p}': {e}") from e
             # Fail-soft: ignore invalid in non-strict mode
             continue
     return out
@@ -704,11 +701,8 @@ class ChainedJSONLLogger:
             # Metrics init must be best-effort: never break logger construction,
             # even in strict_mode. If metrics are misconfigured, we'll surface it
             # on actual updates in log() / _maybe_rotate().
-            try:
+            with suppress(Exception):
                 LOG_SIZE.set(0)  # Init size gauge
-            except Exception:
-                # Swallow init failures: logger must still be usable.
-                pass
 
         # ------------------------------------------------------------------
         # Static process / git context

@@ -8,7 +8,7 @@ import json
 import shutil
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -136,7 +136,7 @@ class StorageBackend(ABC):
 
 @dataclass(frozen=True)
 class LocalStorageBackend(StorageBackend):
-    base_dir: Path = Path.cwd()
+    base_dir: Path = field(default_factory=Path.cwd)
 
     def resolve_path(self, category: str, content_hash: str, filename: str) -> Path:
         shard = content_hash[:2]

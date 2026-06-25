@@ -50,8 +50,8 @@ def test_bernstein_tail_monotonicity():
     """
     from cc.cartographer.bounds import fh_var_envelope, invert_bernstein_eps
 
-    I = (0.10, 0.20)  # excludes 0.5 => v̄ < 0.25
-    vbar = fh_var_envelope(I)
+    interval = (0.10, 0.20)  # excludes 0.5 => v̄ < 0.25
+    vbar = fh_var_envelope(interval)
     eps_small_n = invert_bernstein_eps(n=100, vbar=vbar, delta=0.05)
     eps_large_n = invert_bernstein_eps(n=400, vbar=vbar, delta=0.05)
     assert eps_large_n < eps_small_n

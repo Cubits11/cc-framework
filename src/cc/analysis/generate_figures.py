@@ -23,6 +23,15 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 import numpy as np
 
+from cc.analysis.cc_estimation import cc_confint_newcombe
+from cc.cartographer.audit import _iter_jsonl, tail_sha
+from cc.cartographer.bounds import cc_confint, envelope_over_rocs, fh_intervals
+
+try:
+    from cc.cartographer import io  # optional; for ROC toy loader
+except Exception:
+    io = None  # sentinel
+
 # -------------------- Matplotlib (paper-safe, colorblind-friendly) ------------
 mpl.rcParams.update(
     {
@@ -50,18 +59,6 @@ mpl.rcParams.update(
 CBLUE = "#1f77b4"
 CRED = "#d62728"
 CGREY = "0.35"
-
-# ----------------------- repo utilities (already present) ---------------------
-from cc.cartographer.audit import _iter_jsonl, tail_sha
-
-try:
-    from cc.cartographer import io  # optional; for ROC toy loader
-except Exception:
-    io = None  # sentinel
-
-# Bounds + CIs
-from cc.analysis.cc_estimation import cc_confint_newcombe
-from cc.cartographer.bounds import cc_confint, envelope_over_rocs, fh_intervals
 
 # =============================================================================
 # Helpers

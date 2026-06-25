@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from importlib import import_module
 from typing import Any, Callable
 
 from .base import (
@@ -39,6 +40,9 @@ class LlamaGuardAdapter(GuardrailAdapter):
     ----------
     model_name:
         HuggingFace model id (e.g., meta-llama/Llama-Guard-3-8B).
+    model_revision:
+        Immutable Hugging Face revision for live model loads. Pass a commit SHA or
+        release tag; moving branches such as "main" are rejected.
     device_map:
         Device map for Transformers (e.g., "auto", "cpu", "cuda").
     max_new_tokens:
@@ -55,6 +59,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
     """
 
     model_name: str = "meta-llama/Llama-Guard-3-8B"
+    model_revision: str | None = None
     device_map: str = "auto"
     max_new_tokens: int = 8
     temperature: float = 0.0
@@ -74,6 +79,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
         self._config_fingerprint = fingerprint_payload(
             {
                 "model_name": self.model_name,
+                "model_revision": self.model_revision,
                 "temperature": self.temperature,
                 "threshold": self.threshold,
                 "score_mode": self.score_mode,
@@ -92,11 +98,20 @@ class LlamaGuardAdapter(GuardrailAdapter):
                 raise ImportError(
                     "transformers is required for LlamaGuardAdapter; install it or pass a generator/model."
                 ) from exc
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name, device_map=self.device_map
+            if not self.model_revision or self.model_revision.lower() in {"main", "master"}:
+                raise ValueError(
+                    "LlamaGuardAdapter live loads require model_revision set to an immutable "
+                    "Hugging Face commit SHA or release tag."
+                )
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name, revision=self.model_revision
             )
-        self.version = self.model_name
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name, revision=self.model_revision, device_map=self.device_map
+            )
+        self.version = (
+            f"{self.model_name}@{self.model_revision}" if self.model_revision else self.model_name
+        )
 
     def _build_prompt(self, prompt: str, response: str | None) -> str:
         content = _default_prompt(prompt, response)
@@ -114,7 +129,7 @@ class LlamaGuardAdapter(GuardrailAdapter):
         if self.generator is not None:
             return self.generator(prompt_text)
         try:
-            import torch
+            import_module("torch")
         except ImportError as exc:  # pragma: no cover - dependency guard
             raise ImportError("torch is required for LlamaGuardAdapter generation.") from exc
 

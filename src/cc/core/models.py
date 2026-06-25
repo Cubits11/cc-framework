@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Module: core.models (data layer for CC framework)
 Purpose: Strongly-typed, versioned, and serializable data models used across the
@@ -63,13 +61,15 @@ Important safety notes
   integration with scalar subsets.
 """
 
+from __future__ import annotations
+
 import importlib.util
 import io
-import types
 import json
 import math
 import threading
 import time
+import types
 import unicodedata
 import uuid
 import warnings
@@ -145,7 +145,7 @@ except ImportError:  # pragma: no cover
     np = None  # type: ignore[assignment]
 
 try:  # SQLAlchemy (optional)
-    from sqlalchemy import Column, DateTime, Integer, String  # type: ignore[import]
+    from sqlalchemy import Column, DateTime, String  # type: ignore[import]
     from sqlalchemy.orm import DeclarativeBase, declared_attr  # type: ignore[import]
 
     SQLALCHEMY_AVAILABLE = True
@@ -208,8 +208,10 @@ def _normalize_unix_timestamp(
 
     try:
         f = float(v)
-    except (TypeError, ValueError):
-        raise ValueError(f"timestamp must be numeric unix seconds (got {type(v).__name__}: {v!r})")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"timestamp must be numeric unix seconds (got {type(v).__name__}: {v!r})"
+        ) from exc
 
     if not math.isfinite(f):
         raise ValueError(f"timestamp must be finite (got {f!r})")
@@ -753,7 +755,7 @@ class ModelBase(BaseModel):
 
                     fd_proto.message_type.add().CopyFrom(msg_proto)
                     pool = descriptor_pool.DescriptorPool()
-                    fd = pool.AddSerializedFile(fd_proto.SerializeToString())
+                    pool.AddSerializedFile(fd_proto.SerializeToString())
                     full_name = f"{fd_proto.package}.{cls.__name__}"
                     desc = pool.FindMessageTypeByName(full_name)
                     if hasattr(message_factory, "GetMessageClass"):
@@ -934,10 +936,10 @@ class AttackResult(ModelBase):
             return None
         try:
             f = float(v)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
             raise ValueError(
                 f"utility_score must be numeric or None (got {type(v).__name__}: {v!r})"
-            )
+            ) from exc
         if math.isnan(f) or math.isinf(f):
             raise ValueError("utility_score cannot be NaN or infinite")
         return f
@@ -964,8 +966,10 @@ class AttackResult(ModelBase):
         """
         try:
             iv = int(v)
-        except (TypeError, ValueError):
-            raise ValueError(f"rng_seed must be an integer (got {type(v).__name__}: {v!r})")
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"rng_seed must be an integer (got {type(v).__name__}: {v!r})"
+            ) from exc
         return iv
 
     @field_validator(
@@ -1279,8 +1283,10 @@ class ExperimentConfig(ModelBase):
             return [val] if val else []
         try:
             seq = list(v)
-        except TypeError:
-            raise TypeError("attack_strategies must be an iterable of strings or a single string")
+        except TypeError as exc:
+            raise TypeError(
+                "attack_strategies must be an iterable of strings or a single string"
+            ) from exc
         if not seq:
             raise ValueError("attack_strategies cannot be empty")
         out: list[str] = []
@@ -1297,8 +1303,8 @@ class ExperimentConfig(ModelBase):
     def _normalize_seed(cls, v: Any) -> int:
         try:
             iv = int(v)
-        except (TypeError, ValueError):
-            raise ValueError("random_seed must be an integer")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("random_seed must be an integer") from exc
         return iv
 
     @field_validator("created_at", mode="before")
@@ -1355,8 +1361,8 @@ class CCResult(ModelBase):
             return None
         try:
             f = float(v)
-        except (TypeError, ValueError):
-            raise ValueError("CCResult numeric fields must be numeric")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("CCResult numeric fields must be numeric") from exc
         if math.isnan(f) or math.isinf(f):
             raise ValueError("CCResult numeric fields cannot be NaN or infinite")
         return f
@@ -1366,8 +1372,8 @@ class CCResult(ModelBase):
     def _validate_n_sessions(cls, v: Any) -> int:
         try:
             iv = int(v)
-        except (TypeError, ValueError):
-            raise ValueError("n_sessions must be an integer")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("n_sessions must be an integer") from exc
         if iv < 0:
             raise ValueError("n_sessions must be >= 0")
         return iv
@@ -1405,10 +1411,7 @@ class CCResult(ModelBase):
             raise ValueError("bootstrap_samples must be a sequence of numerics, not a string")
 
         # Numpy array → flattened list
-        if NUMPY_AVAILABLE and isinstance(v, np.ndarray):  # type: ignore[attr-defined]
-            seq = v.flatten().tolist()
-        else:
-            seq = v
+        seq = v.flatten().tolist() if NUMPY_AVAILABLE and isinstance(v, np.ndarray) else v  # type: ignore[attr-defined]
 
         out: list[float] = []
         dropped = 0
@@ -1420,8 +1423,8 @@ class CCResult(ModelBase):
                     dropped += 1
                     continue
                 out.append(f)
-        except (TypeError, ValueError):
-            raise ValueError("bootstrap_samples must be a sequence of numerics")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("bootstrap_samples must be a sequence of numerics") from exc
 
         if dropped:
             warnings.warn(
@@ -1492,14 +1495,17 @@ class AttackStrategySpec(ModelBase):
             return [s] if s else []
         try:
             seq = list(v)
-        except TypeError:
-            raise TypeError("vocabulary must be an iterable of strings or a single string")
+        except TypeError as exc:
+            raise TypeError("vocabulary must be an iterable of strings or a single string") from exc
         out: list[str] = []
         for x in seq:
             s = str(x).strip()
             if s:
                 out.append(s)
         return out
+
+
+AttackStrategy = AttackStrategySpec
 
 
 __all__ = [

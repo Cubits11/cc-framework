@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+
 import pytest
 
 
@@ -61,6 +62,7 @@ class _NoOpBenchmark:
 
 
 if not _has_pytest_benchmark():
+
     @pytest.fixture
     def benchmark():
         return _NoOpBenchmark()

@@ -126,7 +126,7 @@ def _iter_jsonl(path: str) -> Iterator[tuple[int, dict[str, Any]]]:
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError as e:
-                raise AuditError(f"Line {i}: invalid JSON ({e})")
+                raise AuditError(f"Line {i}: invalid JSON ({e})") from e
             if not isinstance(obj, dict):
                 raise AuditError(f"Line {i}: JSON object expected")
             yield i, cast(dict[str, Any], obj)
@@ -524,9 +524,10 @@ def audit_fh_ceiling_by_index(
         add_anchors: if True, ensure (0,0) and (1,1) present (indices refer to augmented arrays).
         tol: allowed numerical slack (J_obs > J_cap + tol counts as violation).
     """
-    comp = comp.upper()
-    if comp not in {"AND", "OR"}:
-        raise ValueError(f"comp must be 'AND' or 'OR', got {comp!r}")
+    comp_upper = comp.upper()
+    if comp_upper not in {"AND", "OR"}:
+        raise ValueError(f"comp must be 'AND' or 'OR', got {comp_upper!r}")
+    comp_norm: Literal["AND", "OR"] = "AND" if comp_upper == "AND" else "OR"
 
     if add_anchors:
         A = ensure_anchors(roc_a)
@@ -536,7 +537,7 @@ def audit_fh_ceiling_by_index(
         B = np.asarray(roc_b, dtype=float)
 
     # Build FH envelope grid once
-    _, Jgrid = envelope_over_rocs(A, B, comp=comp, add_anchors=False)
+    _, Jgrid = envelope_over_rocs(A, B, comp=comp_norm, add_anchors=False)
     H, W = Jgrid.shape
 
     bad: list[Violation] = []
@@ -573,9 +574,10 @@ def audit_fh_ceiling_by_points(
     Returns:
         List of ((fpr_a, tpr_a), (fpr_b, tpr_b), J_obs, J_cap) for violations.
     """
-    comp = comp.upper()
-    if comp not in {"AND", "OR"}:
-        raise ValueError(f"comp must be 'AND' or 'OR', got {comp!r}")
+    comp_upper = comp.upper()
+    if comp_upper not in {"AND", "OR"}:
+        raise ValueError(f"comp must be 'AND' or 'OR', got {comp_upper!r}")
+    comp_norm: Literal["AND", "OR"] = "AND" if comp_upper == "AND" else "OR"
 
     if add_anchors:
         A = ensure_anchors(roc_a)
@@ -593,7 +595,7 @@ def audit_fh_ceiling_by_points(
         return int(where[0]) if where.size > 0 else None
 
     # Envelope grid
-    _, Jgrid = envelope_over_rocs(A, B, comp=comp, add_anchors=False)
+    _, Jgrid = envelope_over_rocs(A, B, comp=comp_norm, add_anchors=False)
 
     violations: list[tuple[tuple[float, float], tuple[float, float], float, float]] = []
     for pa, pb, j_obs in triples:

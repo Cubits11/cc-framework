@@ -102,10 +102,13 @@ import json
 import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy import stats as scipy_stats
+
+if TYPE_CHECKING:
+    from cc.core.models import AttackResult
 
 # Type aliases for clarity
 AttackResults = list["AttackResult"]
@@ -1264,7 +1267,7 @@ def _build_pairs(
         m[pid][1] = int(y[i])
 
     pairs = []
-    for pid, (a, b) in m.items():
+    for _pid, (a, b) in m.items():
         if a is None or b is None:
             continue
         pairs.append((a, b))

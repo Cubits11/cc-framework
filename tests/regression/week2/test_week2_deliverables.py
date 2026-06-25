@@ -1,6 +1,7 @@
 """Test that Week 2 deliverables are complete"""
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -15,7 +16,7 @@ def test_smoke_runs():
 
 def test_unit_tests_pass():
     """Unit tests are green"""
-    result = subprocess.run(["pytest", "tests/unit", "-q"], capture_output=True)
+    result = subprocess.run([sys.executable, "-m", "pytest", "tests/unit", "-q"], capture_output=True)
     assert result.returncode == 0, result.stderr.decode()
 
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import difflib
 from collections.abc import Iterable, Mapping
+from contextlib import suppress
 from typing import Any
 
 # Core types
@@ -239,11 +240,8 @@ def register_guardrail(name: str, cls: type[Guardrail]) -> None:
     key = name.lower().strip()
     _Guardrails[key] = cls
     # lightweight interface check (best-effort)
-    try:
+    with suppress(Exception):
         _ensure_guardrail_interface(cls())  # type: ignore[misc]
-    except Exception:
-        # Defer strict checks until actual instantiation with params.
-        pass
 
 
 __all__ = [

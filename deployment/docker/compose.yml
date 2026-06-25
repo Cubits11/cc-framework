@@ -1,0 +1,12 @@
+services:
+  cc-framework:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+    image: cc-framework:cpu
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace:ro
+    command: ["python", "-c", "import cc; print('cc-framework ready')"]
+    profiles:
+      - tools
