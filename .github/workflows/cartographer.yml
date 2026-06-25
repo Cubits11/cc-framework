@@ -23,8 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,10 +40,11 @@ jobs:
             --fig "${{ github.event.inputs.fig || 'figs/phase_auto.png' }}" \
             --audit runs/audit.jsonl \
             --post-comment false
-      - name: Commit artifacts
-        run: |
-          git config user.name "cc-cartographer-bot"
-          git config user.email "bot@example.com"
-          git add runs/audit.jsonl figs/* || true
-          git commit -m "Cartographer artifacts [skip ci]" || echo "No changes"
-          git push
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cartographer-run
+          if-no-files-found: warn
+          path: |
+            runs/audit.jsonl
+            figs/

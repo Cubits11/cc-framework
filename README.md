@@ -1,20 +1,37 @@
-# CC-Framework: Correlation Cliff Framework
+# CC-Framework
 
-**Dependence-aware evaluation of composed AI safety guardrails under uncertainty.**
+**Dependence-aware evaluation and audit receipts for composed AI guardrails.**
 
-[![Tests](https://github.com/Cubits11/cc-framework/actions/workflows/tests.yml/badge.svg)](https://github.com/Cubits11/cc-framework/actions/workflows/tests.yml)
+[![CI](https://github.com/Cubits11/cc-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/Cubits11/cc-framework/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Status](https://img.shields.io/badge/status-research%20prototype-orange)
 ![Research Area](https://img.shields.io/badge/research-AI%20safety%20evaluation-purple)
 
+Measure guardrail composition without pretending independence.
+
 > **Research status:** CC-Framework is an active research prototype. A formal preprint and archival release may be added later. This README intentionally avoids placeholder arXiv, DOI, publication, or certification badges until those records exist.
+
+## What this is
+
+- A research prototype for dependence-aware guardrail composition evaluation.
+- A small Python kernel for Fréchet-Hoeffding bounds, composition metrics, and local audit evidence.
+- A reproducibility scaffold for controlled experiments and evidence bundles.
+
+## What this is not
+
+- Not a safety certification system.
+- Not an enterprise SaaS backend.
+- Not an AWS-native platform.
+- Not proof that a deployed AI system is safe.
+- Not a complete red-team framework.
 
 ---
 
 ## Table of Contents
 
 - [Research Statement](#research-statement)
+- [What this is](#what-this-is)
 - [Why This Matters](#why-this-matters)
 - [Core Concept](#core-concept)
 - [Kernel Contract](#kernel-contract)
@@ -23,7 +40,7 @@
 - [Audit Packet v1](#audit-packet-v1)
 - [Determinism and Reproducibility Contract](#determinism-and-reproducibility-contract)
 - [Privacy-Auditing Extension Point](#privacy-auditing-extension-point)
-- [What CC-Framework Provides](#what-cc-framework-provides)
+- [What CC-Framework Provides Today](#what-cc-framework-provides-today)
 - [Repository Structure](#repository-structure)
 - [Key Modules](#key-modules)
 - [Installation](#installation)
@@ -44,16 +61,22 @@
 
 Modern AI safety systems increasingly rely on **composed guardrails**: multiple filters, classifiers, monitors, or policy checks layered together to reduce unsafe behavior. Standard evaluation often reports each guardrail's individual performance, but deployed systems can fail through **dependence**. Two strong guardrails may share the same blind spot, trigger on the same examples, fail under the same distribution shift, or interfere when combined.
 
-**CC-Framework** studies this problem directly. It provides a Python research software framework for evaluating when composed guardrails exhibit **correlation cliffs**: regimes where changes in dependence structure cause large changes in the behavior of a composed safety system.
+**CC-Framework** studies this problem directly. It provides Python research utilities for evaluating dependence-sensitive regimes where changes in overlap or distribution shift can cause large changes in composed guardrail behavior.
 
-The framework combines:
+The current stable candidates are:
 
 - Fréchet-Hoeffding bounds for dependence-aware reasoning
+- local tamper-evident audit chains
+- minimal evidence bundles
+- toy, keyword, and regex guardrails for reproducible examples
+
+Experimental surfaces include:
+
 - two-world evaluation for baseline-vs-shift comparison
-- adversarial attack simulation
-- uncertainty-aware statistical protocols
-- alternative composition metrics
-- audit-oriented reproducibility infrastructure
+- adversarial attack simulation utilities
+- ICC-aware and Bayesian stopping diagnostics
+- alternative composition metrics and plotting
+- vendor guardrail adapters
 
 The goal is not to claim that composition is always good or always bad. The goal is to make composition behavior **measurable, bounded, inspectable, and reproducible**.
 
@@ -464,7 +487,7 @@ In privacy auditing, aggregate attack success can appear manageable while specif
 
 ---
 
-## What CC-Framework Provides
+## What CC-Framework Provides Today
 
 ### 1. Dependence-aware composition analysis
 
@@ -480,9 +503,9 @@ These bounds allow the framework to compute feasible envelopes for composed beha
 
 ---
 
-### 2. Two-world experimental protocol
+### 2. Experimental two-world protocol
 
-The framework supports baseline-vs-shift comparisons for guardrail systems.
+The experimental protocol layer supports baseline-vs-shift comparisons for guardrail systems.
 
 Examples of two-world setups:
 
@@ -496,9 +519,9 @@ Examples of two-world setups:
 
 ---
 
-### 3. Adaptive statistical evaluation
+### 3. Experimental statistical evaluation
 
-The protocol layer includes statistical components such as:
+The protocol layer includes experimental statistical components such as:
 
 - ICC-aware correction for clustered attack trials
 - one-way random-effects ANOVA for ICC estimation
@@ -508,7 +531,7 @@ The protocol layer includes statistical components such as:
 - confidence intervals adjusted by design effect
 - deterministic checkpoints for experiment recovery
 
-These components are intended to make evaluation claims more statistically disciplined than raw pass/fail counts.
+These components are diagnostics, not validated Bayesian or causal evidence by themselves. Claims should state assumptions and use seeded, reproducible runs.
 
 ---
 
@@ -543,17 +566,17 @@ The purpose is to avoid relying on a single metric when composition behavior is 
 
 ### 6. Audit-oriented reproducibility
 
-CC-Framework includes infrastructure for evidence-oriented experiments:
+CC-Framework includes prototype infrastructure for evidence-oriented experiments:
 
 - reproducible configuration
 - manifest-style metadata
 - stable JSON serialization
-- tamper-evident JSONL audit chains
+- local tamper-evident JSONL audit chains
 - SHA-256 linked records
 - chain verification utilities
 - provenance-aware experiment records
 
-This makes the framework useful not only for running experiments, but for preserving the reasoning trail behind safety claims.
+Unsigned local hash chains detect ordinary modification after recording, but they are not sufficient against an attacker who can rewrite and re-anchor an entire log. Use externally managed signing keys for stronger evidence bundles.
 
 ---
 
@@ -759,12 +782,6 @@ source .venv/bin/activate
 Install the package:
 
 ```bash
-pip install -e .
-```
-
-Install development dependencies if available:
-
-```bash
 pip install -e ".[dev]"
 ```
 
@@ -825,6 +842,32 @@ verify_chain(path)
 
 print("appended:", sha)
 ```
+
+### 5. Generate a minimal evidence bundle
+
+Create a small guardrail config:
+
+```bash
+cat > /tmp/cc-guardrails.json <<'JSON'
+[
+  {"name": "keyword_blocker", "params": {"keywords": ["secret", "bypass"]}},
+  {"name": "regex_filter", "params": {"patterns": ["(?i)password"]}}
+]
+JSON
+```
+
+Run the bundle generator:
+
+```bash
+cc-bundle run \
+  --prompt-source datasets/attack_prompts/basic.txt \
+  --guardrails-config /tmp/cc-guardrails.json \
+  --output-dir runs/evidence \
+  --run-id demo \
+  --disable-plots
+```
+
+By default, the attestation is unsigned and no private key is written into the bundle. Pass `--private-key-path` only with an externally managed Ed25519 key outside the output directory.
 
 ---
 

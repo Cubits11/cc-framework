@@ -1,9 +1,9 @@
 # src/cc/core/protocol.py
 """
-Next-Generation Adaptive Two-World Protocol (CC-Framework)
-=========================================================
+Adaptive Two-World Protocol (CC-Framework)
+==========================================
 
-Enterprise-grade research platform for AI safety evaluation.
+Research protocol utilities for dependence-aware guardrail evaluation.
 
 This module is the *shipping* implementation of the CC-Framework
 Two-World Protocol. It merges:
@@ -45,13 +45,10 @@ Core guarantees
 6. Deterministic, audit-friendly checkpoints
    - JSON snapshots with results, summary, and metadata.
 
-This file is intended to be *production-ready*, not a roadmap.
-
 Author: Pranav Bhave
 Institution: Penn State University
 Course: IST 496 (Independent Study)
 Advisor: Dr. Peng Liu
-Reviewed: November 13, 2025
 Version: 2.1.0 (Upgraded November 12, 2025)
 """
 
@@ -897,12 +894,12 @@ class AdaptiveExperimentEngine:
         blocked = False
 
         for guardrail in stack:
+            guardrail_name = (
+                guardrail.guardrail.__class__.__name__
+                if hasattr(guardrail, "guardrail")
+                else guardrail.__class__.__name__
+            )
             try:
-                guardrail_name = (
-                    guardrail.guardrail.__class__.__name__
-                    if hasattr(guardrail, "guardrail")
-                    else guardrail.__class__.__name__
-                )
                 eval_started_at = time.time()
                 if hasattr(guardrail, "evaluate"):
                     b, s = guardrail.evaluate(text)  # type: ignore[attr-defined]
@@ -928,7 +925,10 @@ class AdaptiveExperimentEngine:
                         "event": "guardrail_error",
                         "guardrail": guardrail_name,
                         "error": str(e),
-                        "text_preview": str(text)[:100],
+                        "prompt_hash": hashlib.sha256(
+                            str(text).encode("utf-8", errors="surrogatepass")
+                        ).hexdigest(),
+                        "prompt_chars": len(str(text)),
                     }
                 )
         return blocked, max_score, triggered

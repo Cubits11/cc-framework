@@ -27,6 +27,19 @@ class CountingGuardrail(Guardrail):
         return None
 
 
+class FailingGuardrail(Guardrail):
+    """Guardrail that forces the protocol error logging path."""
+
+    def score(self, text: str) -> float:
+        raise RuntimeError("forced guardrail failure")
+
+    def blocks(self, text: str) -> bool:
+        return False
+
+    def calibrate(self, benign_texts, target_fpr: float = 0.05) -> None:
+        return None
+
+
 def test_apply_guardrail_stack_scores_once(tmp_path: Path) -> None:
     """Protocol should invoke ``score`` at most once per guardrail."""
 
@@ -41,6 +54,24 @@ def test_apply_guardrail_stack_scores_once(tmp_path: Path) -> None:
     assert score == 0.9
     assert triggered == ["CountingGuardrail"]
     assert cg.score_calls == 1
+
+
+def test_guardrail_error_log_omits_raw_prompt(tmp_path: Path) -> None:
+    secret_prompt = "secret_prompt_should_not_appear"
+    log_path = tmp_path / "audit.jsonl"
+    proto = TwoWorldProtocol(logger=ChainedJSONLLogger(str(log_path)))
+
+    blocked, score, triggered = proto.apply_guardrail_stack(
+        [GuardrailAdapter(FailingGuardrail())], secret_prompt
+    )
+
+    assert blocked is False
+    assert score == 0.0
+    assert triggered == []
+    log_text = log_path.read_text(encoding="utf-8")
+    assert secret_prompt not in log_text
+    assert "text_preview" not in log_text
+    assert "prompt_hash" in log_text
 
 
 def test_causal_effect_cluster_robust_imbalanced_clusters() -> None:

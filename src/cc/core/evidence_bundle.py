@@ -6,7 +6,7 @@ Outputs deterministic, leak-safe artifacts:
 - metrics.json (summary metrics)
 - manifest.json (rerun command, seed, env gates)
 - ledger.jsonl (tamper-evident chain)
-- attestation.json (Ed25519 signature)
+- attestation.json (unsigned by default; Ed25519-signed when an external key is provided)
 - plots/ (quantitative plots)
 """
 
@@ -73,21 +73,66 @@ def _merkle_root(lines: Iterable[str]) -> str:
     return hashes[0].hex()
 
 
-def _load_private_key(path: Path):
+_SENSITIVE_ARG_NAMES = {
+    "--api-key",
+    "--key",
+    "--password",
+    "--private-key",
+    "--private-key-path",
+    "--secret",
+    "--token",
+}
+
+
+def _redact_argv(argv: Sequence[str]) -> list[str]:
+    redacted: list[str] = []
+    redact_next = False
+    for arg in argv:
+        if redact_next:
+            redacted.append("<redacted>")
+            redact_next = False
+            continue
+
+        key, sep, value = arg.partition("=")
+        key_l = key.lower()
+        if key_l in _SENSITIVE_ARG_NAMES:
+            if sep:
+                redacted.append(f"{key}=<redacted>")
+            else:
+                redacted.append(arg)
+                redact_next = True
+            continue
+        if any(marker in key_l for marker in ("password", "secret", "token")):
+            redacted.append(f"{key}=<redacted>" if sep else "<redacted>")
+            continue
+        redacted.append(arg if not value else f"{key}{sep}{value}")
+    return redacted
+
+
+def _load_required_private_key(path: Path):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ed25519
 
-    if path.exists():
-        return serialization.load_pem_private_key(path.read_bytes(), password=None)
-    key = ed25519.Ed25519PrivateKey.generate()
-    path.write_bytes(
-        key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Signing key not found: {path}. Generate and manage signing keys outside "
+            "the evidence output directory, or omit private_key_path to emit an unsigned "
+            "local attestation."
         )
-    )
+    key = serialization.load_pem_private_key(path.read_bytes(), password=None)
+    if not isinstance(key, ed25519.Ed25519PrivateKey):
+        raise TypeError("Evidence bundle signing requires an Ed25519 private key.")
     return key
+
+
+def _assert_key_outside_output(private_key_path: Path, output_dir: Path) -> None:
+    key_path = private_key_path.expanduser().resolve()
+    run_output = output_dir.resolve()
+    if key_path == run_output or key_path.is_relative_to(run_output):
+        raise ValueError(
+            "private_key_path must live outside the evidence output directory; "
+            "otherwise the bundle can leak the signing key."
+        )
 
 
 def _read_text_lines(path: Path) -> list[str]:
@@ -323,7 +368,6 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         },
     }
 
-    rerun_command = " ".join(sys.argv) if sys.argv else "python -m cc.core.evidence_bundle"
     manifest = {
         "run_id": run_id,
         "created_at": _utc_now(),
@@ -331,7 +375,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         "guardrails": config.guardrails,
         "composition": config.composition,
         "seed": config.seed,
-        "rerun_command": rerun_command,
+        "rerun_argv": _redact_argv(sys.argv) if sys.argv else ["python", "-m", "cc.core.evidence_bundle"],
         "env_gates": config.env_gates or {},
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "platform": sys.platform,
@@ -387,16 +431,6 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
     }
     audit_chain.append_jsonl(str(ledger_path), ledger_record)
 
-    from cryptography.hazmat.primitives import serialization
-
-    key_path = config.private_key_path or output_dir / "attestation_private_key.pem"
-    private_key = _load_private_key(key_path)
-    public_key = private_key.public_key()
-    public_key_bytes = public_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    )
-
     attestation = {
         "run_id": run_id,
         "timestamp": _utc_now(),
@@ -404,13 +438,26 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         "metrics_hash": _sha256_json(metrics),
         "results_merkle_root": results_merkle_root,
         "ledger_tail_hash": audit_chain.tail_sha(str(ledger_path)),
-        "public_key": public_key_bytes.hex(),
+        "public_key": None,
+        "signature": None,
+        "signature_status": "unsigned",
     }
-    attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode(
-        "utf-8"
-    )
-    signature = private_key.sign(attestation_message).hex()
-    attestation["signature"] = signature
+    if config.private_key_path is not None:
+        from cryptography.hazmat.primitives import serialization
+
+        _assert_key_outside_output(config.private_key_path, output_dir)
+        private_key = _load_required_private_key(config.private_key_path)
+        public_key = private_key.public_key()
+        public_key_bytes = public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        attestation["public_key"] = public_key_bytes.hex()
+        attestation["signature_status"] = "signed"
+        attestation_message = json.dumps(
+            attestation, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        attestation["signature"] = private_key.sign(attestation_message).hex()
     attestation_path = output_dir / "attestation.json"
     write_json(attestation_path, attestation)
 
@@ -449,6 +496,10 @@ def _parse_guardrail_config(path: Path) -> list[dict[str, Any]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     import argparse
+
+    argv = list(argv if argv is not None else sys.argv[1:])
+    if argv and argv[0] == "run":
+        argv = argv[1:]
 
     parser = argparse.ArgumentParser(description="Generate an Assurance Evidence Bundle")
     parser.add_argument("--prompt-source", type=Path, required=True)

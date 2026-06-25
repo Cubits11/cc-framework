@@ -17,7 +17,6 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Topic :: Security",
@@ -113,6 +112,7 @@ test = [
 security = [
   "bandit[toml]>=1.7.10",
   "pip-audit>=2.7.3",
+  "detect-secrets>=1.5.0",
 ]
 
 # Convenience meta-extra: “I’m doing serious work, give me everything”
@@ -121,6 +121,7 @@ all = [
 ]
 
 [project.scripts]
+cc-bundle = "cc.core.evidence_bundle:main"
 cc-cartographer = "cc.cartographer.cli:main"
 
 [project.urls]

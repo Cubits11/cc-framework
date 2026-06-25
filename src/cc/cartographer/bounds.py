@@ -4,59 +4,24 @@ Module: bounds
 Purpose:
   (A) Fréchet-Hoeffding ceilings for composed Youden's J over two ROC curves
   (B) Finite-sample FH-Bernstein utilities for CC at a fixed operating point θ
-  (C) Seamless bridge to optional Enterprise add-ons if present
+  (C) Dependency-light probability validation and envelope utilities
 
 Design notes
 ------------
 - Backward compatibility: the original public API is preserved.
-- If `bounds_enterprise.py` is present, we:
-    • expose its advanced classes in this module's namespace; and
-    • allow select functions to delegate to the enterprise implementations
-      when enterprise-only options are provided (e.g. use_gpu, uncertainty).
-- If `bounds_enterprise.py` is absent, everything still works with the
-  lean, dependency-light numpy core here.
-
-Tip: For power users, you can import the advanced classes directly:
-    from cc.cartographer.bounds import GPBounds, BanditThresholdSelector, ...
+- Invalid ROC probabilities raise by default. Callers that need legacy
+  clipping behavior must opt in with clip="warn" or clip="silent".
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from math import ceil, exp, log
-from typing import Any, Literal, Union, cast
+from typing import Any, Literal, Union
 
 import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import TypeAlias
-
-# -----------------------------------------------------------------------------
-# Optional enterprise bridge (best-effort import)
-# -----------------------------------------------------------------------------
-_HAS_ENTERPRISE = False
-try:
-    # Local sibling file expected at: src/cc/cartographer/bounds_enterprise.py
-    from . import bounds_enterprise as _be
-
-    # Re-export enterprise classes & enums if available
-    AdaptiveBounds = _be.AdaptiveBounds
-    BayesianBounds = _be.BayesianBounds
-    CausalBounds = _be.CausalBounds
-    StreamingBounds = _be.StreamingBounds
-    MultiObjectiveOptimizer = _be.MultiObjectiveOptimizer
-    BanditThresholdSelector = _be.BanditThresholdSelector
-    GPBounds = _be.GPBounds
-    DistributedROCAnalyzer = _be.DistributedROCAnalyzer
-    ConfidenceSequence = _be.ConfidenceSequence
-    PredictionInterval = _be.PredictionInterval
-    UncertaintyQuantifier = _be.UncertaintyQuantifier
-    AdaptiveStrategy = _be.AdaptiveStrategy
-    BoundType = _be.BoundType
-
-    _HAS_ENTERPRISE = True
-except Exception:
-    # Enterprise is optional; quietly continue with the core-only implementation.
-    pass
 
 __all__ = [
     # Core ceilings over ROC curves
@@ -80,24 +45,6 @@ __all__ = [
     "needed_n_bernstein_int",
 ]
 
-# If enterprise is present, surface its extras from this module.
-if _HAS_ENTERPRISE:
-    __all__ += [
-        "AdaptiveBounds",
-        "AdaptiveStrategy",
-        "BanditThresholdSelector",
-        "BayesianBounds",
-        "BoundType",
-        "CausalBounds",
-        "ConfidenceSequence",
-        "DistributedROCAnalyzer",
-        "GPBounds",
-        "MultiObjectiveOptimizer",
-        "PredictionInterval",
-        "StreamingBounds",
-        "UncertaintyQuantifier",
-    ]
-
 # ---- Types -----------------------------------------------------------------
 
 ROCPoint: TypeAlias = tuple[float, float]
@@ -111,15 +58,15 @@ ROCArrayLike: TypeAlias = Union[
 
 
 def _to_array_roc(
-    arr: ROCArrayLike, *, clip: Literal["silent", "warn", "error"] = "silent"
+    arr: ROCArrayLike, *, clip: Literal["silent", "warn", "error"] = "error"
 ) -> NDArray[np.float64]:
     """
     Coerce to float array of shape (n, 2) with columns [FPR, TPR].
 
     clip:
-        - "silent": silently clip out-of-range to [0,1] (default).
+        - "error":  raise on any out-of-range entry (default).
         - "warn":   clip and emit a RuntimeWarning.
-        - "error":  raise on any out-of-range entry.
+        - "silent": silently clip out-of-range to [0,1] for legacy callers.
     """
     if isinstance(arr, np.ndarray):
         roc = arr.astype(float, copy=False)
@@ -149,7 +96,7 @@ def ensure_anchors(
     roc: ROCArrayLike,
     *,
     preserve_order: bool = True,
-    clip: Literal["silent", "warn", "error"] = "silent",
+    clip: Literal["silent", "warn", "error"] = "error",
 ) -> NDArray[np.float64]:
     """
     Ensure ROC contains (0,0) and (1,1).
@@ -228,33 +175,14 @@ def fh_or_bounds_n(alphas: NDArray[np.float64]) -> tuple[NDArray[np.float64], ND
 # ---- Public API: FH ceilings over ROC curves -------------------------------
 
 
-def _maybe_delegate_to_enterprise(fname: str, **kw: Any) -> Callable[..., Any] | None:
-    """
-    Internal: If enterprise has a same-named function and non-core options were
-    provided, delegate to it. Otherwise return None to signal 'use core'.
-    """
-    if not _HAS_ENTERPRISE:
-        return None
-    f = getattr(_be, fname, None)
-    if f is None:
-        return None
-    # If caller passed any enterprise-only options, prefer enterprise path.
-    enterprise_flags = {"use_gpu", "uncertainty", "n_bootstrap"}
-    if enterprise_flags & set(kw):
-        return cast(Callable[..., Any], f)
-    # Even without flags, delegating is safe & feature-equivalent; but we keep
-    # core-by-default for maximal determinism unless flags are present.
-    return None
-
-
 def frechet_upper(
     roc_a: ROCArrayLike,
     roc_b: ROCArrayLike,
     *,
     comp: Literal["AND", "OR", "and", "or"] = "AND",
-    clip: Literal["silent", "warn", "error"] = "silent",
+    clip: Literal["silent", "warn", "error"] = "error",
     add_anchors: bool = False,
-    # Enterprise passthrough (ignored by core; used if bounds_enterprise is present):
+    # Legacy advanced options. Kept in the signature so older callers fail explicitly.
     use_gpu: bool = False,
     uncertainty: bool = False,
     n_bootstrap: int = 1000,
@@ -262,29 +190,16 @@ def frechet_upper(
     """
     Fréchet-style *upper bound* on composed Youden's J over two ROC curves.
 
-    Core path (always available): deterministic numpy implementation.
-    Enterprise path (optional): honors `use_gpu`, `uncertainty`, `n_bootstrap`.
+    Deterministic numpy implementation.
+
+    `use_gpu`, `uncertainty`, and `n_bootstrap` are no longer delegated through
+    this kernel module. Advanced/experimental routines should be imported
+    explicitly from their own module.
     """
-    maybe = _maybe_delegate_to_enterprise(
-        "frechet_upper",
-        use_gpu=use_gpu,
-        uncertainty=uncertainty,
-        n_bootstrap=n_bootstrap,
-    )
-    if maybe is not None:
-        # Delegate entirely; enterprise variant matches this signature.
-        return cast(
-            float | tuple[float, dict[str, float]],
-            maybe(
-                roc_a,
-                roc_b,
-                comp=comp,
-                clip=clip,
-                add_anchors=add_anchors,
-                use_gpu=use_gpu,
-                uncertainty=uncertainty,
-                n_bootstrap=n_bootstrap,
-            ),
+    if use_gpu or uncertainty or n_bootstrap != 1000:
+        raise ValueError(
+            "Advanced bounds options are not part of the stable cartographer kernel. "
+            "Use the explicit experimental implementation instead."
         )
 
     # ---- Core implementation (numpy-only) ---------------------------------
@@ -320,7 +235,7 @@ def frechet_upper_with_argmax(
     roc_b: ROCArrayLike,
     *,
     comp: Literal["AND", "OR", "and", "or"] = "AND",
-    clip: Literal["silent", "warn", "error"] = "silent",
+    clip: Literal["silent", "warn", "error"] = "error",
     add_anchors: bool = False,
 ) -> tuple[float, int | None, int | None]:
     """As `frechet_upper`, but also return (ia, ib) of the maximizing cross-pair."""
@@ -359,7 +274,7 @@ def frechet_upper_with_argmax_points(
     roc_b: ROCArrayLike,
     *,
     comp: Literal["AND", "OR", "and", "or"] = "AND",
-    clip: Literal["silent", "warn", "error"] = "silent",
+    clip: Literal["silent", "warn", "error"] = "error",
     add_anchors: bool = False,
 ) -> tuple[float, ROCPoint, ROCPoint]:
     """
@@ -384,7 +299,7 @@ def envelope_over_rocs(
     roc_b: ROCArrayLike,
     *,
     comp: Literal["AND", "OR", "and", "or"] = "AND",
-    clip: Literal["silent", "warn", "error"] = "silent",
+    clip: Literal["silent", "warn", "error"] = "error",
     add_anchors: bool = False,
 ) -> tuple[float, NDArray[np.float64]]:
     """

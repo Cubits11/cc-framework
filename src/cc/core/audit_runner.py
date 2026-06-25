@@ -7,7 +7,7 @@ This module provides a small, deterministic audit flow suitable for demos:
 2. Evaluate guardrail stack (per prompt).
 3. Write results.jsonl + execution_manifest.json.
 4. Build a Merkle root over results.
-5. Sign a run attestation (Ed25519).
+5. Emit a local attestation; sign it with Ed25519 only when an external key is provided.
 
 It intentionally avoids external infrastructure (queues, DBs) while producing
 artifacts that map to the broader Assurance Docker vision.
@@ -126,18 +126,27 @@ def _merkle_root(lines: Iterable[str]) -> str:
     return hashes[0].hex()
 
 
-def _load_private_key(path: Path) -> ed25519.Ed25519PrivateKey:
-    if path.exists():
-        return serialization.load_pem_private_key(path.read_bytes(), password=None)
-    key = ed25519.Ed25519PrivateKey.generate()
-    path.write_bytes(
-        key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
+def _load_required_private_key(path: Path) -> ed25519.Ed25519PrivateKey:
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Signing key not found: {path}. Generate and manage signing keys outside "
+            "the audit output directory, or omit private_key_path to emit an unsigned "
+            "local attestation."
         )
-    )
+    key = serialization.load_pem_private_key(path.read_bytes(), password=None)
+    if not isinstance(key, ed25519.Ed25519PrivateKey):
+        raise TypeError("Audit attestations require an Ed25519 private key.")
     return key
+
+
+def _assert_key_outside_output(private_key_path: Path, output_dir: Path) -> None:
+    key_path = private_key_path.expanduser().resolve()
+    run_output = output_dir.resolve()
+    if key_path == run_output or key_path.is_relative_to(run_output):
+        raise ValueError(
+            "private_key_path must live outside the audit output directory; "
+            "otherwise the bundle can leak the signing key."
+        )
 
 
 @dataclass
@@ -254,27 +263,30 @@ def run_audit(config: AuditRunConfig) -> dict[str, Any]:
     results_merkle_root = _merkle_root(results_lines)
     manifest_hash = _sha256_json(execution_manifest)
 
-    key_path = config.private_key_path or output_dir / "attestation_private_key.pem"
-    private_key = _load_private_key(key_path)
-    public_key = private_key.public_key()
-    public_key_bytes = public_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    )
-
     attestation = {
         "run_id": run_id,
         "timestamp": _utc_now(),
         "execution_manifest_hash": manifest_hash,
         "results_merkle_root": results_merkle_root,
         "previous_attestation_hash": None,
-        "public_key": public_key_bytes.hex(),
+        "public_key": None,
+        "signature": None,
+        "signature_status": "unsigned",
     }
-    attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode(
-        "utf-8"
-    )
-    signature = private_key.sign(attestation_message).hex()
-    attestation["signature"] = signature
+    if config.private_key_path is not None:
+        _assert_key_outside_output(config.private_key_path, output_dir)
+        private_key = _load_required_private_key(config.private_key_path)
+        public_key = private_key.public_key()
+        public_key_bytes = public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        attestation["public_key"] = public_key_bytes.hex()
+        attestation["signature_status"] = "signed"
+        attestation_message = json.dumps(
+            attestation, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        attestation["signature"] = private_key.sign(attestation_message).hex()
 
     attestation_path = output_dir / "attestation.json"
     attestation_path.write_text(json.dumps(attestation, indent=2, sort_keys=True), encoding="utf-8")
@@ -306,21 +318,25 @@ def verify_attestation(
     if attestation.get("results_merkle_root") != expected_merkle_root:
         return False, "results merkle root mismatch"
 
+    signature_status = attestation.get("signature_status")
+    if signature_status not in {None, "signed"}:
+        return False, "attestation is unsigned"
+
     public_key = ed25519.Ed25519PublicKey.from_public_bytes(
         bytes.fromhex(attestation["public_key"])
     )
-    message = json.dumps(
-        {
-            "execution_manifest_hash": attestation["execution_manifest_hash"],
-            "previous_attestation_hash": attestation["previous_attestation_hash"],
-            "public_key": attestation["public_key"],
-            "results_merkle_root": attestation["results_merkle_root"],
-            "run_id": attestation["run_id"],
-            "timestamp": attestation["timestamp"],
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    message_fields = {
+        "execution_manifest_hash": attestation["execution_manifest_hash"],
+        "previous_attestation_hash": attestation["previous_attestation_hash"],
+        "public_key": attestation["public_key"],
+        "results_merkle_root": attestation["results_merkle_root"],
+        "run_id": attestation["run_id"],
+        "timestamp": attestation["timestamp"],
+    }
+    if signature_status == "signed":
+        message_fields["signature"] = None
+        message_fields["signature_status"] = "signed"
+    message = json.dumps(message_fields, sort_keys=True, separators=(",", ":")).encode("utf-8")
     try:
         public_key.verify(bytes.fromhex(attestation["signature"]), message)
     except Exception:
