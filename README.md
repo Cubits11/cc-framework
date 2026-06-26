@@ -523,15 +523,15 @@ Examples of two-world setups:
 
 The protocol layer includes experimental statistical components such as:
 
-- ICC-aware correction for clustered attack trials
-- one-way random-effects ANOVA for ICC estimation
+- cluster-bootstrap causal intervals for correlated prompt batches
+- empirical ICC diagnostics for clustered attack trials
 - anytime-valid e-process sequential testing
 - deprecated Bayesian ROPE heuristic only behind an explicit legacy flag
 - ATE estimation for world effects
-- confidence intervals adjusted by design effect
+- pre-registration-style analysis-plan artifacts
 - deterministic checkpoints for experiment recovery
 
-These components are diagnostics unless their assumptions are stated and checked. The anytime-valid stopping rule controls Type-I error under the null stated in `docs/theory/anytime_valid.md`; causal claims still require their own identification assumptions.
+These components are diagnostics unless their assumptions are stated and checked. The anytime-valid stopping rule controls Type-I error under the null stated in `docs/theory/anytime_valid.md`; causal claims require the identifying assumptions stated in `docs/theory/two_world_estimand.md`.
 
 ---
 
@@ -647,10 +647,11 @@ Adaptive two-world experiment engine.
 
 Includes:
 
-- ICC computation
+- empirical ICC diagnostics
 - anytime-valid e-process sequential testing
 - deprecated Bayesian heuristic behind `--legacy-bayesian-heuristic`
-- causal effect / ATE estimation
+- cluster-bootstrap causal effect / ATE estimation
+- per-run analysis-plan artifacts
 - guardrail factory layer
 - experiment states and stopping reasons
 - deterministic checkpointing

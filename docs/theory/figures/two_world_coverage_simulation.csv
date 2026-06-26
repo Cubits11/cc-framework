@@ -1,0 +1,5 @@
+n_clusters,cluster_size,icc,true_effect,nominal_coverage,monte_carlo_reps,bootstrap_reps,cluster_bootstrap_coverage,naive_coverage,coverage_tolerance,within_tolerance,mean_se_understatement_ratio
+36,4,0.0,0.2,0.95,40,120,0.925,0.925,0.10338036564067671,True,0.966755867806911
+36,4,0.25,0.2,0.95,40,120,0.925,0.875,0.10338036564067671,True,1.2590149078942303
+36,10,0.0,0.2,0.95,40,120,0.95,0.95,0.10338036564067671,True,0.9784433960978868
+36,10,0.25,0.2,0.95,40,120,0.925,0.8,0.10338036564067671,True,1.7244729592459485

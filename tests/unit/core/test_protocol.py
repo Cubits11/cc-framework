@@ -1,12 +1,14 @@
+import json
 from pathlib import Path
 
 import numpy as np
 import pytest
 from scipy import stats
 
+from cc.core.attackers import AttackStrategy
 from cc.core.guardrail_api import GuardrailAdapter
 from cc.core.logging import ChainedJSONLLogger
-from cc.core.models import AttackResult
+from cc.core.models import AttackResult, WorldConfig
 from cc.core.protocol import CausalInferenceEngine, TwoWorldProtocol
 from cc.guardrails.base import Guardrail
 
@@ -38,6 +40,17 @@ class FailingGuardrail(Guardrail):
         return False
 
     def calibrate(self, benign_texts, target_fpr: float = 0.05) -> None:
+        return None
+
+
+class TinyAttacker(AttackStrategy):
+    def generate_attack(self, history: list[dict]) -> dict:
+        return {"prompt": "synthetic attack"}
+
+    def update_strategy(self, attack: dict, result: dict) -> None:
+        return None
+
+    def reset(self, *, seed: int | None = None) -> None:
         return None
 
 
@@ -94,6 +107,44 @@ def test_default_protocol_uses_anytime_tester_without_legacy(tmp_path: Path) -> 
 
     assert proto.bayesian_tester is None
     assert proto.sequential_tester.result().e_value == 1.0
+
+
+def test_run_writes_preregistration_style_analysis_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    proto = TwoWorldProtocol(
+        logger=ChainedJSONLLogger(str(tmp_path / "audit.jsonl")),
+        episode_length=1,
+        random_seed=9,
+        checkpoint_every=0,
+    )
+    worlds = {
+        0: WorldConfig(world_id=0, baseline_success_rate=0.4, description="A-only"),
+        1: WorldConfig(world_id=1, baseline_success_rate=0.2, description="A+B"),
+    }
+
+    with pytest.warns(RuntimeWarning, match="Cluster-bootstrap causal estimator failed"):
+        proto.run_experiment(
+            attacker=TinyAttacker(),
+            world_configs=worlds,
+            n_sessions=6,
+            experiment_id="analysis_plan_test",
+            checkpoint_every=0,
+        )
+
+    plan_json = tmp_path / "checkpoints" / "analysis_plan_test" / "analysis_plan.json"
+    plan_md = tmp_path / "checkpoints" / "analysis_plan_test" / "analysis_plan.md"
+    assert plan_json.exists()
+    assert plan_md.exists()
+
+    payload = json.loads(plan_json.read_text(encoding="utf-8"))
+    assert payload["estimand"]["notation"] == "tau = E_P[Y_i(1) - Y_i(0)]"
+    assert payload["pre_specified_analysis"]["significance_threshold_alpha"] == 0.05
+    assert payload["pre_specified_analysis"]["causal_estimator"] == "cluster_bootstrap_ate"
+    assert payload["actual_run"]["actual_sessions"] == 6
+    assert "Identifying Assumptions" in plan_md.read_text(encoding="utf-8")
 
 
 def test_causal_effect_cluster_robust_imbalanced_clusters() -> None:

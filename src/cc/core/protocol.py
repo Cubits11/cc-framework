@@ -13,11 +13,11 @@ Two-World Protocol. It merges:
 
 Core guarantees
 ---------------
-1. ICC (Intra-Class Correlation)
-   - Computed using a proper one-way random-effects ANOVA (ICC(1))
-   - Clustered by attack strategy (attack_strategy / strategy_type)
-   - Produces a design effect and widening factor for CIs
-   - Approximation for binary data; warns and suggests GLMM alternatives
+1. Cluster-robust causal inference
+   - Estimand is the potential-outcomes ATE of adding guardrail B to A
+   - Clustered by prompt/attack batch labels (attack_strategy / strategy_type)
+   - Confidence intervals use a seeded cluster bootstrap over whole clusters
+   - ICC is reported only as a dependence diagnostic, not as a CI correction
 
 2. Anytime-valid Sequential Testing
    - Uses a Bernoulli e-process/test martingale from cc.kernel.sequential
@@ -26,9 +26,9 @@ Core guarantees
      all stopping times by Ville's inequality
 
 3. Causal Effect Estimation (ATE)
-   - Difference in means (p1 - p0) with Welch-style SE
-   - Standard errors and CIs are ICC-adjusted via design effect
-   - Post-hoc power and Cohen's d
+   - Difference in means (p1 - p0)
+   - Cluster-bootstrap SE and CI
+   - Naive-vs-cluster uncertainty diagnostics
 
 4. Backward Compatibility
    - TwoWorldProtocol.run_experiment(attacker, worlds, n_sessions)
@@ -64,7 +64,6 @@ from pathlib import Path
 from typing import Any, TypeAlias
 
 import numpy as np
-import statsmodels.api as sm
 from scipy import stats  # required for t / normal ops (legacy parts)
 
 # Core imports from CC-Framework
@@ -74,6 +73,7 @@ from cc.core.attackers import AttackStrategy
 from cc.core.logging import ChainedJSONLLogger, audit_context
 from cc.core.models import AttackResult, GuardrailSpec, WorldConfig
 from cc.guardrails.base import Guardrail
+from cc.kernel.causal import empirical_intraclass_correlation, estimate_clustered_ate
 from cc.kernel.sequential import AnytimeBernoulliResult, AnytimeBernoulliTester
 
 # Optional built-in guardrails (best-effort import)
@@ -147,13 +147,19 @@ class CausalEffect:
     """Causal effect estimation result (difference in means)."""
 
     ate: float  # Average Treatment Effect (p1 - p0)
-    se: float  # Standard Error (cluster-robust or mixed-effects)
+    se: float  # Cluster-bootstrap standard error
     ci_lower: float
     ci_upper: float
     p_value: float
     method: str
     cohens_d: float
     power: float
+    n_clusters: int = 0
+    n_observations: int = 0
+    icc_estimate: float = 0.0
+    naive_se: float = 0.0
+    bootstrap_reps: int = 0
+    bootstrap_valid_reps: int = 0
 
 
 @dataclass
@@ -174,15 +180,10 @@ class SessionMetadata:
 @dataclass
 class ICCAnalysis:
     """
-    Intra-Class Correlation (ICC) analysis.
+    Dependence diagnostic for clustered outcomes.
 
-    Computed via one-way random-effects ANOVA:
-        ICC(1) = (MS_between - MS_within) / (MS_between + (m̄ - 1) * MS_within)
-
-    Design effect accounts for unequal cluster sizes via:
-        DE = 1 + ICC * (m̄ - 1) * (1 + CV^2)
-
-    Cluster labels are based on attack strategy identity (attack_strategy).
+    This is retained for summary compatibility. It is no longer used to widen
+    confidence intervals; the causal estimator uses a seeded cluster bootstrap.
     """
 
     global_icc: float
@@ -200,17 +201,10 @@ class ICCAnalysis:
 
 class ICCComputer:
     """
-    Compute ICC(1) for binary outcomes, clustered by attack strategy.
+    Report within-cluster dependence diagnostics by attack strategy.
 
-    This avoids fake ICC heuristics. Instead, we:
-      1. Identify cluster labels from AttackResult.attack_strategy
-      2. Run one-way ANOVA decomposition
-      3. Compute ICC(1) as per Shrout & Fleiss (1979)
-      4. Derive design effect and effective sample size, adjusting for
-         unequal cluster sizes using the coefficient of variation (CV)
-         of cluster sizes: DE = 1 + ICC * (m̄ - 1) * (1 + CV^2)
-
-    Note: For binary data, this is an approximation; consider GLMM for precision.
+    The returned design-effect fields are descriptive compatibility fields only.
+    They are not used for causal standard errors.
     """
 
     @staticmethod
@@ -238,18 +232,7 @@ class ICCComputer:
                 confidence="none",
             )
 
-        # Extract binary outcomes and cluster labels
         successes = np.array([1.0 if r.success else 0.0 for r in results], dtype=float)
-
-        # Check if binary
-        if np.all(np.isin(successes, [0.0, 1.0])):
-            warnings.warn(
-                "ICC computation is approximate for binary outcomes; "
-                "consider generalized linear mixed models (GLMM) for more accurate estimation.",
-                stacklevel=2,
-            )
-
-        # AttackResult may have .attack_strategy or .strategy_type
         labels_arr = ICCComputer._cluster_labels(results)
         unique_clusters, cluster_index = np.unique(labels_arr, return_inverse=True)
         k = unique_clusters.size
@@ -271,7 +254,7 @@ class ICCComputer:
                 confidence=confidence,
             )
 
-        icc = ICCComputer._compute_icc_oneway(successes, cluster_index)
+        icc = empirical_intraclass_correlation(successes, cluster_index)
         icc = float(np.clip(icc, 0.0, 1.0))
 
         # Design effect and effective N (adjusted for unequal cluster sizes)
@@ -296,63 +279,22 @@ class ICCComputer:
         )
 
     @staticmethod
-    def _compute_icc_oneway(values: np.ndarray, cluster_index: np.ndarray) -> float:
-        """One-way random-effects ANOVA ICC(1) implementation."""
-        values = np.asarray(values, dtype=float)
-        cluster_index = np.asarray(cluster_index)
-        n = values.size
-        unique_clusters = np.unique(cluster_index)
-        k = unique_clusters.size
-
-        # Cluster sizes and means
-        cluster_sizes = np.bincount(cluster_index)
-        cluster_sums = np.bincount(cluster_index, weights=values)
-        cluster_means = cluster_sums / np.maximum(cluster_sizes, 1)
-
-        grand_mean = float(np.mean(values))
-
-        # Between-cluster mean square
-        ms_between_num = float(np.sum(cluster_sizes * (cluster_means - grand_mean) ** 2))
-        ms_between_den = float(k - 1)
-        ms_between = ms_between_num / max(ms_between_den, 1.0)
-
-        # Within-cluster mean square
-        ss_within = 0.0
-        for idx in unique_clusters:
-            mask = cluster_index == idx
-            ss_within += float(np.sum((values[mask] - cluster_means[idx]) ** 2))
-        ms_within_den = float(n - k)
-        ms_within = ss_within / max(ms_within_den, 1.0)
-
-        if ms_between <= 0.0 and ms_within <= 0.0:
-            return 0.0
-
-        m_bar = float(n) / float(k)
-        denom = ms_between + (m_bar - 1.0) * ms_within
-        if denom <= 0.0:
-            return 0.0
-        return (ms_between - ms_within) / denom
-
-    @staticmethod
     def _interpret_icc(global_icc: float, effective_n: int, nominal_n: int) -> str:
         parts = [
-            f"Global ICC (clustered by attack strategy): {global_icc:.3f}.",
-            f"Effective N ≈ {effective_n} (nominal N={nominal_n}).",
+            f"Empirical within-cluster dependence diagnostic: {global_icc:.3f}.",
+            f"Descriptive effective N ≈ {effective_n} (nominal N={nominal_n}).",
         ]
         if global_icc >= 0.75:
             parts.append(
-                "High within-strategy dependence; design-effect correction is critical "
-                "for valid standard errors."
+                "High within-strategy dependence; cluster-bootstrap inference is required."
             )
         elif global_icc >= 0.50:
             parts.append(
-                "Moderate within-strategy dependence; design-effect correction "
-                "strongly recommended."
+                "Moderate within-strategy dependence; report cluster-robust intervals."
             )
         elif global_icc >= 0.20:
             parts.append(
-                "Low within-strategy dependence; trials mostly independent but "
-                "design-effect still applied for safety."
+                "Low within-strategy dependence; cluster-bootstrap intervals remain prespecified."
             )
         else:
             parts.append("Negligible within-strategy dependence.")
@@ -520,81 +462,23 @@ class BayesianSequentialTester:
 
 class CausalInferenceEngine:
     """
-    Causal effect estimation with cluster-robust standard errors.
+    Causal effect estimation with seeded cluster-bootstrap standard errors.
 
     ATE = E[Y|W=1] - E[Y|W=0]
-
-    Steps:
-      1. Compute OLS estimate of the ATE (difference in means).
-      2. Use a cluster-robust sandwich variance estimator for SEs.
-      3. If clusters are too small/imbalanced, fall back to a random-intercept
-         mixed-effects model (linear probability model).
-      4. Compute t-test, CI, Cohen's d, post-hoc power using cluster df.
     """
 
-    def __init__(self, icc_computer: ICCComputer | None = None):
+    def __init__(
+        self,
+        icc_computer: ICCComputer | None = None,
+        *,
+        random_seed: int = 0,
+        alpha: float = 0.05,
+        bootstrap_reps: int = 2000,
+    ):
         self.icc_computer = icc_computer or ICCComputer()
-
-    @staticmethod
-    def _cluster_robust_ols(
-        y: np.ndarray,
-        w: np.ndarray,
-        cluster_index: np.ndarray,
-    ) -> tuple[float, float, int]:
-        x = np.column_stack([np.ones_like(w), w])
-        n, k = x.shape
-        if n <= k:
-            raise ValueError("Insufficient observations for cluster-robust OLS.")
-
-        x_tx = x.T @ x
-        if np.linalg.matrix_rank(x_tx) < k:
-            raise ValueError("Singular design matrix in cluster-robust OLS.")
-
-        beta = np.linalg.solve(x_tx, x.T @ y)
-        residuals = y - x @ beta
-
-        unique_clusters = np.unique(cluster_index)
-        g = unique_clusters.size
-        if g < 2:
-            raise ValueError("Need at least two clusters for robust variance.")
-
-        meat = np.zeros((k, k))
-        for cluster_id in unique_clusters:
-            mask = cluster_index == cluster_id
-            s = x[mask].T @ residuals[mask]
-            meat += np.outer(s, s)
-
-        x_tx_inv = np.linalg.inv(x_tx)
-        adjustment = (g / (g - 1.0)) * ((n - 1.0) / (n - k))
-        var_beta = x_tx_inv @ meat @ x_tx_inv * adjustment
-
-        se = float(np.sqrt(max(var_beta[1, 1], 0.0)))
-        df = max(int(g - 1), 1)
-        return float(beta[1]), se, df
-
-    @staticmethod
-    def _mixedlm_ate(
-        y: np.ndarray,
-        w: np.ndarray,
-        cluster_index: np.ndarray,
-    ) -> tuple[float, float, int]:
-        x = sm.add_constant(w, has_constant="add")
-        model = sm.MixedLM(y, x, groups=cluster_index)
-        result = model.fit(reml=False, method="lbfgs", disp=False)
-        ate = float(result.params[1])
-        se = float(result.bse[1])
-        df = max(int(result.df_resid), 1)
-        return ate, se, df
-
-    @staticmethod
-    def _should_use_mixedlm(cluster_sizes: np.ndarray) -> bool:
-        if cluster_sizes.size < 4:
-            return True
-        m_bar = float(np.mean(cluster_sizes))
-        if m_bar <= 0.0:
-            return True
-        cv = float(np.std(cluster_sizes, ddof=1) / m_bar) if cluster_sizes.size > 1 else 0.0
-        return np.min(cluster_sizes) < 2 or cv > 1.0
+        self.random_seed = int(random_seed)
+        self.alpha = float(alpha)
+        self.bootstrap_reps = int(bootstrap_reps)
 
     def estimate_ate(self, results: list[AttackResult]) -> CausalEffect:
         w0 = [r.success for r in results if r.world_bit == 0]
@@ -614,8 +498,6 @@ class CausalInferenceEngine:
 
         p0 = float(np.mean(w0))
         p1 = float(np.mean(w1))
-        n0 = len(w0)
-        n1 = len(w1)
 
         # Variance components for Cohen's d
         var0 = max(p0 * (1.0 - p0), 1e-12)
@@ -624,58 +506,68 @@ class CausalInferenceEngine:
         y = np.array([1.0 if r.success else 0.0 for r in results], dtype=float)
         w = np.array([1.0 if r.world_bit == 1 else 0.0 for r in results], dtype=float)
         labels = self.icc_computer._cluster_labels(results)
-        _unique_clusters, cluster_index = np.unique(labels, return_inverse=True)
-        cluster_sizes = np.bincount(cluster_index)
-
-        ate = p1 - p0
-        method = "cluster_robust_ols"
         try:
-            if self._should_use_mixedlm(cluster_sizes):
-                ate, se_diff_adj, df = self._mixedlm_ate(y, w, cluster_index)
-                method = "mixedlm_random_intercept"
-            else:
-                ate, se_diff_adj, df = self._cluster_robust_ols(y, w, cluster_index)
-        except Exception:
-            # Fallback: treat samples as independent when robust estimators fail.
-            se0 = float(np.sqrt(var0 / max(n0, 1)))
-            se1 = float(np.sqrt(var1 / max(n1, 1)))
-            se_diff_adj = float(np.sqrt(se0**2 + se1**2))
-            df = max(min(n0, n1) - 1, 1)
-            method = "welch_t_test_independent"
-
-        if se_diff_adj <= 0.0:
-            t_stat = 0.0
-            p_value = 1.0
-            ci_half = 0.0
-        else:
-            t_stat = ate / se_diff_adj
-            p_value = float(2.0 * (1.0 - stats.t.cdf(abs(t_stat), df=df)))  # type: ignore[arg-type]
-            ci_half = float(stats.t.ppf(0.975, df)) * se_diff_adj  # type: ignore[arg-type]
-
-        ci_lower = ate - ci_half
-        ci_upper = ate + ci_half
+            estimate = estimate_clustered_ate(
+                y,
+                w.astype(int),
+                labels,
+                alpha=self.alpha,
+                bootstrap_reps=self.bootstrap_reps,
+                seed=self.random_seed,
+            )
+        except Exception as exc:
+            warnings.warn(
+                f"Cluster-bootstrap causal estimator failed: {exc}; "
+                "returning explicit insufficient-data result.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            ate = p1 - p0
+            return CausalEffect(
+                ate=ate,
+                se=float("inf"),
+                ci_lower=float("-inf"),
+                ci_upper=float("inf"),
+                p_value=1.0,
+                method="cluster_bootstrap_unavailable",
+                cohens_d=0.0,
+                power=0.0,
+                n_clusters=int(np.unique(labels).size),
+                n_observations=len(results),
+                icc_estimate=0.0,
+                naive_se=0.0,
+                bootstrap_reps=self.bootstrap_reps,
+                bootstrap_valid_reps=0,
+            )
 
         # Cohen's d
         pooled_std = float(np.sqrt((var0 + var1) / 2.0))
-        cohens_d = ate / max(pooled_std, 1e-12) if pooled_std > 0 else 0.0
+        cohens_d = estimate.ate / max(pooled_std, 1e-12) if pooled_std > 0 else 0.0
 
         # Post-hoc power (two-tailed, alpha=0.05)
-        if se_diff_adj <= 0.0:
+        if estimate.se <= 0.0:
             power = 0.0
         else:
-            noncentrality = abs(t_stat)
-            crit = float(stats.t.ppf(0.975, df))  # type: ignore[arg-type]
+            df = max(estimate.n_clusters - 1, 1)
+            noncentrality = abs(estimate.ate / estimate.se)
+            crit = float(stats.t.ppf(1.0 - self.alpha / 2.0, df))  # type: ignore[arg-type]
             power = float(1.0 - stats.nct.cdf(crit, df=df, nc=noncentrality))  # type: ignore[arg-type]
 
         return CausalEffect(
-            ate=ate,
-            se=se_diff_adj,
-            ci_lower=ci_lower,
-            ci_upper=ci_upper,
-            p_value=p_value,
-            method=method,
+            ate=estimate.ate,
+            se=estimate.se,
+            ci_lower=estimate.ci_lower,
+            ci_upper=estimate.ci_upper,
+            p_value=estimate.p_value,
+            method=estimate.method,
             cohens_d=cohens_d,
             power=power,
+            n_clusters=estimate.n_clusters,
+            n_observations=estimate.n_observations,
+            icc_estimate=estimate.icc_estimate,
+            naive_se=estimate.naive_se,
+            bootstrap_reps=estimate.bootstrap_reps,
+            bootstrap_valid_reps=estimate.bootstrap_valid_reps,
         )
 
 
@@ -867,7 +759,11 @@ class AdaptiveExperimentEngine:
         self.bayesian_tester: BayesianSequentialTester | None = (
             BayesianSequentialTester(rng=self.rng) if self.legacy_bayesian_heuristic else None
         )
-        self.causal_engine = CausalInferenceEngine(self.icc_computer)
+        self.causal_engine = CausalInferenceEngine(
+            self.icc_computer,
+            random_seed=int(random_seed),
+            alpha=self.safe_alpha,
+        )
 
         # State
         self.state = ExperimentState.INITIALIZING
@@ -1136,8 +1032,19 @@ class AdaptiveExperimentEngine:
         )
         self._active_experiment_id = experiment_id
         self._init_guardrail_audit_log(experiment_id)
+        self._write_analysis_plan(
+            experiment_id=experiment_id,
+            world_configs=world_configs,
+            planned_max_sessions=int(max_sessions),
+            planned_min_sessions=int(min_sessions),
+            status="planned",
+            actual_sessions=0,
+            deviations=[],
+            causal_method=None,
+        )
 
         session_results: list[AttackResult] = []
+        stop_reason: str | None = None
 
         try:
             for i in range(max(0, int(max_sessions))):
@@ -1168,6 +1075,7 @@ class AdaptiveExperimentEngine:
                                 "safe_null_rate": safe_result.null_rate,
                             }
                         )
+                        stop_reason = "anytime_valid_e_process"
                         break
 
                 if self.enable_bayesian_stopping and self.bayesian_tester is not None:
@@ -1186,6 +1094,7 @@ class AdaptiveExperimentEngine:
                                 "credible_interval": br.credible_interval,
                             }
                         )
+                        stop_reason = "legacy_bayesian_heuristic"
                         break
 
                 # Checkpoint
@@ -1227,6 +1136,7 @@ class AdaptiveExperimentEngine:
                 "final_anytime_valid_result": self._sequential_result_dict(final_safe),
                 "causal_effect": {
                     "ate": self._json_safe_float(causal.ate),
+                    "se": self._json_safe_float(causal.se),
                     "ci": [
                         self._json_safe_float(causal.ci_lower),
                         self._json_safe_float(causal.ci_upper),
@@ -1235,6 +1145,12 @@ class AdaptiveExperimentEngine:
                     "method": causal.method,
                     "cohens_d": self._json_safe_float(causal.cohens_d),
                     "power": self._json_safe_float(causal.power),
+                    "n_clusters": causal.n_clusters,
+                    "n_observations": causal.n_observations,
+                    "icc_estimate": self._json_safe_float(causal.icc_estimate),
+                    "naive_se": self._json_safe_float(causal.naive_se),
+                    "bootstrap_reps": causal.bootstrap_reps,
+                    "bootstrap_valid_reps": causal.bootstrap_valid_reps,
                 },
             }
             if final_bayes is not None:
@@ -1246,6 +1162,21 @@ class AdaptiveExperimentEngine:
                     "rope_decision": final_bayes.rope_decision,
                 }
             self.logger.log(complete_payload)
+            self._write_analysis_plan(
+                experiment_id=experiment_id,
+                world_configs=world_configs,
+                planned_max_sessions=int(max_sessions),
+                planned_min_sessions=int(min_sessions),
+                status="completed",
+                actual_sessions=len(session_results),
+                deviations=self._analysis_deviations(
+                    planned_max_sessions=int(max_sessions),
+                    actual_sessions=len(session_results),
+                    stop_reason=stop_reason,
+                    causal_method=causal.method,
+                ),
+                causal_method=causal.method,
+            )
 
         except KeyboardInterrupt:  # pragma: no cover - user interrupt
             self.state = ExperimentState.FAILED
@@ -1256,6 +1187,16 @@ class AdaptiveExperimentEngine:
                     "completed_sessions": len(session_results),
                 }
             )
+            self._write_analysis_plan(
+                experiment_id=experiment_id,
+                world_configs=world_configs,
+                planned_max_sessions=int(max_sessions),
+                planned_min_sessions=int(min_sessions),
+                status="interrupted",
+                actual_sessions=len(session_results),
+                deviations=["run interrupted before planned completion"],
+                causal_method=None,
+            )
         except Exception as e:
             self.state = ExperimentState.FAILED
             self.logger.log(
@@ -1265,6 +1206,16 @@ class AdaptiveExperimentEngine:
                     "error": str(e),
                     "completed_sessions": len(session_results),
                 }
+            )
+            self._write_analysis_plan(
+                experiment_id=experiment_id,
+                world_configs=world_configs,
+                planned_max_sessions=int(max_sessions),
+                planned_min_sessions=int(min_sessions),
+                status="failed",
+                actual_sessions=len(session_results),
+                deviations=[f"run failed before planned completion: {type(e).__name__}"],
+                causal_method=None,
             )
             raise
         finally:
@@ -1440,6 +1391,12 @@ class AdaptiveExperimentEngine:
             "method": ce.method,
             "cohens_d": ce.cohens_d,
             "power": ce.power,
+            "n_clusters": ce.n_clusters,
+            "n_observations": ce.n_observations,
+            "icc_estimate": ce.icc_estimate,
+            "naive_se": ce.naive_se,
+            "bootstrap_reps": ce.bootstrap_reps,
+            "bootstrap_valid_reps": ce.bootstrap_valid_reps,
         }
 
         # Performance
@@ -1589,6 +1546,213 @@ class AdaptiveExperimentEngine:
                 "payload": payload,
             },
         )
+
+    def _analysis_deviations(
+        self,
+        *,
+        planned_max_sessions: int,
+        actual_sessions: int,
+        stop_reason: str | None,
+        causal_method: str,
+    ) -> list[str]:
+        deviations: list[str] = []
+        if actual_sessions < planned_max_sessions:
+            if stop_reason:
+                deviations.append(
+                    f"stopped at {actual_sessions}/{planned_max_sessions} sessions via {stop_reason}"
+                )
+            else:
+                deviations.append(
+                    f"completed fewer sessions than planned: {actual_sessions}/{planned_max_sessions}"
+                )
+        if causal_method != "cluster_bootstrap_ate":
+            deviations.append(f"causal estimator method differed from plan: {causal_method}")
+        if self.legacy_bayesian_heuristic:
+            deviations.append("legacy Bayesian heuristic was explicitly enabled")
+        return deviations
+
+    def _analysis_plan_payload(
+        self,
+        *,
+        experiment_id: str,
+        world_configs: dict[int, WorldConfig],
+        planned_max_sessions: int,
+        planned_min_sessions: int,
+        status: str,
+        actual_sessions: int,
+        deviations: list[str],
+        causal_method: str | None,
+    ) -> dict[str, Any]:
+        estimand = {
+            "name": "two_world_incremental_guardrail_ate",
+            "notation": "tau = E_P[Y_i(1) - Y_i(0)]",
+            "plain_language": (
+                "Average effect, on the prompt population under evaluation, of composing "
+                "guardrail B onto a system already running guardrail A."
+            ),
+            "world_0": "A-only baseline system",
+            "world_1": "A+B composed system",
+            "outcome": (
+                "Attack success / harmful pass-through indicator as encoded by AttackResult.success"
+            ),
+            "effect_scale": "risk difference; positive values mean higher success in world 1",
+        }
+        assumptions = [
+            "Consistency: observed outcome equals the potential outcome for the assigned world.",
+            "Exchangeability: world assignment is randomized or conditionally ignorable.",
+            "Positivity: every evaluated prompt type has positive probability of both worlds.",
+            "Non-interference across prompts: one prompt's assignment does not affect another prompt's outcome.",
+            "Independent clusters: prompt/attack clusters are independent draws; arbitrary within-cluster correlation is allowed.",
+            "Stable measurement: outcome definition and guardrail semantics are identical across worlds except for adding B.",
+        ]
+        return {
+            "schema": "cc/two-world-analysis-plan.v1",
+            "experiment_id": experiment_id,
+            "status": status,
+            "created_or_updated_at": time.time(),
+            "estimand": estimand,
+            "identifying_assumptions": assumptions,
+            "pre_specified_analysis": {
+                "significance_threshold_alpha": self.safe_alpha,
+                "confidence_level": 1.0 - self.safe_alpha,
+                "causal_estimator": "cluster_bootstrap_ate",
+                "cluster_variable": "AttackResult.attack_strategy, falling back to strategy_type/unknown",
+                "bootstrap_reps": self.causal_engine.bootstrap_reps,
+                "bootstrap_seed": self.causal_engine.random_seed,
+                "sequential_test": (
+                    "anytime_valid_bernoulli_e_process"
+                    if self.enable_anytime_stopping
+                    else "disabled_fixed_sample"
+                ),
+                "safe_null_rate": self.safe_null_rate,
+                "planned_min_sessions": int(planned_min_sessions),
+                "planned_max_sessions": int(planned_max_sessions),
+            },
+            "worlds": {
+                str(world_id): {
+                    "world_id": int(config.world_id),
+                    "guardrail_stack": [
+                        {
+                            "name": spec.name,
+                            "version": spec.version,
+                            "config_hash": spec.config_hash,
+                        }
+                        for spec in config.guardrail_stack
+                    ],
+                    "description": config.description,
+                    "baseline_success_rate": config.baseline_success_rate,
+                    "env_hash": config.env_hash,
+                }
+                for world_id, config in sorted(world_configs.items())
+            },
+            "actual_run": {
+                "actual_sessions": int(actual_sessions),
+                "causal_method": causal_method,
+                "deviations": list(deviations),
+            },
+        }
+
+    @staticmethod
+    def _analysis_plan_markdown(payload: dict[str, Any]) -> str:
+        estimand = payload["estimand"]
+        prespec = payload["pre_specified_analysis"]
+        actual = payload["actual_run"]
+        assumptions = "\n".join(f"- {item}" for item in payload["identifying_assumptions"])
+        deviations = actual["deviations"] or ["None recorded."]
+        deviations_md = "\n".join(f"- {item}" for item in deviations)
+        worlds_md = "\n".join(
+            f"- World {world_id}: {world['description'] or '(no description)'}; "
+            f"guards={[spec['name'] for spec in world['guardrail_stack']]}"
+            for world_id, world in payload["worlds"].items()
+        )
+        return "\n".join(
+            [
+                "# Two-World Analysis Plan",
+                "",
+                f"Experiment: `{payload['experiment_id']}`",
+                f"Status: `{payload['status']}`",
+                "",
+                "## Estimand",
+                "",
+                f"`{estimand['notation']}`",
+                "",
+                estimand["plain_language"],
+                "",
+                f"- World 0: {estimand['world_0']}",
+                f"- World 1: {estimand['world_1']}",
+                f"- Outcome: {estimand['outcome']}",
+                f"- Scale: {estimand['effect_scale']}",
+                "",
+                "## Identifying Assumptions",
+                "",
+                assumptions,
+                "",
+                "## Pre-Specified Analysis",
+                "",
+                f"- Alpha: {prespec['significance_threshold_alpha']}",
+                f"- Confidence level: {prespec['confidence_level']}",
+                f"- Causal estimator: {prespec['causal_estimator']}",
+                f"- Cluster variable: {prespec['cluster_variable']}",
+                f"- Bootstrap reps: {prespec['bootstrap_reps']}",
+                f"- Bootstrap seed: {prespec['bootstrap_seed']}",
+                f"- Sequential test: {prespec['sequential_test']}",
+                f"- Safe null rate: {prespec['safe_null_rate']}",
+                f"- Planned sessions: {prespec['planned_min_sessions']} to {prespec['planned_max_sessions']}",
+                "",
+                "## Worlds",
+                "",
+                worlds_md or "- None recorded.",
+                "",
+                "## Actual Run",
+                "",
+                f"- Actual sessions: {actual['actual_sessions']}",
+                f"- Causal method: {actual['causal_method']}",
+                "",
+                "## Deviations",
+                "",
+                deviations_md,
+                "",
+            ]
+        )
+
+    def _write_analysis_plan(
+        self,
+        *,
+        experiment_id: str,
+        world_configs: dict[int, WorldConfig],
+        planned_max_sessions: int,
+        planned_min_sessions: int,
+        status: str,
+        actual_sessions: int,
+        deviations: list[str],
+        causal_method: str | None,
+    ) -> dict[str, Any]:
+        ckpt_dir = Path("checkpoints") / experiment_id
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+        payload = self._analysis_plan_payload(
+            experiment_id=experiment_id,
+            world_configs=world_configs,
+            planned_max_sessions=planned_max_sessions,
+            planned_min_sessions=planned_min_sessions,
+            status=status,
+            actual_sessions=actual_sessions,
+            deviations=deviations,
+            causal_method=causal_method,
+        )
+        json_path = ckpt_dir / "analysis_plan.json"
+        md_path = ckpt_dir / "analysis_plan.md"
+        json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        md_path.write_text(self._analysis_plan_markdown(payload), encoding="utf-8")
+        self.logger.log(
+            {
+                "event": "analysis_plan_written",
+                "experiment_id": experiment_id,
+                "status": status,
+                "analysis_plan_json": str(json_path),
+                "analysis_plan_markdown": str(md_path),
+            }
+        )
+        return payload
 
     def _save_checkpoint(
         self, experiment_id: str, results: list[AttackResult], final: bool = False
