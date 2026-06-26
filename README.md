@@ -897,10 +897,11 @@ cc-bundle run \
   --guardrails-config /tmp/cc-guardrails.json \
   --output-dir runs/evidence \
   --run-id demo \
+  --unsigned \
   --disable-plots
 ```
 
-By default, the attestation is unsigned and no private key is written into the bundle. Pass `--private-key-path` only with an externally managed Ed25519 key outside the output directory.
+Unsigned mode must be requested explicitly with `--unsigned`; otherwise pass `--private-key-path` with an externally managed Ed25519 key outside the output directory. The bundle generator never writes a private key into the output directory.
 
 ---
 

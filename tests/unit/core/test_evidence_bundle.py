@@ -21,6 +21,7 @@ def _bundle_config(tmp_path: Path, prompt_text: str = "user email: test@example.
         seed=123,
         enable_plots=False,
         env_gates={"allow_real": False},
+        unsigned=True,
     )
 
 
@@ -39,6 +40,7 @@ def test_evidence_bundle_emits_leak_safe_artifacts(tmp_path: Path, monkeypatch) 
     assert "test@example.com" not in manifest_text
 
     assert (output_dir / "ledger.jsonl").exists()
+    assert (output_dir / "transparency_log.jsonl").exists()
     assert (output_dir / "attestation.json").exists()
     assert (output_dir / "bundle_hashes.json").exists()
     assert not list(output_dir.glob("*private*key*"))
@@ -54,6 +56,19 @@ def test_evidence_bundle_default_attestation_is_unsigned(tmp_path: Path, monkeyp
     assert '"signature_status": "unsigned"' in attestation
     assert '"signature": null' in attestation
     assert "PRIVATE KEY" not in attestation
+
+
+def test_evidence_bundle_requires_key_or_explicit_unsigned_mode(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    config = _bundle_config(tmp_path)
+    config.unsigned = False
+
+    with pytest.raises(ValueError, match="private_key_path"):
+        run_evidence_bundle(config)
 
 
 def test_evidence_bundle_signs_with_external_key(tmp_path: Path, monkeypatch) -> None:
@@ -74,6 +89,7 @@ def test_evidence_bundle_signs_with_external_key(tmp_path: Path, monkeypatch) ->
 
     config = _bundle_config(tmp_path)
     config.private_key_path = key_path
+    config.unsigned = False
 
     result = run_evidence_bundle(config)
     output_dir = Path(result["output_dir"])

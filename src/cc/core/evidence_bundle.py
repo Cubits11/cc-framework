@@ -6,7 +6,7 @@ Outputs deterministic, leak-safe artifacts:
 - metrics.json (summary metrics)
 - manifest.json (rerun command, seed, env gates)
 - ledger.jsonl (tamper-evident chain)
-- attestation.json (unsigned by default; Ed25519-signed when an external key is provided)
+- attestation.json (explicitly unsigned, or Ed25519-signed with an external key)
 - plots/ (quantitative plots)
 """
 
@@ -15,8 +15,9 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import secrets
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,14 @@ from cc.core.manifest import (
     guardrail_versions_from_instances,
 )
 from cc.core.registry import build_guardrails
+from cc.evidence.anchoring import (
+    Ed25519Witness,
+    RootCheckpoint,
+    Witness,
+    anchor_root,
+    verify_anchor,
+)
+from cc.evidence.merkle_log import HASH_ALGORITHM, MerkleLog
 from cc.utils.artifacts import detect_git_commit, write_json
 
 
@@ -50,27 +59,22 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _canonical_json_bytes(data: Any) -> bytes:
+    return json.dumps(
+        data,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
 def _sha256_json(data: dict[str, Any]) -> str:
-    payload = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return _sha256_bytes(payload)
+    return _sha256_bytes(_canonical_json_bytes(data))
 
 
 def _sha256_file(path: Path) -> str:
     return _sha256_bytes(path.read_bytes())
-
-
-def _merkle_root(lines: Iterable[str]) -> str:
-    hashes = [hashlib.sha256(line.encode("utf-8")).digest() for line in lines]
-    if not hashes:
-        return _sha256_bytes(b"")
-    while len(hashes) > 1:
-        if len(hashes) % 2 == 1:
-            hashes.append(hashes[-1])
-        next_level = []
-        for left, right in zip(hashes[0::2], hashes[1::2], strict=False):
-            next_level.append(hashlib.sha256(left + right).digest())
-        hashes = next_level
-    return hashes[0].hex()
 
 
 _SENSITIVE_ARG_NAMES = {
@@ -116,8 +120,8 @@ def _load_required_private_key(path: Path):
     if not path.exists():
         raise FileNotFoundError(
             f"Signing key not found: {path}. Generate and manage signing keys outside "
-            "the evidence output directory, or omit private_key_path to emit an unsigned "
-            "local attestation."
+            "the evidence output directory, or pass explicit unsigned=True/--unsigned "
+            "mode for a local unsigned attestation."
         )
     key = serialization.load_pem_private_key(path.read_bytes(), password=None)
     if not isinstance(key, ed25519.Ed25519PrivateKey):
@@ -133,6 +137,16 @@ def _assert_key_outside_output(private_key_path: Path, output_dir: Path) -> None
             "private_key_path must live outside the evidence output directory; "
             "otherwise the bundle can leak the signing key."
         )
+
+
+def _attestation_signing_payload(attestation: Mapping[str, Any]) -> dict[str, Any]:
+    payload = dict(attestation)
+    payload["signature"] = None
+    return payload
+
+
+def _attestation_signing_bytes(attestation: Mapping[str, Any]) -> bytes:
+    return _canonical_json_bytes(_attestation_signing_payload(attestation))
 
 
 def _read_text_lines(path: Path) -> list[str]:
@@ -207,10 +221,15 @@ class EvidenceBundleConfig:
     composition: str = "any_block"
     benign_calibration_source: Path | None = None
     private_key_path: Path | None = None
+    unsigned: bool = False
     run_id: str | None = None
+    run_nonce: str | None = None
     seed: int = 1337
     enable_plots: bool = True
     env_gates: dict[str, Any] | None = None
+    witness: Witness | None = None
+    witness_private_key_path: Path | None = None
+    witness_id: str = "cc-evidence-witness"
 
 
 def _event_id(run_id: str, prompt_hash: str, guardrail_name: str, index: int) -> str:
@@ -242,8 +261,25 @@ def _render_block_rate_plot(path: Path, labels: Sequence[str], values: Sequence[
 def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
     run_id = config.run_id or f"bundle_{uuid4().hex[:12]}"
     output_dir = config.output_dir / run_id
+
+    if config.private_key_path is None and not config.unsigned:
+        raise ValueError(
+            "Evidence bundle attestation requires private_key_path, or explicit "
+            "unsigned=True/--unsigned mode."
+        )
+    if config.private_key_path is not None and config.unsigned:
+        raise ValueError("Use either private_key_path or unsigned=True, not both.")
+
+    if config.witness is not None and config.witness_private_key_path is not None:
+        raise ValueError("Use either witness or witness_private_key_path, not both.")
+    if config.private_key_path is not None:
+        _assert_key_outside_output(config.private_key_path, output_dir)
+    if config.witness_private_key_path is not None:
+        _assert_key_outside_output(config.witness_private_key_path, output_dir)
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    run_nonce = config.run_nonce or secrets.token_hex(16)
     random.seed(config.seed)
 
     prompt_rows = _load_prompts(config.prompt_source)
@@ -258,6 +294,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
 
     results_path = output_dir / "results.jsonl"
     results_lines: list[str] = []
+    result_records: list[dict[str, Any]] = []
     guardrail_block_counts: dict[str, int] = {}
     guardrail_review_counts: dict[str, int] = {}
     guardrail_totals: dict[str, int] = {}
@@ -347,6 +384,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
             "verdicts": verdicts,
             "timestamp": _utc_now(),
         }
+        result_records.append(record)
         line = json.dumps(record, sort_keys=True)
         results_lines.append(line)
 
@@ -370,6 +408,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
 
     manifest = {
         "run_id": run_id,
+        "run_nonce": run_nonce,
         "created_at": _utc_now(),
         "prompt_source": str(config.prompt_source),
         "guardrails": config.guardrails,
@@ -418,34 +457,77 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
             _render_block_rate_plot(plot_path, labels, values)
             plot_paths.append(str(plot_path))
 
+    transparency_log_path = output_dir / "transparency_log.jsonl"
+    if transparency_log_path.exists():
+        transparency_log_path.unlink()
+    transparency_log_path.touch()
+    log_id = f"cc-evidence-bundle:{run_id}"
+    transparency_log = MerkleLog(transparency_log_path, log_id=log_id)
+    for result_record in result_records:
+        transparency_log.append(result_record)
+    transparency_root_hash = transparency_log.root_hash()
+    transparency_tree_size = transparency_log.tree_size
+
+    witness = config.witness
+    if witness is None and config.witness_private_key_path is not None:
+        witness = Ed25519Witness.from_private_key_path(
+            config.witness_private_key_path,
+            witness_id=config.witness_id,
+        )
+
+    anchor_payload: dict[str, Any] | None = None
+    if witness is not None:
+        checkpoint = RootCheckpoint.create(
+            log_id=log_id,
+            tree_size=transparency_tree_size,
+            root_hash=transparency_root_hash,
+            run_nonce=run_nonce,
+        )
+        anchor_payload = anchor_root(checkpoint, witness).to_dict()
+
     ledger_path = output_dir / "ledger.jsonl"
-    results_merkle_root = _merkle_root(results_lines)
     ledger_record = {
         "record_type": "evidence_bundle",
         "run_id": run_id,
+        "run_nonce": run_nonce,
         "created_at": _utc_now(),
         "metrics_hash": _sha256_json(metrics),
         "manifest_hash": _sha256_json(manifest),
-        "results_merkle_root": results_merkle_root,
+        "results_merkle_root": transparency_root_hash,
+        "transparency_log": {
+            "hash_algorithm": HASH_ALGORITHM,
+            "log_id": log_id,
+            "root_hash": transparency_root_hash,
+            "tree_size": transparency_tree_size,
+        },
         "plot_paths": plot_paths,
     }
     audit_chain.append_jsonl(str(ledger_path), ledger_record)
 
     attestation = {
+        "schema": "cc/evidence-attestation.v2",
         "run_id": run_id,
+        "run_nonce": run_nonce,
         "timestamp": _utc_now(),
         "manifest_hash": _sha256_json(manifest),
         "metrics_hash": _sha256_json(metrics),
-        "results_merkle_root": results_merkle_root,
+        "results_merkle_root": transparency_root_hash,
+        "transparency_log": {
+            "hash_algorithm": HASH_ALGORITHM,
+            "log_id": log_id,
+            "root_hash": transparency_root_hash,
+            "tree_size": transparency_tree_size,
+        },
         "ledger_tail_hash": audit_chain.tail_sha(str(ledger_path)),
+        "anchor": anchor_payload,
         "public_key": None,
         "signature": None,
-        "signature_status": "unsigned",
+        "signature_status": "unsigned" if config.unsigned else "pending",
+        "unsigned_reason": "explicit_unsigned_mode" if config.unsigned else None,
     }
     if config.private_key_path is not None:
         from cryptography.hazmat.primitives import serialization
 
-        _assert_key_outside_output(config.private_key_path, output_dir)
         private_key = _load_required_private_key(config.private_key_path)
         public_key = private_key.public_key()
         public_key_bytes = public_key.public_bytes(
@@ -454,10 +536,8 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         )
         attestation["public_key"] = public_key_bytes.hex()
         attestation["signature_status"] = "signed"
-        attestation_message = json.dumps(
-            attestation, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-        attestation["signature"] = private_key.sign(attestation_message).hex()
+        attestation["unsigned_reason"] = None
+        attestation["signature"] = private_key.sign(_attestation_signing_bytes(attestation)).hex()
     attestation_path = output_dir / "attestation.json"
     write_json(attestation_path, attestation)
 
@@ -466,6 +546,7 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         "metrics.json": _sha256_file(metrics_path),
         "manifest.json": _sha256_file(manifest_path),
         "ledger.jsonl": _sha256_file(ledger_path),
+        "transparency_log.jsonl": _sha256_file(transparency_log_path),
         "attestation.json": _sha256_file(attestation_path),
     }
     hashes_path = output_dir / "bundle_hashes.json"
@@ -478,6 +559,9 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         "metrics_path": str(metrics_path),
         "manifest_path": str(manifest_path),
         "ledger_path": str(ledger_path),
+        "transparency_log_path": str(transparency_log_path),
+        "transparency_root_hash": transparency_root_hash,
+        "transparency_tree_size": transparency_tree_size,
         "attestation_path": str(attestation_path),
         "hashes_path": str(hashes_path),
         "plot_paths": plot_paths,
@@ -485,6 +569,135 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         "run_manifest_chain": manifest_artifacts["chain_path"],
         "run_manifest_chain_head": manifest_artifacts["chain_head"],
     }
+
+
+def _read_results_records(path: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, raw in enumerate(handle, start=1):
+            if not raw.strip():
+                continue
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise ValueError(f"results line {line_number} is not a JSON object")
+            records.append(payload)
+    return records
+
+
+def _verify_attestation_signature(
+    attestation: Mapping[str, Any],
+    *,
+    require_signature: bool,
+) -> tuple[bool, str]:
+    signature_status = attestation.get("signature_status")
+    if signature_status == "unsigned":
+        if require_signature:
+            return False, "attestation is unsigned"
+        if attestation.get("signature") is not None or attestation.get("public_key") is not None:
+            return False, "unsigned attestation contains signature material"
+        return True, "unsigned attestation accepted"
+
+    if signature_status != "signed":
+        return False, "attestation signature_status is invalid"
+
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        public_key_hex = attestation.get("public_key")
+        signature_hex = attestation.get("signature")
+        if not isinstance(public_key_hex, str) or not isinstance(signature_hex, str):
+            return False, "signed attestation missing public key or signature"
+        public_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(public_key_hex))
+        public_key.verify(bytes.fromhex(signature_hex), _attestation_signing_bytes(attestation))
+        return True, "signature verified"
+    except Exception:
+        return False, "signature verification failed"
+
+
+def verify_evidence_bundle(
+    output_dir: Path,
+    *,
+    require_signature: bool = True,
+    require_anchor: bool = False,
+    trusted_witness_public_keys: Mapping[str, str] | None = None,
+) -> tuple[bool, str]:
+    """Verify an evidence bundle without trusting its host storage."""
+
+    try:
+        output_dir = Path(output_dir)
+        attestation_path = output_dir / "attestation.json"
+        manifest_path = output_dir / "manifest.json"
+        metrics_path = output_dir / "metrics.json"
+        results_path = output_dir / "results.jsonl"
+        transparency_log_path = output_dir / "transparency_log.jsonl"
+
+        attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        result_records = _read_results_records(results_path)
+
+        if attestation.get("manifest_hash") != _sha256_json(manifest):
+            return False, "manifest hash mismatch"
+        if attestation.get("metrics_hash") != _sha256_json(metrics):
+            return False, "metrics hash mismatch"
+        if attestation.get("run_id") != manifest.get("run_id"):
+            return False, "run_id mismatch"
+        if not manifest.get("run_nonce") or attestation.get("run_nonce") != manifest.get("run_nonce"):
+            return False, "run_nonce mismatch"
+
+        transparency = attestation.get("transparency_log")
+        if not isinstance(transparency, Mapping):
+            return False, "missing transparency log checkpoint"
+
+        expected_log = MerkleLog(
+            records=result_records,
+            log_id=str(transparency.get("log_id", "cc-transparency-log")),
+        )
+        expected_root = expected_log.root_hash()
+        expected_tree_size = expected_log.tree_size
+
+        if transparency.get("hash_algorithm") != HASH_ALGORITHM:
+            return False, "unsupported transparency hash algorithm"
+        if transparency.get("root_hash") != expected_root:
+            return False, "transparency root mismatch"
+        if transparency.get("tree_size") != expected_tree_size:
+            return False, "transparency tree size mismatch"
+        if attestation.get("results_merkle_root") != expected_root:
+            return False, "results merkle root mismatch"
+
+        if transparency_log_path.exists():
+            disk_log = MerkleLog(transparency_log_path)
+            if disk_log.root_hash() != expected_root or disk_log.tree_size != expected_tree_size:
+                return False, "transparency log file mismatch"
+            if disk_log.records != result_records:
+                return False, "transparency log records mismatch"
+
+        ok, reason = _verify_attestation_signature(
+            attestation,
+            require_signature=require_signature,
+        )
+        if not ok:
+            return False, reason
+
+        anchor = attestation.get("anchor")
+        if require_anchor and anchor is None:
+            return False, "required root anchor is missing"
+        if anchor is not None:
+            if not trusted_witness_public_keys:
+                return False, "trusted witness public keys are required for anchor verification"
+            if not verify_anchor(
+                anchor,
+                trusted_witness_public_keys=trusted_witness_public_keys,
+                expected_root_hash=expected_root,
+                expected_tree_size=expected_tree_size,
+                expected_log_id=str(transparency["log_id"]),
+                expected_run_nonce=str(attestation["run_nonce"]),
+            ):
+                return False, "root anchor verification failed"
+
+        return True, "evidence bundle verified"
+    except Exception as exc:
+        return False, f"evidence bundle verification error: {exc}"
 
 
 def _parse_guardrail_config(path: Path) -> list[dict[str, Any]]:
@@ -510,6 +723,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--benign-calibration-source", type=Path, default=None)
     parser.add_argument("--private-key-path", type=Path, default=None)
+    parser.add_argument("--unsigned", action="store_true")
+    parser.add_argument("--witness-private-key-path", type=Path, default=None)
+    parser.add_argument("--witness-id", type=str, default="cc-evidence-witness")
     parser.add_argument("--disable-plots", action="store_true")
     args = parser.parse_args(argv)
 
@@ -520,10 +736,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         composition=args.composition,
         benign_calibration_source=args.benign_calibration_source,
         private_key_path=args.private_key_path,
+        unsigned=args.unsigned,
         run_id=args.run_id,
         seed=args.seed,
         enable_plots=not args.disable_plots,
         env_gates={"allow_real": False},
+        witness_private_key_path=args.witness_private_key_path,
+        witness_id=args.witness_id,
     )
 
     result = run_evidence_bundle(config)
