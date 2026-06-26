@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "experiment_id": "exp_1782517221",
+    "config_file": "experiments/configs/week5_pilot.yaml",
+    "config_sha256": "c9b16860a4c0031f885559d94e9e0c3105e1c9a355bb27221cbc974a188f0f89",
+    "dataset_sha256": "unknown",
+    "n_sessions_requested": 150,
+    "n_sessions_completed": 150,
+    "attacker_type": "RandomInjectionAttacker",
+    "timestamp_unix": 1782517224.366395,
+    "git_commit": "5120e0015f253c72bf87902cd3e8e9de22d7b49a",
+    "configuration": {
+      "seed": 123,
+      "alpha_cap": 0.05,
+      "baseline_success_rate": 0.65,
+      "episode_length": 10,
+      "attacker": {
+        "type": "random_injection",
+        "params": {
+          "vocab_harmful": [
+            "attack",
+            "breach",
+            "exploit",
+            "bypass",
+            "override",
+            "poison"
+          ],
+          "vocab_benign": [
+            "hello",
+            "thanks",
+            "please",
+            "info",
+            "question",
+            "assist"
+          ]
+        }
+      },
+      "guardrails": [
+        {
+          "name": "toy_threshold",
+          "params": {
+            "keywords": [
+              "attack",
+              "breach",
+              "exploit",
+              "bypass",
+              "override",
+              "poison"
+            ],
+            "threshold": 0.2,
+            "alpha_cap": 0.05
+          },
+          "fpr_target": 0.05
+        }
+      ],
+      "protocol": {
+        "epsilon": 0.01,
+        "T": 0.5
+      },
+      "experiment": {
+        "n_sessions": 150,
+        "memo_tag": "week5_pilot"
+      },
+      "notes": {
+        "purpose": "Week 5 pilot to measure guardrail interaction effects",
+        "usage": "make week5-pilot\n"
+      }
+    },
+    "calibration_summary": {
+      "name": "toy_threshold",
+      "threshold": 0.13392857142857142,
+      "fpr": 0.04,
+      "n_texts": 200,
+      "alpha_cap": 0.05,
+      "target_window": [
+        0.04,
+        0.06
+      ],
+      "stack_fpr": 0.04,
+      "timestamp": "2026-06-26T23:40:20.625202Z"
+    },
+    "sequential_stopping": {
+      "anytime_valid_enabled": false,
+      "legacy_bayesian_heuristic": false,
+      "safe_null_rate": null,
+      "alpha": 0.05
+    }
+  },
+  "results": {
+    "sample_sizes": {
+      "world_0": 76,
+      "world_1": 74,
+      "total": 150
+    },
+    "success_rates": {
+      "world_0_empirical": 1.0,
+      "world_1_empirical": 0.5945945945945946
+    },
+    "operating_points": {
+      "world_0": {
+        "tpr": 0.0,
+        "fpr": 0.0
+      },
+      "world_1": {
+        "tpr": 0.4054054054054054,
+        "fpr": 0.04
+      }
+    },
+    "j_statistic": {
+      "empirical": 0.4054054054054054,
+      "theoretical_max": 0.3654054054054054,
+      "confidence_interval": {
+        "lower": 0.29729729729729726,
+        "upper": 0.5405405405405406,
+        "method": "bootstrap"
+      }
+    },
+    "composability_metrics": {
+      "cc_max": 1.1094674556213018,
+      "delta_add": 0.03999999999999998
+    },
+    "metrics_for_audit": {
+      "J_A": 0.0,
+      "J_A_CI": null,
+      "J_B": 0.3654054054054054,
+      "J_B_CI": null,
+      "J_comp": 0.4054054054054054,
+      "J_comp_CI": [
+        0.29729729729729726,
+        0.5405405405405406
+      ],
+      "CC_max": 1.1094674556213018,
+      "Delta_add": 0.03999999999999998,
+      "TPR_A": 0.0,
+      "FPR_A": 0.0,
+      "TPR_B": 0.4054054054054054,
+      "FPR_B": 0.04
+    }
+  }
+}

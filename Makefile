@@ -24,6 +24,7 @@ TYPE_TARGETS ?= \
 	src/cc/cartographer/bounds.py \
 	src/cc/cartographer/intervals.py \
 	src/cc/io/storage.py \
+	src/cc/kernel/sensitivity.py \
 	src/cc/utils/artifacts.py \
 	src/cc/utils/timing.py
 
