@@ -45,3 +45,34 @@ jobs:
             src/cc/utils/timing.py
       - name: Tests
         run: pytest -q
+
+  enterprise-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Python enterprise dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -e '.[enterprise,test]'
+      - name: Install and synthesize CDK
+        working-directory: infra
+        run: |
+          npm ci
+          npm run build
+          npm run synth
+      - name: Install and build dashboard
+        working-directory: apps/dashboard
+        run: |
+          npm ci
+          npm run build
+      - name: Enterprise emulation and dashboard smoke
+        run: |
+          pytest tests/integration/test_enterprise_aws_emulation.py tests/e2e/test_enterprise_smoke.py

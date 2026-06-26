@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .venv/
+.venv-enterprise/
 .env
 
 # builds / caches
@@ -19,6 +20,7 @@ site/
 # results & runs (keep artifacts small)
 results/raw/
 results/aggregates/
+runs/
 runs/*.jsonl
 runs/*.jsonl.bak
 
@@ -32,6 +34,8 @@ runs/*.jsonl.bak
 
 # Node
 node_modules/
+.next/
+cdk.out/
 
 # editor swap/backup files
 *.swp
