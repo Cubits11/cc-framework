@@ -460,7 +460,7 @@ However, its methodology transfers naturally to privacy-auditing research becaus
 | Guardrail failure under distribution shift | Privacy leakage under deployment or query shift |
 | Marginal guardrail rates | Aggregate attack success rates |
 | Unknown joint dependence | Hidden dependence between risk factors |
-| Correlation cliffs | Sudden leakage increases under access or subgroup changes |
+| Tail-dependence cliffs | Sudden leakage increases under access or subgroup changes |
 | Two-world evaluation | Baseline model vs. defended model, or score-access vs. label-only access |
 | Subpopulation-concentrated failures | Group-specific privacy vulnerability |
 | Audit packet | Privacy report with assumptions, threat model, metrics, artifacts |
@@ -691,6 +691,22 @@ Includes:
 - sample size planning helpers
 
 Use this module when you need dependence-aware bounds over composed ROC behavior.
+
+---
+
+### `src/cc/kernel/cliff.py`
+
+Copula tail-dependence estimators and cliff certificates.
+
+Includes:
+
+- empirical lower and upper tail-dependence estimates
+- Gaussian, Clayton, Gumbel, and Student-t copula model selection
+- AIC/BIC candidate rankings
+- bootstrap cliff certificates for sub-critical, critical, and super-critical co-failure regimes
+
+Use this module when joint extreme guardrail co-failure is the object of inference.
+See `docs/theory/correlation_cliffs.md` for the formal definition.
 
 ---
 

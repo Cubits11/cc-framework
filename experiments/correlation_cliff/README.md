@@ -6,15 +6,15 @@
 
 ## TL;DR: What This Experiment Does
 
-You have two AI guardrails (A and B) that flag unsafe content. You want to combine them with a rule like AND or OR. **The hidden danger**: if their failures correlate, the composition can make your system WORSE than using just the best single guardrail.
+You have two AI guardrails (A and B) that flag unsafe content. You want to combine them with a rule like AND or OR. **The hidden danger**: if their failures are tail-dependent, the composition can make your system WORSE than using just the best single guardrail.
 
-This experiment **discovers and quantifies the "correlation cliff"** - the exact dependence threshold (ρ\* or λ\*) where composition flips from constructive (safer) to destructive (less safe).
+This experiment explores the historical "correlation cliff" idea. The formal version is a **tail-dependence cliff**: a threshold in copula lower/upper tail coefficients (`lambda_L`, `lambda_U`), not a threshold in Pearson correlation. See `docs/theory/correlation_cliffs.md`.
 
 **Key outputs**:
 - 📊 **Phase diagram**: CC vs correlation with the cliff clearly visible
-- 📈 **Threshold estimate**: λ\* ≈ 0.47 (example) with 95% CI [0.44, 0.51]
+- 📈 **Threshold estimate**: tail-dependence λ\* ≈ 0.47 (example) with 95% CI [0.44, 0.51]
 - ✅ **FH bounds validation**: All empirical points within theoretical envelope (0 violations)
-- 🎯 **Actionable insight**: "Don't compose these rails if ρ > 0.47"
+- 🎯 **Actionable insight**: "Don't compose these rails if max(lambda_L, lambda_U) > 0.47"
 
 ---
 
@@ -57,7 +57,7 @@ pip install scipy  # optional, for gaussian_copula path
 **Reality**: Guardrail composition performance depends on **dependence structure** between failures:
 - If failures are **anti-correlated** (one fails when the other succeeds): composition is **constructive** (CC < 1)
 - If failures are **independent**: composition performance is predictable
-- If failures are **correlated** (both fail together): composition is **destructive** (CC > 1)
+- If failures are **tail-dependent** (extreme failures persist together): composition can be **destructive** (CC > 1)
 
 ### Why This Matters
 
@@ -67,7 +67,7 @@ pip install scipy  # optional, for gaussian_copula path
 
 ### Our Contribution (This Experiment)
 
-**Novel Result**: The "correlation cliff" - a sharp phase transition where CC crosses 1.0 as dependence increases.
+**Novel Result**: The "correlation cliff" should be treated as a tail-dependence claim: sharp co-failure growth occurs when rare-event overlap is controlled by positive `lambda_L` or `lambda_U`.
 
 **Key Innovation**: We don't assume independence. Instead:
 1. Fix per-guardrail marginals (TPR, FPR) based on isolated testing
