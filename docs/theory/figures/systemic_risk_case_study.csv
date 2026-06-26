@@ -1,0 +1,7 @@
+method,metric,stress_budget,realized_distance,composed_failure_risk,effective_protection,risk_increase_vs_baseline,gap_to_fh_upper,note
+Empirical copula baseline,observed,0.0,0.0,0.08,0.92,0.0,0.12000000000000001,Observed synthetic joint failure rate.
+CCF beta-factor point estimate,module4_beta_factor,,,0.08,0.92,0.0,0.12000000000000001,"beta_hat=0.302776, fitted to the same empirical co-failure rate."
+Budget-constrained stress eps=0.02,wasserstein,0.02,0.019999999999999997,0.09999999999999998,0.9,0.019999999999999976,0.10000000000000003,Worst fixed-marginal dependence shift inside normalized-Hamming W1 ball.
+Budget-constrained stress eps=0.06,wasserstein,0.06,0.060000000000000005,0.14,0.86,0.06000000000000001,0.06,Worst fixed-marginal dependence shift inside normalized-Hamming W1 ball.
+Budget-constrained stress eps=0.10,wasserstein,0.1,0.09999999999999998,0.18,0.8200000000000001,0.09999999999999999,0.020000000000000018,Worst fixed-marginal dependence shift inside normalized-Hamming W1 ball.
+Unconstrained FH upper limit,frechet_hoeffding,inf,0.12,0.2,0.8,0.12000000000000001,0.0,"Budget-to-infinity comparison point, not a finite local stress estimate."

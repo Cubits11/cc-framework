@@ -54,12 +54,24 @@ from cc.kernel.sequential import (
     independent_joint_miss_baseline,
     simulate_power_curve,
 )
+from cc.kernel.stress import (
+    BaselineDependence,
+    ConditionalComposedRiskResult,
+    StressBudget,
+    StressMetric,
+    StressTestResult,
+    composed_risk_given_guardrail_X_failure,
+    composed_risk_given_guardrail_x_failure,
+    stress_test,
+)
 
 __all__ = [
     "AnytimeBernoulliResult",
     "AnytimeBernoulliTester",
+    "BaselineDependence",
     "CalibrationResult",
     "CliffCertificate",
+    "ConditionalComposedRiskResult",
     "CopulaCandidateFit",
     "CopulaFitResult",
     "DependenceEvidence",
@@ -69,6 +81,9 @@ __all__ = [
     "PairwiseDependence",
     "PairwiseJointConstraint",
     "PowerResult",
+    "StressBudget",
+    "StressMetric",
+    "StressTestResult",
     "TailDependenceCI",
     "TailDependenceEstimate",
     "alpha_factor",
@@ -82,6 +97,8 @@ __all__ = [
     "calibrate_false_stop_rate",
     "classical_frechet_bounds",
     "cliff_certificate",
+    "composed_risk_given_guardrail_X_failure",
+    "composed_risk_given_guardrail_x_failure",
     "dependence_to_joint_probability",
     "distribution_moments",
     "estimate_tail_dependence",
@@ -101,5 +118,6 @@ __all__ = [
     "sample_binary_vectors",
     "sample_copula",
     "simulate_power_curve",
+    "stress_test",
     "theoretical_tail_dependence",
 ]
