@@ -74,7 +74,7 @@ Experimental surfaces include:
 
 - two-world evaluation for baseline-vs-shift comparison
 - adversarial attack simulation utilities
-- ICC-aware and Bayesian stopping diagnostics
+- ICC-aware diagnostics and anytime-valid sequential stopping
 - alternative composition metrics and plotting
 - vendor guardrail adapters
 
@@ -160,7 +160,7 @@ This distinction matters because safety, privacy, or audit claims should depend 
 | Level | Meaning | Examples |
 |---|---|---|
 | **Kernel** | Intended stable research logic. Changes should preserve documented invariants. | Fréchet-Hoeffding bounds, probability validation, composition metrics, audit-chain verification |
-| **Protocol** | Research workflow logic that may evolve but should preserve documented output semantics. | two-world protocol, ICC-aware evaluation, Bayesian sequential testing, ATE summaries |
+| **Protocol** | Research workflow logic that may evolve but should preserve documented output semantics. | two-world protocol, ICC-aware evaluation, anytime-valid sequential testing, ATE summaries |
 | **Experimental** | Exploration code, notebooks, simulations, and analysis scripts. APIs may change. | correlation-cliff experiments, atlas generation, path sensitivity studies |
 | **Application** | Adapters, demos, toy guardrails, dashboards, and user-facing workflows. APIs may change fastest. | guardrail adapters, CLI demos, visualization scripts |
 
@@ -525,13 +525,13 @@ The protocol layer includes experimental statistical components such as:
 
 - ICC-aware correction for clustered attack trials
 - one-way random-effects ANOVA for ICC estimation
-- ROPE-based Bayesian sequential testing
-- Beta posterior modeling for proportions
+- anytime-valid e-process sequential testing
+- deprecated Bayesian ROPE heuristic only behind an explicit legacy flag
 - ATE estimation for world effects
 - confidence intervals adjusted by design effect
 - deterministic checkpoints for experiment recovery
 
-These components are diagnostics, not validated Bayesian or causal evidence by themselves. Claims should state assumptions and use seeded, reproducible runs.
+These components are diagnostics unless their assumptions are stated and checked. The anytime-valid stopping rule controls Type-I error under the null stated in `docs/theory/anytime_valid.md`; causal claims still require their own identification assumptions.
 
 ---
 
@@ -648,7 +648,8 @@ Adaptive two-world experiment engine.
 Includes:
 
 - ICC computation
-- ROPE-based Bayesian sequential testing
+- anytime-valid e-process sequential testing
+- deprecated Bayesian heuristic behind `--legacy-bayesian-heuristic`
 - causal effect / ATE estimation
 - guardrail factory layer
 - experiment states and stopping reasons
@@ -707,6 +708,22 @@ Includes:
 
 Use this module when joint extreme guardrail co-failure is the object of inference.
 See `docs/theory/correlation_cliffs.md` for the formal definition.
+
+---
+
+### `src/cc/kernel/sequential.py`
+
+Anytime-valid Bernoulli e-process sequential testing.
+
+Includes:
+
+- explicit null `composed miss rate <= pre-registered p0`
+- test-martingale/e-process wealth tracking
+- Type-I error control for continuous monitoring via Ville's inequality
+- null calibration and power simulation helpers with injectable RNGs
+
+Use this module when early stopping must remain valid without sample-size pre-commitment.
+See `docs/theory/anytime_valid.md` for the theorem and assumptions.
 
 ---
 

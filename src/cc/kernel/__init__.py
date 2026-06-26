@@ -1,5 +1,18 @@
 """Numerical kernels for dependency-sensitive probability bounds."""
 
+from cc.kernel.cliff import (
+    CliffCertificate,
+    CopulaCandidateFit,
+    CopulaFitResult,
+    TailDependenceCI,
+    TailDependenceEstimate,
+    bootstrap_tail_dependence_ci,
+    cliff_certificate,
+    estimate_tail_dependence,
+    fit_copula_family,
+    sample_copula,
+    theoretical_tail_dependence,
+)
 from cc.kernel.frechet_classes import (
     FrechetBoundResult,
     FrechetClassInfeasibleError,
@@ -17,21 +30,22 @@ from cc.kernel.frechet_classes import (
     random_feasible_distribution,
     sample_binary_vectors,
 )
-from cc.kernel.cliff import (
-    CliffCertificate,
-    CopulaCandidateFit,
-    CopulaFitResult,
-    TailDependenceCI,
-    TailDependenceEstimate,
-    bootstrap_tail_dependence_ci,
-    cliff_certificate,
-    estimate_tail_dependence,
-    fit_copula_family,
-    sample_copula,
-    theoretical_tail_dependence,
+from cc.kernel.sequential import (
+    AnytimeBernoulliResult,
+    AnytimeBernoulliTester,
+    CalibrationResult,
+    PowerResult,
+    betting_fractions,
+    calibrate_false_stop_rate,
+    fixed_sample_size_one_sided,
+    independent_joint_miss_baseline,
+    simulate_power_curve,
 )
 
 __all__ = [
+    "AnytimeBernoulliResult",
+    "AnytimeBernoulliTester",
+    "CalibrationResult",
     "CliffCertificate",
     "CopulaCandidateFit",
     "CopulaFitResult",
@@ -39,10 +53,13 @@ __all__ = [
     "FrechetClassInfeasibleError",
     "PairwiseDependence",
     "PairwiseJointConstraint",
+    "PowerResult",
     "TailDependenceCI",
     "TailDependenceEstimate",
     "atom_matrix",
+    "betting_fractions",
     "bootstrap_tail_dependence_ci",
+    "calibrate_false_stop_rate",
     "classical_frechet_bounds",
     "cliff_certificate",
     "dependence_to_joint_probability",
@@ -50,12 +67,15 @@ __all__ = [
     "estimate_tail_dependence",
     "event_probability",
     "fit_copula_family",
+    "fixed_sample_size_one_sided",
     "frechet_bounds",
     "improved_frechet_bounds",
+    "independent_joint_miss_baseline",
     "joint_probability_to_dependence",
     "pairwise_correlation_bounds",
     "random_feasible_distribution",
     "sample_binary_vectors",
     "sample_copula",
+    "simulate_power_curve",
     "theoretical_tail_dependence",
 ]

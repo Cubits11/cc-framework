@@ -431,6 +431,28 @@ def main() -> None:
     ap.add_argument("--calibration-summary", help="Optional JSON file from calibration script")
     ap.add_argument("--seed", type=int, help="Override global seed")
     ap.add_argument(
+        "--enable-anytime-stopping",
+        action="store_true",
+        help="Enable anytime-valid e-process stopping instead of a fixed-length run.",
+    )
+    ap.add_argument(
+        "--safe-null-rate",
+        type=float,
+        default=None,
+        help="Pre-registered null miss-rate benchmark p0 for anytime-valid stopping.",
+    )
+    ap.add_argument(
+        "--alpha",
+        type=float,
+        default=0.05,
+        help="Type-I error level for anytime-valid stopping.",
+    )
+    ap.add_argument(
+        "--legacy-bayesian-heuristic",
+        action="store_true",
+        help="Opt into the deprecated unvalidated Bayesian ROPE stopping heuristic.",
+    )
+    ap.add_argument(
         "--set", nargs="*", default=[], help="Overrides: key=val (e.g., protocol.epsilon=0.02)"
     )
     ap.add_argument("--experiment-id", default=None, help="Optional tag for this run")
@@ -502,6 +524,11 @@ def main() -> None:
         base_success_rate=cfg.get("baseline_success_rate", 0.6),
         episode_length=cfg.get("episode_length", 10),
         random_seed=seed,
+        enable_anytime_stopping=bool(args.enable_anytime_stopping),
+        enable_bayesian_stopping=bool(args.legacy_bayesian_heuristic),
+        legacy_bayesian_heuristic=bool(args.legacy_bayesian_heuristic),
+        safe_null_rate=args.safe_null_rate,
+        alpha=float(args.alpha),
     )
 
     # Audited operation
@@ -519,12 +546,21 @@ def main() -> None:
         print(f"Starting experiment: n_sessions={n_sessions} (exp_id={exp_id})")
 
         # Run
-        results: list[AttackResult] = protocol.run_experiment(
-            attacker=attacker,
-            world_configs=worlds,
-            n_sessions=n_sessions,
-            experiment_id=exp_id,
-        )
+        if args.enable_anytime_stopping or args.legacy_bayesian_heuristic:
+            results = protocol.run_adaptive_experiment(
+                attacker=attacker,
+                world_configs=worlds,
+                max_sessions=n_sessions,
+                experiment_id=exp_id,
+                min_sessions=int(cfg.get("min_sessions", min(100, n_sessions))),
+            )
+        else:
+            results = protocol.run_experiment(
+                attacker=attacker,
+                world_configs=worlds,
+                n_sessions=n_sessions,
+                experiment_id=exp_id,
+            )
         print(f"Completed {len(results)} sessions")
 
         # Analyze
@@ -545,6 +581,12 @@ def main() -> None:
                 "git_commit": git_sha,
                 "configuration": cfg,  # full (as run)
                 "calibration_summary": calibration_summary,
+                "sequential_stopping": {
+                    "anytime_valid_enabled": bool(args.enable_anytime_stopping),
+                    "legacy_bayesian_heuristic": bool(args.legacy_bayesian_heuristic),
+                    "safe_null_rate": args.safe_null_rate,
+                    "alpha": float(args.alpha),
+                },
             },
             "results": analysis,
         }

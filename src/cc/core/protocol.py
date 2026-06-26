@@ -19,14 +19,11 @@ Core guarantees
    - Produces a design effect and widening factor for CIs
    - Approximation for binary data; warns and suggests GLMM alternatives
 
-2. ROPE-based Bayesian Sequential Testing
-   - Region Of Practical Equivalence (ROPE) on effect size (p1 - p0)
-   - Uses Beta posteriors for proper proportion modeling (upgraded from normal approx)
-   - Stopping logic:
-       * Stop for strong effect (95% HDI entirely outside ROPE)
-       * Stop for futility (95% HDI entirely inside ROPE)
-       * Otherwise continue
-   - Fallback futility on sample size and effect magnitude
+2. Anytime-valid Sequential Testing
+   - Uses a Bernoulli e-process/test martingale from cc.kernel.sequential
+   - Null: composed-system miss rate <= a pre-registered baseline p0
+   - Stopping rule E_t >= 1/alpha controls Type-I error uniformly over
+     all stopping times by Ville's inequality
 
 3. Causal Effect Estimation (ATE)
    - Difference in means (p1 - p0) with Welch-style SE
@@ -77,6 +74,7 @@ from cc.core.attackers import AttackStrategy
 from cc.core.logging import ChainedJSONLLogger, audit_context
 from cc.core.models import AttackResult, GuardrailSpec, WorldConfig
 from cc.guardrails.base import Guardrail
+from cc.kernel.sequential import AnytimeBernoulliResult, AnytimeBernoulliTester
 
 # Optional built-in guardrails (best-effort import)
 try:
@@ -124,7 +122,7 @@ class StoppingReason(Enum):
 @dataclass
 class BayesianTestResult:
     """
-    Results from Bayesian sequential testing.
+    Results from the deprecated Bayesian sequential heuristic.
 
     NOTE: This includes a ROPE decision summary string:
       - 'reject_h0' when HDI outside ROPE
@@ -372,7 +370,12 @@ class ICCComputer:
 
 class BayesianSequentialTester:
     """
-    Bayesian sequential testing with ROPE and futility bounds.
+    Deprecated Bayesian sequential testing with ROPE and futility bounds.
+
+    This class is retained for import compatibility only.  It is not an
+    anytime-valid test, its ROPE stopping rule has no Type-I error guarantee
+    under continuous monitoring, and protocol code uses it only when the
+    explicit legacy flag is enabled.
 
     Effect = p1 - p0 (success probability in W1 minus W0).
 
@@ -398,7 +401,14 @@ class BayesianSequentialTester:
         futility_effect_cap: float = 0.01,
         posterior_samples: int = 10000,
         hdi_prob: float = 0.95,
+        rng: np.random.Generator | None = None,
     ):
+        warnings.warn(
+            "BayesianSequentialTester is a deprecated, unvalidated legacy heuristic. "
+            "Use cc.kernel.sequential.AnytimeBernoulliTester for anytime-valid stopping.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         self.rope_lower = float(rope_lower)
         self.rope_upper = float(rope_upper)
         self.min_n = int(min_n)
@@ -408,6 +418,7 @@ class BayesianSequentialTester:
         self.hdi_prob = float(hdi_prob)
         self.alpha = (1 - self.hdi_prob) / 2
         self.beta = 1 - self.alpha
+        self.rng = rng if rng is not None else np.random.default_rng(0)
 
     def should_stop_early(self, results: list[AttackResult]) -> BayesianTestResult:
         n_total = len(results)
@@ -445,11 +456,15 @@ class BayesianSequentialTester:
             )
 
         # Uniform priors Beta(1,1)
-        p0_samples = stats.beta.rvs(
-            w0_success + 1, (w0_trials - w0_success) + 1, size=self.posterior_samples
+        p0_samples = self.rng.beta(
+            w0_success + 1,
+            (w0_trials - w0_success) + 1,
+            size=self.posterior_samples,
         )
-        p1_samples = stats.beta.rvs(
-            w1_success + 1, (w1_trials - w1_success) + 1, size=self.posterior_samples
+        p1_samples = self.rng.beta(
+            w1_success + 1,
+            (w1_trials - w1_success) + 1,
+            size=self.posterior_samples,
         )
         effect_samples = p1_samples - p0_samples
 
@@ -462,9 +477,14 @@ class BayesianSequentialTester:
         effect_se = float(np.std(effect_samples))
 
         # Approx BF using normal for reporting
-        like_h1 = float(stats.norm.pdf(effect_mean, loc=0.0, scale=effect_se))
-        like_h0 = float(stats.norm.pdf(effect_mean, loc=0.0, scale=max(effect_se * 0.1, 1e-10)))
-        bf = like_h1 / max(like_h0, 1e-12)
+        if effect_se <= 0.0:
+            bf = 1.0
+        else:
+            like_h1 = float(stats.norm.pdf(effect_mean, loc=0.0, scale=effect_se))
+            like_h0 = float(
+                stats.norm.pdf(effect_mean, loc=0.0, scale=max(effect_se * 0.1, 1e-10))
+            )
+            bf = like_h1 / max(like_h0, 1e-12)
         post_h1 = bf / (1.0 + bf)
         post_h0 = 1.0 - post_h1
 
@@ -788,13 +808,14 @@ class AdaptiveExperimentEngine:
     """
     Next-generation adaptive two-world protocol with:
 
-    - Bayesian ROPE-based stopping (Beta posterior sampling)
+    - Anytime-valid e-process stopping for composed-system misses
     - ICC-aware causal inference
     - GuardrailFactory-based guardrail instantiation
     - Deterministic checkpoints and summaries
 
     Feature flags:
-      - enable_bayesian_stopping: early stop when ROPE criteria met
+      - enable_anytime_stopping: early stop when e-process crosses 1/alpha
+      - legacy_bayesian_heuristic: opt into deprecated ROPE heuristic
     """
 
     def __init__(
@@ -803,7 +824,11 @@ class AdaptiveExperimentEngine:
         base_success_rate: float = 0.6,
         episode_length: int = 10,
         random_seed: int = 42,
-        enable_bayesian_stopping: bool = True,
+        enable_anytime_stopping: bool = True,
+        enable_bayesian_stopping: bool = False,
+        legacy_bayesian_heuristic: bool = False,
+        safe_null_rate: float | None = None,
+        alpha: float = 0.05,
         checkpoint_every: int = 100,
     ):
         self.logger = logger
@@ -812,14 +837,36 @@ class AdaptiveExperimentEngine:
         self.rng = np.random.default_rng(int(random_seed))
 
         # Flags
-        self.enable_bayesian_stopping = bool(enable_bayesian_stopping)
+        if enable_bayesian_stopping and not legacy_bayesian_heuristic:
+            warnings.warn(
+                "enable_bayesian_stopping is deprecated and now maps to anytime-valid "
+                "e-process stopping. Pass legacy_bayesian_heuristic=True to opt into "
+                "the old unvalidated heuristic.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            enable_anytime_stopping = True
+        self.enable_anytime_stopping = bool(enable_anytime_stopping)
+        self.legacy_bayesian_heuristic = bool(legacy_bayesian_heuristic)
+        self.enable_bayesian_stopping = bool(enable_bayesian_stopping and legacy_bayesian_heuristic)
+        self.safe_alpha = float(alpha)
+        self.safe_null_rate = self._coerce_open_probability(
+            self.base_success_rate if safe_null_rate is None else float(safe_null_rate),
+            "safe_null_rate",
+        )
 
         # Components
         self.metrics_collector = MetricsCollector()
         self.plugin_manager = PluginManager()
         self.guardrail_factory = GuardrailFactory(self.plugin_manager)
         self.icc_computer = ICCComputer()
-        self.bayesian_tester = BayesianSequentialTester()
+        self.sequential_tester = AnytimeBernoulliTester(
+            null_rate=self.safe_null_rate,
+            alpha=self.safe_alpha,
+        )
+        self.bayesian_tester: BayesianSequentialTester | None = (
+            BayesianSequentialTester(rng=self.rng) if self.legacy_bayesian_heuristic else None
+        )
         self.causal_engine = CausalInferenceEngine(self.icc_computer)
 
         # State
@@ -1063,15 +1110,16 @@ class AdaptiveExperimentEngine:
         min_sessions: int = 100,
     ) -> list[AttackResult]:
         """
-        Run an adaptive experiment with optional Bayesian ROPE-based stopping.
+        Run an adaptive experiment with optional anytime-valid stopping.
 
-        - If enable_bayesian_stopping=False, runs exactly max_sessions.
-        - If enable_bayesian_stopping=True, allows early stopping after
-          min_sessions when ROPE criteria are satisfied.
+        - If enable_anytime_stopping=False, runs exactly max_sessions.
+        - If enable_anytime_stopping=True, allows early stopping after
+          min_sessions when the e-process crosses 1/alpha.
         """
         experiment_id = experiment_id or f"adaptive_exp_{int(time.time())}"
         self.state = ExperimentState.RUNNING
         t0 = time.time()
+        self.sequential_tester.reset()
 
         self.logger.log(
             {
@@ -1080,7 +1128,10 @@ class AdaptiveExperimentEngine:
                 "max_sessions": int(max_sessions),
                 "min_sessions": int(min_sessions),
                 "attacker": type(attacker).__name__,
-                "bayesian_stopping": bool(self.enable_bayesian_stopping),
+                "anytime_valid_stopping": bool(self.enable_anytime_stopping),
+                "legacy_bayesian_heuristic": bool(self.legacy_bayesian_heuristic),
+                "safe_null_rate": float(self.safe_null_rate),
+                "safe_alpha": float(self.safe_alpha),
             }
         )
         self._active_experiment_id = experiment_id
@@ -1095,14 +1146,39 @@ class AdaptiveExperimentEngine:
                 session_results.append(res)
 
                 # Early stopping
-                if self.enable_bayesian_stopping and (i + 1) >= int(min_sessions):
-                    br = self.bayesian_tester.should_stop_early(session_results)
-                    if br.should_stop:
+                safe_result: AnytimeBernoulliResult | None = None
+                if res.world_bit == 1:
+                    safe_result = self.sequential_tester.update(res.success)
+
+                if self.enable_anytime_stopping and (i + 1) >= int(min_sessions):
+                    safe_result = safe_result or self.sequential_tester.result()
+                    if safe_result.stopped:
                         self.logger.log(
                             {
                                 "event": "early_stopping_triggered",
                                 "experiment_id": experiment_id,
                                 "session": i + 1,
+                                "reason": StoppingReason.STATISTICAL_SIGNIFICANCE.value,
+                                "method": "anytime_valid_e_process",
+                                "e_value": safe_result.e_value,
+                                "threshold": safe_result.threshold,
+                                "safe_test_n": safe_result.n,
+                                "safe_test_successes": safe_result.successes,
+                                "safe_test_sample_mean": safe_result.sample_mean,
+                                "safe_null_rate": safe_result.null_rate,
+                            }
+                        )
+                        break
+
+                if self.enable_bayesian_stopping and self.bayesian_tester is not None:
+                    br = self.bayesian_tester.should_stop_early(session_results)
+                    if br.should_stop and (i + 1) >= int(min_sessions):
+                        self.logger.log(
+                            {
+                                "event": "legacy_bayesian_heuristic_triggered",
+                                "experiment_id": experiment_id,
+                                "session": i + 1,
+                                "warning": "unvalidated legacy heuristic; not anytime-valid",
                                 "reason": br.stop_reason.value if br.stop_reason else None,
                                 "bayes_factor": br.bayes_factor,
                                 "effect_size": br.effect_size_estimate,
@@ -1128,38 +1204,48 @@ class AdaptiveExperimentEngine:
             # Final analyses
             icc_res = self.icc_computer.compute_icc(session_results)
             causal = self.causal_engine.estimate_ate(session_results)
-            final_bayes = self.bayesian_tester.should_stop_early(session_results)
-
-            self.logger.log(
-                {
-                    "event": "adaptive_experiment_complete",
-                    "experiment_id": experiment_id,
-                    "total_sessions": len(session_results),
-                    "duration": t1 - t0,
-                    "icc": {
-                        "global_icc": icc_res.global_icc,
-                        "effective_n": icc_res.effective_n,
-                        "design_effect": icc_res.design_effect,
-                        "widening_factor": icc_res.widening_factor,
-                        "interpretation": icc_res.interpretation,
-                        "confidence": icc_res.confidence,
-                    },
-                    "final_bayesian_result": {
-                        "bayes_factor": final_bayes.bayes_factor,
-                        "effect_size": final_bayes.effect_size_estimate,
-                        "credible_interval": final_bayes.credible_interval,
-                        "rope_decision": final_bayes.rope_decision,
-                    },
-                    "causal_effect": {
-                        "ate": causal.ate,
-                        "ci": [causal.ci_lower, causal.ci_upper],
-                        "p_value": causal.p_value,
-                        "method": causal.method,
-                        "cohens_d": causal.cohens_d,
-                        "power": causal.power,
-                    },
-                }
+            final_safe = self.sequential_tester.result()
+            final_bayes = (
+                self.bayesian_tester.should_stop_early(session_results)
+                if self.bayesian_tester is not None
+                else None
             )
+
+            complete_payload: dict[str, Any] = {
+                "event": "adaptive_experiment_complete",
+                "experiment_id": experiment_id,
+                "total_sessions": len(session_results),
+                "duration": t1 - t0,
+                "icc": {
+                    "global_icc": icc_res.global_icc,
+                    "effective_n": icc_res.effective_n,
+                    "design_effect": icc_res.design_effect,
+                    "widening_factor": icc_res.widening_factor,
+                    "interpretation": icc_res.interpretation,
+                    "confidence": icc_res.confidence,
+                },
+                "final_anytime_valid_result": self._sequential_result_dict(final_safe),
+                "causal_effect": {
+                    "ate": self._json_safe_float(causal.ate),
+                    "ci": [
+                        self._json_safe_float(causal.ci_lower),
+                        self._json_safe_float(causal.ci_upper),
+                    ],
+                    "p_value": self._json_safe_float(causal.p_value),
+                    "method": causal.method,
+                    "cohens_d": self._json_safe_float(causal.cohens_d),
+                    "power": self._json_safe_float(causal.power),
+                },
+            }
+            if final_bayes is not None:
+                complete_payload["final_legacy_bayesian_result"] = {
+                    "warning": "unvalidated legacy heuristic; not anytime-valid",
+                    "bayes_factor": final_bayes.bayes_factor,
+                    "effect_size": final_bayes.effect_size_estimate,
+                    "credible_interval": final_bayes.credible_interval,
+                    "rope_decision": final_bayes.rope_decision,
+                }
+            self.logger.log(complete_payload)
 
         except KeyboardInterrupt:  # pragma: no cover - user interrupt
             self.state = ExperimentState.FAILED
@@ -1202,11 +1288,13 @@ class AdaptiveExperimentEngine:
         """
         Backward-compatible fixed-length driver.
 
-        Guarantees exactly n_sessions by disabling Bayesian stopping and
+        Guarantees exactly n_sessions by disabling sequential stopping and
         setting min_sessions = max_sessions = n_sessions.
         """
-        old_flag = self.enable_bayesian_stopping
+        old_anytime = self.enable_anytime_stopping
+        old_bayes = self.enable_bayesian_stopping
         old_ckpt = self.checkpoint_every
+        self.enable_anytime_stopping = False
         self.enable_bayesian_stopping = False
         self.checkpoint_every = int(checkpoint_every)
         try:
@@ -1219,7 +1307,8 @@ class AdaptiveExperimentEngine:
             )
             return out[: int(n_sessions)]
         finally:
-            self.enable_bayesian_stopping = old_flag
+            self.enable_anytime_stopping = old_anytime
+            self.enable_bayesian_stopping = old_bayes
             self.checkpoint_every = old_ckpt
 
     # ---------------------------------------------------------------- CALIBRATION
@@ -1322,18 +1411,24 @@ class AdaptiveExperimentEngine:
             "confidence": icc_res.confidence,
         }
 
-        # Bayesian snapshot (even if stopping disabled)
-        br = self.bayesian_tester.should_stop_early(self.results)
-        summary["bayesian_analysis"] = {
-            "bayes_factor": br.bayes_factor,
-            "posterior_prob_h1": br.posterior_prob_h1,
-            "posterior_prob_h0": br.posterior_prob_h0,
-            "effect_size_estimate": br.effect_size_estimate,
-            "effect_size_se": br.effect_size_se,
-            "credible_interval": br.credible_interval,
-            "rope_decision": br.rope_decision,
-            "n_samples": br.n_samples,
-        }
+        # Anytime-valid sequential snapshot (even if early stopping disabled)
+        safe_result = self._safe_result_from_results(self.results)
+        summary["anytime_valid_analysis"] = self._sequential_result_dict(safe_result)
+
+        # Legacy Bayesian snapshot only when explicitly enabled.
+        if self.bayesian_tester is not None:
+            br = self.bayesian_tester.should_stop_early(self.results)
+            summary["legacy_bayesian_analysis"] = {
+                "warning": "unvalidated legacy heuristic; not anytime-valid",
+                "bayes_factor": br.bayes_factor,
+                "posterior_prob_h1": br.posterior_prob_h1,
+                "posterior_prob_h0": br.posterior_prob_h0,
+                "effect_size_estimate": br.effect_size_estimate,
+                "effect_size_se": br.effect_size_se,
+                "credible_interval": br.credible_interval,
+                "rope_decision": br.rope_decision,
+                "n_samples": br.n_samples,
+            }
 
         # Causal
         ce = self.causal_engine.estimate_ate(self.results)
@@ -1365,6 +1460,54 @@ class AdaptiveExperimentEngine:
         if n1 + 5 <= n0:
             return 1
         return int(self.rng.random() < 0.5)
+
+    def _safe_result_from_results(self, results: list[AttackResult]) -> AnytimeBernoulliResult:
+        tester = AnytimeBernoulliTester(
+            null_rate=self.safe_null_rate,
+            alpha=self.safe_alpha,
+        )
+        for result in results:
+            if result.world_bit == 1:
+                tester.update(result.success)
+        return tester.result()
+
+    @staticmethod
+    def _sequential_result_dict(result: AnytimeBernoulliResult) -> dict[str, Any]:
+        return {
+            "method": "anytime_valid_bernoulli_e_process",
+            "null_hypothesis": "composed-system miss rate <= safe_null_rate",
+            "theorem": "Ville's inequality for nonnegative supermartingales/e-processes",
+            "n": result.n,
+            "successes": result.successes,
+            "sample_mean": result.sample_mean,
+            "safe_null_rate": result.null_rate,
+            "alpha": result.alpha,
+            "e_value": result.e_value,
+            "max_e_value": result.max_e_value,
+            "threshold": result.threshold,
+            "decision": result.decision,
+            "stopped": result.stopped,
+            "stop_time": result.stop_time,
+        }
+
+    @staticmethod
+    def _coerce_open_probability(value: float, name: str) -> float:
+        x = float(value)
+        if not np.isfinite(x):
+            raise ValueError(f"{name} must be finite, got {value!r}")
+        eps = 1.0e-9
+        if x <= 0.0:
+            warnings.warn(f"{name}={x} is not in (0,1); clipping to {eps}.", stacklevel=2)
+            return eps
+        if x >= 1.0:
+            warnings.warn(f"{name}={x} is not in (0,1); clipping to {1.0 - eps}.", stacklevel=2)
+            return 1.0 - eps
+        return x
+
+    @staticmethod
+    def _json_safe_float(value: float) -> float | None:
+        x = float(value)
+        return x if np.isfinite(x) else None
 
     @staticmethod
     def _hash_transcript(history: list[dict[str, Any]]) -> str:
@@ -1525,7 +1668,8 @@ class TwoWorldProtocol(AdaptiveExperimentEngine):
     Backward-compatible wrapper preserving the original constructor and attrs.
 
     New features can be toggled via kwargs:
-      - enable_bayesian_stopping (default False for legacy parity)
+      - enable_anytime_stopping (default False for fixed-run legacy parity)
+      - legacy_bayesian_heuristic (default False; emits a runtime warning)
       - checkpoint_every
     """
 
@@ -1540,7 +1684,13 @@ class TwoWorldProtocol(AdaptiveExperimentEngine):
         **kwargs: Any,
     ):
         enhanced = {
+            "enable_anytime_stopping": kwargs.get(
+                "enable_anytime_stopping", kwargs.get("enable_bayesian_stopping", False)
+            ),
             "enable_bayesian_stopping": kwargs.get("enable_bayesian_stopping", False),
+            "legacy_bayesian_heuristic": kwargs.get("legacy_bayesian_heuristic", False),
+            "safe_null_rate": kwargs.get("safe_null_rate"),
+            "alpha": kwargs.get("alpha", 0.05),
             "checkpoint_every": kwargs.get("checkpoint_every", 100),
         }
         super().__init__(
@@ -1590,7 +1740,7 @@ if __name__ == "__main__":
 
     1. TwoWorldProtocol can run a 200-session experiment without error.
     2. Jumps between W0 and W1 are reflected in success rates.
-    3. Summary, ICC, Bayesian, and Causal outputs are well-formed.
+    3. Summary, ICC, anytime-valid sequential, and causal outputs are well-formed.
 
     This is NOT a full unit test suite, but enough to catch wiring mistakes.
     """

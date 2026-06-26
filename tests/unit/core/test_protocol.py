@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 from scipy import stats
 
 from cc.core.guardrail_api import GuardrailAdapter
@@ -72,6 +73,27 @@ def test_guardrail_error_log_omits_raw_prompt(tmp_path: Path) -> None:
     assert secret_prompt not in log_text
     assert "text_preview" not in log_text
     assert "prompt_hash" in log_text
+
+
+def test_legacy_bayesian_heuristic_requires_explicit_warning(tmp_path: Path) -> None:
+    log_path = tmp_path / "audit.jsonl"
+
+    with pytest.warns(RuntimeWarning, match="deprecated, unvalidated legacy heuristic"):
+        proto = TwoWorldProtocol(
+            logger=ChainedJSONLLogger(str(log_path)),
+            enable_bayesian_stopping=True,
+            legacy_bayesian_heuristic=True,
+        )
+
+    assert proto.bayesian_tester is not None
+    assert proto.enable_bayesian_stopping is True
+
+
+def test_default_protocol_uses_anytime_tester_without_legacy(tmp_path: Path) -> None:
+    proto = TwoWorldProtocol(logger=ChainedJSONLLogger(str(tmp_path / "audit.jsonl")))
+
+    assert proto.bayesian_tester is None
+    assert proto.sequential_tester.result().e_value == 1.0
 
 
 def test_causal_effect_cluster_robust_imbalanced_clusters() -> None:

@@ -1,0 +1,91 @@
+{
+  "false_stop_check": {
+    "criterion": "false_stop_rate <= alpha + 2 * monte_carlo_se",
+    "passed": true
+  },
+  "null_calibration": {
+    "alpha": 0.05,
+    "false_stop_rate": 0.0286,
+    "false_stops": 143,
+    "monte_carlo_se": 0.0023572034277931976,
+    "n_max": 1000,
+    "n_trials": 5000,
+    "null_rate": 0.1,
+    "seed_note": "rng supplied by caller; no global RNG state used",
+    "within_two_se": true
+  },
+  "power": [
+    {
+      "effect_size": 0.01999999999999999,
+      "expected_stop_time": 882.536,
+      "fixed_sample_n_approx": 1471,
+      "median_stop_time": 1000.0,
+      "n_max": 1000,
+      "n_trials": 1000,
+      "stop_probability": 0.184,
+      "true_rate": 0.12
+    },
+    {
+      "effect_size": 0.04999999999999999,
+      "expected_stop_time": 409.07,
+      "fixed_sample_n_approx": 253,
+      "median_stop_time": 373.5,
+      "n_max": 1000,
+      "n_trials": 1000,
+      "stop_probability": 0.949,
+      "true_rate": 0.15
+    },
+    {
+      "effect_size": 0.1,
+      "expected_stop_time": 97.143,
+      "fixed_sample_n_approx": 69,
+      "median_stop_time": 80.0,
+      "n_max": 1000,
+      "n_trials": 1000,
+      "stop_probability": 1.0,
+      "true_rate": 0.2
+    },
+    {
+      "effect_size": 0.19999999999999998,
+      "expected_stop_time": 26.936,
+      "fixed_sample_n_approx": 20,
+      "median_stop_time": 20.0,
+      "n_max": 1000,
+      "n_trials": 1000,
+      "stop_probability": 1.0,
+      "true_rate": 0.3
+    }
+  ],
+  "seed": 20260915,
+  "side_by_side_existing_dataset": {
+    "independent_joint_miss_null_rate": 0.03477840840478203,
+    "legacy_bayesian_heuristic": {
+      "bayes_factor": 77392277206.43475,
+      "credible_interval": [
+        -0.5591583491530111,
+        -0.10196543710333508
+      ],
+      "rope_decision": "reject_h0",
+      "runtime_warnings": [
+        "BayesianSequentialTester is a deprecated, unvalidated legacy heuristic. Use cc.kernel.sequential.AnytimeBernoulliTester for anytime-valid stopping."
+      ],
+      "stop_time_harmful_rows": 17,
+      "stopped": true,
+      "warning": "unvalidated legacy heuristic; not anytime-valid"
+    },
+    "n_harmful": 91,
+    "new_anytime_valid": {
+      "decision": "continue",
+      "e_value": 0.016420584764747354,
+      "stop_time_harmful_rows": null,
+      "stopped": false,
+      "threshold": 20.0
+    },
+    "observed_composed_miss_rate": 0.03296703296703297,
+    "path": "datasets/examples/rails_tiny.csv",
+    "rail_a_miss_rate": 0.17582417582417584,
+    "rail_b_miss_rate": 0.1978021978021978,
+    "status": "ok",
+    "threshold": 0.5
+  }
+}
