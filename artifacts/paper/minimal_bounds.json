@@ -76,5 +76,5 @@
     }
   ],
   "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
-  "schema_version_tampered": "cc.paper.bounds.v1"
+  "schema_version": "cc.paper.bounds.v1"
 }
