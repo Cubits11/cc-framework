@@ -5,7 +5,7 @@
     "numpy": "2.5.0",
     "scipy": "1.18.0"
   },
-  "generation_command": "scripts/reproduce_paper.py --out artifacts/paper",
+  "generation_command": "scripts/reproduce_paper.py --output-dir artifacts/paper",
   "generation_timestamp": "1970-01-01T00:00:00Z",
   "package_version": "0.2.0",
   "platform": {

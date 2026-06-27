@@ -170,14 +170,15 @@ test-int: install
 
 test-kernel:
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/kernel -q
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/kernel/test_sensitivity.py tests/unit/kernel/test_frechet_classes.py -q
 	PYTHONPATH=src $(VENV_DIR)/bin/mypy src/cc/kernel --strict
 	$(VENV_DIR)/bin/ruff check src/cc/kernel tests/unit/kernel
 
 test-release: test-kernel
+	PYTHONPATH=src $(VENV_DIR)/bin/python examples/minimal/run_bounds.py >/dev/null
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest \
 	  tests/integration/test_reproduce_paper.py \
 	  tests/integration/test_verify_paper_artifacts.py -q
-	PYTHONPATH=src $(VENV_DIR)/bin/python examples/minimal/run_bounds.py >/dev/null
 
 # Week-3 focused tests (subset)
 test-week3: install
@@ -266,10 +267,10 @@ reproduce-figures: install
 		--out-dir results/smoke/aggregates
 
 reproduce-paper:
-	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/reproduce_paper.py --out $(PAPER_ARTIFACT_DIR)
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/reproduce_paper.py --output-dir $(PAPER_ARTIFACT_DIR)
 
 verify-paper-artifacts:
-	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_paper_artifacts.py --dir $(PAPER_ARTIFACT_DIR)
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_paper_artifacts.py --artifact-dir $(PAPER_ARTIFACT_DIR)
 
 # -------- Analysis / Figures / Reports ---
 figures: reproduce-figures

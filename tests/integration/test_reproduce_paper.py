@@ -14,6 +14,7 @@ REQUIRED_FILES = {
     "table_3_witness_verification.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
+    "figure_3_correlation_cliff_toy.png",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",
@@ -29,7 +30,7 @@ def test_reproduce_paper_creates_required_artifacts_and_matching_manifest(tmp_pa
         [
             sys.executable,
             "scripts/reproduce_paper.py",
-            "--out",
+            "--output-dir",
             str(out_dir),
         ],
         cwd=ROOT,
@@ -65,18 +66,27 @@ def test_minimal_example_runs_and_returns_expected_keys() -> None:
     payload = json.loads(result.stdout)
     expected_keys = {
         "failure_event_convention",
+        "labels",
         "guardrails",
         "declared_marginals",
         "query",
+        "query_details",
         "lower_bound",
         "upper_bound",
         "fh_width",
         "fh_position",
+        "product_baseline",
         "independent_baseline",
         "independence_regret",
+        "independence_regret_lower",
+        "independence_regret_upper",
+        "lower_witness_verified",
+        "upper_witness_verified",
         "witnesses_verified",
     }
     assert expected_keys <= set(payload)
+    assert payload["lower_witness_verified"] is True
+    assert payload["upper_witness_verified"] is True
     assert payload["witnesses_verified"] == {"lower": True, "upper": True}
 
 

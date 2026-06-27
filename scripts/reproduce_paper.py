@@ -40,6 +40,7 @@ ARTIFACT_FILENAMES = (
     "table_3_witness_verification.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
+    "figure_3_correlation_cliff_toy.png",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",
@@ -56,7 +57,9 @@ NUMERIC_TOL = 1.0e-8
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--output-dir",
         "--out",
+        dest="output_dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
         help="Artifact directory to create or update.",
@@ -64,13 +67,13 @@ def main() -> int:
     args = parser.parse_args()
 
     command = _command_string(sys.argv)
-    generate_artifacts(args.out, generation_command=command)
-    print(f"Wrote paper artifacts to {args.out}")
+    generate_artifacts(args.output_dir, generation_command=command)
+    print(f"Wrote paper artifacts to {args.output_dir}")
     return 0
 
 
 def generate_artifacts(output_dir: Path, *, generation_command: str) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _prepare_output_dir(output_dir)
 
     cases = _build_minimal_cases()
     _write_table_1(output_dir / "table_1_classical_frechet_bounds.csv")
@@ -103,6 +106,8 @@ def _build_minimal_cases() -> list[dict[str, Any]]:
     for case_id, event, observed, query in specs:
         result = identified_region(query, assumptions)
         independent = independent_event_probability(marginals, query, labels=labels)
+        lower_regret = independence_regret(result.lower_bound, independent)
+        upper_regret = independence_regret(result.upper_bound, independent)
         cases.append(
             {
                 "case_id": case_id,
@@ -117,8 +122,11 @@ def _build_minimal_cases() -> list[dict[str, Any]]:
                 "fh_width": fh_width(result.lower_bound, result.upper_bound),
                 "observed": observed,
                 "fh_position": fh_position(observed, result.lower_bound, result.upper_bound),
+                "product_baseline": independent,
                 "independent_baseline": independent,
                 "independence_regret": independence_regret(observed, independent),
+                "independence_regret_lower": lower_regret,
+                "independence_regret_upper": upper_regret,
                 "solver_status": result.solver_status,
                 "witnesses": {
                     "lower": {
@@ -333,6 +341,36 @@ def _write_figures(output_dir: Path, cases: Sequence[dict[str, Any]]) -> None:
     )
     plt.close(fig)
 
+    fig, ax = plt.subplots(figsize=(6.0, 3.0), constrained_layout=True)
+    p_left = 0.2
+    p_right = 0.35
+    joint_lower, joint_upper = classical_frechet_bounds((p_left, p_right), event="and")
+    product_joint = p_left * p_right
+    joint_values = np.linspace(joint_lower, joint_upper, 101)
+    dependence_shift = joint_values - product_joint
+    ax.plot(dependence_shift, joint_values, color="#3B6EA8", linewidth=2.2, label="AND")
+    ax.plot(
+        dependence_shift,
+        p_left + p_right - joint_values,
+        color="#C44536",
+        linewidth=2.2,
+        label="OR",
+    )
+    ax.axvline(0.0, color="#222222", linewidth=1.0, alpha=0.8)
+    ax.scatter([0.0], [product_joint], color="#3B6EA8", s=24, zorder=3)
+    ax.scatter([0.0], [p_left + p_right - product_joint], color="#C44536", s=24, zorder=3)
+    ax.set_xlabel("P(A and B) - P(A)P(B)")
+    ax.set_ylabel("Composition failure probability")
+    ax.set_title("Toy dependence sweep")
+    ax.legend(frameon=False, loc="center right")
+    ax.grid(alpha=0.25)
+    fig.savefig(
+        output_dir / "figure_3_correlation_cliff_toy.png",
+        dpi=150,
+        metadata={"Software": "cc-framework reproduce_paper.py"},
+    )
+    plt.close(fig)
+
 
 def _minimal_bounds_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {
@@ -350,8 +388,11 @@ def _minimal_bounds_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 "fh_width": case["fh_width"],
                 "observed": case["observed"],
                 "fh_position": case["fh_position"],
+                "product_baseline": case["product_baseline"],
                 "independent_baseline": case["independent_baseline"],
                 "independence_regret": case["independence_regret"],
+                "independence_regret_lower": case["independence_regret_lower"],
+                "independence_regret_upper": case["independence_regret_upper"],
                 "assumptions_hash": case["assumptions_hash"],
             }
             for case in cases
@@ -400,7 +441,10 @@ def _minimal_bundle_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 "lower_bound": case["lower_bound"],
                 "upper_bound": case["upper_bound"],
                 "fh_width": case["fh_width"],
+                "product_baseline": case["product_baseline"],
                 "independence_regret": case["independence_regret"],
+                "independence_regret_lower": case["independence_regret_lower"],
+                "independence_regret_upper": case["independence_regret_upper"],
             }
             for case in cases
         ],
@@ -451,6 +495,14 @@ def _write_manifest(output_dir: Path, *, generation_command: str) -> None:
     }
     manifest["manifest_payload_sha256"] = _hash_manifest_payload(manifest)
     _write_json(output_dir / "manifest.json", manifest)
+
+
+def _prepare_output_dir(output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for filename in ARTIFACT_FILENAMES:
+        path = output_dir / filename
+        if path.exists():
+            path.unlink()
 
 
 def _assumptions_payload(assumptions: AssumptionSet) -> dict[str, Any]:

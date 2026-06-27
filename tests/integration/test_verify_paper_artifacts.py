@@ -55,7 +55,7 @@ def _reproduce(tmp_path: Path) -> Path:
         [
             sys.executable,
             "scripts/reproduce_paper.py",
-            "--out",
+            "--output-dir",
             str(out_dir),
         ],
         cwd=ROOT,
@@ -73,7 +73,7 @@ def _verify(out_dir: Path) -> subprocess.CompletedProcess[str]:
         [
             sys.executable,
             "scripts/verify_paper_artifacts.py",
-            "--dir",
+            "--artifact-dir",
             str(out_dir),
         ],
         cwd=ROOT,

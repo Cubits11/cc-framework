@@ -5,6 +5,7 @@
     "table_3_witness_verification.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
+    "figure_3_correlation_cliff_toy.png",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",
@@ -18,7 +19,10 @@
       "event": "and",
       "fh_width": 0.2,
       "independence_regret": 0.05,
+      "independence_regret_lower": -0.06999999999999999,
+      "independence_regret_upper": 0.13,
       "lower_bound": 0.0,
+      "product_baseline": 0.06999999999999999,
       "upper_bound": 0.2
     },
     {
@@ -26,7 +30,10 @@
       "event": "or",
       "fh_width": 0.20000000000000007,
       "independence_regret": -0.02999999999999997,
+      "independence_regret_lower": -0.13,
+      "independence_regret_upper": 0.07000000000000006,
       "lower_bound": 0.35,
+      "product_baseline": 0.48,
       "upper_bound": 0.55
     }
   ],

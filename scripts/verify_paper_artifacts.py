@@ -24,7 +24,13 @@ from cc.kernel.metrics import (
     independence_regret,
     independent_event_probability,
 )
-from cc.kernel.sensitivity import AssumptionSet, LinearConstraint, LinearQuery, enumerate_atoms
+from cc.kernel.sensitivity import (
+    AssumptionSet,
+    LinearConstraint,
+    LinearQuery,
+    enumerate_atoms,
+    identified_region,
+)
 
 REQUIRED_FILES = (
     "table_1_classical_frechet_bounds.csv",
@@ -32,6 +38,7 @@ REQUIRED_FILES = (
     "table_3_witness_verification.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
+    "figure_3_correlation_cliff_toy.png",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",
@@ -41,6 +48,7 @@ REQUIRED_FILES = (
 HASHED_FILES = tuple(name for name in REQUIRED_FILES if name != "manifest.json")
 DEFAULT_ARTIFACT_DIR = Path("artifacts/paper")
 DEFAULT_TOL = 1.0e-8
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 MANIFEST_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -146,7 +154,9 @@ class ArtifactVerificationError(RuntimeError):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--artifact-dir",
         "--dir",
+        dest="artifact_dir",
         type=Path,
         default=DEFAULT_ARTIFACT_DIR,
         help="Artifact directory to verify.",
@@ -155,11 +165,11 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        verify_artifact_dir(args.dir, tol=args.tol)
+        verify_artifact_dir(args.artifact_dir, tol=args.tol)
     except ArtifactVerificationError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    print(f"Verified paper artifacts in {args.dir}")
+    print(f"Verified paper artifacts in {args.artifact_dir}")
     return 0
 
 
@@ -196,11 +206,13 @@ def verify_artifact_dir(artifact_dir: Path, *, tol: float = DEFAULT_TOL) -> None
         errors.extend(_verify_environment(environment))
         errors.extend(_verify_bundle(bundle))
         errors.extend(_verify_bounds_against_witnesses(bounds, witnesses, tol=tol))
+        errors.extend(_verify_bounds_metrics(bounds, tol=tol))
         errors.extend(_verify_witnesses(witnesses, tol=tol))
 
     errors.extend(_verify_classical_table(artifact_dir / "table_1_classical_frechet_bounds.csv", tol=tol))
     errors.extend(_verify_metric_table(artifact_dir / "table_2_metric_examples.csv", tol=tol))
     errors.extend(_verify_witness_table(artifact_dir / "table_3_witness_verification.csv", tol=tol))
+    errors.extend(_verify_png_artifacts(artifact_dir))
 
     if errors:
         raise ArtifactVerificationError("Paper artifact verification failed:\n- " + "\n- ".join(errors))
@@ -359,10 +371,24 @@ def _verify_witness_case(case: Mapping[str, Any], *, tol: float) -> list[str]:
             expected_length=n_atoms,
             label=f"{case_id}.query.coefficients",
         )
+        reported_lower = float(bounds["lower"])
+        reported_upper = float(bounds["upper"])
     except (KeyError, TypeError, ValueError) as exc:
         return [f"{case_id} has malformed witness payload: {exc}"]
 
     errors.extend(_verify_assumptions_hash(case, labels, assumptions_payload))
+    errors.extend(
+        _verify_reported_endpoints_are_lp_optima(
+            case_id,
+            labels=labels,
+            assumptions_payload=assumptions_payload,
+            query_payload=query_payload,
+            query_coefficients=query_coefficients,
+            reported_lower=reported_lower,
+            reported_upper=reported_upper,
+            tol=tol,
+        )
+    )
 
     for endpoint in ("lower", "upper"):
         witness_payload = witnesses.get(endpoint)
@@ -396,12 +422,48 @@ def _verify_witness_case(case: Mapping[str, Any], *, tol: float) -> list[str]:
                 f"{case_id}.{endpoint} recorded query value {recorded_query_value} "
                 f"does not equal witness value {computed_query_value}."
             )
-        reported_bound = float(bounds[endpoint])
+        reported_bound = reported_lower if endpoint == "lower" else reported_upper
         if abs(computed_query_value - reported_bound) > tol:
             errors.append(
                 f"{case_id}.{endpoint} witness value {computed_query_value} "
                 f"does not match reported bound {reported_bound}."
             )
+    return errors
+
+
+def _verify_reported_endpoints_are_lp_optima(
+    case_id: str,
+    *,
+    labels: Sequence[str],
+    assumptions_payload: Mapping[str, Any],
+    query_payload: Mapping[str, Any],
+    query_coefficients: np.ndarray[Any, Any],
+    reported_lower: float,
+    reported_upper: float,
+    tol: float,
+) -> list[str]:
+    try:
+        assumptions = _assumptions_from_payload(labels, assumptions_payload)
+        query = LinearQuery.from_coefficients(
+            labels,
+            str(query_payload.get("name", f"{case_id}_query")),
+            query_coefficients,
+        )
+        result = identified_region(query, assumptions, feasibility_tol=tol)
+    except (TypeError, ValueError) as exc:
+        return [f"{case_id} could not be re-solved from witness payload: {exc}"]
+
+    errors: list[str] = []
+    if abs(result.lower_bound - reported_lower) > tol:
+        errors.append(
+            f"{case_id} reported lower endpoint {reported_lower} "
+            f"does not match recomputed LP optimum {result.lower_bound}."
+        )
+    if abs(result.upper_bound - reported_upper) > tol:
+        errors.append(
+            f"{case_id} reported upper endpoint {reported_upper} "
+            f"does not match recomputed LP optimum {result.upper_bound}."
+        )
     return errors
 
 
@@ -516,29 +578,162 @@ def _verify_assumptions_hash(
     labels: Sequence[str],
     assumptions_payload: Mapping[str, Any],
 ) -> list[str]:
-    constraints_payload = assumptions_payload.get("constraints")
-    if not isinstance(constraints_payload, list):
-        return ["assumptions.constraints must be a list for hash verification."]
     try:
-        constraints = tuple(
-            LinearConstraint.from_coefficients(
-                labels,
-                str(constraint["name"]),
-                constraint["coefficients"],
-                str(constraint["sense"]),
-                float(constraint["rhs"]),
-            )
-            for constraint in constraints_payload
-            if isinstance(constraint, Mapping)
-        )
-        metadata = _mapping(assumptions_payload.get("metadata", {}), label="assumptions.metadata")
-        assumptions = AssumptionSet(tuple(labels), constraints=constraints, metadata=metadata)
+        assumptions = _assumptions_from_payload(labels, assumptions_payload)
     except (TypeError, ValueError, KeyError) as exc:
         return [f"Unable to reconstruct assumptions for hash verification: {exc}"]
     expected = assumptions.stable_hash()
     actual = case.get("assumptions_hash")
     if actual != expected:
         return [f"{case.get('case_id', '<unknown>')} assumptions_hash mismatch."]
+    return []
+
+
+def _assumptions_from_payload(
+    labels: Sequence[str],
+    assumptions_payload: Mapping[str, Any],
+) -> AssumptionSet:
+    constraints_payload = assumptions_payload.get("constraints")
+    if not isinstance(constraints_payload, list):
+        raise TypeError("assumptions.constraints must be a list.")
+    constraints = tuple(
+        LinearConstraint.from_coefficients(
+            labels,
+            str(constraint["name"]),
+            constraint["coefficients"],
+            str(constraint["sense"]),
+            float(constraint["rhs"]),
+        )
+        for constraint in constraints_payload
+        if isinstance(constraint, Mapping)
+    )
+    metadata = _mapping(assumptions_payload.get("metadata", {}), label="assumptions.metadata")
+    return AssumptionSet(tuple(labels), constraints=constraints, metadata=metadata)
+
+
+def _verify_bounds_metrics(bounds: Mapping[str, Any], *, tol: float) -> list[str]:
+    errors: list[str] = []
+    cases = bounds.get("cases")
+    if not isinstance(cases, list):
+        return ["minimal_bounds.json cases must be a list."]
+    for case in cases:
+        if not isinstance(case, Mapping):
+            errors.append("minimal_bounds.json contains a non-object case.")
+            continue
+        case_id = str(case.get("case_id", "<unknown>"))
+        try:
+            labels = tuple(_string_list(case["labels"], label=f"{case_id}.labels"))
+            marginals = _float_mapping(
+                case["declared_marginals"],
+                label=f"{case_id}.declared_marginals",
+            )
+            query_payload = _mapping(case["query"], label=f"{case_id}.query")
+            query = LinearQuery.from_coefficients(
+                labels,
+                str(query_payload.get("name", f"{case_id}_query")),
+                _float_vector(
+                    query_payload["coefficients"],
+                    expected_length=1 << len(labels),
+                    label=f"{case_id}.query.coefficients",
+                ),
+            )
+            lower = float(case["lower_bound"])
+            upper = float(case["upper_bound"])
+            independent = independent_event_probability(marginals, query, labels=labels)
+        except (KeyError, TypeError, ValueError) as exc:
+            errors.append(f"Malformed minimal bounds case {case_id}: {exc}")
+            continue
+
+        errors.extend(
+            _check_optional_metric(
+                case,
+                "fh_width",
+                fh_width(lower, upper),
+                case_id=case_id,
+                tol=tol,
+            )
+        )
+        errors.extend(
+            _check_optional_metric(
+                case,
+                "independent_baseline",
+                independent,
+                case_id=case_id,
+                tol=tol,
+            )
+        )
+        errors.extend(
+            _check_optional_metric(
+                case,
+                "product_baseline",
+                independent,
+                case_id=case_id,
+                tol=tol,
+            )
+        )
+        if "observed" in case:
+            try:
+                observed = float(case["observed"])
+                position = fh_position(observed, lower, upper)
+            except (TypeError, ValueError) as exc:
+                errors.append(f"{case_id}.observed is invalid: {exc}")
+                continue
+            if position is not None:
+                errors.extend(
+                    _check_optional_metric(
+                        case,
+                        "fh_position",
+                        position,
+                        case_id=case_id,
+                        tol=tol,
+                    )
+                )
+            errors.extend(
+                _check_optional_metric(
+                    case,
+                    "independence_regret",
+                    independence_regret(observed, independent),
+                    case_id=case_id,
+                    tol=tol,
+                )
+            )
+        errors.extend(
+            _check_optional_metric(
+                case,
+                "independence_regret_lower",
+                independence_regret(lower, independent),
+                case_id=case_id,
+                tol=tol,
+            )
+        )
+        errors.extend(
+            _check_optional_metric(
+                case,
+                "independence_regret_upper",
+                independence_regret(upper, independent),
+                case_id=case_id,
+                tol=tol,
+            )
+        )
+    return errors
+
+
+def _check_optional_metric(
+    payload: Mapping[str, Any],
+    field: str,
+    expected: float,
+    *,
+    case_id: str,
+    tol: float,
+) -> list[str]:
+    if field not in payload:
+        return []
+    try:
+        actual = float(payload[field])
+    except (TypeError, ValueError) as exc:
+        return [f"{case_id}.{field} is invalid: {exc}."]
+    if abs(actual - expected) > tol:
+        return [f"{case_id}.{field} {actual} does not match canonical value {expected}."]
     return []
 
 
@@ -647,6 +842,27 @@ def _verify_witness_table(path: Path, *, tol: float) -> list[str]:
             errors.append(f"Witness verification table min probability for {case_id}.{endpoint} is negative.")
         if abs(query_value - reported_bound) > tol or absolute_error > tol:
             errors.append(f"Witness verification table query mismatch for {case_id}.{endpoint}.")
+    return errors
+
+
+def _verify_png_artifacts(artifact_dir: Path) -> list[str]:
+    errors: list[str] = []
+    for filename in (
+        "figure_1_fh_interval.png",
+        "figure_2_independence_regret.png",
+        "figure_3_correlation_cliff_toy.png",
+    ):
+        path = artifact_dir / filename
+        try:
+            with path.open("rb") as handle:
+                signature = handle.read(len(PNG_SIGNATURE))
+        except OSError as exc:
+            errors.append(f"Unable to read {filename}: {exc}")
+            continue
+        if signature != PNG_SIGNATURE:
+            errors.append(f"{filename} is not a valid PNG artifact.")
+        if path.stat().st_size <= len(PNG_SIGNATURE):
+            errors.append(f"{filename} is unexpectedly empty.")
     return errors
 
 

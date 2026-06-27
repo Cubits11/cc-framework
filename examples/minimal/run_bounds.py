@@ -19,7 +19,7 @@ from cc.kernel.metrics import (
 )
 from cc.kernel.sensitivity import AssumptionSet, LinearQuery
 
-FAILURE_EVENT_CONVENTION = "Z_i=1 denotes a guardrail failure or unsafe pass."
+FAILURE_EVENT_CONVENTION = "Z_i = 1 means guardrail failure / unsafe pass."
 DEFAULT_TOL = 1.0e-8
 
 
@@ -35,7 +35,7 @@ def main() -> int:
     args = parser.parse_args()
 
     payload = run_example(observed=args.observed)
-    text = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False)
+    text = json.dumps(payload, sort_keys=True, allow_nan=False)
     if args.out is not None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(text + "\n", encoding="utf-8")
@@ -66,9 +66,16 @@ def run_example(*, observed: float) -> dict[str, Any]:
 
     return {
         "failure_event_convention": FAILURE_EVENT_CONVENTION,
+        "labels": list(labels),
         "guardrails": list(labels),
         "declared_marginals": marginals,
-        "query": {
+        "atom_order": "little_endian",
+        "assumption_set": {
+            "type": "finite_atom_exact_singleton_marginals",
+            "constraint_names": [constraint.name for constraint in assumptions.constraints],
+        },
+        "query": query.name,
+        "query_details": {
             "name": query.name,
             "event": "and",
             "coefficients": [float(value) for value in query.coefficients],
@@ -79,8 +86,13 @@ def run_example(*, observed: float) -> dict[str, Any]:
         "fh_width": fh_width(result.lower_bound, result.upper_bound),
         "observed": observed,
         "fh_position": fh_position(observed, result.lower_bound, result.upper_bound),
+        "product_baseline": independent,
         "independent_baseline": independent,
         "independence_regret": independence_regret(observed, independent),
+        "independence_regret_lower": independence_regret(result.lower_bound, independent),
+        "independence_regret_upper": independence_regret(result.upper_bound, independent),
+        "lower_witness_verified": lower_ok,
+        "upper_witness_verified": upper_ok,
         "witnesses_verified": {
             "lower": lower_ok,
             "upper": upper_ok,

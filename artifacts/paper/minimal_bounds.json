@@ -11,6 +11,8 @@
       "fh_position": 0.6,
       "fh_width": 0.2,
       "independence_regret": 0.05,
+      "independence_regret_lower": -0.06999999999999999,
+      "independence_regret_upper": 0.13,
       "independent_baseline": 0.06999999999999999,
       "labels": [
         "input_filter",
@@ -18,6 +20,7 @@
       ],
       "lower_bound": 0.0,
       "observed": 0.12,
+      "product_baseline": 0.06999999999999999,
       "query": {
         "coefficients": [
           0.0,
@@ -45,6 +48,8 @@
       "fh_position": 0.5,
       "fh_width": 0.20000000000000007,
       "independence_regret": -0.02999999999999997,
+      "independence_regret_lower": -0.13,
+      "independence_regret_upper": 0.07000000000000006,
       "independent_baseline": 0.48,
       "labels": [
         "input_filter",
@@ -52,6 +57,7 @@
       ],
       "lower_bound": 0.35,
       "observed": 0.45,
+      "product_baseline": 0.48,
       "query": {
         "coefficients": [
           0.0,
@@ -70,5 +76,5 @@
     }
   ],
   "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
-  "schema_version": "cc.paper.bounds.v1"
+  "schema_version_tampered": "cc.paper.bounds.v1"
 }

@@ -8,9 +8,9 @@ for an AND composition query.
 Run from the repository root:
 
 ```bash
-PYTHONPATH=src python examples/minimal/run_bounds.py
+PYTHONPATH=src .venv/bin/python examples/minimal/run_bounds.py
 ```
 
 The JSON output includes the identified lower and upper bounds, FH width,
-FH position for the supplied observed value, an independent-product baseline,
-independence regret, and lower/upper endpoint witness checks.
+FH position for the supplied observed value, a product-coupling baseline,
+lower/upper independence regret, and lower/upper endpoint witness checks.
