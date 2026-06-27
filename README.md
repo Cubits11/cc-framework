@@ -34,6 +34,7 @@ Measure guardrail composition without pretending independence.
 - [Research Statement](#research-statement)
 - [What this is](#what-this-is)
 - [Public Research Framing](#public-research-framing)
+- [Research Program](#research-program)
 - [Why This Matters](#why-this-matters)
 - [Core Concept](#core-concept)
 - [Kernel Contract](#kernel-contract)
@@ -104,6 +105,19 @@ The strongest paper-sized subset is:
 
 See [Public Research Framing](docs/research/public-framing.md) for preferred
 language, non-claims, and the longer research map.
+
+---
+
+## Research Program
+
+The publication-facing research spine is split into focused documents:
+
+- [Research Program](docs/research/RESEARCH_PROGRAM.md)
+- [Paper Core](docs/research/PAPER_CORE.md)
+- [Non-Claims](docs/research/NON_CLAIMS.md)
+- [Roadmap](docs/research/ROADMAP.md)
+- [Metric Taxonomy](docs/theory/metric_taxonomy.md)
+- [Theorem Ledger](docs/theory/theorem_ledger.md)
 
 ---
 
