@@ -18,7 +18,6 @@ import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from math import isclose
 from types import MappingProxyType
 from typing import Any, Literal, TypeAlias, cast
 
@@ -35,27 +34,23 @@ ConstraintSense: TypeAlias = Literal["==", "<=", ">="]
 AtomPredicate: TypeAlias = Callable[[Mapping[str, int]], bool]
 JsonScalar: TypeAlias = str | int | float | bool | None
 
-_TOL = 1.0e-10
+DEFAULT_TOL = 1.0e-9
 
 __all__ = [
     "AssumptionSet",
-    "AtomPredicate",
-    "ConstraintSense",
+    "IdentificationInfeasibleError",
     "IdentificationResult",
     "LinearConstraint",
     "LinearQuery",
-    "PartialIdentificationInfeasibleError",
-    "atom_predicate_mask",
-    "atoms_matching",
-    "atoms_where",
-    "enumerate_atoms",
-    "event_mask",
-    "identify",
+    "identified_region",
 ]
 
 
-class PartialIdentificationInfeasibleError(FrechetClassInfeasibleError):
+class IdentificationInfeasibleError(FrechetClassInfeasibleError):
     """Raised when declared atom-space assumptions admit no joint law."""
+
+
+PartialIdentificationInfeasibleError = IdentificationInfeasibleError
 
 
 @dataclass(frozen=True)
@@ -498,7 +493,12 @@ class AssumptionSet:
         return self.with_monotonicity(antecedent, consequent)
 
     def stable_hash(self) -> str:
-        """Return a deterministic SHA-256 hash of the declared assumptions."""
+        """Return a deterministic SHA-256 hash of the declared assumptions.
+
+        The payload includes guardrail order, constraint names, senses, right-hand
+        sides, coefficient vectors, and metadata. Constraint descriptions are
+        intentionally excluded because they do not change the feasible atom set.
+        """
 
         return _stable_assumptions_hash(self)
 
@@ -506,11 +506,11 @@ class AssumptionSet:
         self,
         query: LinearQuery,
         *,
-        feasibility_tol: float = _TOL,
+        feasibility_tol: float = DEFAULT_TOL,
     ) -> IdentificationResult:
         """Return sharp identified bounds for ``query`` under these assumptions."""
 
-        return identify(query, self, feasibility_tol=feasibility_tol)
+        return identified_region(query, self, feasibility_tol=feasibility_tol)
 
 
 @dataclass(frozen=True)
@@ -529,10 +529,16 @@ class IdentificationResult:
     upper_objective_status: str
     lower_message: str
     upper_message: str
+    active_constraints_lower: tuple[str, ...] = ()
+    active_constraints_upper: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "lower_bound", float(self.lower_bound))
         object.__setattr__(self, "upper_bound", float(self.upper_bound))
+        if self.upper_bound + DEFAULT_TOL < self.lower_bound:
+            raise IdentificationInfeasibleError(
+                f"identified interval is empty: [{self.lower_bound}, {self.upper_bound}]."
+            )
         object.__setattr__(
             self,
             "lower_solution",
@@ -542,6 +548,19 @@ class IdentificationResult:
             self,
             "upper_solution",
             _as_float_vector(self.upper_solution, label="upper_solution"),
+        )
+        if self.lower_solution.size != self.upper_solution.size:
+            raise ValueError("lower_solution and upper_solution must have the same length.")
+        object.__setattr__(self, "active_constraints", tuple(self.active_constraints))
+        object.__setattr__(
+            self,
+            "active_constraints_lower",
+            tuple(self.active_constraints_lower),
+        )
+        object.__setattr__(
+            self,
+            "active_constraints_upper",
+            tuple(self.active_constraints_upper),
         )
 
     @property
@@ -610,11 +629,11 @@ def atoms_matching(
     return states[atom_predicate_mask(guardrails, predicate)]
 
 
-def identify(
+def identified_region(
     query: LinearQuery,
     assumptions: AssumptionSet,
     *,
-    feasibility_tol: float = _TOL,
+    feasibility_tol: float = DEFAULT_TOL,
 ) -> IdentificationResult:
     """Solve the two atom LPs defining the sharp identified query interval."""
 
@@ -658,10 +677,12 @@ def identify(
         feasibility_tol,
     )
     if upper_value + feasibility_tol < lower_value:
-        raise PartialIdentificationInfeasibleError(
+        raise IdentificationInfeasibleError(
             f"Numerical LP returned an empty interval [{lower_value}, {upper_value}]."
         )
     lower_value, upper_value = _snap_interval(lower_value, upper_value, feasibility_tol)
+    active_lower = _active_constraint_names(assumptions, lower.solution, feasibility_tol)
+    active_upper = _active_constraint_names(assumptions, upper.solution, feasibility_tol)
 
     return IdentificationResult(
         query_name=query.name,
@@ -670,13 +691,26 @@ def identify(
         lower_solution=lower.solution,
         upper_solution=upper.solution,
         solver_status="optimal",
-        active_constraints=tuple(constraint.name for constraint in assumptions.constraints),
+        active_constraints=_ordered_union(active_lower, active_upper),
         assumptions_hash=assumptions.stable_hash(),
         lower_objective_status=lower.status,
         upper_objective_status=upper.status,
         lower_message=lower.message,
         upper_message=upper.message,
+        active_constraints_lower=active_lower,
+        active_constraints_upper=active_upper,
     )
+
+
+def identify(
+    query: LinearQuery,
+    assumptions: AssumptionSet,
+    *,
+    feasibility_tol: float = DEFAULT_TOL,
+) -> IdentificationResult:
+    """Backward-compatible alias for :func:`identified_region`."""
+
+    return identified_region(query, assumptions, feasibility_tol=feasibility_tol)
 
 
 @dataclass(frozen=True)
@@ -739,16 +773,38 @@ def _solve_query_lp(
         b_eq=b_eq,
         bounds=[(0.0, 1.0)] * objective.size,
         method="highs",
+        options={
+            "dual_feasibility_tolerance": feasibility_tol,
+            "primal_feasibility_tolerance": feasibility_tol,
+        },
     )
     if not result.success or result.x is None:
         message = str(result.message) if result.message else "linear program failed"
-        raise PartialIdentificationInfeasibleError(
+        raise IdentificationInfeasibleError(
             "No atom distribution satisfies the supplied partial-identification "
             f"assumptions: {message}"
         )
 
-    solution = _clean_solution(cast(FloatArray, result.x), feasibility_tol)
-    _validate_lp_solution(solution, a_eq, b_eq, a_ub, b_ub, feasibility_tol)
+    raw_solution = np.asarray(cast(FloatArray, result.x), dtype=float)
+    _validate_lp_solution(
+        raw_solution,
+        a_eq,
+        b_eq,
+        a_ub,
+        b_ub,
+        feasibility_tol,
+        label="raw LP solution",
+    )
+    solution = _clean_solution(raw_solution, feasibility_tol)
+    _validate_lp_solution(
+        solution,
+        a_eq,
+        b_eq,
+        a_ub,
+        b_ub,
+        feasibility_tol,
+        label="cleaned LP solution",
+    )
     value = float(objective @ solution)
     return _SolvedObjective(
         value=value,
@@ -760,17 +816,20 @@ def _solve_query_lp(
 
 def _clean_solution(solution: FloatArray, tol: float) -> FloatArray:
     cleaned = np.asarray(solution, dtype=float).copy()
-    cleaned[np.abs(cleaned) <= tol] = 0.0
+    cleaned[(cleaned < 0.0) & (cleaned >= -tol)] = 0.0
+    cleaned[(cleaned > 1.0) & (cleaned <= 1.0 + tol)] = 1.0
     if np.any(cleaned < -tol):
-        raise PartialIdentificationInfeasibleError("LP returned negative atom probabilities.")
-    cleaned = np.clip(cleaned, 0.0, 1.0)
+        raise IdentificationInfeasibleError("LP returned negative atom probabilities.")
+    if np.any(cleaned > 1.0 + tol):
+        raise IdentificationInfeasibleError("LP returned atom probabilities above 1.")
     total = float(np.sum(cleaned))
-    if not isclose(total, 1.0, abs_tol=max(1.0e-8, 100.0 * tol)):
-        raise PartialIdentificationInfeasibleError(
-            f"LP solution atom probabilities sum to {total}, not 1."
-        )
-    normalized = (cleaned / total).astype(np.float64)
-    return cast(FloatArray, normalized)
+    correction = 1.0 - total
+    if 0.0 < abs(correction) <= tol:
+        pivot = int(np.argmax(cleaned))
+        cleaned[pivot] = cleaned[pivot] + correction
+    cleaned = cleaned.astype(np.float64, copy=False)
+    cleaned.setflags(write=False)
+    return cast(FloatArray, cleaned)
 
 
 def _validate_lp_solution(
@@ -780,25 +839,57 @@ def _validate_lp_solution(
     a_ub: FloatArray | None,
     b_ub: FloatArray | None,
     tol: float,
+    *,
+    label: str,
 ) -> None:
+    if solution.ndim != 1:
+        raise IdentificationInfeasibleError(f"{label} is not a probability vector.")
+    if not np.all(np.isfinite(solution)):
+        raise IdentificationInfeasibleError(f"{label} contains non-finite atom probabilities.")
     if np.any(solution < -tol):
-        raise PartialIdentificationInfeasibleError("LP solution has negative atom mass.")
+        raise IdentificationInfeasibleError(f"{label} has negative atom mass.")
+    if np.any(solution > 1.0 + tol):
+        raise IdentificationInfeasibleError(f"{label} has atom mass above 1.")
     total = float(np.sum(solution))
-    if not isclose(total, 1.0, abs_tol=max(1.0e-8, 100.0 * tol)):
-        raise PartialIdentificationInfeasibleError(
-            f"LP solution atom probabilities sum to {total}, not 1."
+    if abs(total - 1.0) > tol:
+        raise IdentificationInfeasibleError(
+            f"{label} atom probabilities sum to {total}, not 1."
         )
     eq_residual = float(np.max(np.abs(a_eq @ solution - b_eq)))
-    if eq_residual > max(1.0e-7, 100.0 * tol):
-        raise PartialIdentificationInfeasibleError(
-            f"LP solution violates equality constraints by {eq_residual:.3e}."
+    if eq_residual > tol:
+        raise IdentificationInfeasibleError(
+            f"{label} violates equality constraints by {eq_residual:.3e}."
         )
     if a_ub is not None and b_ub is not None:
         ub_residual = float(np.max(a_ub @ solution - b_ub))
-        if ub_residual > max(1.0e-7, 100.0 * tol):
-            raise PartialIdentificationInfeasibleError(
-                f"LP solution violates inequality constraints by {ub_residual:.3e}."
+        if ub_residual > tol:
+            raise IdentificationInfeasibleError(
+                f"{label} violates inequality constraints by {ub_residual:.3e}."
             )
+
+
+def _active_constraint_names(
+    assumptions: AssumptionSet,
+    solution: FloatArray,
+    tol: float,
+) -> tuple[str, ...]:
+    names: list[str] = []
+    for constraint in assumptions.constraints:
+        lhs = float(constraint.coefficients @ solution)
+        residual = abs(lhs - constraint.rhs)
+        if residual <= tol:
+            names.append(constraint.name)
+    return tuple(names)
+
+
+def _ordered_union(left: Sequence[str], right: Sequence[str]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in (*left, *right):
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return tuple(out)
 
 
 def _stable_assumptions_hash(assumptions: AssumptionSet) -> str:
@@ -808,12 +899,15 @@ def _stable_assumptions_hash(assumptions: AssumptionSet) -> str:
             {
                 "name": constraint.name,
                 "sense": constraint.sense,
-                "rhs": _json_float(constraint.rhs),
-                "coefficients": [_json_float(value) for value in constraint.coefficients],
+                "rhs": _canonical_float(constraint.rhs),
+                "coefficients": [_canonical_float(value) for value in constraint.coefficients],
             }
             for constraint in assumptions.constraints
         ],
-        "metadata": dict(sorted(assumptions.metadata.items())),
+        "metadata": {
+            key: _canonical_json_scalar(value)
+            for key, value in sorted(assumptions.metadata.items())
+        },
     }
     encoded = json.dumps(
         payload,
@@ -895,13 +989,13 @@ def _validate_interval(label: str, lower: float, upper: float) -> tuple[float, f
     hi = float(upper)
     if not np.isfinite(lo) or not np.isfinite(hi):
         raise ValueError(f"{label} endpoints must be finite.")
-    if lo < -_TOL or hi > 1.0 + _TOL:
+    if lo < -DEFAULT_TOL or hi > 1.0 + DEFAULT_TOL:
         raise ValueError(f"{label} endpoints must lie in [0, 1].")
     lo = float(np.clip(lo, 0.0, 1.0))
     hi = float(np.clip(hi, 0.0, 1.0))
-    if lo > hi + _TOL:
+    if lo > hi + DEFAULT_TOL:
         raise ValueError(f"{label} must satisfy lower <= upper.")
-    if abs(lo - hi) <= _TOL:
+    if abs(lo - hi) <= DEFAULT_TOL:
         midpoint = 0.5 * (lo + hi)
         return midpoint, midpoint
     return lo, hi
@@ -920,11 +1014,21 @@ def _metadata_mapping(metadata: Mapping[str, JsonScalar]) -> dict[str, JsonScala
     return out
 
 
-def _json_float(value: Any) -> float:
+def _canonical_json_scalar(value: JsonScalar) -> JsonScalar | str:
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return value
+    if isinstance(value, float):
+        return _canonical_float(value)
+    return value
+
+
+def _canonical_float(value: Any) -> str:
     number = float(value)
-    if abs(number) <= _TOL:
-        return 0.0
-    return number
+    if not np.isfinite(number):
+        raise ValueError("canonical numeric values must be finite.")
+    if abs(number) <= DEFAULT_TOL:
+        number = 0.0
+    return format(number, ".17g")
 
 
 def _snap_to_objective_range(value: float, coefficients: FloatArray, tol: float) -> float:

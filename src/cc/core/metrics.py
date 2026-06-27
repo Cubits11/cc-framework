@@ -30,6 +30,7 @@ Minimal deps: `numpy` (no plotting). Designed for CPU-cheap, deterministic smoke
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
 from math import sqrt
@@ -74,6 +75,17 @@ __all__ = [
 EPS = 1e-12
 
 
+def _warn_legacy_metric(name: str, replacement: str) -> None:
+    warnings.warn(
+        (
+            f"{name} is deprecated and will be removed in v0.4. "
+            f"{replacement} Legacy semantics are preserved for this call."
+        ),
+        FutureWarning,
+        stacklevel=2,
+    )
+
+
 # =============================================================================
 # Core legacy API (vectorized, but backward compatible for scalars)
 # =============================================================================
@@ -100,6 +112,11 @@ def delta_add(j_comp: float, j_a: float, j_b: float) -> float:
     Δ_add = J_comp - (J_A + J_B - J_A * J_B).
     Positive values indicate **super-additive** composition (synergy).
     """
+    _warn_legacy_metric(
+        "delta_add",
+        "Use cc.kernel.metrics.independence_regret only when comparing to an "
+        "explicit independence event probability.",
+    )
     j_a = float(j_a)
     j_b = float(j_b)
     j_comp = float(j_comp)
@@ -113,6 +130,11 @@ def cc_max(j_comp: float, j_a: float, j_b: float) -> float:
 
     Interpret as: how much does the composed rail outperform the best singleton rail?
     """
+    _warn_legacy_metric(
+        "cc_max",
+        "Use cc.kernel.metrics.cc_gain only for operator-relative failure-risk "
+        "normalization with matching domain assumptions.",
+    )
     j_comp = float(j_comp)
     denom = max(float(j_a), float(j_b))
     return float(j_comp / denom) if denom > 0 else float("inf")
@@ -130,6 +152,10 @@ def cc_rel(j_comp: float, j_a: float, j_b: float) -> float:
 
     Returns +∞ if the denominator is 0 and J_comp > 0; 0 if both are 0.
     """
+    _warn_legacy_metric(
+        "cc_rel",
+        "There is no canonical replacement in the formal estimand taxonomy.",
+    )
     j_comp = float(j_comp)
     base = float(j_a) + float(j_b) - float(j_a) * float(j_b)
     if abs(base) < EPS:
@@ -144,6 +170,10 @@ def delta_mult(j_comp: float, j_a: float, j_b: float) -> float:
 
     Interprets composition on the complement scale (residual error mass).
     """
+    _warn_legacy_metric(
+        "delta_mult",
+        "There is no canonical replacement in the formal estimand taxonomy.",
+    )
     j_a = float(j_a)
     j_b = float(j_b)
     j_comp = float(j_comp)

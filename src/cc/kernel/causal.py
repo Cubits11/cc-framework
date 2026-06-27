@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from scipy import stats
+from scipy import stats  # type: ignore[import-untyped]
 
 AssignmentMode = Literal["cluster", "individual"]
 

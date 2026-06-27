@@ -22,6 +22,11 @@ Kernel code should include modules that define or compute:
 - deterministic audit records,
 - serialized result payloads consumed by downstream reports.
 
+`src/cc/kernel/sensitivity.py` is strict-kernel pure math. It must remain free
+of network calls, model API calls, dashboard dependencies, filesystem side
+effects, AWS dependencies, and runtime guardrail invocation. It operates only
+on declared finite binary event assumptions and linear queries.
+
 Non-kernel code may include:
 
 - exploratory scripts,
