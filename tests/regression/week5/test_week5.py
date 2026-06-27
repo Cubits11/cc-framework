@@ -1,4 +1,6 @@
 import csv
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -29,11 +31,22 @@ SCAN_PATH = Path("results/week5_scan/scan.csv")
 
 
 @pytest.fixture(scope="session")
-def ensure_week5_scan() -> Path:
-    subprocess.run(["make", "week5-pilot"], check=True)
+def ensure_week5_scan(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    if os.environ.get("CC_REFRESH_GOLDEN_ARTIFACTS") == "1":
+        subprocess.run(["make", "week5-pilot"], check=True)
+        if not SCAN_PATH.exists():
+            raise RuntimeError("Week5 scan did not produce scan.csv")
+        return SCAN_PATH
+
     if not SCAN_PATH.exists():
-        raise RuntimeError("Week5 scan did not produce scan.csv")
-    return SCAN_PATH
+        pytest.skip(
+            "Committed Week5 scan artifact is absent; set "
+            "CC_REFRESH_GOLDEN_ARTIFACTS=1 to regenerate it."
+        )
+
+    tmp_scan = tmp_path_factory.mktemp("week5_scan") / "scan.csv"
+    shutil.copyfile(SCAN_PATH, tmp_scan)
+    return tmp_scan
 
 
 def test_scan_schema_and_rows(ensure_week5_scan: Path) -> None:

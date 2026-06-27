@@ -190,8 +190,10 @@ coverage, or deployment safety.
 
 The repository already exposes endpoint solutions through
 `IdentificationResult.lower_solution` and `IdentificationResult.upper_solution`.
-A final reproduce-paper pipeline is planned in the
-[research roadmap](docs/research/ROADMAP.md), not treated here as complete.
+Paper-core artifacts can be regenerated with `make reproduce-paper` and checked
+with `make verify-paper-artifacts`. This pipeline verifies deterministic kernel
+artifacts and endpoint witnesses; it is not a claim that the historical LaTeX
+paper source is complete.
 
 ## Research Program Documents
 

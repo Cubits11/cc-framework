@@ -599,5 +599,5 @@ Output directory: artifacts/perspective_vs_llamaguard
 ✅ **100% Free** — No API costs  
 ✅ **Reproducible** — Seed + config saved  
 ✅ **Validated** — FH bounds checked automatically  
-✅ **Production-ready** — Error handling + logging  
-✅ **Documented** — Every step logged  
+✅ **Prototype-ready for local experiments** — Error handling + logging
+✅ **Documented** — Every step logged

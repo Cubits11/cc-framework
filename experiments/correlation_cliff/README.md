@@ -1,6 +1,6 @@
 # Correlation Cliff Experiment
 
-**Status**: 🟢 Production-ready | **Rigor Level**: PhD-grade | **Runtime**: ~5-15 min (CPU-bound)
+**Status**: Exploratory research prototype | **Rigor Level**: internal experimental scaffold | **Runtime**: ~5-15 min (CPU-bound)
 
 ---
 
@@ -8,13 +8,13 @@
 
 You have two AI guardrails (A and B) that flag unsafe content. You want to combine them with a rule like AND or OR. **The hidden danger**: if their failures are tail-dependent, the composition can make your system WORSE than using just the best single guardrail.
 
-This experiment explores the historical "correlation cliff" idea. The formal version is a **tail-dependence cliff**: a threshold in copula lower/upper tail coefficients (`lambda_L`, `lambda_U`), not a threshold in Pearson correlation. See `docs/theory/correlation_cliffs.md`.
+This experiment explores the historical "correlation cliff" idea. The formal version is a **tail-dependence cliff**: a threshold in copula lower/upper tail coefficients (`lambda_L`, `lambda_U`), not a threshold in Pearson correlation. Treat the outputs as conditional sensitivity diagnostics, not deployment recommendations. See `docs/theory/correlation_cliffs.md`.
 
 **Key outputs**:
 - 📊 **Phase diagram**: CC vs correlation with the cliff clearly visible
 - 📈 **Threshold estimate**: tail-dependence λ\* ≈ 0.47 (example) with 95% CI [0.44, 0.51]
-- ✅ **FH bounds validation**: All empirical points within theoretical envelope (0 violations)
-- 🎯 **Actionable insight**: "Don't compose these rails if max(lambda_L, lambda_U) > 0.47"
+- ✅ **FH bounds check**: Empirical points are compared with the theoretical envelope
+- 🎯 **Exploratory sensitivity flag**: High tail dependence is a reason to gather more evidence before relying on the composition
 
 ---
 
@@ -52,7 +52,7 @@ pip install scipy  # optional, for gaussian_copula path
 
 ### The Problem
 
-**Industry assumption (WRONG)**: "More guardrails = safer system"
+**Over-simplified assumption**: "More guardrails = safer system"
 
 **Reality**: Guardrail composition performance depends on **dependence structure** between failures:
 - If failures are **anti-correlated** (one fails when the other succeeds): composition is **constructive** (CC < 1)
@@ -63,23 +63,23 @@ pip install scipy  # optional, for gaussian_copula path
 
 1. **Nobody measures this**: Industry evaluates guardrails in isolation, then composes them blindly
 2. **The risk is hidden**: Two "90% accurate" guardrails composed with AND can perform WORSE than either alone if their failures overlap
-3. **No prior art**: This is the first quantitative framework for measuring compositional safety under unknown dependence
+3. **Prior-work positioning required**: The experiment is a repo-local scaffold and should be positioned against related work before publication
 
 ### Our Contribution (This Experiment)
 
-**Novel Result**: The "correlation cliff" should be treated as a tail-dependence claim: sharp co-failure growth occurs when rare-event overlap is controlled by positive `lambda_L` or `lambda_U`.
+**Working hypothesis**: The "correlation cliff" should be treated as a tail-dependence claim: sharp co-failure growth can occur when rare-event overlap is controlled by positive `lambda_L` or `lambda_U`.
 
-**Key Innovation**: We don't assume independence. Instead:
+**Experiment design**: We don't assume independence. Instead:
 1. Fix per-guardrail marginals (TPR, FPR) based on isolated testing
 2. Treat joint distribution as **unknown copula** constrained by Fréchet-Hoeffding (FH) bounds
 3. Sweep dependence parameter λ ∈ [0,1] to scan the entire feasible space
 4. Measure CC(λ) empirically via two-world distinguishability tests
 5. Identify λ\* where CC(λ\*) = 1 (the cliff)
 
-**Why it's rigorous**:
+**Why this scaffold is useful**:
 - ✅ Theory-backed: FH bounds are provably tight for marginal-constrained copulas
 - ✅ Statistically sound: BCa bootstrap + jackknife acceleration for proper inference
-- ✅ Falsifiable: If empirical J_C ever violates FH envelope, the theory is wrong (hasn't happened)
+- ✅ Falsifiable within the stated setup: empirical J_C is checked against the FH envelope
 - ✅ Reproducible: Deterministic RNG, config snapshots, cryptographic audit logs (in CC-Framework)
 
 ---
@@ -310,9 +310,9 @@ bootstrap:
 ```
 
 **Interpretation**:
-- λ\* ≈ 0.47 means: "If dependence exceeds 47% of the FH range, composition becomes destructive"
-- phi\* ≈ 0.32 means: "Don't compose if correlation > 0.32"
-- This is **actionable**: Measure correlation in production data → decide whether to compose
+- λ\* ≈ 0.47 means: in this conditional setup, the composition crosses the chosen destructive threshold near 47% of the FH range
+- phi\* ≈ 0.32 means: the crossing corresponds to this correlation summary under the chosen dependence path
+- This is a sensitivity diagnostic: use it to prioritize measurement, replication, and review before making composition decisions
 
 ### Sanity Checks (Validation)
 
@@ -374,7 +374,7 @@ rail_b = OpenAIPolicyAdapter("gpt-4-moderation")
 # Feed into correlation_cliff with those marginals
 ```
 
-**Output**: λ\* for REAL deployed system → actionable audit report
+**Output**: conditional sensitivity report for the evaluated dataset and guardrails, requiring external review before deployment use
 
 ### 4. Adversarial Correlation Attack (Option 3)
 
@@ -601,5 +601,5 @@ Population concordance measure:
 ---
 
 **Document version**: 2025-12-20  
-**Experiment status**: Production-ready, awaiting YOUR S1 marginals  
+**Experiment status**: Exploratory prototype, awaiting problem-specific marginals
 **Next artifact**: Multi-rail scaling law (Option 2)

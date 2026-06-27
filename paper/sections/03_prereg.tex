@@ -161,7 +161,7 @@ $\alpha_{\mathrm{strata}}$; for example, a simple Bonferroni choice is
   \alpha_y^{\mathrm{glob}} = \frac{\alpha_{\mathrm{strata}}}{2}.
 \]
 
-\paragraph{Decision rule (certificate of stability).}
+\paragraph{Decision rule (stability evidence).}
 For each class $y$ and each stratum $s \in \mathcal{S}$, consider the
 quantity
 \begin{equation}
@@ -184,7 +184,8 @@ whenever all three coordinates lie in their respective confidence
 intervals.
 
 We \emph{reject} $H_{0,\mathrm{strata}}$ at level
-$\alpha_{\mathrm{strata}}$ (and thus certify strata stability) if
+$\alpha_{\mathrm{strata}}$ (and thus report finite-sample evidence for
+strata stability) if
 \begin{equation}
   B_y^{(s)} \le \epsilon_{\mathrm{strata}}
   \quad\text{for all } y \in \{0,1\},\;
@@ -197,11 +198,11 @@ $\epsilon_{\mathrm{strata}}$ in that stratum, and we report these
 strata explicitly.
 
 \begin{remark}[Conservatism and interpretation]
-The rule~\eqref{eq:H3-decision} is conservative: failure to certify
-stability does not prove the existence of a Simpson reversal, only
+The rule~\eqref{eq:H3-decision} is conservative: failure to meet this
+stability rule does not prove the existence of a Simpson reversal, only
 that our finite sample does not suffice to rule one out at the chosen
 tolerance and error level.
 This is appropriate for safety auditing, where we prefer
-non-certification over overconfident claims of homogeneity across
+non-acceptance over overconfident claims of homogeneity across
 strata.
 \end{remark}

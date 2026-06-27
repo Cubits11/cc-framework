@@ -562,12 +562,6 @@ def _write_summary_csv(
         w.writeheader()
         w.writerow(row)
 
-    # mirror to a conventional location
-    mirror = Path("results/aggregates")
-    mirror.mkdir(parents=True, exist_ok=True)
-    mirror_file = mirror / "summary.csv"
-    mirror_file.write_bytes(out_file.read_bytes())
-
     return out_file
 
 

@@ -255,9 +255,10 @@ an independence baseline can be from feasible dependence-aware conclusions.
 - What current CC kernel supports: Assumption hashes, endpoint witnesses,
   Merkle transparency primitives, evidence-bundle concepts, and draft assurance
   case schemas that mark claims for human review.
-- What is missing: A complete paper reproduction pipeline, stable receipt
-  schema, verifier workflow, and governance process for accepting or rejecting
-  claims.
+- What is missing: A manuscript-integrated reproduction workflow, stable
+  receipt schema, verifier workflow, and governance process for accepting or
+  rejecting claims. The paper-core artifact pipeline is implemented separately
+  through `make reproduce-paper` and `make verify-paper-artifacts`.
 - Possible paper contribution: A claim-bounded reproducibility discipline that
   ties mathematical outputs to audit artifacts while preserving non-claims.
 - Non-claim: Receipts can support integrity and review; they do not make the

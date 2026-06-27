@@ -109,7 +109,7 @@ CC-Framework does not prove that an AI system is safe. It proves that many
 safety-composition claims are underidentified unless dependence is measured or
 bounded.
 
-Endpoint witnesses certify mathematical feasibility relative to supplied
+Endpoint witnesses demonstrate mathematical feasibility relative to supplied
 constraints. They do not certify dataset representativeness, causal validity,
 future deployment safety, semantic correctness, or absence of unmeasured
 confounding.
