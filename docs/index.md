@@ -1,8 +1,15 @@
-# CC Framework Developer Manual
+# CC Framework Documentation
 
-Welcome to the internal guide for engineers working on the cc‑framework. It
-provides architectural background, research directions, and practical tips for
-extending the codebase.
+CC-Framework is a research prototype for dependence-aware evaluation and audit
+receipts for composed AI guardrails. It studies when individual guardrail
+metrics are insufficient because the joint dependence structure of failures is
+unknown.
+
+The public claim boundary is documented in
+[Public Research Framing](research/public-framing.md). In short: CC-Framework
+does not prove deployed systems are safe. It helps show when composition claims
+are underidentified unless dependence is measured, bounded, or explicitly
+assumed.
 
 ## 1. Architectural Overview
 
@@ -18,10 +25,15 @@ The experiment flow is illustrated in
 
 ## 2. Research Roadmap
 
-* **N‑way composition**: extend CC beyond pairwise guardrails.
-* **Adaptive attackers**: evaluate deep RL and side‑channel strategies.
-* **Theoretical bounds**: derive closed‑form limits for CC under specific
-  guardrail families.
+* **Frechet cartography**: compute sharp finite-atom composition intervals from
+  marginals and optional pairwise dependence evidence.
+* **Independence regret**: compare observed composition risk with an explicit
+  product-coupling baseline.
+* **Witness distributions**: return endpoint joint laws that verify reported
+  lower and upper bounds.
+* **Correlation cliffs**: detect dependence-driven jumps in composed risk.
+* **Claim-bounded receipts**: bind claims to evidence while separating evidence
+  integrity from statistical validity.
 
 ## 3. Best Practices
 
@@ -49,6 +61,7 @@ The experiment flow is illustrated in
 
 ## 5. Further Reading
 
+* [Public Research Framing](research/public-framing.md)
 * [Experiments Guide](experiments-guide.md)
 * [Reproducibility Notes](reproducibility.md)
 

@@ -51,11 +51,25 @@ This document serves as a Codex-style internal manual for cc-framework developer
 
 ## 3. Research Questions & Deep-Dive Areas
 
-- How do composability coefficients scale beyond pairwise guardrail combinations?
-- Which adaptive attack strategies (e.g., deep RL, genetic search) expose weaknesses in guardrail stacks?
-- Can confidence interval estimation for J-statistics be tightened or replaced with Bayesian approaches?
-- How do varying utility profiles affect CC outcomes across domains?
-- What formal guarantees can be provided for tamper-evident audit chains?
+The public framing for these directions is maintained in
+[`docs/research/public-framing.md`](research/public-framing.md). Treat the
+items below as research directions built from existing mathematical and
+engineering literatures, not as newly established fields.
+
+- How can finite-atom Frechet bounds produce sharp composition intervals for
+  arbitrary Boolean guardrail failure events?
+- How often does a product-coupling independence baseline understate observed
+  or feasible composed failure risk?
+- Can every reported composition bound return endpoint witness distributions
+  that independently verify the lower and upper values?
+- Which distribution shifts create correlation cliffs: large composed-risk
+  changes with only modest marginal changes?
+- How should audit receipts bind evidence, assumptions, code, solver outputs,
+  and non-claims without implying safety certification?
+- Which semantic slices show high dependence risk after multiple-testing or
+  held-out validation controls?
+- How can sequential or agentic guardrail trajectories be bounded when the full
+  joint process is not identified?
 
 ## 4. Technical Improvements & Best Practices
 

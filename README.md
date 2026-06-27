@@ -17,6 +17,7 @@ Measure guardrail composition without pretending independence.
 - A research prototype for dependence-aware guardrail composition evaluation.
 - A small Python kernel for Fréchet-Hoeffding bounds, composition metrics, and local audit evidence.
 - A reproducibility scaffold for controlled experiments and evidence bundles.
+- A concrete implementation of a partial-identification framing for composed safety systems under unknown dependence.
 
 ## What this is not
 
@@ -32,6 +33,7 @@ Measure guardrail composition without pretending independence.
 
 - [Research Statement](#research-statement)
 - [What this is](#what-this-is)
+- [Public Research Framing](#public-research-framing)
 - [Why This Matters](#why-this-matters)
 - [Core Concept](#core-concept)
 - [Kernel Contract](#kernel-contract)
@@ -79,6 +81,29 @@ Experimental surfaces include:
 - vendor guardrail adapters
 
 The goal is not to claim that composition is always good or always bad. The goal is to make composition behavior **measurable, bounded, inspectable, and reproducible**.
+
+---
+
+## Public Research Framing
+
+CC-Framework should be described as a research program at the intersection of
+dependence-aware statistical identification and composed AI safety systems.
+
+The core claim is not that the project proves AI systems are safe. The core
+claim is that many safety-composition claims are **underidentified** unless the
+dependence among guardrail failures is measured, bounded, or explicitly
+assumed.
+
+The strongest paper-sized subset is:
+
+- finite-atom Fréchet bounds for Boolean guardrail composition events
+- independence regret against an explicit product-coupling baseline
+- endpoint witness distributions that certify sharp lower and upper bounds
+- correlation cliffs as dependence-driven changes in composition risk
+- audit receipts that separate evidence integrity from statistical validity
+
+See [Public Research Framing](docs/research/public-framing.md) for preferred
+language, non-claims, and the longer research map.
 
 ---
 

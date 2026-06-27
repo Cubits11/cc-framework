@@ -11,8 +11,9 @@ Institution: Penn State University
 STATISTICAL CONTRACT (Enterprise / Audit-Safe)
 ================================================================================
 
-This module is the CC framework's "truth engine": it defines *what* is being
-measured, *how* uncertainty is quantified, and *how* failures are surfaced.
+This module is the CC framework's statistical measurement contract: it defines
+*what* is being measured, *how* uncertainty is quantified, and *how* failures
+are surfaced.
 
 Core definitions (hard contract):
 
