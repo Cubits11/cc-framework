@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from cc.analysis.week7_utils import independence_and, independence_or
+from cc.analysis.week7_utils import independence_and, independence_or  # noqa: E402
 
 
 def load_point(path: Path) -> dict:

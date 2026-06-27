@@ -26,8 +26,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from cc.analysis.week7_utils import (
+from cc.analysis.week7_utils import (  # noqa: E402
     BCaInterval,
+    WilsonInterval,
     bca_bootstrap,
     fh_envelope,
     independence_and,

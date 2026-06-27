@@ -1,0 +1,38 @@
+{
+  "artifact_files": [
+    "table_1_classical_frechet_bounds.csv",
+    "table_2_metric_examples.csv",
+    "table_3_witness_verification.csv",
+    "figure_1_fh_interval.png",
+    "figure_2_independence_regret.png",
+    "minimal_bounds.json",
+    "minimal_witnesses.json",
+    "minimal_bundle.json",
+    "environment.json",
+    "manifest.json"
+  ],
+  "bounds_file": "minimal_bounds.json",
+  "cases": [
+    {
+      "case_id": "minimal_and",
+      "event": "and",
+      "fh_width": 0.2,
+      "independence_regret": 0.05,
+      "lower_bound": 0.0,
+      "upper_bound": 0.2
+    },
+    {
+      "case_id": "minimal_or",
+      "event": "or",
+      "fh_width": 0.20000000000000007,
+      "independence_regret": -0.02999999999999997,
+      "lower_bound": 0.35,
+      "upper_bound": 0.55
+    }
+  ],
+  "environment_file": "environment.json",
+  "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
+  "schema_version": "cc.paper.bundle.v1",
+  "witness_verification_table": "table_3_witness_verification.csv",
+  "witnesses_file": "minimal_witnesses.json"
+}

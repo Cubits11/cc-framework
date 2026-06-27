@@ -147,6 +147,8 @@ def two_event_joint_subinterval(draw: st.DrawFn) -> tuple[float, float, float, f
     beta = draw(probabilities())
     fh_lower = max(0.0, alpha + beta - 1.0)
     fh_upper = min(alpha, beta)
+    if fh_lower > fh_upper:
+        fh_lower = fh_upper
     joint_lower = draw(
         st.floats(
             min_value=fh_lower,

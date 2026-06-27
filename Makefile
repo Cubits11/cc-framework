@@ -39,6 +39,7 @@ CONFIG_MVP   ?= experiments/configs/mvp.yaml
 FIG_DIR    := paper/figures
 SMOKE_CSV  := results/smoke/aggregates/summary.csv
 AUDIT_LOG  := runs/audit.jsonl
+PAPER_ARTIFACT_DIR := artifacts/paper
 
 # -------- Week-3 fixed params (single θ) ----------
 W3_D        ?= 0.55
@@ -63,8 +64,9 @@ W6_FIG_DIR  := figures/week6
 W6_RAILS    := keyword regex semantic and or
 
 # -------- Phony ----------
-.PHONY: help dev install setup lock deps fmt lint type security test test-week3 test-unit test-int cov bench \
+.PHONY: help dev install setup lock deps fmt lint type security test test-kernel test-release test-week3 test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
+        reproduce-paper verify-paper-artifacts \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
         carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
@@ -96,7 +98,11 @@ help:
 	@echo "fmt / lint / type   Code quality: ruff/isort/black/mypy"
 	@echo "security            Run Bandit and pip-audit"
 	@echo "test                Unit+integration + coverage >= $(COV_MIN)%"
+	@echo "test-kernel         Kernel-only unit tests, strict mypy, and focused ruff"
+	@echo "test-release        Kernel lane + paper reproduction integration checks"
 	@echo "test-week3          Run Week-3 unit tests only"
+	@echo "reproduce-paper     Build deterministic paper artifacts under $(PAPER_ARTIFACT_DIR)"
+	@echo "verify-paper-artifacts Verify hashes, schemas, metrics, and LP witnesses"
 	@echo "reproduce-smoke     $(SESS_SMOKE) sessions quick run + CSV + figs"
 	@echo "reproduce-mvp       $(SESS_MVP) sessions main run"
 	@echo "reproduce-figures   Rebuild smoke CSV + 3 figs from audit history"
@@ -161,6 +167,17 @@ test-unit: install
 
 test-int: install
 	$(ACT); pytest tests/integration -q --disable-warnings
+
+test-kernel:
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/kernel -q
+	PYTHONPATH=src $(VENV_DIR)/bin/mypy src/cc/kernel --strict
+	$(VENV_DIR)/bin/ruff check src/cc/kernel tests/unit/kernel
+
+test-release: test-kernel
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest \
+	  tests/integration/test_reproduce_paper.py \
+	  tests/integration/test_verify_paper_artifacts.py -q
+	PYTHONPATH=src $(VENV_DIR)/bin/python examples/minimal/run_bounds.py >/dev/null
 
 # Week-3 focused tests (subset)
 test-week3: install
@@ -247,6 +264,12 @@ reproduce-figures: install
 		--history $(AUDIT_LOG) \
 		--fig-dir $(FIG_DIR) \
 		--out-dir results/smoke/aggregates
+
+reproduce-paper:
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/reproduce_paper.py --out $(PAPER_ARTIFACT_DIR)
+
+verify-paper-artifacts:
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_paper_artifacts.py --dir $(PAPER_ARTIFACT_DIR)
 
 # -------- Analysis / Figures / Reports ---
 figures: reproduce-figures

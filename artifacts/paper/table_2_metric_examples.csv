@@ -1,0 +1,7 @@
+metric,inputs_json,value
+fh_width,"{""lower"":0.1,""upper"":0.4}",0.30000000000000004
+fh_position,"{""lower"":0.1,""observed"":0.25,""upper"":0.4}",0.49999999999999989
+independent_event_probability,"{""labels"":[""A"",""B""],""marginals"":{""A"":0.2,""B"":0.3},""query"":""union_all""}",0.43999999999999995
+independence_regret,"{""independent"":0.44,""observed"":0.5}",0.059999999999999998
+cc_gain,"{""composition_risk"":0.18,""singleton_failures"":{""A"":0.04,""B"":0.06}}",3
+cc_shift,"{""composition_baseline"":0.1,""composition_deployed"":0.16,""singleton_baseline"":{""A"":0.08,""B"":0.11},""singleton_deployed"":{""A"":0.1,""B"":0.08}}",2

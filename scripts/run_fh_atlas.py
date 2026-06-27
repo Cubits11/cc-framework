@@ -7,8 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
 
-from experiments.fh_atlas.config import FHAtlasConfig
-from experiments.fh_atlas.generate import run_fh_atlas
+from experiments.fh_atlas.config import FHAtlasConfig  # noqa: E402
+from experiments.fh_atlas.generate import run_fh_atlas  # noqa: E402
 
 
 def main() -> None:

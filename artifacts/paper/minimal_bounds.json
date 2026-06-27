@@ -1,0 +1,74 @@
+{
+  "cases": [
+    {
+      "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "case_id": "minimal_and",
+      "declared_marginals": {
+        "input_filter": 0.2,
+        "semantic_judge": 0.35
+      },
+      "event": "and",
+      "fh_position": 0.6,
+      "fh_width": 0.2,
+      "independence_regret": 0.05,
+      "independent_baseline": 0.06999999999999999,
+      "labels": [
+        "input_filter",
+        "semantic_judge"
+      ],
+      "lower_bound": 0.0,
+      "observed": 0.12,
+      "query": {
+        "coefficients": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "event": "and",
+        "events": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "name": "AND_failure"
+      },
+      "upper_bound": 0.2
+    },
+    {
+      "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "case_id": "minimal_or",
+      "declared_marginals": {
+        "input_filter": 0.2,
+        "semantic_judge": 0.35
+      },
+      "event": "or",
+      "fh_position": 0.5,
+      "fh_width": 0.20000000000000007,
+      "independence_regret": -0.02999999999999997,
+      "independent_baseline": 0.48,
+      "labels": [
+        "input_filter",
+        "semantic_judge"
+      ],
+      "lower_bound": 0.35,
+      "observed": 0.45,
+      "query": {
+        "coefficients": [
+          0.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "event": "or",
+        "events": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "name": "OR_failure"
+      },
+      "upper_bound": 0.55
+    }
+  ],
+  "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
+  "schema_version": "cc.paper.bounds.v1"
+}

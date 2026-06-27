@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "bytes": 554,
+      "filename": "table_1_classical_frechet_bounds.csv",
+      "sha256": "d250b527dc673a1a8d029e03ab144cf8589bfac2a0e0dd6540f0b79230f45c02"
+    },
+    {
+      "bytes": 651,
+      "filename": "table_2_metric_examples.csv",
+      "sha256": "d400177d4f2510d6dd7800779e66ce496687a28bb56b1aedf594fe6514ac66da"
+    },
+    {
+      "bytes": 341,
+      "filename": "table_3_witness_verification.csv",
+      "sha256": "cdcdb67f99da0c10377c9359c8732dc559fe9b95f459cca9bf0961ad17c1004d"
+    },
+    {
+      "bytes": 18756,
+      "filename": "figure_1_fh_interval.png",
+      "sha256": "c21339165c40cdcbf8944e5a4cd748ccda17d67d0d3eb58031f3aa0bbd49e551"
+    },
+    {
+      "bytes": 18998,
+      "filename": "figure_2_independence_regret.png",
+      "sha256": "b19e44ef906102c413fcaf50137874d2ec7dd3421b7c0362ac4c62ea785edd92"
+    },
+    {
+      "bytes": 1772,
+      "filename": "minimal_bounds.json",
+      "sha256": "bd22f6cfc67ef351e58f6b2a4cf3c401dc7a2c9f6d980c72c77a8543f6e0b6ac"
+    },
+    {
+      "bytes": 5764,
+      "filename": "minimal_witnesses.json",
+      "sha256": "7bd71e0dfa042277d654413fc70f3391e7b2ef104b3cb5212d56e6a2e3724fb2"
+    },
+    {
+      "bytes": 1071,
+      "filename": "minimal_bundle.json",
+      "sha256": "4d11157dbb3862049c823ee07f7339cd7cbe8f57a69d83946f2bc9fd5beeb405"
+    },
+    {
+      "bytes": 812,
+      "filename": "environment.json",
+      "sha256": "986f6ff081ca2c95550e7851e49de10c9d0634ea9cfb4bc633ddafd06f0a2d3f"
+    }
+  ],
+  "generation_command": "scripts/reproduce_paper.py --out artifacts/paper",
+  "manifest_payload_sha256": "2a1ce866fc5db4a9cc28ac96fb0dbb4edc8a4498940cb475502e5d6966bbc2cd",
+  "package_version": "0.2.0",
+  "required_files": [
+    "table_1_classical_frechet_bounds.csv",
+    "table_2_metric_examples.csv",
+    "table_3_witness_verification.csv",
+    "figure_1_fh_interval.png",
+    "figure_2_independence_regret.png",
+    "minimal_bounds.json",
+    "minimal_witnesses.json",
+    "minimal_bundle.json",
+    "environment.json",
+    "manifest.json"
+  ],
+  "schema_version": "cc.paper.manifest.v1"
+}

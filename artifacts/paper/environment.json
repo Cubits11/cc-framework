@@ -1,0 +1,25 @@
+{
+  "dependency_versions": {
+    "jsonschema": "4.26.0",
+    "matplotlib": "3.11.0",
+    "numpy": "2.5.0",
+    "scipy": "1.18.0"
+  },
+  "generation_command": "scripts/reproduce_paper.py --out artifacts/paper",
+  "generation_timestamp": "1970-01-01T00:00:00Z",
+  "package_version": "0.2.0",
+  "platform": {
+    "machine": "arm64",
+    "platform": "macOS-15.5-arm64-arm-64bit-Mach-O",
+    "release": "24.5.0",
+    "system": "Darwin"
+  },
+  "python": {
+    "executable": "/Users/pranavbhave/Documents/GitHub/cc-framework/.venv/bin/python",
+    "implementation": "CPython",
+    "version": "3.13.1"
+  },
+  "random_seed_policy": "no random sampling is used; deterministic examples only",
+  "schema_version": "cc.paper.environment.v1",
+  "timestamp_policy": "fixed reproducibility timestamp; wall-clock time omitted"
+}

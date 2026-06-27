@@ -1,0 +1,245 @@
+{
+  "atom_order": "little_endian",
+  "cases": [
+    {
+      "assumptions": {
+        "constraints": [
+          {
+            "coefficients": [
+              0.0,
+              1.0,
+              0.0,
+              1.0
+            ],
+            "name": "marginal:input_filter:lower",
+            "rhs": 0.2,
+            "sense": ">="
+          },
+          {
+            "coefficients": [
+              0.0,
+              1.0,
+              0.0,
+              1.0
+            ],
+            "name": "marginal:input_filter:upper",
+            "rhs": 0.2,
+            "sense": "<="
+          },
+          {
+            "coefficients": [
+              0.0,
+              0.0,
+              1.0,
+              1.0
+            ],
+            "name": "marginal:semantic_judge:lower",
+            "rhs": 0.35,
+            "sense": ">="
+          },
+          {
+            "coefficients": [
+              0.0,
+              0.0,
+              1.0,
+              1.0
+            ],
+            "name": "marginal:semantic_judge:upper",
+            "rhs": 0.35,
+            "sense": "<="
+          }
+        ],
+        "guardrails": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "metadata": {
+          "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
+          "source": "scripts/reproduce_paper.py"
+        }
+      },
+      "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "bounds": {
+        "lower": 0.0,
+        "upper": 0.2
+      },
+      "case_id": "minimal_and",
+      "declared_marginals": {
+        "input_filter": 0.2,
+        "semantic_judge": 0.35
+      },
+      "event": "and",
+      "labels": [
+        "input_filter",
+        "semantic_judge"
+      ],
+      "query": {
+        "coefficients": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "event": "and",
+        "events": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "name": "AND_failure"
+      },
+      "witnesses": {
+        "lower": {
+          "active_constraints": [
+            "marginal:input_filter:lower",
+            "marginal:input_filter:upper",
+            "marginal:semantic_judge:lower",
+            "marginal:semantic_judge:upper"
+          ],
+          "distribution": [
+            0.45,
+            0.2,
+            0.35,
+            0.0
+          ],
+          "query_value": 0.0
+        },
+        "upper": {
+          "active_constraints": [
+            "marginal:input_filter:lower",
+            "marginal:input_filter:upper",
+            "marginal:semantic_judge:lower",
+            "marginal:semantic_judge:upper"
+          ],
+          "distribution": [
+            0.6500000000000001,
+            0.0,
+            0.14999999999999997,
+            0.2
+          ],
+          "query_value": 0.2
+        }
+      }
+    },
+    {
+      "assumptions": {
+        "constraints": [
+          {
+            "coefficients": [
+              0.0,
+              1.0,
+              0.0,
+              1.0
+            ],
+            "name": "marginal:input_filter:lower",
+            "rhs": 0.2,
+            "sense": ">="
+          },
+          {
+            "coefficients": [
+              0.0,
+              1.0,
+              0.0,
+              1.0
+            ],
+            "name": "marginal:input_filter:upper",
+            "rhs": 0.2,
+            "sense": "<="
+          },
+          {
+            "coefficients": [
+              0.0,
+              0.0,
+              1.0,
+              1.0
+            ],
+            "name": "marginal:semantic_judge:lower",
+            "rhs": 0.35,
+            "sense": ">="
+          },
+          {
+            "coefficients": [
+              0.0,
+              0.0,
+              1.0,
+              1.0
+            ],
+            "name": "marginal:semantic_judge:upper",
+            "rhs": 0.35,
+            "sense": "<="
+          }
+        ],
+        "guardrails": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "metadata": {
+          "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
+          "source": "scripts/reproduce_paper.py"
+        }
+      },
+      "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "bounds": {
+        "lower": 0.35,
+        "upper": 0.55
+      },
+      "case_id": "minimal_or",
+      "declared_marginals": {
+        "input_filter": 0.2,
+        "semantic_judge": 0.35
+      },
+      "event": "or",
+      "labels": [
+        "input_filter",
+        "semantic_judge"
+      ],
+      "query": {
+        "coefficients": [
+          0.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "event": "or",
+        "events": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "name": "OR_failure"
+      },
+      "witnesses": {
+        "lower": {
+          "active_constraints": [
+            "marginal:input_filter:lower",
+            "marginal:input_filter:upper",
+            "marginal:semantic_judge:lower",
+            "marginal:semantic_judge:upper"
+          ],
+          "distribution": [
+            0.6500000000000001,
+            0.0,
+            0.14999999999999997,
+            0.2
+          ],
+          "query_value": 0.35
+        },
+        "upper": {
+          "active_constraints": [
+            "marginal:input_filter:lower",
+            "marginal:input_filter:upper",
+            "marginal:semantic_judge:lower",
+            "marginal:semantic_judge:upper"
+          ],
+          "distribution": [
+            0.45,
+            0.2,
+            0.35,
+            0.0
+          ],
+          "query_value": 0.55
+        }
+      }
+    }
+  ],
+  "schema_version": "cc.paper.witnesses.v1",
+  "tolerance": 1e-08
+}
