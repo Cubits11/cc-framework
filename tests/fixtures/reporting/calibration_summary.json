@@ -1,0 +1,11 @@
+{
+  "alpha_cap": 0.05,
+  "calibration_window": {
+    "lower": 0.04,
+    "upper": 0.06
+  },
+  "realized_fpr": 0.04,
+  "status": "pass",
+  "target_fpr": 0.05,
+  "threshold": 0.13392857142857142
+}

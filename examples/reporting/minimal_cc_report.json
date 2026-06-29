@@ -1,0 +1,89 @@
+{
+  "assumptions": [
+    "The fixture data are treated as a fixed evaluation distribution.",
+    "The calibration window is the named fixture operating window."
+  ],
+  "calibration": {
+    "alpha_cap": 0.05,
+    "calibration_window": {
+      "lower": 0.04,
+      "upper": 0.06
+    },
+    "realized_fpr": 0.04,
+    "status": "pass",
+    "target_fpr": 0.05,
+    "threshold": 0.13392857142857142
+  },
+  "claim": {
+    "allowed_claim_level": "bounded_empirical",
+    "non_claims": [
+      "This report does not certify production safety.",
+      "This report does not generalize outside the named evaluation distribution."
+    ],
+    "statement": "At the pinned operating point, the composed guardrail has a bounded empirical CC interval under the stated assumptions."
+  },
+  "created_at": "2026-01-01T00:00:00Z",
+  "environment": {
+    "dependency_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "platform": "fixture-platform",
+    "python_version": "3.12.0"
+  },
+  "evidence": {
+    "artifacts": [
+      {
+        "bytes": 40,
+        "path": "tests/fixtures/reporting/artifact.txt",
+        "role": "artifact",
+        "sha256": "19771b0ec53a290e110150e11223df14cce83b2bec073e19d0d71ef1ed38c586"
+      }
+    ],
+    "audit_log": {
+      "bytes": 121,
+      "path": "tests/fixtures/reporting/audit.jsonl",
+      "role": "audit_log",
+      "sha256": "c70c8f9626e8527ab0cfaa59336f99a8338bf3cc9b85ac45d7d1fedd8c7671e9"
+    },
+    "figure_manifest": {
+      "bytes": 167,
+      "path": "tests/fixtures/reporting/figure_manifest.json",
+      "role": "figure_manifest",
+      "sha256": "a6ef5cdcf88e09c422c384ef41ba5d894ba303a7f68ce86c160d1e06b363ff37"
+    }
+  },
+  "framework_version": "0.3.1-fixture",
+  "git": {
+    "branch": "main",
+    "commit": "0000000000000000000000000000000000000000",
+    "dirty": false
+  },
+  "measurement": {
+    "confidence_level": 0.95,
+    "delta": null,
+    "interval": {
+      "lower": 1.05,
+      "upper": 1.18
+    },
+    "interval_method": "FH-Bernstein",
+    "metric_family": "CC",
+    "point_estimate": 1.11,
+    "sample_sizes": {
+      "n0": 200,
+      "n1": 200
+    }
+  },
+  "receipt": {
+    "canonical_hash": "275258501fcc0885074863327eb38a90f3c14e4dff0233cd9b2d050315428fb2",
+    "canonicalization_method": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded",
+    "hash_algorithm": "sha256",
+    "previous_hash": null
+  },
+  "report_id": "cc-report-smoke-example",
+  "run": {
+    "command": "fixture build-report",
+    "config_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "config_path": "experiments/configs/smoke.yaml",
+    "run_id": "smoke-example",
+    "seed": 123
+  },
+  "schema_version": "cc.report.v0.3.1"
+}

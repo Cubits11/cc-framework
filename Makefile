@@ -64,7 +64,7 @@ W6_FIG_DIR  := figures/week6
 W6_RAILS    := keyword regex semantic and or
 
 # -------- Phony ----------
-.PHONY: help dev install setup lock deps fmt lint type security test test-kernel test-release test-week3 test-unit test-int cov bench \
+.PHONY: help dev install setup lock deps fmt lint type security test test-kernel test-release test-reporting test-week3 test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         reproduce-paper verify-paper-artifacts \
         verify-invariants verify-statistics verify-audit \
@@ -100,6 +100,7 @@ help:
 	@echo "test                Unit+integration + coverage >= $(COV_MIN)%"
 	@echo "test-kernel         Kernel-only unit tests, strict mypy, and focused ruff"
 	@echo "test-release        Kernel lane + paper reproduction integration checks"
+	@echo "test-reporting      CC report/receipt unit tests and CLI fixture smoke"
 	@echo "test-week3          Run Week-3 unit tests only"
 	@echo "reproduce-paper     Build deterministic paper artifacts under $(PAPER_ARTIFACT_DIR)"
 	@echo "verify-paper-artifacts Verify hashes, schemas, metrics, and LP witnesses"
@@ -179,6 +180,9 @@ test-release: test-kernel
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest \
 	  tests/integration/test_reproduce_paper.py \
 	  tests/integration/test_verify_paper_artifacts.py -q
+
+test-reporting:
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/reporting -q
 
 # Week-3 focused tests (subset)
 test-week3: install

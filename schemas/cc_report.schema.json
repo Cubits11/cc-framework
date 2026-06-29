@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-framework.local/schemas/cc_report.schema.json",
+  "title": "CC Report v0.3.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "created_at",
+    "framework_version",
+    "git",
+    "environment",
+    "run",
+    "assumptions",
+    "calibration",
+    "measurement",
+    "evidence",
+    "claim",
+    "receipt"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cc.report.v0.3.1"
+    },
+    "report_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "framework_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "dirty", "branch"],
+      "properties": {
+        "commit": {
+          "type": ["string", "null"]
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "branch": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python_version", "platform"],
+      "properties": {
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependency_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "package_snapshot": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "config_path", "config_hash", "seed", "command"],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_path": {
+          "type": ["string", "null"]
+        },
+        "config_hash": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "seed": {
+          "type": ["integer", "null"]
+        },
+        "command": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_fpr",
+        "alpha_cap",
+        "realized_fpr",
+        "calibration_window",
+        "threshold",
+        "status"
+      ],
+      "properties": {
+        "target_fpr": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "alpha_cap": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "realized_fpr": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "calibration_window": {
+          "type": "object"
+        },
+        "threshold": {
+          "type": ["number", "null"]
+        },
+        "status": {
+          "enum": ["pass", "fail"]
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "target_fpr": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "properties": {
+            "alpha_cap": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_family",
+        "point_estimate",
+        "interval",
+        "confidence_level",
+        "delta",
+        "interval_method",
+        "sample_sizes"
+      ],
+      "properties": {
+        "metric_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "point_estimate": {
+          "type": "number"
+        },
+        "interval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "upper"],
+          "properties": {
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            }
+          }
+        },
+        "confidence_level": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "delta": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interval_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_sizes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "confidence_level": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "properties": {
+            "delta": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifacts", "audit_log", "figure_manifest"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_artifact"
+          }
+        },
+        "audit_log": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/evidence_artifact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "figure_manifest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/evidence_artifact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "allowed_claim_level", "non_claims"],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_claim_level": {
+          "enum": ["diagnostic", "bounded_empirical", "reproducible_run", "release_claim"]
+        },
+        "non_claims": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonical_hash",
+        "hash_algorithm",
+        "canonicalization_method",
+        "previous_hash"
+      ],
+      "properties": {
+        "canonical_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "hash_algorithm": {
+          "const": "sha256"
+        },
+        "canonicalization_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous_hash": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "evidence_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes", "role"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

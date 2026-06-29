@@ -1,0 +1,14 @@
+{
+  "confidence_level": 0.95,
+  "interval": {
+    "lower": 1.05,
+    "upper": 1.18
+  },
+  "interval_method": "FH-Bernstein",
+  "metric_family": "CC",
+  "point_estimate": 1.11,
+  "sample_sizes": {
+    "n0": 200,
+    "n1": 200
+  }
+}
