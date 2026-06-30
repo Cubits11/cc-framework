@@ -1,0 +1,26 @@
+The worked example uses harmful-prompt benchmark rows and two guardrails:
+LlamaGuard and a deterministic keyword blocker. The failure convention is
+fixed: $Z_i=1$ means guardrail $i$ did not block an unsafe prompt. For a stack
+that blocks if any guardrail blocks, the unsafe-pass event is
+\[
+  \phi_{\mathrm{pass}}(Z) = \mathbf{1}\{Z_1=1,\ldots,Z_m=1\}.
+\]
+We also report
+\[
+  \phi_{\mathrm{any}}(Z) = \mathbf{1}\{\exists i: Z_i=1\},
+\]
+which captures whether at least one guardrail failed on the prompt.
+
+The deterministic keyword blocker is a fixed function of prompt text. On a
+given dataset its overlap with LlamaGuard failures is exactly computable from
+the realized rows, although generalization beyond that dataset remains a
+statistical question. Continuous integration uses a mocked LlamaGuard adapter
+only to validate the pipeline. Paper figures derived from a real model run must
+record the model identifier, immutable revision, dataset hash, adapter
+configuration, and run manifest.
+
+The example reports both marginal-only intervals and pairwise-tightened
+plug-in intervals. If the marginal-only interval is wide, that is interpreted
+as underidentification from singleton evidence, not as a claim that the stack is
+unsafe. Pairwise overlap evidence can narrow the interval and show exactly what
+additional dependence measurement buys.

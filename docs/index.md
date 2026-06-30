@@ -1,9 +1,9 @@
 # CC Framework Documentation
 
-CC-Framework is a research prototype for dependence-aware evaluation and audit
-receipts for composed AI guardrails. It studies when individual guardrail
-metrics are insufficient because the joint dependence structure of failures is
-unknown.
+CC-Framework is a research prototype for dependence-aware partial
+identification of composed AI guardrail failures. It studies when singleton
+guardrail failure rates are insufficient because the joint dependence structure
+of failures is unknown or only partially measured.
 
 The public claim boundary is documented in
 [Public Research Framing](research/public-framing.md). In short: CC-Framework
@@ -13,12 +13,14 @@ assumed.
 
 ## 1. Architectural Overview
 
-* **`cc.core`** – dataclasses for sessions, metrics, and shared constants.
-* **`cc.guardrails`** – pluggable safeguards such as keyword filters and
-  semantic classifiers.
-* **`cc.exp`** – experiment runners implementing the two‑world protocol.
-* **`cc.analysis`** – utilities for computing the Composability Coefficient and
-  generating figures.
+* **`cc.kernel.sensitivity`** – finite binary atom LP for sharp identified
+  composition intervals and endpoint witnesses.
+* **`cc.kernel.metrics`** – identified-set diagnostics, product-coupling
+  baselines, independence regret, and bounded normalization helpers.
+* **`cc.kernel.sample_complexity`** – Hoeffding-style finite-sample helper
+  functions for singleton and pairwise Bernoulli rates.
+* **`cc.evals.dependence_benchmark`** – benchmark ingestion and Paper 1 example
+  summaries using the `Z_i=1` failure convention.
 
 The experiment flow is illustrated in
 [architecture/protocol_sequence.md](architecture/protocol_sequence.md).
@@ -37,10 +39,11 @@ The experiment flow is illustrated in
 
 ## 3. Best Practices
 
-* Write configuration‑driven experiments—avoid hard‑coded parameters.
-* Keep runs reproducible: seed RNGs and commit `audit.jsonl` outputs.
-* Adhere to Black formatting and ruff linting; run `pre-commit run --all-files`
-  before pushing.
+* State the binary event convention before interpreting any bound.
+* Keep product-coupling calculations labeled as baselines, not default truth.
+* Pair every reported sharp interval with endpoint witness checks.
+* Use `make paper-smoke`, `make reproduce-paper`, and
+  `make verify-paper-artifacts` for Paper 1 source and artifact checks.
 
 ## 4. Extending the Framework
 
@@ -54,10 +57,12 @@ The experiment flow is illustrated in
 1. Implement attacker in `cc/core/attackers.py` or a new module.
 2. Expose entry point through `cc.exp.run_two_world` or custom runner.
 
-### Adding Metrics
+### Adding Paper-Facing Metrics
 
-1. Define metric in `cc.analysis.metrics`.
-2. Update summary aggregation to include the new metric.
+1. Define the estimand-level metric in `cc.kernel.metrics`.
+2. Add focused unit tests under `tests/unit/kernel`.
+3. Update `docs/theory/metric_taxonomy.md` and the paper artifact verifier if
+   the metric appears in Paper 1 outputs.
 
 ## 5. Further Reading
 

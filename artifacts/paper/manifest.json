@@ -16,6 +16,16 @@
       "sha256": "cdcdb67f99da0c10377c9359c8732dc559fe9b95f459cca9bf0961ad17c1004d"
     },
     {
+      "bytes": 802,
+      "filename": "table_4_sample_complexity.csv",
+      "sha256": "172e1b8739d8d574f223d45fa925992bb7da03efddbf848d774bd1328938a362"
+    },
+    {
+      "bytes": 278,
+      "filename": "table_5_runtime_scaling.csv",
+      "sha256": "d630d4ab98237735dc0855ac1f9612e12c49f9dd9b03f007f9b7c49fbe51256b"
+    },
+    {
       "bytes": 18756,
       "filename": "figure_1_fh_interval.png",
       "sha256": "c21339165c40cdcbf8944e5a4cd748ccda17d67d0d3eb58031f3aa0bbd49e551"
@@ -31,6 +41,16 @@
       "sha256": "5b29a009744ca994185d24d24ec057fff7178a2f96457f7f64b677c013ed070a"
     },
     {
+      "bytes": 29944,
+      "filename": "figure_4_runtime_scaling.png",
+      "sha256": "2e2dbb0dc391b21c5b09b271f0bf39fdee7f3dd527ac57694c654a851b7abe4a"
+    },
+    {
+      "bytes": 4156,
+      "filename": "benchmark_example_summary.json",
+      "sha256": "dc39383af953565f8266fdf41c6531843a1ffcdf70d8637d0512910ab80e8b9c"
+    },
+    {
       "bytes": 2047,
       "filename": "minimal_bounds.json",
       "sha256": "06d3476ea8fb7407586ea35e0adb6d61bc648728e23feb595712592b341bc2e5"
@@ -41,9 +61,9 @@
       "sha256": "7bd71e0dfa042277d654413fc70f3391e7b2ef104b3cb5212d56e6a2e3724fb2"
     },
     {
-      "bytes": 1388,
+      "bytes": 1534,
       "filename": "minimal_bundle.json",
-      "sha256": "aebd266f16299bcb0c265abb19913195277169afc00bc8ea9a2bff6415f93d79"
+      "sha256": "c3a00da55cde50dbfd85d82952e6817509810a29dae0acd0066525e82e987a46"
     },
     {
       "bytes": 819,
@@ -52,15 +72,19 @@
     }
   ],
   "generation_command": "scripts/reproduce_paper.py --output-dir artifacts/paper",
-  "manifest_payload_sha256": "64b4740f59c3b09f500f2ca121e3a017735225a1264495a19b96778d37722682",
+  "manifest_payload_sha256": "220e5559c2455bd55a9fa84005a5ccdd973cb9a34a5dad73abeacf211e968115",
   "package_version": "0.2.0",
   "required_files": [
     "table_1_classical_frechet_bounds.csv",
     "table_2_metric_examples.csv",
     "table_3_witness_verification.csv",
+    "table_4_sample_complexity.csv",
+    "table_5_runtime_scaling.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
     "figure_3_correlation_cliff_toy.png",
+    "figure_4_runtime_scaling.png",
+    "benchmark_example_summary.json",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",

@@ -31,6 +31,10 @@ and assumptions; it does not establish deployment safety.
 3. Dependence-aware diagnostics including FH width, FH position, and independence regret.
 4. Endpoint witness distributions for reproducibility.
 5. Claim-bounded artifact discipline separating mathematical verification from deployment safety.
+6. Sample-complexity guidance for estimating singleton and pairwise Bernoulli
+   failure rates.
+7. Explicit scaling analysis distinguishing closed-form marginal-only AND/OR
+   bounds from the general `2^m` atom-LP path.
 
 ## Non-Contributions
 
@@ -83,7 +87,9 @@ and assumptions; it does not establish deployment safety.
 
 - Include toy finite examples that recover classical special cases.
 - Include dependence-sensitivity examples where singleton rates are fixed.
-- Include a correlation-cliff toy demonstration if the artifact is stable.
+- Include one LlamaGuard + deterministic keyword worked-example scaffold,
+  separating CI fixtures from pinned real-model evidence.
+- Include a correlation-cliff toy demonstration only if labeled illustrative.
 - Report runtime and atom-scaling limitations for the explicit LP.
 
 ### 7. Related Work
@@ -117,6 +123,9 @@ and assumptions; it does not establish deployment safety.
 | Figure 1: Frechet interval visualization | Visualize `[L_\phi, U_\phi]` and dependence-driven uncertainty. | Planned artifact |
 | Figure 2: Independence regret under product-coupling baseline | Show signed deviation from the independence baseline. | Planned artifact |
 | Figure 3: Correlation-cliff toy demonstration | Show abrupt dependence sensitivity in a controlled example. | Planned artifact |
+| Table 4: Sample complexity | Show simultaneous Bernoulli-rate radii and sample sizes. | Planned artifact |
+| Table 5: Runtime scaling | Show closed-form versus atom-LP scaling. | Planned artifact |
+| Figure 4: Runtime scaling | Visualize explicit atom variables as guardrail count grows. | Planned artifact |
 
 Existing scripts and docs may support some of these artifacts, but the paper
 should count an artifact as implemented only after it has a stable generation

@@ -1,0 +1,29 @@
+The kernel consumes Bernoulli rates. Estimating those rates from data is a
+separate statistical problem. For one Bernoulli rate estimated from $n$ samples,
+Hoeffding's inequality gives
+\[
+  \Prob(|\hat p-p| > \epsilon) \le 2\exp(-2n\epsilon^2).
+\]
+Thus a two-sided radius at error probability $\delta$ is
+\[
+  \epsilon(n,\delta) = \sqrt{\frac{\log(2/\delta)}{2n}},
+\]
+and the corresponding sample size for radius $\epsilon$ is
+\[
+  n \ge \frac{\log(2/\delta)}{2\epsilon^2}.
+\]
+
+For $k$ simultaneously reported Bernoulli rates, a union bound replaces
+$\delta$ by $\delta/k$, yielding
+\[
+  \epsilon(n,k,\delta) =
+  \sqrt{\frac{\log(2k/\delta)}{2n}}.
+\]
+For $m$ guardrails, the number of singleton plus pairwise rates is
+$m + m(m-1)/2$.
+
+Computational scaling has a different source. Marginal-only AND and OR bounds
+have closed forms. The general finite-atom LP enumerates all $2^m$ atoms, so it
+is appropriate for small guardrail stacks, theorem validation, and auditable
+examples. Scaling beyond that requires structure, decomposition, or a different
+optimization layer.

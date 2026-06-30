@@ -1,5 +1,9 @@
 # paper/draft.md
 
+Historical note: this file records an early sketch of the older two-setting
+scalar-metric framing. It is retained for provenance only. The Paper 1 source is
+`paper/main.tex`; do not use this file for current manuscript claims.
+
 ## The Composability Coefficient: Initial Results
 
 ### 1. Introduction (0.5 page)

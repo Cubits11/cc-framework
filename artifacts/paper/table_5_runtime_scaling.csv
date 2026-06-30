@@ -1,0 +1,7 @@
+guardrails,closed_form_marginal_and_or,atom_lp_variables,simplex_equality_constraints,singleton_constraints,pairwise_overlap_rates
+2,available,4,1,4,1
+4,available,16,1,8,6
+6,available,64,1,12,15
+8,available,256,1,16,28
+10,available,1024,1,20,45
+12,available,4096,1,24,66

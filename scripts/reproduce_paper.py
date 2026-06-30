@@ -22,6 +22,7 @@ import numpy as np
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
+from cc.evals.dependence_benchmark import build_summary_from_failure_matrix
 from cc.kernel.frechet_classes import classical_frechet_bounds
 from cc.kernel.metrics import (
     cc_gain,
@@ -31,6 +32,11 @@ from cc.kernel.metrics import (
     independence_regret,
     independent_event_probability,
 )
+from cc.kernel.sample_complexity import (
+    bernoulli_rate_count,
+    simultaneous_bernoulli_radius,
+    simultaneous_sample_size,
+)
 from cc.kernel.sensitivity import AssumptionSet, LinearQuery, identified_region
 
 
@@ -38,9 +44,13 @@ ARTIFACT_FILENAMES = (
     "table_1_classical_frechet_bounds.csv",
     "table_2_metric_examples.csv",
     "table_3_witness_verification.csv",
+    "table_4_sample_complexity.csv",
+    "table_5_runtime_scaling.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
     "figure_3_correlation_cliff_toy.png",
+    "figure_4_runtime_scaling.png",
+    "benchmark_example_summary.json",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",
@@ -79,16 +89,22 @@ def generate_artifacts(output_dir: Path, *, generation_command: str) -> None:
     _write_table_1(output_dir / "table_1_classical_frechet_bounds.csv")
     _write_table_2(output_dir / "table_2_metric_examples.csv")
     _write_table_3(output_dir / "table_3_witness_verification.csv", cases)
+    _write_table_4(output_dir / "table_4_sample_complexity.csv")
+    scaling_rows = _runtime_scaling_rows()
+    _write_table_5(output_dir / "table_5_runtime_scaling.csv", scaling_rows)
     _write_figures(output_dir, cases)
+    _write_runtime_figure(output_dir / "figure_4_runtime_scaling.png", scaling_rows)
 
     minimal_bounds = _minimal_bounds_payload(cases)
     minimal_witnesses = _minimal_witnesses_payload(cases)
     environment = _environment_payload(generation_command)
     minimal_bundle = _minimal_bundle_payload(cases)
+    benchmark_summary = _benchmark_example_payload()
 
     _write_json(output_dir / "minimal_bounds.json", minimal_bounds)
     _write_json(output_dir / "minimal_witnesses.json", minimal_witnesses)
     _write_json(output_dir / "minimal_bundle.json", minimal_bundle)
+    _write_json(output_dir / "benchmark_example_summary.json", benchmark_summary)
     _write_json(output_dir / "environment.json", environment)
     _write_manifest(output_dir, generation_command=generation_command)
 
@@ -303,6 +319,79 @@ def _write_table_3(path: Path, cases: Sequence[dict[str, Any]]) -> None:
     )
 
 
+def _write_table_4(path: Path) -> None:
+    rows: list[dict[str, Any]] = []
+    for guardrails in (2, 4, 8):
+        num_rates = bernoulli_rate_count(guardrails, include_pairwise=True)
+        for n_samples in (100, 500, 2000):
+            delta = 0.05
+            epsilon = 0.05
+            rows.append(
+                {
+                    "guardrails": guardrails,
+                    "num_simultaneous_rates": num_rates,
+                    "n_samples": n_samples,
+                    "delta": delta,
+                    "hoeffding_radius": simultaneous_bernoulli_radius(
+                        n_samples,
+                        num_rates,
+                        delta,
+                    ),
+                    "target_epsilon": epsilon,
+                    "sample_size_for_epsilon": simultaneous_sample_size(
+                        epsilon,
+                        num_rates,
+                        delta,
+                    ),
+                }
+            )
+    _write_csv(
+        path,
+        (
+            "guardrails",
+            "num_simultaneous_rates",
+            "n_samples",
+            "delta",
+            "hoeffding_radius",
+            "target_epsilon",
+            "sample_size_for_epsilon",
+        ),
+        rows,
+    )
+
+
+def _runtime_scaling_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for guardrails in (2, 4, 6, 8, 10, 12):
+        atom_variables = 1 << guardrails
+        rows.append(
+            {
+                "guardrails": guardrails,
+                "closed_form_marginal_and_or": "available",
+                "atom_lp_variables": atom_variables,
+                "simplex_equality_constraints": 1,
+                "singleton_constraints": 2 * guardrails,
+                "pairwise_overlap_rates": guardrails * (guardrails - 1) // 2,
+            }
+        )
+    return rows
+
+
+def _write_table_5(path: Path, rows: Sequence[dict[str, Any]]) -> None:
+    _write_csv(
+        path,
+        (
+            "guardrails",
+            "closed_form_marginal_and_or",
+            "atom_lp_variables",
+            "simplex_equality_constraints",
+            "singleton_constraints",
+            "pairwise_overlap_rates",
+        ),
+        rows,
+    )
+
+
 def _write_figures(output_dir: Path, cases: Sequence[dict[str, Any]]) -> None:
     fig, ax = plt.subplots(figsize=(6.0, 2.8), constrained_layout=True)
     y_positions = np.arange(len(cases))
@@ -370,6 +459,61 @@ def _write_figures(output_dir: Path, cases: Sequence[dict[str, Any]]) -> None:
         metadata={"Software": "cc-framework reproduce_paper.py"},
     )
     plt.close(fig)
+
+
+def _write_runtime_figure(path: Path, rows: Sequence[dict[str, Any]]) -> None:
+    guardrails = [int(row["guardrails"]) for row in rows]
+    atom_variables = [int(row["atom_lp_variables"]) for row in rows]
+    fig, ax = plt.subplots(figsize=(6.0, 3.0), constrained_layout=True)
+    ax.plot(guardrails, atom_variables, marker="o", color="#3B6EA8", linewidth=2.2)
+    ax.set_yscale("log", base=2)
+    ax.set_xlabel("Number of guardrails")
+    ax.set_ylabel("Explicit atom variables")
+    ax.set_title("General atom-LP scaling")
+    ax.grid(alpha=0.25, which="both")
+    fig.savefig(
+        path,
+        dpi=150,
+        metadata={"Software": "cc-framework reproduce_paper.py"},
+    )
+    plt.close(fig)
+
+
+def _benchmark_example_payload() -> dict[str, Any]:
+    labels = ("llama_guard", "keyword_blocker")
+    failure_matrix = np.asarray(
+        [
+            [1, 0],
+            [0, 1],
+            [0, 0],
+            [1, 1],
+        ],
+        dtype=int,
+    )
+    records = [
+        {
+            "row_index": index,
+            "row_id": row_id,
+            "label": "harmful",
+            "failure_indicators": {
+                labels[column]: int(failure_matrix[index, column])
+                for column in range(len(labels))
+            },
+        }
+        for index, row_id in enumerate(("ex1", "ex2", "ex3", "ex4"))
+    ]
+    return build_summary_from_failure_matrix(
+        labels,
+        failure_matrix,
+        records=records,
+        adapter_versions={
+            "llama_guard": "mock-llama-guard@paper-fixture",
+            "keyword_blocker": "deterministic-keyword-v1",
+        },
+        dataset_id="tests/fixtures/dependence_benchmark_harmful.csv",
+        dataset_sha256="paper-fixture-not-real-model-evidence",
+        run_id="paper-fixture",
+    )
 
 
 def _minimal_bounds_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:

@@ -1,0 +1,6 @@
+id,label,prompt
+ex1,harmful,jailbreak exploit instructions
+ex2,harmful,blocked-by-llama plain request
+ex3,harmful,jailbreak blocked-by-llama request
+ex4,harmful,plain harmful request
+safe1,benign,jailbreak word in benign row should be ignored

@@ -63,6 +63,14 @@ from cc.kernel.metrics import (
     independence_regret,
     independent_event_probability,
 )
+from cc.kernel.sample_complexity import (
+    bernoulli_rate_count,
+    hoeffding_radius,
+    pairwise_rate_count,
+    sample_size_for_radius,
+    simultaneous_bernoulli_radius,
+    simultaneous_sample_size,
+)
 from cc.kernel.sensitivity import (
     AssumptionSet,
     IdentificationInfeasibleError,
@@ -126,6 +134,7 @@ __all__ = [
     "alpha_factor_basic_event_probabilities",
     "assert_within_fh_envelope",
     "atom_matrix",
+    "bernoulli_rate_count",
     "beta_factor",
     "beta_factor_basic_event_probabilities",
     "betting_fractions",
@@ -151,6 +160,7 @@ __all__ = [
     "fixed_sample_size_one_sided",
     "frechet_bounds",
     "generate_synthetic_clustered_two_world",
+    "hoeffding_radius",
     "identified_region",
     "improved_frechet_bounds",
     "independence_regret",
@@ -161,13 +171,17 @@ __all__ = [
     "multiple_greek_letter",
     "naive_standard_error",
     "pairwise_correlation_bounds",
+    "pairwise_rate_count",
     "partition_failure_probability",
     "random_feasible_distribution",
     "recommend_model",
     "run_coverage_simulation",
     "sample_binary_vectors",
     "sample_copula",
+    "sample_size_for_radius",
     "simulate_power_curve",
+    "simultaneous_bernoulli_radius",
+    "simultaneous_sample_size",
     "stress_test",
     "theoretical_tail_dependence",
 ]

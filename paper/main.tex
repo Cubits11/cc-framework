@@ -1,12 +1,22 @@
 \documentclass[11pt]{article}
-\usepackage{amsmath,amssymb,amsthm}
-\usepackage{graphicx,xcolor}
+
 \usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage{hyperref}
 \hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
 
-\title{Compositional AI Safety under a Fixed False-Positive Cap:\\ 
-A Finite-Sample Auditable Approach}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\R}{\mathbb{R}}
+
+\title{Sharp Composition Bounds for AI Guardrails Under Unknown Dependence}
 \author{Pranav Bhave}
 \date{\today}
 
@@ -14,35 +24,50 @@ A Finite-Sample Auditable Approach}
 \maketitle
 
 \begin{abstract}
-% [Briefly summarize vision, problem, approach, and results in 4-6 sentences]
+AI systems are increasingly protected by stacks of guardrails, yet evaluations
+often report only singleton failure rates for each guardrail. Those marginals do
+not identify the failure probability of a composed stack unless the dependence
+structure among guardrail failures is measured or assumed. We formalize
+composed guardrail evaluation as a finite partial-identification problem over
+binary failure events. Given singleton marginals, optional pairwise or linear
+side constraints, and a declared Boolean composition event, the method computes
+sharp lower and upper bounds by linear programming over the atom simplex. Here
+``sharp'' means the endpoints are attainable under the declared constraints; it
+does not mean the resulting interval is narrow or sufficient for deployment.
+The framework reports identified-set width, product-coupling regret, endpoint
+witness distributions, sample-complexity guidance, and explicit scaling limits.
 \end{abstract}
 
-\section{Introduction}\label{sec:intro}
+\section{Introduction}
 \input{sections/01_introduction.tex}
 
-\section{Problem Setup and Preliminaries}\label{sec:setup}
-\input{sections/02_setup.tex}
+\section{Problem Setup}
+\input{sections/02_problem_setup.tex}
 
-\section{Finite-Sample Composition Bounds}\label{sec:theory}
-\input{sections/03_theory.tex}
+\section{Sharp Finite-Atom Bounds}
+\input{sections/03_sharp_bounds.tex}
 
-\section{Experimental Evaluation}\label{sec:evaluation}
-\input{sections/04_evaluation.tex}
+\section{Diagnostics and Witnesses}
+\input{sections/04_diagnostics_witnesses.tex}
 
-\section{Discussion and Future Work}\label{sec:discussion}
-\input{sections/05_discussion.tex}
+\section{Sample Complexity and Scaling}
+\input{sections/05_sample_complexity_scaling.tex}
 
-\section*{Acknowledgments}
-% (if any)
+\section{Worked Benchmark Example}
+\input{sections/06_empirical_example.tex}
+
+\section{Related Work and Limitations}
+\input{sections/07_related_work_limitations.tex}
+
+\section{Conclusion}
+Composed guardrail evaluation should distinguish what is observed, what is
+assumed, and what follows from those assumptions. The finite atom LP provides a
+small but auditable core: it computes sharp bounds for declared binary events,
+exposes witness distributions, and makes independence assumptions explicit
+rather than implicit. Wide intervals are not a failure of the method; they are
+evidence that the available evaluation data underidentify the composed risk.
 
 \bibliographystyle{plain}
 \bibliography{references}
-
-\appendix
-\section{Impossibility of a Single Scalar Metric (Proof)}\label{app:impossibility}
-\input{sections/91_impossibility.tex}
-
-\section{Reproducibility Checklist and Details}\label{app:reproducibility}
-\input{sections/92_reproducibility.tex}
 
 \end{document}

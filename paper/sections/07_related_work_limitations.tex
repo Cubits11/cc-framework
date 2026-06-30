@@ -1,0 +1,23 @@
+The mathematical infrastructure is classical. Frechet-Hoeffding bounds,
+Boole--Bonferroni inequalities, copulas, and finite coupling arguments long
+predate this work \cite{frechet1951,hoeffding1940,boole1854,bonferroni1936,sklar1959,joe1997,nelsen2006}.
+Linear programming over partially identified finite distributions is standard
+in econometrics and causal inference \cite{manski1990,balke1994,tamer2010,beresteanu2008}.
+Reliability engineering also studies common-cause and dependent component
+failures \cite{mosleh1998}.
+
+The AI-safety contribution is the translation: composed guardrail evaluation is
+cast as a partial-identification problem with explicit failure events,
+assumptions, diagnostics, and witnesses. Empirical guardrail failures and
+adversarial transfer are well documented in the language-model literature
+\cite{wei2023,zou2023,perez2022}, and recent security analyses emphasize that
+finite guardrail sets should not be treated as universal robustness mechanisms
+\cite{vassilev2026}. HarmBench and JailbreakBench provide public benchmark
+contexts for worked examples \cite{mazeika2024harmbench,chao2024jailbreakbench}.
+
+The limitations are central. The binary reduction discards score-level
+dependence. The LP output is conditional on supplied evidence. Endpoint
+witnesses verify mathematical feasibility, not empirical truth. The explicit
+atom LP scales as $2^m$ in the general case. Finally, no interval produced here
+is a deployment certificate; risk decisions require external standards,
+monitoring, governance, and human accountability.

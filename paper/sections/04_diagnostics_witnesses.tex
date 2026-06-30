@@ -1,0 +1,30 @@
+The primary output is the interval $[L_\phi,U_\phi]$. We report its width
+\[
+  W_\phi = U_\phi - L_\phi
+\]
+as an identified-set diagnostic. Large width means the supplied evidence leaves
+substantial composition risk unidentified.
+
+When a selected or observed event risk $r$ is available, we report its position
+inside the interval:
+\[
+  \operatorname{pos}(r) = \frac{r-L_\phi}{U_\phi-L_\phi},
+\]
+with the degenerate case handled separately. This is descriptive, not a safety
+claim.
+
+We also compute the product-coupling baseline $r_{\mathrm{prod}}$ obtained by
+treating singleton failures as independent Bernoulli variables. The
+independence regret
+\[
+  r-r_{\mathrm{prod}}
+\]
+is a signed diagnostic for how far an observed or selected risk lies from that
+explicit assumption. The product coupling is useful as a comparison point, but
+it is not the default model of reality.
+
+Every reported sharp interval should include endpoint witness distributions
+$\pi_L$ and $\pi_U$. These witnesses satisfy the declared constraints and attain
+the lower and upper query values. They make the mathematical result
+recomputable and challengeable. They do not prove that the empirical inputs are
+representative or that either endpoint is realized in deployment.

@@ -1,0 +1,41 @@
+Let $\mathcal{F}$ be the feasible set of atom distributions satisfying the
+simplex constraints and all declared evidence:
+\[
+  \mathcal{F} = \{\pi \in \R^{2^m}: \pi_z \ge 0,\ \sum_z \pi_z = 1,\ A\pi \le b,\ C\pi=d\}.
+\]
+For a query $\phi$, define
+\[
+  L_\phi = \inf_{\pi\in\mathcal{F}}\E_\pi[\phi(Z)],
+  \qquad
+  U_\phi = \sup_{\pi\in\mathcal{F}}\E_\pi[\phi(Z)].
+\]
+
+\begin{theorem}[Finite sharpness]
+If $\mathcal{F}$ is nonempty, then $L_\phi$ and $U_\phi$ are attained by
+feasible atom distributions. Every probability in $[L_\phi,U_\phi]$ is
+compatible with the declared linear constraints after mixing endpoint
+witnesses.
+\end{theorem}
+
+\begin{proof}
+The feasible set is a closed and bounded polytope in finite-dimensional
+Euclidean space, hence compact. The query functional is linear and therefore
+continuous, so it attains its minimum and maximum on $\mathcal{F}$. Convex
+mixtures of feasible distributions remain feasible and interpolate the query
+value between endpoint optima.
+\end{proof}
+
+Classical Frechet-Hoeffding bounds are recovered when the only evidence is
+singleton marginals. For an intersection event,
+\[
+  \Prob(\cap_i \{Z_i=1\}) \in
+  \left[\max\left\{0,\sum_i p_i-(m-1)\right\},\ \min_i p_i\right],
+\]
+and for a union event,
+\[
+  \Prob(\cup_i \{Z_i=1\}) \in
+  \left[\max_i p_i,\ \min\left\{1,\sum_i p_i\right\}\right].
+\]
+These closed forms are not exponential to compute. Exponential scaling enters
+when the general atom-LP path is used for arbitrary Boolean events or side
+constraints: the explicit LP has $2^m$ atom variables.

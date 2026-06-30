@@ -105,6 +105,12 @@ The current publication-facing kernel surface is intentionally small:
   `cc_shift`.
 - [src/cc/kernel/frechet_classes.py](src/cc/kernel/frechet_classes.py):
   classical Frechet special cases and side-constrained finite Bernoulli bounds.
+- [src/cc/kernel/sample_complexity.py](src/cc/kernel/sample_complexity.py):
+  Hoeffding-style sample-size and radius helpers for singleton and pairwise
+  Bernoulli failure-rate estimates.
+- [src/cc/evals/dependence_benchmark.py](src/cc/evals/dependence_benchmark.py):
+  benchmark ingestion and Paper 1 example summaries using the repository
+  convention that `Z_i=1` means unsafe pass / guardrail failure.
 - [docs/theory/metric_taxonomy.md](docs/theory/metric_taxonomy.md): canonical
   metric domains and deprecated-name mapping.
 - [docs/theory/theorem_ledger.md](docs/theory/theorem_ledger.md): mathematical
@@ -192,8 +198,12 @@ The repository already exposes endpoint solutions through
 `IdentificationResult.lower_solution` and `IdentificationResult.upper_solution`.
 Paper-core artifacts can be regenerated with `make reproduce-paper` and checked
 with `make verify-paper-artifacts`. This pipeline verifies deterministic kernel
-artifacts and endpoint witnesses; it is not a claim that the historical LaTeX
-paper source is complete.
+artifacts and endpoint witnesses; it is not a claim that empirical benchmark
+inputs are representative or deployment-valid.
+
+The current Paper 1 LaTeX source is `paper/main.tex`. Run `make paper-smoke`
+for static source checks and an optional LaTeX build when `latexmk` is
+available.
 
 ## Research Program Documents
 
@@ -242,6 +252,17 @@ PYTHONPATH=src .venv/bin/pytest tests/unit/kernel -q
 PYTHONPATH=src .venv/bin/mypy src/cc/kernel --strict
 .venv/bin/ruff check src/cc/kernel tests/unit/kernel
 .venv/bin/mkdocs build --strict
+make paper-smoke
+```
+
+Paper 1 benchmark summaries can be generated with:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m cc.evals.dependence_benchmark \
+  --dataset tests/fixtures/dependence_benchmark_harmful.csv \
+  --adapters keyword_blocker \
+  --keyword-terms jailbreak,exploit \
+  --out /tmp/cc-dependence-summary.json
 ```
 
 ## Experimental Surfaces

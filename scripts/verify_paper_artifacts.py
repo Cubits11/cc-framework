@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 from jsonschema import Draft202012Validator, ValidationError
 
+from cc.evals.dependence_benchmark import verify_benchmark_summary
 from cc.kernel.frechet_classes import classical_frechet_bounds
 from cc.kernel.metrics import (
     cc_gain,
@@ -23,6 +24,10 @@ from cc.kernel.metrics import (
     fh_width,
     independence_regret,
     independent_event_probability,
+)
+from cc.kernel.sample_complexity import (
+    simultaneous_bernoulli_radius,
+    simultaneous_sample_size,
 )
 from cc.kernel.sensitivity import (
     AssumptionSet,
@@ -36,9 +41,13 @@ REQUIRED_FILES = (
     "table_1_classical_frechet_bounds.csv",
     "table_2_metric_examples.csv",
     "table_3_witness_verification.csv",
+    "table_4_sample_complexity.csv",
+    "table_5_runtime_scaling.csv",
     "figure_1_fh_interval.png",
     "figure_2_independence_regret.png",
     "figure_3_correlation_cliff_toy.png",
+    "figure_4_runtime_scaling.png",
+    "benchmark_example_summary.json",
     "minimal_bounds.json",
     "minimal_witnesses.json",
     "minimal_bundle.json",
@@ -200,6 +209,7 @@ def verify_artifact_dir(artifact_dir: Path, *, tol: float = DEFAULT_TOL) -> None
         witnesses = _load_json(artifact_dir / "minimal_witnesses.json")
         bundle = _load_json(artifact_dir / "minimal_bundle.json")
         environment = _load_json(artifact_dir / "environment.json")
+        benchmark_example = _load_json(artifact_dir / "benchmark_example_summary.json")
     except OSError as exc:
         errors.append(f"Unable to read JSON artifact: {exc}")
     else:
@@ -208,10 +218,13 @@ def verify_artifact_dir(artifact_dir: Path, *, tol: float = DEFAULT_TOL) -> None
         errors.extend(_verify_bounds_against_witnesses(bounds, witnesses, tol=tol))
         errors.extend(_verify_bounds_metrics(bounds, tol=tol))
         errors.extend(_verify_witnesses(witnesses, tol=tol))
+        errors.extend(_verify_benchmark_example(benchmark_example))
 
     errors.extend(_verify_classical_table(artifact_dir / "table_1_classical_frechet_bounds.csv", tol=tol))
     errors.extend(_verify_metric_table(artifact_dir / "table_2_metric_examples.csv", tol=tol))
     errors.extend(_verify_witness_table(artifact_dir / "table_3_witness_verification.csv", tol=tol))
+    errors.extend(_verify_sample_complexity_table(artifact_dir / "table_4_sample_complexity.csv", tol=tol))
+    errors.extend(_verify_runtime_scaling_table(artifact_dir / "table_5_runtime_scaling.csv"))
     errors.extend(_verify_png_artifacts(artifact_dir))
 
     if errors:
@@ -845,12 +858,67 @@ def _verify_witness_table(path: Path, *, tol: float) -> list[str]:
     return errors
 
 
+def _verify_sample_complexity_table(path: Path, *, tol: float) -> list[str]:
+    errors: list[str] = []
+    for row in _read_csv(path):
+        label = f"m={row.get('guardrails')} n={row.get('n_samples')}"
+        try:
+            num_rates = int(row["num_simultaneous_rates"])
+            n_samples = int(row["n_samples"])
+            delta = float(row["delta"])
+            radius = float(row["hoeffding_radius"])
+            epsilon = float(row["target_epsilon"])
+            sample_size = int(row["sample_size_for_epsilon"])
+        except (KeyError, ValueError) as exc:
+            errors.append(f"Malformed sample complexity row {label}: {exc}")
+            continue
+        expected_radius = simultaneous_bernoulli_radius(n_samples, num_rates, delta)
+        expected_sample_size = simultaneous_sample_size(epsilon, num_rates, delta)
+        if abs(radius - expected_radius) > tol:
+            errors.append(f"Sample complexity radius mismatch for {label}.")
+        if sample_size != expected_sample_size:
+            errors.append(f"Sample complexity sample-size mismatch for {label}.")
+    return errors
+
+
+def _verify_runtime_scaling_table(path: Path) -> list[str]:
+    errors: list[str] = []
+    for row in _read_csv(path):
+        try:
+            guardrails = int(row["guardrails"])
+            atom_variables = int(row["atom_lp_variables"])
+            singleton_constraints = int(row["singleton_constraints"])
+            pairwise_rates = int(row["pairwise_overlap_rates"])
+        except (KeyError, ValueError) as exc:
+            errors.append(f"Malformed runtime scaling row: {exc}")
+            continue
+        if row.get("closed_form_marginal_and_or") != "available":
+            errors.append(f"Closed-form status should be available for m={guardrails}.")
+        if atom_variables != 1 << guardrails:
+            errors.append(f"Atom variable count mismatch for m={guardrails}.")
+        if singleton_constraints != 2 * guardrails:
+            errors.append(f"Singleton constraint count mismatch for m={guardrails}.")
+        if pairwise_rates != guardrails * (guardrails - 1) // 2:
+            errors.append(f"Pairwise rate count mismatch for m={guardrails}.")
+    return errors
+
+
+def _verify_benchmark_example(payload: Mapping[str, Any]) -> list[str]:
+    errors = verify_benchmark_summary(payload)
+    if errors:
+        return [f"benchmark_example_summary.json: {error}" for error in errors]
+    if payload.get("dataset", {}).get("sha256") == "paper-fixture-not-real-model-evidence":
+        return []
+    return []
+
+
 def _verify_png_artifacts(artifact_dir: Path) -> list[str]:
     errors: list[str] = []
     for filename in (
         "figure_1_fh_interval.png",
         "figure_2_independence_regret.png",
         "figure_3_correlation_cliff_toy.png",
+        "figure_4_runtime_scaling.png",
     ):
         path = artifact_dir / filename
         try:

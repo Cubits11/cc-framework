@@ -66,7 +66,7 @@ W6_RAILS    := keyword regex semantic and or
 # -------- Phony ----------
 .PHONY: help dev install setup lock deps fmt lint type security test test-kernel test-release test-reporting test-week3 test-unit test-int cov bench \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
-        reproduce-paper verify-paper-artifacts \
+        reproduce-paper verify-paper-artifacts paper-smoke \
         verify-invariants verify-statistics verify-audit \
         docker-build docker-run clean distclean \
         carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
@@ -104,6 +104,7 @@ help:
 	@echo "test-week3          Run Week-3 unit tests only"
 	@echo "reproduce-paper     Build deterministic paper artifacts under $(PAPER_ARTIFACT_DIR)"
 	@echo "verify-paper-artifacts Verify hashes, schemas, metrics, and LP witnesses"
+	@echo "paper-smoke         Static Paper-1 source checks; compile if latexmk exists"
 	@echo "reproduce-smoke     $(SESS_SMOKE) sessions quick run + CSV + figs"
 	@echo "reproduce-mvp       $(SESS_MVP) sessions main run"
 	@echo "reproduce-figures   Rebuild smoke CSV + 3 figs from audit history"
@@ -180,6 +181,9 @@ test-release: test-kernel
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest \
 	  tests/integration/test_reproduce_paper.py \
 	  tests/integration/test_verify_paper_artifacts.py -q
+
+paper-smoke:
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/check_paper_source.py --latex
 
 test-reporting:
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/reporting -q
