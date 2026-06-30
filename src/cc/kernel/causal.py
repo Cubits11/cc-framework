@@ -189,21 +189,27 @@ def estimate_clustered_ate(
         raise ValueError("bootstrap_reps must be positive")
 
     observed = difference_in_means(y, w)
-    unique_clusters = np.unique(c)
+    unique_clusters, inverse = np.unique(c, return_inverse=True)
     n_clusters = int(unique_clusters.size)
     if n_clusters < 2:
         raise ValueError("at least two clusters are required for cluster bootstrap")
 
     rng = seed if isinstance(seed, np.random.Generator) else np.random.default_rng(int(seed))
-    cluster_indices = [np.flatnonzero(c == label) for label in unique_clusters]
+    treated = (w == 1).astype(float)
+    control = 1.0 - treated
+    sum1 = np.bincount(inverse, weights=y * treated, minlength=n_clusters)
+    cnt1 = np.bincount(inverse, weights=treated, minlength=n_clusters)
+    sum0 = np.bincount(inverse, weights=y * control, minlength=n_clusters)
+    cnt0 = np.bincount(inverse, weights=control, minlength=n_clusters)
+
     boot_effects: list[float] = []
     for _ in range(int(bootstrap_reps)):
         sampled = rng.integers(0, n_clusters, size=n_clusters)
-        idx = np.concatenate([cluster_indices[int(j)] for j in sampled])
-        wb = w[idx]
-        if not np.any(wb == 0) or not np.any(wb == 1):
+        n1 = float(np.sum(cnt1[sampled]))
+        n0 = float(np.sum(cnt0[sampled]))
+        if n0 <= 0.0 or n1 <= 0.0:
             continue
-        boot_effects.append(difference_in_means(y[idx], wb))
+        boot_effects.append(float(np.sum(sum1[sampled]) / n1 - np.sum(sum0[sampled]) / n0))
 
     valid_reps = len(boot_effects)
     if valid_reps < max(30, int(0.2 * bootstrap_reps)):
