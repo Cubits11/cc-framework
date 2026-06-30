@@ -75,6 +75,7 @@ The experiment flow is illustrated in
 ## 5. Further Reading
 
 * [Public Research Framing](research/public-framing.md)
+* [Business and Audit Brief](research/business-audit-brief.md)
 * [Validation Matrix](validation_matrix.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
 * [Experiments Guide](experiments-guide.md)
