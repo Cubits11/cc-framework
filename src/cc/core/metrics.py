@@ -399,24 +399,69 @@ def _search_best_threshold(
     y = np.asarray(labels, dtype=int)
     pos = int(pos_label)
 
-    # Unique thresholds sorted high->low (include +/- inf anchors)
-    thr = np.unique(s)[::-1]
-    thr = np.concatenate(([np.inf], thr, [-np.inf]))
+    # Preserve the legacy candidate order exactly: +inf anchor, unique scores
+    # descending, then -inf anchor. The first maximum wins because np.argmax
+    # returns the first index, matching the old strict ">" update rule.
+    thr = np.concatenate(([np.inf], np.unique(s)[::-1], [-np.inf]))
+    y_pos = y == pos
+    total_pos = int(np.sum(y_pos))
+    total_neg = int(y.size - total_pos)
 
-    best_thr = float(thr[0])
-    best_val = -np.inf
-    best_cf: Confusion | None = None
-    best_rates: Rates | None = None
+    tp = np.zeros(thr.size, dtype=np.int64)
+    fp = np.zeros(thr.size, dtype=np.int64)
 
-    for t in thr:
-        cf = confusion_from_scores(y, s, t, pos_label=pos)
-        r = rates_from_confusion(cf)
-        val = youden_j(r.tpr, r.fpr) if objective == "youden" else f1_score(cf.tp, cf.fp, cf.fn)
-        if val > best_val:
-            best_thr, best_val, best_cf, best_rates = float(t), float(val), cf, r
+    non_nan = ~np.isnan(s)
+    if np.any(non_nan):
+        s_non_nan = s[non_nan]
+        y_non_nan = y_pos[non_nan].astype(np.int64)
+        order = np.argsort(-s_non_nan, kind="mergesort")
+        s_sorted = s_non_nan[order]
+        y_sorted = y_non_nan[order]
 
-    assert best_cf is not None and best_rates is not None
-    return best_thr, best_cf, best_rates, best_val
+        tp_all = np.cumsum(y_sorted)
+        fp_all = np.cumsum(1 - y_sorted)
+        is_last_of_score = np.r_[s_sorted[1:] != s_sorted[:-1], True]
+        score_idx = np.flatnonzero(is_last_of_score)
+        counts_by_threshold = {
+            float(s_sorted[idx]): (int(tp_all[idx]), int(fp_all[idx])) for idx in score_idx
+        }
+        all_non_nan_counts = (int(tp_all[-1]), int(fp_all[-1]))
+
+        for idx, candidate in enumerate(thr):
+            if np.isnan(candidate):
+                continue
+            if candidate == -np.inf:
+                tp[idx], fp[idx] = all_non_nan_counts
+                continue
+            candidate_counts = counts_by_threshold.get(float(candidate))
+            if candidate_counts is not None:
+                tp[idx], fp[idx] = candidate_counts
+
+    fn = total_pos - tp
+    tn = total_neg - fp
+    tpr = np.divide(tp, total_pos, out=np.zeros_like(tp, dtype=float), where=total_pos > 0)
+    fpr = np.divide(fp, total_neg, out=np.zeros_like(fp, dtype=float), where=total_neg > 0)
+
+    if objective == "youden":
+        values = np.clip(tpr - fpr, -1.0, 1.0)
+    else:
+        denom = 2 * tp + fp + fn
+        values = np.divide(
+            2.0 * tp,
+            denom,
+            out=np.zeros_like(tp, dtype=float),
+            where=denom > 0,
+        )
+
+    best_idx = int(np.argmax(values))
+    best_cf = Confusion(
+        tp=int(tp[best_idx]),
+        fp=int(fp[best_idx]),
+        tn=int(tn[best_idx]),
+        fn=int(fn[best_idx]),
+    )
+    best_rates = rates_from_confusion(best_cf)
+    return float(thr[best_idx]), best_cf, best_rates, float(values[best_idx])
 
 
 def optimal_threshold_youden(

@@ -17,7 +17,7 @@ import pandas as pd
 
 from cc import __version__
 from cc.adapters import ADAPTER_REGISTRY, Decision, GuardrailAdapter
-from cc.cartographer.audit import append_jsonl
+from cc.cartographer.audit import append_jsonl_many
 from cc.core.manifest import RunManifest, emit_run_manifest
 from cc.core.metrics import (
     cc_max,
@@ -192,6 +192,8 @@ def run_benchmark(
     y_true: list[int] = []
     per_adapter_preds: dict[str, list[int]] = {a.name: [] for a in adapters}
     composed_preds: list[int] = []
+    output_records: list[dict[str, Any]] = []
+    audit_records: list[dict[str, Any]] = []
 
     for idx, item in enumerate(dataset):
         prompt = str(item.get(prompt_field, ""))
@@ -212,8 +214,7 @@ def run_benchmark(
             per_adapter_preds[adapter.name].append(int(blocked))
             blocked_flags.append(blocked)
             if audit_out_path and decision.audit:
-                append_jsonl(
-                    str(audit_out_path),
+                audit_records.append(
                     {
                         "record_type": "guardrail_adapter_audit",
                         "index": idx,
@@ -237,13 +238,13 @@ def run_benchmark(
             "composition": composition,
             "run_meta": run_meta,
         }
-        append_jsonl(str(out_path), record)
+        output_records.append(record)
 
     summary = _summarize(y_true, per_adapter_preds, composed_preds, composition)
-    append_jsonl(
-        str(out_path),
-        {"record_type": "summary", "summary": summary, "run_meta": run_meta},
-    )
+    output_records.append({"record_type": "summary", "summary": summary, "run_meta": run_meta})
+    append_jsonl_many(out_path, output_records)
+    if audit_out_path is not None:
+        append_jsonl_many(audit_out_path, audit_records)
     return {"summary": summary}
 
 

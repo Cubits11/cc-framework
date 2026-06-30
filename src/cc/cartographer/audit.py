@@ -54,6 +54,8 @@ import os
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import chain
+from pathlib import Path
 from typing import (
     Any,
     Literal,
@@ -68,6 +70,7 @@ __all__ = [
     "AuditError",
     # JSONL chain
     "append_jsonl",
+    "append_jsonl_many",
     "append_record",  # convenience: make_record + append_jsonl
     # FH auditor
     "audit_fh_ceiling_by_index",
@@ -195,6 +198,52 @@ def tail_sha(path: str) -> str | None:
     return last
 
 
+def append_jsonl_many(
+    path: str | Path,
+    records: Iterable[Mapping[str, Any]],
+    *,
+    fsync: bool = True,
+) -> list[str]:
+    """
+    Append multiple records to a JSONL audit log, preserving the same hash-chain
+    format as ``append_jsonl``.
+
+    Batch appends remain tamper-evident because each emitted line is hashed with
+    the previous line's SHA: the first record links to the file tail discovered
+    before the batch, and later records link to the in-memory SHA just written.
+    ``verify_chain`` can replay the resulting file exactly as it does for
+    one-by-one appends.
+    """
+    path_str = os.fspath(path)
+    _ensure_parent_dir(path_str)
+    prev_sha = tail_sha(path_str)
+
+    iterator = iter(records)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return []
+
+    shas: list[str] = []
+    with open(path_str, "a", encoding="utf-8") as f:
+        for rec in chain((first,), iterator):
+            base: dict[str, Any] = _strip_reserved(dict(rec))
+            base["prev_sha256"] = prev_sha
+
+            sha = _compute_record_sha(base)
+            final_rec = dict(base)
+            final_rec["sha256"] = sha
+            f.write(_stable_dumps(final_rec) + "\n")
+            shas.append(sha)
+            prev_sha = sha
+
+        f.flush()
+        if fsync:
+            os.fsync(f.fileno())
+
+    return shas
+
+
 def append_jsonl(path: str, rec: Mapping[str, Any], *, fsync: bool = True) -> str:
     """
     Append a record to a JSONL audit log, adding a hash chain.
@@ -211,25 +260,7 @@ def append_jsonl(path: str, rec: Mapping[str, Any], *, fsync: bool = True) -> st
     Returns:
       Hex digest of the appended record.
     """
-    _ensure_parent_dir(path)
-
-    # Build the hashable record WITHOUT reserved keys and inject the pointer
-    base: dict[str, Any] = _strip_reserved(dict(rec))
-    base["prev_sha256"] = tail_sha(path)
-
-    sha = _compute_record_sha(base)
-    final_rec = dict(base)
-    final_rec["sha256"] = sha
-    line = _stable_dumps(final_rec) + "\n"
-
-    # Append + flush + optional fsync for durability
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(line)
-        f.flush()
-        if fsync:
-            os.fsync(f.fileno())
-
-    return sha
+    return append_jsonl_many(path, [rec], fsync=fsync)[0]
 
 
 def verify_chain(path: str) -> None:
