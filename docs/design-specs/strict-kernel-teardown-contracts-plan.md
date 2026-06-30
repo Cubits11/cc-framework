@@ -1,6 +1,18 @@
-# CC-Framework Strict Kernel Teardown + Contracts Plan (Verified Pass)
+# CC-Framework Strict Kernel Teardown + Contracts Plan (Historical)
 
-> Scope note: this document is a **planning + contract-definition pass only**. It does not implement kernel refactors yet.
+> Historical status: this is an archived planning snapshot from an earlier
+> strict-kernel extraction pass. It is not the current contributor guide.
+> Current readers should start with `README.md`, [docs/index.md](../index.md),
+> [docs/research/PAPER_CORE.md](../research/PAPER_CORE.md), and
+> [docs/architecture/STRICT_KERNEL_CONTRACT.md](../architecture/STRICT_KERNEL_CONTRACT.md).
+>
+> Current repo reality: Python `>=3.10`, active project scripts in
+> `pyproject.toml`, a root `mkdocs.yml`, and publication-facing kernel code in
+> `src/cc/kernel/`. Treat the older `src/cc/core` extraction sketch below as
+> historical design context unless a current contract document says otherwise.
+>
+> Scope note: this document was a **planning + contract-definition pass only**.
+> It did not implement kernel refactors.
 
 ## 1) Repo Reality Map (Verified)
 
@@ -20,13 +32,19 @@ Top-level areas in the current repository:
 - Version: `0.2.0`
 - Python: `>=3.10`
 - Core dependencies are lightweight (`numpy`, `pydantic`, `pyyaml`, `jsonlines`, `cryptography`, `blake3`), with optional extras for heavier stacks.
-- No active CLI entrypoint in `project.scripts` (currently commented out).
+- Active project scripts are declared in `pyproject.toml`: `cc-bundle`,
+  `cc-cartographer`, `cc-dependence-bench`, and `cc-report`.
 - `src` layout with package discovery `include = ["cc*"]`.
 
 ### 1.3 Source layout + public API surface
-- Public package surface is currently broad and package-level via `src/cc/__init__.py`.
-- `cc.__all__` exports package namespaces (`adapters`, `analysis`, `cartographer`, `core`, `exp`, `guardrails`, `io`, `utils`).
-- There is **no** `src/cc/core/__init__.py` and no canonical `api_surface.py` that freezes kernel exports.
+- Current publication-facing kernel modules live under `src/cc/kernel/`.
+- Public package surface is broad and package-level via `src/cc/__init__.py`.
+- `cc.__all__` exports package namespaces (`adapters`, `analysis`,
+  `cartographer`, `core`, `exp`, `guardrails`, `io`, `utils`).
+- The historical proposal below used a `src/cc/core` API-boundary sketch, but
+  current kernel work should follow
+  [docs/architecture/STRICT_KERNEL_CONTRACT.md](../architecture/STRICT_KERNEL_CONTRACT.md)
+  and the `src/cc/kernel/` modules.
 
 ### 1.4 Tests + verification stack
 - Pytest is configured in `pyproject.toml` and used across `tests/`.
@@ -54,10 +72,19 @@ Top-level areas in the current repository:
 - No first-class machine-readable assumption registry with stable IDs + schema validation currently exists under `src/cc/core`.
 
 ### Explicit requested answers
-- **Current de-facto public API:** package namespace exports in `cc.__init__`, plus CLI and experiment entry points.
-- **Core math primitives location:** split across `src/cc/core/metrics.py`, `src/cc/cartographer/bounds.py`, and `experiments/correlation_cliff/theory_core.py`.
-- **Dependence/FH/envelope implementation:** strongest dependence-aware kernel-style implementation currently lives in `experiments/correlation_cliff/theory_core.py`.
-- **Where CC is computed:** multiple locations and semantics (`cc_max` in `src/cc/core/metrics.py`; dependence-agnostic bounds in theory-core and cartographer), without one signed edge-case policy contract.
+- **Current de-facto public API:** package namespace exports in `cc.__init__`,
+  active `project.scripts`, and importable kernel modules under
+  `src/cc/kernel/`.
+- **Core math primitives location:** current paper-facing primitives are in
+  `src/cc/kernel/`, especially `sensitivity.py`, `metrics.py`,
+  `frechet_classes.py`, and `sample_complexity.py`.
+- **Dependence/FH/envelope implementation:** current contributor-facing work
+  should use `src/cc/kernel/` and the strict-kernel contract, with older
+  cartographer and experiment modules treated as clients or historical
+  prototypes.
+- **Where CC is computed:** publication-facing CC and identified-set diagnostics
+  belong in `cc.kernel.metrics`; legacy/supporting workflows may still exist in
+  `cc.core`, `cc.cartographer`, or experiments.
 
 ---
 
@@ -84,9 +111,13 @@ Top-level areas in the current repository:
 
 ---
 
-## 3) Strict Kernel Definition (Contracts + Invariants)
+## 3) Strict Kernel Definition (Historical Contract Sketch)
 
-### 3.1 Contract artifact set (exact proposed files)
+The current source of truth for strict-kernel semantics is
+[docs/architecture/STRICT_KERNEL_CONTRACT.md](../architecture/STRICT_KERNEL_CONTRACT.md).
+The artifact list below is preserved to explain the older planning pass.
+
+### 3.1 Historical contract artifact set (not current target file list)
 
 #### API Contract
 - `docs/contracts/api.md`
@@ -125,12 +156,18 @@ A contract is "signed-off" only if:
 
 ---
 
-## 4) Step-by-step Execution Plan (Steps 1–6)
+## 4) Step-by-step Execution Plan (Historical Steps 1-6)
 
-### Step 1 — Freeze kernel boundary (cc-core contract)
-**Existing assets:** math/stat primitives in `src/cc/core/metrics.py`, dependence engine in `experiments/correlation_cliff/theory_core.py`.
+### Step 1 — Freeze kernel boundary (historical cc-core contract sketch)
+**Current note:** the repo now uses `src/cc/kernel/` as the paper-facing kernel
+home. The file list below is retained as historical planning context, not as
+current implementation guidance.
 
-**Create/change:**
+**Existing assets now:** finite-atom and metric primitives in `src/cc/kernel/`,
+with legacy/supporting primitives in `src/cc/core/metrics.py` and
+`src/cc/cartographer/bounds.py`.
+
+**Historical create/change proposal:**
 - Add `src/cc/core/api_surface.py` (stable re-exports only).
 - Add `src/cc/core/schemas.py` (typed contracts).
 - Add `docs/contracts/api.md` (one-page signed API).
@@ -139,7 +176,7 @@ A contract is "signed-off" only if:
 **Done criteria:** API snapshot test green, deprecated imports warn, no duplicated math entrypoints in signed surface.
 
 ### Step 2 — Operators as types (OR / AND / Sequential)
-**Create/change:**
+**Historical create/change proposal:**
 - Add `src/cc/core/operators.py` dataclass-based operator objects.
 - Modes: `observed_joint`, `fh_worst`, `fh_best`, `copula(param)`.
 - Inputs accepted as either paired outcomes or marginals + dependence model.
@@ -147,21 +184,21 @@ A contract is "signed-off" only if:
 **Done criteria:** class-conditional outputs mandatory; invariants executed before result emission.
 
 ### Step 3 — Machine-readable assumption registry
-**Create/change:**
+**Historical create/change proposal:**
 - Add registry YAML + schema + loader/validator.
 - Attach `assumption_ids` to kernel outputs and audit exports.
 
 **Done criteria:** CI validates registry schema and every verdict-producing output includes IDs.
 
 ### Step 4 — Audit Packet v1 format
-**Create/change:**
+**Historical create/change proposal:**
 - Canonical deterministic packet bundle: `audit_packet/{manifest.json,results.json,report.md,figures/}`.
 - Pure deterministic packet builder + schema validation.
 
 **Done criteria:** golden packet fixture reproducible; CI checks deterministic regen + schema conformance.
 
 ### Step 5 — Upgrade GCE into thin client of cc-core
-**Create/change:**
+**Historical create/change proposal:**
 - Define dependency boundary: tag-pinned kernel release consumption.
 - Define required API entrypoints for GCE UX.
 - Enforce "no duplicated math in client" policy.
@@ -169,7 +206,7 @@ A contract is "signed-off" only if:
 **Done criteria:** integration tests assert client invokes cc-core API, not copied formulas.
 
 ### Step 6 — Build cc-academy (separate repo)
-**Create/change:**
+**Historical create/change proposal:**
 - Define tutorial/docs/notebook API surface from cc-core.
 - Add headless notebook execution CI recipe (papermill/nbclient).
 - Provide minimal reproducible notebook set.
@@ -178,10 +215,15 @@ A contract is "signed-off" only if:
 
 ---
 
-## 5) API Spec v0 (1 page)
+## 5) API Spec v0 (historical sketch)
+
+Current readers should not add a new `src/cc/core/api_surface.py` from this
+sketch. Use the current `src/cc/kernel/` modules and
+[docs/architecture/STRICT_KERNEL_CONTRACT.md](../architecture/STRICT_KERNEL_CONTRACT.md)
+for kernel semantics.
 
 ```python
-# src/cc/core/api_surface.py (proposed)
+# Historical proposal: src/cc/core/api_surface.py
 from .schemas import (
     OperatorRequest,
     OperatorResult,
@@ -314,9 +356,13 @@ def build_audit_packet(result: CCBoundsResult, out_dir: str) -> str: ...
 
 ---
 
-## 9) Refactor Plan (file moves, names, deprecations)
+## 9) Refactor Plan (historical file-move sketch)
 
-### Proposed kernel layout under `src/cc/core/`
+Current repo direction: paper-facing kernel code lives under `src/cc/kernel/`.
+The older proposed layout below is retained only to explain the planning
+history.
+
+### Historical proposed kernel layout under `src/cc/core/`
 - `api_surface.py`
 - `schemas.py`
 - `operators.py`
@@ -334,7 +380,8 @@ def build_audit_packet(result: CCBoundsResult, out_dir: str) -> str: ...
 - Emit clear `DeprecationWarning` migration targets.
 
 ### Duplication elimination
-- Move validated dependence math from experiment module to core kernel modules.
+- Move validated dependence math from legacy/supporting modules to current
+  kernel modules.
 - Make `experiments/` and `cartographer/` consume kernel API only.
 
 ---
@@ -391,7 +438,7 @@ This repository contains strong technical claims, but several external-facing ma
 - `src/cc/exp/run_two_world.py`
 - `src/cc/io/storage.py`
 - `experiments/run.py`
-- `experiments/correlation_cliff/theory_core.py`
+- Legacy correlation-cliff experiment implementation
 - `experiments/fh_atlas/manifest.py`
 - `README.md`
 - `docs/reproducibility.md`

@@ -1,180 +1,123 @@
-# CC Framework Research & Development Guide
+# CC Framework Developer Manual
 
-This manual gives engineers a complete overview of the `cc-framework`, how its
-components interact, and concrete steps for extending and validating the
-system.  It is intended as a living document; feel free to submit pull requests
-that refine or extend the material.
+This manual is the current contributor guide for repository structure,
+development commands, and validation lanes. For the shortest setup path, start
+with `README.md`. For documentation navigation, use [docs/index.md](index.md).
+For the active research lane, use [Paper Core](research/PAPER_CORE.md). For
+kernel semantics and change discipline, use
+[Strict Kernel Contract](architecture/STRICT_KERNEL_CONTRACT.md).
 
-## 1. Architectural Overview
+## 1. Current Package Map
 
-### 1.1 Core Packages
+| Area | Current role |
+| --- | --- |
+| `src/cc/kernel/` | Publication-facing finite-atom kernel, Frechet classes, metric diagnostics, and sample-complexity helpers. |
+| `src/cc/core/` | Protocol models, evidence bundles, audit runners, and legacy workflow support. |
+| `src/cc/exp/` | Two-world experiment runner and configs. |
+| `src/cc/cartographer/` | Workflow, reporting, bounds utilities, and older atlas tooling. |
+| `src/cc/evals/` | Benchmarks and Paper 1 example summaries. |
+| `src/cc/reporting/` | Canonical report and receipt generation. |
+| `src/cc/evidence/` | Assurance schemas and evidence-log helpers. |
+| `src/cc/adapters/` | Vendor and guardrail adapter interfaces. |
+| `src/cc/guardrails/` | Built-in guardrail implementations used by experiments. |
+| `src/cc/io/` | Data loading, deterministic storage, seeds, and serialization helpers. |
 
-| Package | Responsibility |
-|---------|----------------|
-| `cc.core` | Dataclasses, metrics, protocol orchestration, and logging utilities. |
-| `cc.guardrails` | Defensive components such as keyword filters and model wrappers. |
-| `cc.analysis` | Statistical routines for compositional capabilities (CC) evaluation. |
-| `cc.io` | Data loading, experiment persistence, and serialization helpers. |
-| `cc.examples` | Small runnable scripts demonstrating framework features. |
-| `cc._legacy` | Historical reference implementations kept for comparison. |
+New paper-facing math should usually land in `src/cc/kernel/` with focused
+tests under `tests/unit/kernel/`. Use `experiments/`, `cc.cartographer`, and
+`cc.core` for workflows or historical support unless the strict-kernel contract
+explicitly says otherwise.
 
-### 1.2 Data Flow
+## 2. Setup
 
-1. **Experiment configuration** is loaded or constructed with
-   `ExperimentConfig`.
-2. **Attack sessions** are executed, yielding `AttackResult` objects.
-3. **Guardrail stacks** alter behaviour according to `GuardrailSpec` entries in
-   each `WorldConfig`.
-4. **Metrics** consume serialized results (`AttackResult.to_dict()`) and output
-   `CCResult` summaries.
-5. **Analyses** persist artefacts via `cc.io` for reproducibility.
-
-### 1.3 Directory Structure
-
-```
-src/cc
-├── core          # models, metrics, and protocol helpers
-├── guardrails    # built‑in guardrail implementations
-├── analysis      # statistical evaluation routines
-├── io            # dataset and serialization utilities
-└── _legacy       # reference implementations
-```
-
-## 2. Getting Started
-
-### 2.1 Installation
+The package supports Python `>=3.10`. CI currently runs code and docs checks on
+Python 3.10, 3.11, 3.12, and 3.13.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
+python3 -m venv .venv
+.venv/bin/pip install --upgrade pip wheel setuptools
+.venv/bin/pip install -e '.[dev,docs]'
 ```
 
-### 2.2 Running the Test Suite
+Useful first checks:
 
 ```bash
-PYTHONPATH=src pytest tests/unit
+PYTHONPATH=src .venv/bin/python examples/minimal/run_bounds.py
+PYTHONPATH=src .venv/bin/pytest tests/unit/kernel -q
+.venv/bin/mkdocs build --strict
 ```
 
-### 2.3 Quick Example
+The root `mkdocs.yml` is the active documentation configuration. The Makefile
+wraps the docs build as `make docs`.
 
-```python
-from cc.core.models import ExperimentConfig, GuardrailSpec
+## 3. Entrypoints
 
-config = ExperimentConfig(
-    experiment_id="demo",
-    n_sessions=10,
-    attack_strategies=["baseline"],
-    guardrail_configs={
-        "world0": [GuardrailSpec(name="keyword", params={"terms": ["ban"]})],
-    },
-)
-print(config.to_dict())
+Active project scripts are declared in `pyproject.toml`:
+
+| Script | Target |
+| --- | --- |
+| `cc-bundle` | `cc.core.evidence_bundle:main` |
+| `cc-cartographer` | `cc.cartographer.cli:main` |
+| `cc-dependence-bench` | `cc.evals.dependence_benchmark:main` |
+| `cc-report` | `cc.reporting.cli:main` |
+
+Common module and Makefile entrypoints:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m cc.evals.dependence_benchmark --help
+PYTHONPATH=src .venv/bin/python -m cc.cartographer.cli --help
+make test-kernel
+make reproduce-paper
+make verify-paper-artifacts
+make paper-smoke
 ```
 
-## 3. Key Research Questions
+## 4. Development Workflows
 
-1. How can guardrail stacking reduce attack success while maintaining utility?
-2. Which statistical estimators yield the most stable CC measurements under
-   limited samples?
-3. What attacker strategy diversity is necessary to confidently bound CC?
-4. How do different environment hashes influence reproducibility across runs?
-5. Can adaptive guardrails learn from failed defences without leaking data?
+For paper-facing kernel changes:
 
-## 4. Technical Improvement Suggestions
+1. Update `src/cc/kernel/`.
+2. Add or update focused tests under `tests/unit/kernel/`.
+3. Update [Metric Taxonomy](theory/metric_taxonomy.md), [Paper Core](research/PAPER_CORE.md), or artifact verifiers if the change affects paper outputs.
+4. Run `make test-kernel` and the relevant Paper Core validation lane.
 
-- **Type Safety** – introduce `mypy` and `ruff` to enforce style and typing.
-- **Configuration Validation** – migrate dataclasses to `pydantic` models for
-  automatic validation and schema export.
-- **Experiment Tracking** – integrate an experiment tracker (e.g. MLflow) to
-  centralize metrics and artefacts.
-- **Parallel Simulation** – leverage `asyncio` or multiprocessing to speed up
-  large attack sweeps.
-- **Reproducibility** – record package versions and environment hashes in every
-  result payload.
-- **Testing** – expand coverage for protocol edge cases and guardrail
-  calibration routines.
-- **Continuous Integration** – add linting and test jobs to CI to catch
-  regressions early.
+For guardrail or experiment changes:
 
-## 5. Implementation & Extension Guidelines
+1. Put reusable guardrail implementations under `src/cc/guardrails/`.
+2. Put adapter-specific behavior under `src/cc/adapters/`.
+3. Put experiment orchestration under `src/cc/exp/` or `experiments/`.
+4. Keep product-coupling, Frechet, and identified-set calculations labeled and routed through the kernel when they are paper-facing.
 
-* Use dataclasses for all configuration objects and provide `to_dict` methods
-  for serialization.
-* Prefer dependency injection for guardrails and attackers to ease
-  experimentation.
-* Maintain reproducibility by logging environment hashes and RNG seeds.
-* When adding guardrails, implement both scoring and calibration interfaces.
+For documentation changes:
 
-### 5.1 Adding a New Guardrail
+1. Update `README.md` for root-level contributor guidance.
+2. Update [docs/index.md](index.md) for docs navigation.
+3. Update [Paper Core](research/PAPER_CORE.md) for active research-scope changes.
+4. Update [Strict Kernel Contract](architecture/STRICT_KERNEL_CONTRACT.md) when kernel semantics, serialization contracts, or metric meanings change.
+5. Run `make docs`.
 
-1. Implement a class under `cc.guardrails` exposing a `score(text)` method.
-2. Provide a calibration routine returning empirical FPRs.
-3. Define a `GuardrailSpec` describing parameters and versioning.
-4. Register the guardrail in the chosen `WorldConfig` guardrail stack.
+## 5. CI and Validation
 
-```python
-@dataclass
-class LengthGuardrail:
-    max_tokens: int
+GitHub Actions currently uses these lanes:
 
-    def score(self, text: str) -> float:
-        return 1.0 if len(text.split()) > self.max_tokens else 0.0
-```
+| Workflow | What it checks |
+| --- | --- |
+| `.github/workflows/ci.yml` | `ruff check .`, focused `mypy` on Python 3.12, and `pytest -q` across Python 3.10 through 3.13. |
+| `.github/workflows/docs.yml` | `make docs` across Python 3.10 through 3.13. |
+| `.github/workflows/security.yml` | Bandit and `pip-audit` on Python 3.12. |
+| `.github/workflows/pre-commit.yml` | All configured pre-commit hooks on Python 3.12. |
+| `.github/workflows/cartographer.yml` | Scheduled and manual cartographer smoke run. |
 
-### 5.2 Creating an Attack Strategy
+Release-facing validation lanes are summarized in
+[Validation Matrix](validation_matrix.md):
 
-1. Add a new subclass under `cc.core.attackers` implementing a `generate` method.
-2. Register its name and default parameters in experiment configuration files.
-3. Provide unit tests that validate `to_dict` serialization of the new strategy.
+| Lane | Primary commands |
+| --- | --- |
+| Paper Core v0.3 | `make test-kernel`, `make test-release`, `make reproduce-paper`, `make verify-paper-artifacts`, `make paper-smoke` |
+| Full Python | `PYTHONPATH=src .venv/bin/pytest -q` |
+| Enterprise Reference v0.1 | `make enterprise-smoke` |
+| Docs | `make docs` |
+| Security | `make security` |
 
-### 5.3 Contributing Analyses
-
-1. Place new statistical routines in `cc.analysis` with clear docstrings.
-2. Accept and return `AttackResult`/`CCResult` dataclasses for consistency.
-3. Write benchmarks under `examples/` demonstrating usage and performance.
-
-## 6. Action Items
-
-- [ ] Integrate static analysis and linting (`mypy`, `ruff`).
-- [ ] Document attack strategy schemas in the `docs/` directory.
-- [ ] Provide examples for multi-guardrail experimentation.
-- [ ] Benchmark alternative bootstrapping methods for CC estimation.
-- [ ] Add CI workflows executing tests and style checks on pull requests.
-
-## 7. Continuous Integration Expectations
-
-The repository uses GitHub Actions to keep code quality and documentation
-consistent across supported Python versions. CI runs on pull requests and
-pushes, and each job installs the package with the appropriate extras before
-executing its checks.
-
-### 7.1 Lint, Type, and Test Workflow
-
-* **Matrix:** Python 3.10, 3.11, 3.12, and 3.13.
-* **Lint:** `ruff check .` enforces formatting and style rules.
-* **Type check:** the focused mypy target validates selected source files on
-  Python 3.12.
-* **Tests:** `pytest -q` runs the test suite quietly to surface regressions.
-
-### 7.2 Documentation Workflow
-
-* **Matrix:** Python 3.10, 3.11, 3.12, and 3.13.
-* **Docs build:** `make docs` calls the Makefile target, which runs
-  `mkdocs build --strict` to treat warnings as failures.
-
-### 7.3 Validation Lanes
-
-Use [Validation Matrix](validation_matrix.md) to keep claims separated:
-
-* **Paper Core v0.3:** `make test-kernel`, `make test-release`,
-  `make reproduce-paper`, `make verify-paper-artifacts`, and `make paper-smoke`
-  validate the finite-atom kernel, canonical metrics, and deterministic paper
-  artifacts.
-* **Full Python:** `PYTHONPATH=src .venv/bin/pytest -q` validates the broader
-  Python suite for the dependencies installed in the local environment.
-* **Enterprise Reference v0.1:** `make enterprise-smoke` validates the
-  moto-backed AWS emulation and dashboard e2e smoke path, not deployment
-  safety.
-* **Docs/Security/Optional Vendor:** docs, security tooling, and vendor adapter
-  checks are separate lanes with separate extras and skip policies.
+Historical planning docs under `docs/design-specs/` may preserve older
+proposals. Treat them as research history and prefer the current README, docs
+index, Paper Core, and strict-kernel contract for contributor guidance.
