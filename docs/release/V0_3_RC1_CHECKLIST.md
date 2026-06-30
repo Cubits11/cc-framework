@@ -41,10 +41,11 @@ Expected behavior:
 
 - Optional notebooks, dashboard, cloud, and adapter paths are outside this
   release candidate.
-- Enterprise Reference v0.1 checks require `.[enterprise,test]` and may skip
-  when `moto` is absent; that skip does not prove the enterprise lane passed.
-- Dashboard smoke checks require Node.js/npm dashboard dependencies and
-  enterprise Python extras; that skip does not prove the dashboard lane passed.
+- Enterprise Reference v0.1 evidence should use `make enterprise-smoke`. That
+  target installs/checks `.[enterprise,test]`, prepares dashboard dependencies,
+  and fails if the moto-backed AWS emulation or dashboard e2e smoke cannot run.
+  A skip from an ad hoc pytest command does not prove the enterprise lane
+  passed.
 - Optional vendor adapter checks may skip when packages such as `guardrails-ai`
   or vendor credentials are unavailable; that skip does not prove the vendor
   lane passed.

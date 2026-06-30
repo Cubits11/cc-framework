@@ -63,8 +63,13 @@ W6_AUDIT    := runs/audit_week6.jsonl
 W6_FIG_DIR  := figures/week6
 W6_RAILS    := keyword regex semantic and or
 
+# -------- Enterprise Reference ----------
+DASHBOARD_DIR := apps/dashboard
+ENTERPRISE_TESTS := tests/integration/test_enterprise_aws_emulation.py tests/e2e/test_enterprise_smoke.py
+
 # -------- Phony ----------
 .PHONY: help dev install setup lock deps fmt lint type security test test-kernel test-release test-reporting test-week3 test-unit test-int cov bench \
+        enterprise-smoke \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         reproduce-paper verify-paper-artifacts paper-smoke \
         verify-invariants verify-statistics verify-audit \
@@ -102,6 +107,7 @@ help:
 	@echo "test-release        Kernel lane + paper reproduction integration checks"
 	@echo "test-reporting      CC report/receipt unit tests and CLI fixture smoke"
 	@echo "test-week3          Run Week-3 unit tests only"
+	@echo "enterprise-smoke    Install enterprise deps, prep dashboard, run strict AWS+dashboard smoke"
 	@echo "reproduce-paper     Build deterministic paper artifacts under $(PAPER_ARTIFACT_DIR)"
 	@echo "verify-paper-artifacts Verify hashes, schemas, metrics, and LP witnesses"
 	@echo "paper-smoke         Static Paper-1 source checks; compile if latexmk exists"
@@ -187,6 +193,12 @@ paper-smoke:
 
 test-reporting:
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/reporting -q
+
+enterprise-smoke: $(VENV_DIR)/bin/activate
+	$(ACT); $(PIP) install -e '.[enterprise,test]'
+	cd $(DASHBOARD_DIR) && npm ci
+	$(ACT); python -c "import boto3, moto; print('enterprise Python dependencies available')"
+	CC_ENTERPRISE_STRICT=1 PYTHONPATH=src $(VENV_DIR)/bin/pytest $(ENTERPRISE_TESTS) -q
 
 # Week-3 focused tests (subset)
 test-week3: install

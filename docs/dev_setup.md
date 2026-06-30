@@ -46,3 +46,13 @@ Optional enterprise, dashboard, vendor, serialization, experiment, and
 performance dependencies may be skipped by the full local test suite when their
 lane-specific extras or environment gates are not installed. A skip is honest
 only when the corresponding optional lane is not being claimed as passed.
+
+For Enterprise Reference validation, run:
+
+```bash
+make enterprise-smoke
+```
+
+That target installs/checks the enterprise Python extras, installs dashboard
+package dependencies, and runs the moto-backed AWS emulation plus dashboard e2e
+smoke as a single pass/fail lane.

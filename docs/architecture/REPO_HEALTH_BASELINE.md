@@ -56,6 +56,10 @@ python -m pip install -e ".[enterprise,test]"
 python -m pip install -e ".[security]"
 ```
 
+Use `make enterprise-smoke` for Enterprise Reference validation. It installs
+the enterprise/test extras, prepares dashboard dependencies, and fails if the
+AWS emulation or dashboard e2e smoke cannot run.
+
 Optional dependency changes should still happen in dedicated packaging PRs, not
 be mixed into typing or architecture cleanup.
 
@@ -95,8 +99,8 @@ The active validation split is:
 | --- | --- | --- |
 | Paper Core | Paper Core v0.3 | `make test-kernel`, `make test-release`, `make reproduce-paper`, `make verify-paper-artifacts`, `make paper-smoke` |
 | Full Python | Paper Core v0.3 plus broader regression coverage | `PYTHONPATH=src .venv/bin/pytest -q` |
-| Enterprise Reference | Enterprise Reference v0.1 | `PYTHONPATH=src .venv/bin/pytest tests/integration/test_enterprise_aws_emulation.py -q` with `.[enterprise,test]` |
-| Dashboard | Enterprise Reference v0.1 application surface | `npm run build` in `apps/dashboard` plus `PYTHONPATH=src .venv/bin/pytest tests/e2e/test_enterprise_smoke.py -q` |
+| Enterprise Reference | Enterprise Reference v0.1 | `make enterprise-smoke` |
+| Dashboard | Enterprise Reference v0.1 application surface | Covered by `make enterprise-smoke`; direct `npm run smoke` requires `ENTERPRISE_BUNDLE_PATH` |
 | Docs | Shared | `make docs` |
 | Security | Shared package/source hygiene | `make security` |
 | Optional Vendor | Optional adapter/vendor surfaces | Targeted adapter or performance tests with their vendor packages and gates installed |

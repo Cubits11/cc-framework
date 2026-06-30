@@ -6,7 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "smoke": "vitest run --config vitest.config.ts"
+    "smoke": "node scripts/require-enterprise-bundle.mjs && vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

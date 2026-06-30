@@ -173,7 +173,8 @@ Use [Validation Matrix](validation_matrix.md) to keep claims separated:
   artifacts.
 * **Full Python:** `PYTHONPATH=src .venv/bin/pytest -q` validates the broader
   Python suite for the dependencies installed in the local environment.
-* **Enterprise Reference v0.1:** the enterprise emulation and dashboard smoke
-  commands validate evidence-bundle integrity paths, not deployment safety.
+* **Enterprise Reference v0.1:** `make enterprise-smoke` validates the
+  moto-backed AWS emulation and dashboard e2e smoke path, not deployment
+  safety.
 * **Docs/Security/Optional Vendor:** docs, security tooling, and vendor adapter
   checks are separate lanes with separate extras and skip policies.

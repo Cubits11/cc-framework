@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import json
+import os
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -13,14 +16,30 @@ from cc.enterprise.aws_reference import (
     verify_bundle,
 )
 
+_STRICT_ENTERPRISE_ENV = "CC_ENTERPRISE_STRICT"
+
+
+def _enterprise_dependency(module_name: str) -> ModuleType:
+    message = (
+        f"{module_name} is required for enterprise validation. "
+        "Run `make enterprise-smoke` or install `.[enterprise,test]`."
+    )
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:
+        if os.environ.get(_STRICT_ENTERPRISE_ENV) == "1":
+            pytest.fail(message, pytrace=False)
+        pytest.skip(message, allow_module_level=False)
+        raise AssertionError("unreachable") from exc
+
 
 def test_enterprise_reference_uses_real_emulated_aws_api_surface(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    boto3 = pytest.importorskip("boto3")
-    botocore_exceptions = pytest.importorskip("botocore.exceptions")
-    moto = pytest.importorskip("moto")
+    boto3 = _enterprise_dependency("boto3")
+    botocore_exceptions = _enterprise_dependency("botocore.exceptions")
+    moto = _enterprise_dependency("moto")
     ClientError = botocore_exceptions.ClientError
 
     with moto.mock_aws():

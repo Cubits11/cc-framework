@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import importlib
 import os
 import subprocess
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -13,10 +15,32 @@ from cc.enterprise.aws_reference import (
     verify_bundle,
 )
 
+_STRICT_ENTERPRISE_ENV = "CC_ENTERPRISE_STRICT"
+
+
+def _enterprise_dependency(module_name: str) -> ModuleType:
+    message = (
+        f"{module_name} is required for enterprise validation. "
+        "Run `make enterprise-smoke` or install `.[enterprise,test]`."
+    )
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:
+        if os.environ.get(_STRICT_ENTERPRISE_ENV) == "1":
+            pytest.fail(message, pytrace=False)
+        pytest.skip(message, allow_module_level=False)
+        raise AssertionError("unreachable") from exc
+
+
+def _skip_or_fail(message: str) -> None:
+    if os.environ.get(_STRICT_ENTERPRISE_ENV) == "1":
+        pytest.fail(message, pytrace=False)
+    pytest.skip(message, allow_module_level=False)
+
 
 def test_enterprise_smoke_pipeline(tmp_path: Path) -> None:
-    boto3 = pytest.importorskip("boto3")
-    moto = pytest.importorskip("moto")
+    boto3 = _enterprise_dependency("boto3")
+    moto = _enterprise_dependency("moto")
 
     with moto.mock_aws():
         _run_enterprise_smoke_pipeline(tmp_path, boto3)
@@ -26,7 +50,10 @@ def _run_enterprise_smoke_pipeline(tmp_path: Path, boto3: object) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     dashboard_dir = repo_root / "apps" / "dashboard"
     if not (dashboard_dir / "node_modules").exists():
-        pytest.skip("apps/dashboard dependencies are not installed")
+        _skip_or_fail(
+            "apps/dashboard dependencies are required for enterprise validation. "
+            "Run `make enterprise-smoke` or `cd apps/dashboard && npm ci`."
+        )
 
     session = boto3.Session(region_name="us-east-1")
     resources = deploy_emulated_reference(
