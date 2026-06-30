@@ -18,12 +18,12 @@ reference architecture, not a deployment safety certification.
 
 ## 1. Architectural Overview
 
-* **`cc.kernel.sensitivity`** – finite binary atom LP for sharp identified
-  composition intervals and endpoint witnesses.
-* **`cc.kernel.metrics`** – identified-set diagnostics, product-coupling
-  baselines, independence regret, and bounded normalization helpers.
-* **`cc.kernel.sample_complexity`** – Hoeffding-style finite-sample helper
-  functions for singleton and pairwise Bernoulli rates.
+* **`cc.kernel.strict`** – narrow Paper Core import surface for finite binary
+  atom LPs, Frechet helpers, canonical metrics, sample-complexity utilities,
+  interval constraint propagation, and endpoint witnesses.
+* **`cc.kernel.sensitivity`**, **`cc.kernel.metrics`**,
+  **`cc.kernel.frechet_classes`**, and **`cc.kernel.sample_complexity`** –
+  implementation modules behind the strict paper-core surface.
 * **`cc.evals.dependence_benchmark`** – benchmark ingestion and Paper 1 example
   summaries using the `Z_i=1` failure convention.
 
@@ -67,7 +67,8 @@ The experiment flow is illustrated in
 
 ### Adding Paper-Facing Metrics
 
-1. Define the estimand-level metric in `cc.kernel.metrics`.
+1. Define the estimand-level metric in `cc.kernel.metrics` and export it through
+   `cc.kernel.strict` only if it belongs inside Paper Core.
 2. Add focused unit tests under `tests/unit/kernel`.
 3. Update `docs/theory/metric_taxonomy.md` and the paper artifact verifier if
    the metric appears in Paper 1 outputs.

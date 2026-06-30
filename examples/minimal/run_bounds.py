@@ -11,13 +11,14 @@ from typing import Any
 
 import numpy as np
 
-from cc.kernel.metrics import (
+from cc.kernel.strict import (
+    AssumptionSet,
+    LinearQuery,
     fh_position,
     fh_width,
     independence_regret,
     independent_event_probability,
 )
-from cc.kernel.sensitivity import AssumptionSet, LinearQuery
 
 FAILURE_EVENT_CONVENTION = "Z_i = 1 means guardrail failure / unsafe pass."
 DEFAULT_TOL = 1.0e-8

@@ -66,14 +66,14 @@
       "sha256": "135158e88f26d3b921fc3430e6fd8c784d9778168884e6e1fea5a8bfd3598693"
     },
     {
-      "bytes": 819,
+      "bytes": 822,
       "filename": "environment.json",
-      "sha256": "d4603ac67a59a8092bb94de174d3d073baa2a336db3dfaffc2c11add861e3258"
+      "sha256": "66f43a8e5c1e502b5df0ab6fe78b295f316b37db36b2387ed09e8a5b3de2f4fb"
     }
   ],
   "generation_command": "scripts/reproduce_paper.py --output-dir artifacts/paper",
-  "manifest_payload_sha256": "b289f7893fde8f7f9d731cd39c735ea8965f162637b4209c8bcd9591180c9373",
-  "package_version": "0.2.0",
+  "manifest_payload_sha256": "577a7225319690ae1d42d13bcbdc01a2952ca2ccc2dce5ff79ee6a484128d525",
+  "package_version": "0.3.0rc1",
   "required_files": [
     "table_1_classical_frechet_bounds.csv",
     "table_2_metric_examples.csv",

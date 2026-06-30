@@ -23,21 +23,21 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
 from cc.evals.dependence_benchmark import build_summary_from_failure_matrix
-from cc.kernel.frechet_classes import classical_frechet_bounds
-from cc.kernel.metrics import (
+from cc.kernel.strict import (
+    AssumptionSet,
+    LinearQuery,
+    bernoulli_rate_count,
+    classical_frechet_bounds,
     cc_gain,
     cc_shift,
     fh_position,
     fh_width,
-    independence_regret,
     independent_event_probability,
-)
-from cc.kernel.sample_complexity import (
-    bernoulli_rate_count,
+    independence_regret,
+    identified_region,
     simultaneous_bernoulli_radius,
     simultaneous_sample_size,
 )
-from cc.kernel.sensitivity import AssumptionSet, LinearQuery, identified_region
 
 
 ARTIFACT_FILENAMES = (

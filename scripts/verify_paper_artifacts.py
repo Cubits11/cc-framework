@@ -16,25 +16,21 @@ import numpy as np
 from jsonschema import Draft202012Validator, ValidationError
 
 from cc.evals.dependence_benchmark import verify_benchmark_summary
-from cc.kernel.frechet_classes import classical_frechet_bounds
-from cc.kernel.metrics import (
-    cc_gain,
-    cc_shift,
-    fh_position,
-    fh_width,
-    independence_regret,
-    independent_event_probability,
-)
-from cc.kernel.sample_complexity import (
-    simultaneous_bernoulli_radius,
-    simultaneous_sample_size,
-)
-from cc.kernel.sensitivity import (
+from cc.kernel.strict import (
     AssumptionSet,
     LinearConstraint,
     LinearQuery,
+    cc_gain,
+    cc_shift,
+    classical_frechet_bounds,
     enumerate_atoms,
+    fh_position,
+    fh_width,
     identified_region,
+    independence_regret,
+    independent_event_probability,
+    simultaneous_bernoulli_radius,
+    simultaneous_sample_size,
 )
 
 REQUIRED_FILES = (

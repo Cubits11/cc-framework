@@ -6,7 +6,9 @@ This document defines the stable research-software contract for the strict kerne
 
 The goal is to prevent future cleanup work from silently changing scientific meaning while repairing typing, tests, packaging, and implementation details.
 
-This contract is documentation-only. It does not change runtime behavior, source code, dependency groups, tests, or CI configuration.
+The runtime import boundary for paper-facing code is `cc.kernel.strict`. The
+broader `cc.kernel` package remains available for compatibility, but it includes
+experimental modules outside the Paper Core claim boundary.
 
 ## Kernel and non-kernel boundary
 
@@ -22,10 +24,13 @@ Kernel code should include modules that define or compute:
 - deterministic audit records,
 - serialized result payloads consumed by downstream reports.
 
-`src/cc/kernel/sensitivity.py` is strict-kernel pure math. It must remain free
-of network calls, model API calls, dashboard dependencies, filesystem side
-effects, AWS dependencies, and runtime guardrail invocation. It operates only
-on declared finite binary event assumptions and linear queries.
+`src/cc/kernel/sensitivity.py`, `src/cc/kernel/frechet_classes.py`,
+`src/cc/kernel/metrics.py`, and `src/cc/kernel/sample_complexity.py` form the
+Paper Core implementation family exported by `cc.kernel.strict`. They must
+remain free of network calls, model API calls, dashboard dependencies,
+filesystem side effects, AWS dependencies, and runtime guardrail invocation.
+They operate only on declared finite binary event assumptions, linear queries,
+metrics, and finite-sample count evidence.
 
 Non-kernel code may include:
 

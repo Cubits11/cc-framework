@@ -14,3 +14,13 @@ PYTHONPATH=src .venv/bin/python examples/minimal/run_bounds.py
 The JSON output includes the identified lower and upper bounds, FH width,
 FH position for the supplied observed value, a product-coupling baseline,
 lower/upper independence regret, and lower/upper endpoint witness checks.
+
+For finite-sample count evidence, run:
+
+```bash
+PYTHONPATH=src .venv/bin/python examples/minimal/run_finite_sample_bounds.py
+```
+
+That example shows both singleton-only count intervals and singleton plus
+pairwise co-failure count intervals before solving the same AND composition
+query.

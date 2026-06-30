@@ -7,7 +7,7 @@
   },
   "generation_command": "scripts/reproduce_paper.py --output-dir artifacts/paper",
   "generation_timestamp": "1970-01-01T00:00:00Z",
-  "package_version": "0.2.0",
+  "package_version": "0.3.0rc1",
   "platform": {
     "machine": "arm64",
     "platform": "macOS-15.5-arm64-arm-64bit-Mach-O",

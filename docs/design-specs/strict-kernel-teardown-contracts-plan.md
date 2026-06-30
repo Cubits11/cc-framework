@@ -29,7 +29,7 @@ Top-level areas in the current repository:
 
 ### 1.2 Packaging identity
 - Project name: `cc-framework`
-- Version: `0.2.0`
+- Version: `0.3.0-rc1`
 - Python: `>=3.10`
 - Core dependencies are lightweight (`numpy`, `pydantic`, `pyyaml`, `jsonlines`, `cryptography`, `blake3`), with optional extras for heavier stacks.
 - Active project scripts are declared in `pyproject.toml`: `cc-bundle`,

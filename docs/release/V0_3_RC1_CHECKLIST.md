@@ -27,7 +27,10 @@ These surfaces are inside the Paper Core v0.3 release-candidate boundary:
 - `src/cc/kernel/frechet_classes.py`: classical Frechet special cases and
   side-constrained finite Bernoulli bounds.
 - `src/cc/kernel/sample_complexity.py`: Hoeffding-style sample-size and radius
-  helpers for singleton and pairwise Bernoulli rates.
+  helpers for singleton and pairwise Bernoulli rates, plus count-to-interval
+  constraint propagation for finite-sample identification examples.
+- `src/cc/kernel/strict.py`: the narrow Paper Core import surface used by
+  paper-facing examples, artifact generators, and artifact verifiers.
 - Paper artifact scripts and verifiers for deterministic generated outputs
   under `artifacts/paper`.
 - Documentation that defines the paper-core claim boundary:
@@ -61,14 +64,19 @@ Local environment for this record:
 
 - Date: 2026-06-30.
 - Python: 3.13.1 from `.venv`.
-- Working tree after validation: only intentional release-documentation edits.
+- Working tree after validation: intentional release metadata, strict kernel,
+  documentation, artifact, and dashboard dependency edits.
 
 | Command | Track | Required for rc1 | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `make test-kernel` | Paper Core v0.3 | Yes | Pass | Kernel unit tests passed; focused strict mypy reported no issues in 10 source files; focused ruff passed. |
+| `make test-kernel` | Paper Core v0.3 | Yes | Pass | Kernel unit tests passed; focused strict mypy reported no issues in 11 source files; focused ruff passed. |
 | `make test-release` | Paper Core v0.3 | Yes | Pass | Re-ran `make test-kernel`, ran `examples/minimal/run_bounds.py`, and passed 10 paper reproduction / artifact-verifier integration tests. |
+| `make test-reporting` | Reporting receipts | Yes | Pass | CC report/receipt unit tests passed. |
 | `make docs` | Shared docs | Yes | Pass | Strict MkDocs build completed. MkDocs Material printed its upstream MkDocs 2.0 warning; the build still exited successfully. |
 | `PYTHONPATH=src .venv/bin/pytest -q` | Full Python regression | Yes | Pass with skips | Full pytest exited successfully with 7 optional skips and 2 expected warnings from tests that drop non-finite bootstrap samples. |
+| `npm run build` in `apps/dashboard` | Dashboard | No | Pass | Next 15 production build passed. Next warned about multiple lockfiles and inferred the repository root. |
+| `make enterprise-smoke` | Enterprise Reference v0.1 | No | Pass | Moto-backed enterprise smoke passed, including the dashboard smoke path. |
+| `npm audit --audit-level=high` in `apps/dashboard` | Dashboard dependency hygiene | No | Pass | No critical or high findings remain; 2 moderate transitive `postcss` findings remain through Next. |
 
 ## Artifact Verification
 
@@ -78,14 +86,32 @@ tracked artifacts.
 
 Checklist:
 
-- [ ] Verify committed artifact state: `make verify-paper-artifacts`.
-- [ ] Regenerate from scratch: `rm -rf artifacts/paper && make reproduce-paper`.
-- [ ] Verify regenerated artifacts: `make verify-paper-artifacts`.
-- [ ] Run a second verification without regeneration: `make verify-paper-artifacts`.
+- [x] Regenerate artifacts in place: `PYTHONPATH=src .venv/bin/python scripts/reproduce_paper.py --output-dir artifacts/paper`.
+- [x] Verify regenerated artifacts: `PYTHONPATH=src .venv/bin/python scripts/verify_paper_artifacts.py --artifact-dir artifacts/paper`.
+- [x] Run reproduction and verifier integration tests through `make test-release`.
 
-Status for this release-doc pass: not run. The required `make test-release`
-command did run the paper reproduction and artifact-verifier integration tests,
-but it did not replace the explicit artifact regeneration procedure above.
+Status for this release-doc pass: run. The regenerated artifact metadata records
+the normalized installed package version `0.3.0rc1`, matching the
+`0.3.0-rc1` release candidate after Python package normalization.
+
+## Dashboard Dependency Audit
+
+The dashboard remains outside the Paper Core v0.3 claim boundary, but its
+security debt was checked for this pass.
+
+- Initial `npm audit --json` in `apps/dashboard` reported 3 moderate, 2 high,
+  and 1 critical vulnerabilities.
+- `next` was upgraded from `^14.2.5` to `15.5.19`.
+- `vitest` was upgraded from `^2.0.5` to `4.1.9`.
+- `vite` was pinned as a dev dependency at `6.4.3` to avoid the `vite@8` Node
+  engine requirement on local Node `20.12.2`.
+- Follow-up `npm audit --json` reports 0 critical and 0 high vulnerabilities,
+  with 2 moderate findings remaining through Next's transitive `postcss`
+  dependency path.
+
+Migration risk: both Next and Vitest crossed major versions. The local dashboard
+build and `make enterprise-smoke` passed, but this remains dependency hygiene,
+not a dashboard release claim.
 
 Expected artifact behavior:
 
@@ -127,7 +153,6 @@ Full pytest skipped these optional items in the local validation run:
 
 Not run for this paper-core rc1 record:
 
-- `make enterprise-smoke`.
 - `make security`.
 - Direct vendor, performance, experiment, notebook, Pandoc/PDF, and LaTeX-only
   lanes outside the commands listed above.
