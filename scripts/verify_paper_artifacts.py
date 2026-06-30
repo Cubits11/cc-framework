@@ -58,6 +58,100 @@ HASHED_FILES = tuple(name for name in REQUIRED_FILES if name != "manifest.json")
 DEFAULT_ARTIFACT_DIR = Path("artifacts/paper")
 DEFAULT_TOL = 1.0e-8
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ATOM_ORDER = "little_endian"
+BOUNDS_SCHEMA_VERSION = "cc.paper.bounds.v2"
+WITNESSES_SCHEMA_VERSION = "cc.paper.witnesses.v2"
+BUNDLE_SCHEMA_VERSION = "cc.paper.bundle.v2"
+PROOF_CONTEXT_SCHEMA_VERSION = "cc.paper.proof_context.v1"
+
+HEX_SHA_SCHEMA: dict[str, Any] = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+FINITE_NUMBER_SCHEMA: dict[str, Any] = {"type": "number"}
+LABELS_SCHEMA: dict[str, Any] = {
+    "type": "array",
+    "minItems": 1,
+    "items": {"type": "string", "minLength": 1},
+}
+FLOAT_VECTOR_SCHEMA: dict[str, Any] = {
+    "type": "array",
+    "items": FINITE_NUMBER_SCHEMA,
+}
+QUERY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["name", "event", "events", "coefficients"],
+    "additionalProperties": False,
+    "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "event": {"enum": ["and", "or"]},
+        "events": LABELS_SCHEMA,
+        "coefficients": FLOAT_VECTOR_SCHEMA,
+    },
+}
+PROOF_CONTEXT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": [
+        "schema_version",
+        "atom_order",
+        "labels",
+        "labels_sha256",
+        "query_sha256",
+        "constraints_sha256",
+        "assumptions_hash",
+        "tolerance",
+        "proof_context_sha256",
+    ],
+    "additionalProperties": False,
+    "properties": {
+        "schema_version": {"const": PROOF_CONTEXT_SCHEMA_VERSION},
+        "atom_order": {"const": ATOM_ORDER},
+        "labels": LABELS_SCHEMA,
+        "labels_sha256": HEX_SHA_SCHEMA,
+        "query_sha256": HEX_SHA_SCHEMA,
+        "constraints_sha256": HEX_SHA_SCHEMA,
+        "assumptions_hash": HEX_SHA_SCHEMA,
+        "tolerance": {"const": DEFAULT_TOL},
+        "proof_context_sha256": HEX_SHA_SCHEMA,
+    },
+}
+CONSTRAINT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["name", "sense", "rhs", "coefficients"],
+    "additionalProperties": False,
+    "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "sense": {"enum": ["==", "<=", ">="]},
+        "rhs": FINITE_NUMBER_SCHEMA,
+        "coefficients": FLOAT_VECTOR_SCHEMA,
+    },
+}
+ASSUMPTIONS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["guardrails", "metadata", "constraints"],
+    "additionalProperties": False,
+    "properties": {
+        "guardrails": LABELS_SCHEMA,
+        "metadata": {
+            "type": "object",
+            "additionalProperties": {"type": ["string", "number", "integer", "boolean", "null"]},
+        },
+        "constraints": {
+            "type": "array",
+            "items": CONSTRAINT_SCHEMA,
+        },
+    },
+}
+WITNESS_ENDPOINT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["distribution", "query_value", "active_constraints"],
+    "additionalProperties": False,
+    "properties": {
+        "distribution": FLOAT_VECTOR_SCHEMA,
+        "query_value": FINITE_NUMBER_SCHEMA,
+        "active_constraints": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+        },
+    },
+}
 
 MANIFEST_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -69,6 +163,7 @@ MANIFEST_SCHEMA: dict[str, Any] = {
         "files",
         "manifest_payload_sha256",
     ],
+    "additionalProperties": False,
     "properties": {
         "schema_version": {"const": "cc.paper.manifest.v1"},
         "generation_command": {"type": "string", "minLength": 1},
@@ -79,35 +174,152 @@ MANIFEST_SCHEMA: dict[str, Any] = {
             "items": {
                 "type": "object",
                 "required": ["filename", "sha256", "bytes"],
+                "additionalProperties": False,
                 "properties": {
                     "filename": {"type": "string"},
-                    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                    "sha256": HEX_SHA_SCHEMA,
                     "bytes": {"type": "integer", "minimum": 0},
                 },
             },
         },
-        "manifest_payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "manifest_payload_sha256": HEX_SHA_SCHEMA,
     },
 }
 
 BOUNDS_SCHEMA: dict[str, Any] = {
     "type": "object",
-    "required": ["schema_version", "failure_event_convention", "cases"],
+    "required": [
+        "schema_version",
+        "failure_event_convention",
+        "atom_order",
+        "tolerance",
+        "cases",
+    ],
+    "additionalProperties": False,
     "properties": {
-        "schema_version": {"const": "cc.paper.bounds.v1"},
+        "schema_version": {"const": BOUNDS_SCHEMA_VERSION},
         "failure_event_convention": {"type": "string", "minLength": 1},
-        "cases": {"type": "array", "minItems": 1},
+        "atom_order": {"const": ATOM_ORDER},
+        "tolerance": {"const": DEFAULT_TOL},
+        "cases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "case_id",
+                    "event",
+                    "labels",
+                    "atom_order",
+                    "tolerance",
+                    "declared_marginals",
+                    "query",
+                    "proof_context",
+                    "lower_bound",
+                    "upper_bound",
+                    "fh_width",
+                    "observed",
+                    "fh_position",
+                    "product_baseline",
+                    "independent_baseline",
+                    "independence_regret",
+                    "independence_regret_lower",
+                    "independence_regret_upper",
+                    "assumptions_hash",
+                ],
+                "additionalProperties": False,
+                "properties": {
+                    "case_id": {"type": "string", "minLength": 1},
+                    "event": {"enum": ["and", "or"]},
+                    "labels": LABELS_SCHEMA,
+                    "atom_order": {"const": ATOM_ORDER},
+                    "tolerance": {"const": DEFAULT_TOL},
+                    "declared_marginals": {
+                        "type": "object",
+                        "additionalProperties": FINITE_NUMBER_SCHEMA,
+                    },
+                    "query": QUERY_SCHEMA,
+                    "proof_context": PROOF_CONTEXT_SCHEMA,
+                    "lower_bound": FINITE_NUMBER_SCHEMA,
+                    "upper_bound": FINITE_NUMBER_SCHEMA,
+                    "fh_width": FINITE_NUMBER_SCHEMA,
+                    "observed": FINITE_NUMBER_SCHEMA,
+                    "fh_position": FINITE_NUMBER_SCHEMA,
+                    "product_baseline": FINITE_NUMBER_SCHEMA,
+                    "independent_baseline": FINITE_NUMBER_SCHEMA,
+                    "independence_regret": FINITE_NUMBER_SCHEMA,
+                    "independence_regret_lower": FINITE_NUMBER_SCHEMA,
+                    "independence_regret_upper": FINITE_NUMBER_SCHEMA,
+                    "assumptions_hash": HEX_SHA_SCHEMA,
+                },
+            },
+        },
     },
 }
 
 WITNESSES_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["schema_version", "atom_order", "tolerance", "cases"],
+    "additionalProperties": False,
     "properties": {
-        "schema_version": {"const": "cc.paper.witnesses.v1"},
-        "atom_order": {"const": "little_endian"},
-        "tolerance": {"type": "number", "exclusiveMinimum": 0},
-        "cases": {"type": "array", "minItems": 1},
+        "schema_version": {"const": WITNESSES_SCHEMA_VERSION},
+        "atom_order": {"const": ATOM_ORDER},
+        "tolerance": {"const": DEFAULT_TOL},
+        "cases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "case_id",
+                    "event",
+                    "labels",
+                    "atom_order",
+                    "tolerance",
+                    "declared_marginals",
+                    "assumptions",
+                    "assumptions_hash",
+                    "query",
+                    "proof_context",
+                    "bounds",
+                    "witnesses",
+                ],
+                "additionalProperties": False,
+                "properties": {
+                    "case_id": {"type": "string", "minLength": 1},
+                    "event": {"enum": ["and", "or"]},
+                    "labels": LABELS_SCHEMA,
+                    "atom_order": {"const": ATOM_ORDER},
+                    "tolerance": {"const": DEFAULT_TOL},
+                    "declared_marginals": {
+                        "type": "object",
+                        "additionalProperties": FINITE_NUMBER_SCHEMA,
+                    },
+                    "assumptions": ASSUMPTIONS_SCHEMA,
+                    "assumptions_hash": HEX_SHA_SCHEMA,
+                    "query": QUERY_SCHEMA,
+                    "proof_context": PROOF_CONTEXT_SCHEMA,
+                    "bounds": {
+                        "type": "object",
+                        "required": ["lower", "upper"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "lower": FINITE_NUMBER_SCHEMA,
+                            "upper": FINITE_NUMBER_SCHEMA,
+                        },
+                    },
+                    "witnesses": {
+                        "type": "object",
+                        "required": ["lower", "upper"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "lower": WITNESS_ENDPOINT_SCHEMA,
+                            "upper": WITNESS_ENDPOINT_SCHEMA,
+                        },
+                    },
+                },
+            },
+        },
     },
 }
 
@@ -115,19 +327,65 @@ BUNDLE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": [
         "schema_version",
+        "failure_event_convention",
+        "atom_order",
+        "tolerance",
         "artifact_files",
         "bounds_file",
         "witnesses_file",
         "environment_file",
+        "witness_verification_table",
         "cases",
     ],
+    "additionalProperties": False,
     "properties": {
-        "schema_version": {"const": "cc.paper.bundle.v1"},
+        "schema_version": {"const": BUNDLE_SCHEMA_VERSION},
+        "failure_event_convention": {"type": "string", "minLength": 1},
+        "atom_order": {"const": ATOM_ORDER},
+        "tolerance": {"const": DEFAULT_TOL},
         "artifact_files": {"type": "array", "items": {"type": "string"}},
         "bounds_file": {"const": "minimal_bounds.json"},
         "witnesses_file": {"const": "minimal_witnesses.json"},
         "environment_file": {"const": "environment.json"},
-        "cases": {"type": "array", "minItems": 1},
+        "witness_verification_table": {"const": "table_3_witness_verification.csv"},
+        "cases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "case_id",
+                    "event",
+                    "atom_order",
+                    "tolerance",
+                    "assumptions_hash",
+                    "proof_context_sha256",
+                    "lower_bound",
+                    "upper_bound",
+                    "fh_width",
+                    "product_baseline",
+                    "independence_regret",
+                    "independence_regret_lower",
+                    "independence_regret_upper",
+                ],
+                "additionalProperties": False,
+                "properties": {
+                    "case_id": {"type": "string", "minLength": 1},
+                    "event": {"enum": ["and", "or"]},
+                    "atom_order": {"const": ATOM_ORDER},
+                    "tolerance": {"const": DEFAULT_TOL},
+                    "assumptions_hash": HEX_SHA_SCHEMA,
+                    "proof_context_sha256": HEX_SHA_SCHEMA,
+                    "lower_bound": FINITE_NUMBER_SCHEMA,
+                    "upper_bound": FINITE_NUMBER_SCHEMA,
+                    "fh_width": FINITE_NUMBER_SCHEMA,
+                    "product_baseline": FINITE_NUMBER_SCHEMA,
+                    "independence_regret": FINITE_NUMBER_SCHEMA,
+                    "independence_regret_lower": FINITE_NUMBER_SCHEMA,
+                    "independence_regret_upper": FINITE_NUMBER_SCHEMA,
+                },
+            },
+        },
     },
 }
 
@@ -142,7 +400,9 @@ ENVIRONMENT_SCHEMA: dict[str, Any] = {
         "timestamp_policy",
         "generation_timestamp",
         "generation_command",
+        "random_seed_policy",
     ],
+    "additionalProperties": False,
     "properties": {
         "schema_version": {"const": "cc.paper.environment.v1"},
         "python": {"type": "object"},
@@ -152,6 +412,7 @@ ENVIRONMENT_SCHEMA: dict[str, Any] = {
         "timestamp_policy": {"type": "string", "minLength": 1},
         "generation_timestamp": {"type": "string", "minLength": 1},
         "generation_command": {"type": "string", "minLength": 1},
+        "random_seed_policy": {"type": "string", "minLength": 1},
     },
 }
 
@@ -214,15 +475,15 @@ def verify_artifact_dir(artifact_dir: Path, *, tol: float = DEFAULT_TOL) -> None
         errors.append(f"Unable to read JSON artifact: {exc}")
     else:
         errors.extend(_verify_environment(environment))
-        errors.extend(_verify_bundle(bundle))
+        errors.extend(_verify_bundle(bundle, bounds=bounds))
         errors.extend(_verify_bounds_against_witnesses(bounds, witnesses, tol=tol))
         errors.extend(_verify_bounds_metrics(bounds, tol=tol))
         errors.extend(_verify_witnesses(witnesses, tol=tol))
         errors.extend(_verify_benchmark_example(benchmark_example))
+        errors.extend(_verify_witness_table(artifact_dir / "table_3_witness_verification.csv", witnesses, tol=tol))
 
     errors.extend(_verify_classical_table(artifact_dir / "table_1_classical_frechet_bounds.csv", tol=tol))
     errors.extend(_verify_metric_table(artifact_dir / "table_2_metric_examples.csv", tol=tol))
-    errors.extend(_verify_witness_table(artifact_dir / "table_3_witness_verification.csv", tol=tol))
     errors.extend(_verify_sample_complexity_table(artifact_dir / "table_4_sample_complexity.csv", tol=tol))
     errors.extend(_verify_runtime_scaling_table(artifact_dir / "table_5_runtime_scaling.csv"))
     errors.extend(_verify_png_artifacts(artifact_dir))
@@ -318,15 +579,63 @@ def _verify_environment(environment: Mapping[str, Any]) -> list[str]:
     return errors
 
 
-def _verify_bundle(bundle: Mapping[str, Any]) -> list[str]:
+def _verify_bundle(bundle: Mapping[str, Any], *, bounds: Mapping[str, Any]) -> list[str]:
     errors: list[str] = []
     artifact_files = set(_string_list(bundle.get("artifact_files"), label="bundle.artifact_files"))
     if artifact_files != set(REQUIRED_FILES):
         errors.append("minimal_bundle.json does not list exactly the required artifact files.")
+    if bundle.get("atom_order") != ATOM_ORDER:
+        errors.append("minimal_bundle.json atom_order mismatch.")
+    if float(bundle.get("tolerance", float("nan"))) != DEFAULT_TOL:
+        errors.append("minimal_bundle.json tolerance mismatch.")
     if bundle.get("bounds_file") != "minimal_bounds.json":
         errors.append("minimal_bundle.json points to the wrong bounds file.")
     if bundle.get("witnesses_file") != "minimal_witnesses.json":
         errors.append("minimal_bundle.json points to the wrong witnesses file.")
+    try:
+        bounds_cases = _cases_by_id(bounds.get("cases"), label="minimal_bounds.json")
+        bundle_cases = _cases_by_id(bundle.get("cases"), label="minimal_bundle.json")
+    except ArtifactVerificationError as exc:
+        errors.append(str(exc))
+        return errors
+    if set(bundle_cases) != set(bounds_cases):
+        errors.append(
+            f"Bundle and bounds case ids differ: {sorted(bundle_cases)} vs {sorted(bounds_cases)}"
+        )
+        return errors
+    for case_id, bundle_case in sorted(bundle_cases.items()):
+        bounds_case = bounds_cases[case_id]
+        proof_context = bounds_case.get("proof_context")
+        proof_hash = (
+            proof_context.get("proof_context_sha256")
+            if isinstance(proof_context, Mapping)
+            else None
+        )
+        expected_fields = {
+            "event": bounds_case.get("event"),
+            "atom_order": bounds_case.get("atom_order"),
+            "tolerance": bounds_case.get("tolerance"),
+            "assumptions_hash": bounds_case.get("assumptions_hash"),
+            "proof_context_sha256": proof_hash,
+            "lower_bound": bounds_case.get("lower_bound"),
+            "upper_bound": bounds_case.get("upper_bound"),
+            "fh_width": bounds_case.get("fh_width"),
+            "product_baseline": bounds_case.get("product_baseline"),
+            "independence_regret": bounds_case.get("independence_regret"),
+            "independence_regret_lower": bounds_case.get("independence_regret_lower"),
+            "independence_regret_upper": bounds_case.get("independence_regret_upper"),
+        }
+        for field, expected in expected_fields.items():
+            actual = bundle_case.get(field)
+            if isinstance(expected, float):
+                try:
+                    matches = abs(float(actual) - expected) <= DEFAULT_TOL
+                except (TypeError, ValueError):
+                    matches = False
+            else:
+                matches = actual == expected
+            if not matches:
+                errors.append(f"minimal_bundle.json {case_id}.{field} differs from minimal_bounds.json.")
     return errors
 
 
@@ -337,6 +646,9 @@ def _verify_bounds_against_witnesses(
     tol: float,
 ) -> list[str]:
     errors: list[str] = []
+    for field in ("atom_order", "tolerance"):
+        if bounds.get(field) != witnesses.get(field):
+            errors.append(f"Bounds and witnesses top-level {field} differ.")
     bounds_cases = _cases_by_id(bounds.get("cases"), label="minimal_bounds.json")
     witness_cases = _cases_by_id(witnesses.get("cases"), label="minimal_witnesses.json")
     if set(bounds_cases) != set(witness_cases):
@@ -349,7 +661,16 @@ def _verify_bounds_against_witnesses(
             actual = float(witness_case["bounds"][witness_key])
             if abs(expected - actual) > tol:
                 errors.append(f"{case_id} {key} differs between bounds and witnesses.")
-        for key in ("labels", "declared_marginals", "query", "assumptions_hash"):
+        for key in (
+            "event",
+            "labels",
+            "atom_order",
+            "tolerance",
+            "declared_marginals",
+            "query",
+            "proof_context",
+            "assumptions_hash",
+        ):
             if bounds_case.get(key) != witness_case.get(key):
                 errors.append(f"{case_id} {key} differs between bounds and witnesses.")
     return errors
@@ -357,6 +678,10 @@ def _verify_bounds_against_witnesses(
 
 def _verify_witnesses(witnesses: Mapping[str, Any], *, tol: float) -> list[str]:
     errors: list[str] = []
+    if witnesses.get("atom_order") != ATOM_ORDER:
+        errors.append("minimal_witnesses.json atom_order mismatch.")
+    if witnesses.get("tolerance") != DEFAULT_TOL:
+        errors.append("minimal_witnesses.json tolerance mismatch.")
     cases = witnesses.get("cases")
     if not isinstance(cases, list):
         return ["minimal_witnesses.json cases must be a list."]
@@ -373,10 +698,13 @@ def _verify_witness_case(case: Mapping[str, Any], *, tol: float) -> list[str]:
     errors: list[str] = []
     try:
         labels = tuple(_string_list(case["labels"], label=f"{case_id}.labels"))
+        atom_order = str(case["atom_order"])
+        tolerance = float(case["tolerance"])
         n_atoms = 1 << len(labels)
         declared_marginals = _float_mapping(case["declared_marginals"], label=f"{case_id}.declared_marginals")
         assumptions_payload = _mapping(case["assumptions"], label=f"{case_id}.assumptions")
         query_payload = _mapping(case["query"], label=f"{case_id}.query")
+        proof_context = _mapping(case["proof_context"], label=f"{case_id}.proof_context")
         bounds = _mapping(case["bounds"], label=f"{case_id}.bounds")
         witnesses = _mapping(case["witnesses"], label=f"{case_id}.witnesses")
         query_coefficients = _float_vector(
@@ -389,7 +717,24 @@ def _verify_witness_case(case: Mapping[str, Any], *, tol: float) -> list[str]:
     except (KeyError, TypeError, ValueError) as exc:
         return [f"{case_id} has malformed witness payload: {exc}"]
 
+    if atom_order != ATOM_ORDER:
+        errors.append(f"{case_id} atom_order mismatch: {atom_order!r}.")
+    if tolerance != DEFAULT_TOL:
+        errors.append(f"{case_id} tolerance mismatch: {tolerance}.")
+    errors.extend(_verify_query_payload(case_id, labels, query_payload, tol=tol))
     errors.extend(_verify_assumptions_hash(case, labels, assumptions_payload))
+    errors.extend(
+        _verify_proof_context(
+            case_id,
+            proof_context,
+            labels=labels,
+            atom_order=atom_order,
+            query_payload=query_payload,
+            assumptions_payload=assumptions_payload,
+            assumptions_hash=str(case.get("assumptions_hash")),
+            tolerance=tolerance,
+        )
+    )
     errors.extend(
         _verify_reported_endpoints_are_lp_optima(
             case_id,
@@ -602,10 +947,103 @@ def _verify_assumptions_hash(
     return []
 
 
+def _verify_query_payload(
+    case_id: str,
+    labels: Sequence[str],
+    query_payload: Mapping[str, Any],
+    *,
+    tol: float,
+) -> list[str]:
+    errors: list[str] = []
+    try:
+        event = str(query_payload["event"])
+        events = tuple(_string_list(query_payload["events"], label=f"{case_id}.query.events"))
+        coefficients = _float_vector(
+            query_payload["coefficients"],
+            expected_length=1 << len(labels),
+            label=f"{case_id}.query.coefficients",
+        )
+        if event == "and":
+            expected = LinearQuery.intersection(labels, events, name="canonical").coefficients
+        elif event == "or":
+            expected = LinearQuery.union(labels, events, name="canonical").coefficients
+        else:
+            return [f"{case_id}.query.event {event!r} is not supported."]
+    except (KeyError, TypeError, ValueError) as exc:
+        return [f"{case_id}.query is malformed: {exc}"]
+    if not set(events) <= set(labels):
+        errors.append(f"{case_id}.query.events must be drawn from labels.")
+    if not np.allclose(coefficients, expected, atol=tol, rtol=0.0):
+        errors.append(f"{case_id}.query.coefficients do not match canonical {event!r} event.")
+    return errors
+
+
+def _verify_proof_context(
+    case_id: str,
+    proof_context: Mapping[str, Any],
+    *,
+    labels: Sequence[str],
+    atom_order: str,
+    query_payload: Mapping[str, Any],
+    assumptions_payload: Mapping[str, Any],
+    assumptions_hash: str,
+    tolerance: float,
+) -> list[str]:
+    errors: list[str] = []
+    errors.extend(_validate_schema(f"{case_id}.proof_context", proof_context, PROOF_CONTEXT_SCHEMA))
+    constraints = assumptions_payload.get("constraints")
+    if not isinstance(constraints, list):
+        return [*errors, f"{case_id}.assumptions.constraints must be a list."]
+    expected = _expected_proof_context(
+        labels=labels,
+        atom_order=atom_order,
+        query_payload=query_payload,
+        constraints=constraints,
+        assumptions_hash=assumptions_hash,
+        tolerance=tolerance,
+    )
+    for field, expected_value in expected.items():
+        actual = proof_context.get(field)
+        if actual != expected_value:
+            errors.append(f"{case_id}.proof_context.{field} mismatch.")
+    return errors
+
+
+def _expected_proof_context(
+    *,
+    labels: Sequence[str],
+    atom_order: str,
+    query_payload: Mapping[str, Any],
+    constraints: Sequence[Mapping[str, Any]],
+    assumptions_hash: str,
+    tolerance: float,
+) -> dict[str, Any]:
+    context: dict[str, Any] = {
+        "schema_version": PROOF_CONTEXT_SCHEMA_VERSION,
+        "atom_order": atom_order,
+        "labels": list(labels),
+        "labels_sha256": _canonical_sha256({"labels": list(labels)}),
+        "query_sha256": _canonical_sha256({"query": query_payload}),
+        "constraints_sha256": _canonical_sha256({"constraints": list(constraints)}),
+        "assumptions_hash": assumptions_hash,
+        "tolerance": float(tolerance),
+    }
+    context["proof_context_sha256"] = _canonical_sha256(context)
+    return context
+
+
 def _assumptions_from_payload(
     labels: Sequence[str],
     assumptions_payload: Mapping[str, Any],
 ) -> AssumptionSet:
+    payload_guardrails = tuple(
+        _string_list(
+            assumptions_payload.get("guardrails"),
+            label="assumptions.guardrails",
+        )
+    )
+    if payload_guardrails != tuple(labels):
+        raise ValueError("assumptions.guardrails must match case labels.")
     constraints_payload = assumptions_payload.get("constraints")
     if not isinstance(constraints_payload, list):
         raise TypeError("assumptions.constraints must be a list.")
@@ -626,6 +1064,10 @@ def _assumptions_from_payload(
 
 def _verify_bounds_metrics(bounds: Mapping[str, Any], *, tol: float) -> list[str]:
     errors: list[str] = []
+    if bounds.get("atom_order") != ATOM_ORDER:
+        errors.append("minimal_bounds.json atom_order mismatch.")
+    if bounds.get("tolerance") != DEFAULT_TOL:
+        errors.append("minimal_bounds.json tolerance mismatch.")
     cases = bounds.get("cases")
     if not isinstance(cases, list):
         return ["minimal_bounds.json cases must be a list."]
@@ -636,6 +1078,8 @@ def _verify_bounds_metrics(bounds: Mapping[str, Any], *, tol: float) -> list[str
         case_id = str(case.get("case_id", "<unknown>"))
         try:
             labels = tuple(_string_list(case["labels"], label=f"{case_id}.labels"))
+            atom_order = str(case["atom_order"])
+            tolerance = float(case["tolerance"])
             marginals = _float_mapping(
                 case["declared_marginals"],
                 label=f"{case_id}.declared_marginals",
@@ -657,6 +1101,29 @@ def _verify_bounds_metrics(bounds: Mapping[str, Any], *, tol: float) -> list[str
             errors.append(f"Malformed minimal bounds case {case_id}: {exc}")
             continue
 
+        if atom_order != ATOM_ORDER:
+            errors.append(f"{case_id}.atom_order mismatch: {atom_order!r}.")
+        if tolerance != DEFAULT_TOL:
+            errors.append(f"{case_id}.tolerance mismatch: {tolerance}.")
+        if case.get("event") != query_payload.get("event"):
+            errors.append(f"{case_id}.event differs from query.event.")
+        errors.extend(_verify_query_payload(case_id, labels, query_payload, tol=tol))
+        proof_context = case.get("proof_context")
+        if not isinstance(proof_context, Mapping):
+            errors.append(f"{case_id}.proof_context must be an object.")
+        else:
+            partial_context = {
+                "schema_version": PROOF_CONTEXT_SCHEMA_VERSION,
+                "atom_order": atom_order,
+                "labels": list(labels),
+                "labels_sha256": _canonical_sha256({"labels": list(labels)}),
+                "query_sha256": _canonical_sha256({"query": query_payload}),
+                "assumptions_hash": case.get("assumptions_hash"),
+                "tolerance": tolerance,
+            }
+            for field, expected in partial_context.items():
+                if proof_context.get(field) != expected:
+                    errors.append(f"{case_id}.proof_context.{field} mismatch.")
         errors.extend(
             _check_optional_metric(
                 case,
@@ -832,11 +1299,22 @@ def _metric_value(metric: str, inputs: Mapping[str, Any]) -> float | None:
     raise ValueError(f"Unknown metric {metric!r}")
 
 
-def _verify_witness_table(path: Path, *, tol: float) -> list[str]:
+def _verify_witness_table(path: Path, witnesses: Mapping[str, Any], *, tol: float) -> list[str]:
     errors: list[str] = []
+    expected_rows = _expected_witness_table_rows(witnesses)
+    seen: set[tuple[str, str]] = set()
     for row in _read_csv(path):
         case_id = row.get("case_id", "<unknown>")
         endpoint = row.get("endpoint", "<unknown>")
+        key = (str(case_id), str(endpoint))
+        if key in seen:
+            errors.append(f"Witness verification table has duplicate row for {case_id}.{endpoint}.")
+            continue
+        seen.add(key)
+        expected = expected_rows.get(key)
+        if expected is None:
+            errors.append(f"Witness verification table has unexpected row for {case_id}.{endpoint}.")
+            continue
         try:
             passed = row["passed"].lower() == "true"
             probability_sum = float(row["probability_sum"])
@@ -844,18 +1322,86 @@ def _verify_witness_table(path: Path, *, tol: float) -> list[str]:
             query_value = float(row["query_value"])
             reported_bound = float(row["reported_bound"])
             absolute_error = float(row["absolute_error"])
+            tolerance = float(row["tolerance"])
         except (KeyError, ValueError) as exc:
             errors.append(f"Malformed witness verification table row {case_id}.{endpoint}: {exc}")
             continue
-        if not passed:
-            errors.append(f"Witness verification table marks {case_id}.{endpoint} as failed.")
-        if abs(probability_sum - 1.0) > tol:
-            errors.append(f"Witness verification table sum for {case_id}.{endpoint} is not 1.")
-        if min_probability < -tol:
-            errors.append(f"Witness verification table min probability for {case_id}.{endpoint} is negative.")
-        if abs(query_value - reported_bound) > tol or absolute_error > tol:
-            errors.append(f"Witness verification table query mismatch for {case_id}.{endpoint}.")
+        if row.get("proof_context_sha256") != expected["proof_context_sha256"]:
+            errors.append(f"Witness verification table proof context mismatch for {case_id}.{endpoint}.")
+        numeric_fields = {
+            "probability_sum": probability_sum,
+            "min_probability": min_probability,
+            "query_value": query_value,
+            "reported_bound": reported_bound,
+            "absolute_error": absolute_error,
+            "tolerance": tolerance,
+        }
+        for field, actual in numeric_fields.items():
+            expected_value = float(expected[field])
+            if abs(actual - expected_value) > tol:
+                errors.append(f"Witness verification table {field} mismatch for {case_id}.{endpoint}.")
+        if passed != expected["passed"]:
+            errors.append(f"Witness verification table passed flag mismatch for {case_id}.{endpoint}.")
+    missing = sorted(set(expected_rows) - seen)
+    for case_id, endpoint in missing:
+        errors.append(f"Witness verification table is missing row for {case_id}.{endpoint}.")
     return errors
+
+
+def _expected_witness_table_rows(witnesses: Mapping[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    rows: dict[tuple[str, str], dict[str, Any]] = {}
+    cases = witnesses.get("cases")
+    if not isinstance(cases, list):
+        return rows
+    for case in cases:
+        if not isinstance(case, Mapping):
+            continue
+        try:
+            case_id = str(case["case_id"])
+            labels = tuple(_string_list(case["labels"], label=f"{case_id}.labels"))
+            query_payload = _mapping(case["query"], label=f"{case_id}.query")
+            query = _float_vector(
+                query_payload["coefficients"],
+                expected_length=1 << len(labels),
+                label=f"{case_id}.query.coefficients",
+            )
+            bounds = _mapping(case["bounds"], label=f"{case_id}.bounds")
+            witness_payloads = _mapping(case["witnesses"], label=f"{case_id}.witnesses")
+            proof_context = _mapping(case["proof_context"], label=f"{case_id}.proof_context")
+            proof_context_sha256 = str(proof_context["proof_context_sha256"])
+            tolerance = float(case["tolerance"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        for endpoint in ("lower", "upper"):
+            witness_payload = witness_payloads.get(endpoint)
+            if not isinstance(witness_payload, Mapping):
+                continue
+            try:
+                distribution = _float_vector(
+                    witness_payload["distribution"],
+                    expected_length=query.size,
+                    label=f"{case_id}.{endpoint}.distribution",
+                )
+                reported_bound = float(bounds[endpoint])
+            except (KeyError, TypeError, ValueError):
+                continue
+            query_value = float(query @ distribution)
+            probability_sum = float(np.sum(distribution))
+            min_probability = float(np.min(distribution))
+            absolute_error = abs(query_value - reported_bound)
+            rows[(case_id, endpoint)] = {
+                "probability_sum": probability_sum,
+                "min_probability": min_probability,
+                "query_value": query_value,
+                "reported_bound": reported_bound,
+                "absolute_error": absolute_error,
+                "passed": absolute_error <= tolerance
+                and min_probability >= -tolerance
+                and abs(probability_sum - 1.0) <= tolerance,
+                "proof_context_sha256": proof_context_sha256,
+                "tolerance": tolerance,
+            }
+    return rows
 
 
 def _verify_sample_complexity_table(path: Path, *, tol: float) -> list[str]:
@@ -969,6 +1515,10 @@ def _sha256_file(path: Path) -> str:
 def _hash_manifest_payload(manifest: Mapping[str, Any]) -> str:
     payload = dict(manifest)
     payload.pop("manifest_payload_sha256", None)
+    return _canonical_sha256(payload)
+
+
+def _canonical_sha256(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(
         payload,
         sort_keys=True,

@@ -59,6 +59,7 @@
         }
       },
       "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "atom_order": "little_endian",
       "bounds": {
         "lower": 0.0,
         "upper": 0.2
@@ -73,6 +74,20 @@
         "input_filter",
         "semantic_judge"
       ],
+      "proof_context": {
+        "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+        "atom_order": "little_endian",
+        "constraints_sha256": "f85a1cede6296284bb3ede64d230397d385d93d5b4a61472e129e27162b4d610",
+        "labels": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "labels_sha256": "720cf225c43326090f206449de2f9250fc46b074d3f6f474e0bfcdb26bf021e3",
+        "proof_context_sha256": "e8cc3dd966cce391bae19083e03d849408f42d39167daa5f9096658fabfc682b",
+        "query_sha256": "98a1c981c34da743bdc23c91aa6cc64f33bee5fd22cc1187004f1ab2586bf9b5",
+        "schema_version": "cc.paper.proof_context.v1",
+        "tolerance": 1e-08
+      },
       "query": {
         "coefficients": [
           0.0,
@@ -87,6 +102,7 @@
         ],
         "name": "AND_failure"
       },
+      "tolerance": 1e-08,
       "witnesses": {
         "lower": {
           "active_constraints": [
@@ -178,6 +194,7 @@
         }
       },
       "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "atom_order": "little_endian",
       "bounds": {
         "lower": 0.35,
         "upper": 0.55
@@ -192,6 +209,20 @@
         "input_filter",
         "semantic_judge"
       ],
+      "proof_context": {
+        "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+        "atom_order": "little_endian",
+        "constraints_sha256": "f85a1cede6296284bb3ede64d230397d385d93d5b4a61472e129e27162b4d610",
+        "labels": [
+          "input_filter",
+          "semantic_judge"
+        ],
+        "labels_sha256": "720cf225c43326090f206449de2f9250fc46b074d3f6f474e0bfcdb26bf021e3",
+        "proof_context_sha256": "cf37d0def1512f829b7a9e274bbbbcbe9b89110d9d60c0cf750773b5fa78e5e6",
+        "query_sha256": "7d37e2a972bf2b50fc97e19ebac7ab521f7961d391eb754cae8a6b8bbc6429d9",
+        "schema_version": "cc.paper.proof_context.v1",
+        "tolerance": 1e-08
+      },
       "query": {
         "coefficients": [
           0.0,
@@ -206,6 +237,7 @@
         ],
         "name": "OR_failure"
       },
+      "tolerance": 1e-08,
       "witnesses": {
         "lower": {
           "active_constraints": [
@@ -240,6 +272,6 @@
       }
     }
   ],
-  "schema_version": "cc.paper.witnesses.v1",
+  "schema_version": "cc.paper.witnesses.v2",
   "tolerance": 1e-08
 }

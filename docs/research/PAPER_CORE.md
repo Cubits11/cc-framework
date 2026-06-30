@@ -80,7 +80,9 @@ and assumptions; it does not establish deployment safety.
 
 - Define endpoint witness distributions.
 - Show how witnesses reconstruct constraints and endpoint objectives.
-- Describe assumption hashes and active constraint reporting.
+- Describe assumption hashes, active constraint reporting, and per-case proof
+  contexts that bind labels, atom order, query coefficients, constraints,
+  assumptions hash, and numerical tolerance.
 - Separate witness verification from empirical validity.
 
 ### 6. Experiments

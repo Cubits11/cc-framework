@@ -1,29 +1,29 @@
 {
   "files": [
     {
-      "bytes": 554,
+      "bytes": 549,
       "filename": "table_1_classical_frechet_bounds.csv",
-      "sha256": "d250b527dc673a1a8d029e03ab144cf8589bfac2a0e0dd6540f0b79230f45c02"
+      "sha256": "9fc528722a3a72c16dc47041d8bf5c434da8cb71341556e1e174d471d3f7af3c"
+    },
+    {
+      "bytes": 644,
+      "filename": "table_2_metric_examples.csv",
+      "sha256": "deeadb440cc56f68e1395f3e3f42684fc95036096448de3c7b548885178a7644"
     },
     {
       "bytes": 651,
-      "filename": "table_2_metric_examples.csv",
-      "sha256": "d400177d4f2510d6dd7800779e66ce496687a28bb56b1aedf594fe6514ac66da"
-    },
-    {
-      "bytes": 341,
       "filename": "table_3_witness_verification.csv",
-      "sha256": "cdcdb67f99da0c10377c9359c8732dc559fe9b95f459cca9bf0961ad17c1004d"
+      "sha256": "8e99037501a25d906fd24b8bf48d886acff1839a8f17f6e4c6e31e4cd07b0db6"
     },
     {
-      "bytes": 802,
+      "bytes": 792,
       "filename": "table_4_sample_complexity.csv",
-      "sha256": "172e1b8739d8d574f223d45fa925992bb7da03efddbf848d774bd1328938a362"
+      "sha256": "a489cad1c8012ef1ed233d67e789a59b4e264e091a414935f1d9eee04a68d104"
     },
     {
-      "bytes": 278,
+      "bytes": 271,
       "filename": "table_5_runtime_scaling.csv",
-      "sha256": "d630d4ab98237735dc0855ac1f9612e12c49f9dd9b03f007f9b7c49fbe51256b"
+      "sha256": "e1ab1caee62e3e70c29525febeedbf02075bdc498bac59a4567543b49289cbd3"
     },
     {
       "bytes": 18756,
@@ -51,19 +51,19 @@
       "sha256": "dc39383af953565f8266fdf41c6531843a1ffcdf70d8637d0512910ab80e8b9c"
     },
     {
-      "bytes": 2047,
+      "bytes": 3664,
       "filename": "minimal_bounds.json",
-      "sha256": "06d3476ea8fb7407586ea35e0adb6d61bc648728e23feb595712592b341bc2e5"
+      "sha256": "0769389e575327159ba522e160af18e35fb3c216c3ab96ec21d89bc446f7e0b8"
     },
     {
-      "bytes": 5764,
+      "bytes": 7326,
       "filename": "minimal_witnesses.json",
-      "sha256": "7bd71e0dfa042277d654413fc70f3391e7b2ef104b3cb5212d56e6a2e3724fb2"
+      "sha256": "65b37f924b30ea4b708bd113f97d1149909784ea3997009f2b5f9c2976d12345"
     },
     {
-      "bytes": 1534,
+      "bytes": 2099,
       "filename": "minimal_bundle.json",
-      "sha256": "c3a00da55cde50dbfd85d82952e6817509810a29dae0acd0066525e82e987a46"
+      "sha256": "135158e88f26d3b921fc3430e6fd8c784d9778168884e6e1fea5a8bfd3598693"
     },
     {
       "bytes": 819,
@@ -72,7 +72,7 @@
     }
   ],
   "generation_command": "scripts/reproduce_paper.py --output-dir artifacts/paper",
-  "manifest_payload_sha256": "220e5559c2455bd55a9fa84005a5ccdd973cb9a34a5dad73abeacf211e968115",
+  "manifest_payload_sha256": "b289f7893fde8f7f9d731cd39c735ea8965f162637b4209c8bcd9591180c9373",
   "package_version": "0.2.0",
   "required_files": [
     "table_1_classical_frechet_bounds.csv",

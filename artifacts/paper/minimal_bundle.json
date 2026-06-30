@@ -16,9 +16,12 @@
     "environment.json",
     "manifest.json"
   ],
+  "atom_order": "little_endian",
   "bounds_file": "minimal_bounds.json",
   "cases": [
     {
+      "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "atom_order": "little_endian",
       "case_id": "minimal_and",
       "event": "and",
       "fh_width": 0.2,
@@ -27,9 +30,13 @@
       "independence_regret_upper": 0.13,
       "lower_bound": 0.0,
       "product_baseline": 0.06999999999999999,
+      "proof_context_sha256": "e8cc3dd966cce391bae19083e03d849408f42d39167daa5f9096658fabfc682b",
+      "tolerance": 1e-08,
       "upper_bound": 0.2
     },
     {
+      "assumptions_hash": "6076924fcb338bcf688dfc10837605dc39f248c0bcad21a5a4c2d573fb5b98c8",
+      "atom_order": "little_endian",
       "case_id": "minimal_or",
       "event": "or",
       "fh_width": 0.20000000000000007,
@@ -38,12 +45,15 @@
       "independence_regret_upper": 0.07000000000000006,
       "lower_bound": 0.35,
       "product_baseline": 0.48,
+      "proof_context_sha256": "cf37d0def1512f829b7a9e274bbbbcbe9b89110d9d60c0cf750773b5fa78e5e6",
+      "tolerance": 1e-08,
       "upper_bound": 0.55
     }
   ],
   "environment_file": "environment.json",
   "failure_event_convention": "Z_i=1 denotes a guardrail failure or unsafe pass.",
-  "schema_version": "cc.paper.bundle.v1",
+  "schema_version": "cc.paper.bundle.v2",
+  "tolerance": 1e-08,
   "witness_verification_table": "table_3_witness_verification.csv",
   "witnesses_file": "minimal_witnesses.json"
 }

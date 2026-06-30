@@ -49,6 +49,81 @@ def test_verify_paper_artifacts_catches_manifest_hash_mismatch(tmp_path: Path) -
     assert "Hash mismatch" in result.stderr
 
 
+def test_verify_paper_artifacts_catches_stale_assumptions_hash(tmp_path: Path) -> None:
+    out_dir = _reproduce(tmp_path)
+    witness_path = out_dir / "minimal_witnesses.json"
+    witnesses = json.loads(witness_path.read_text(encoding="utf-8"))
+    witnesses["cases"][0]["assumptions"]["metadata"]["source"] = "mutated-source"
+    _write_json(witness_path, witnesses)
+    _refresh_manifest_entry(out_dir, "minimal_witnesses.json")
+
+    result = _verify(out_dir)
+
+    assert result.returncode != 0
+    assert "assumptions_hash mismatch" in result.stderr or "proof_context" in result.stderr
+
+
+def test_verify_paper_artifacts_catches_schema_drift(tmp_path: Path) -> None:
+    out_dir = _reproduce(tmp_path)
+    bounds_path = out_dir / "minimal_bounds.json"
+    bounds = json.loads(bounds_path.read_text(encoding="utf-8"))
+    bounds["cases"][0]["undocumented_field"] = "schema drift"
+    _write_json(bounds_path, bounds)
+    _refresh_manifest_entry(out_dir, "minimal_bounds.json")
+
+    result = _verify(out_dir)
+
+    assert result.returncode != 0
+    assert "schema-valid" in result.stderr
+
+
+def test_verify_paper_artifacts_catches_atom_order_mismatch(tmp_path: Path) -> None:
+    out_dir = _reproduce(tmp_path)
+    witness_path = out_dir / "minimal_witnesses.json"
+    witnesses = json.loads(witness_path.read_text(encoding="utf-8"))
+    witnesses["atom_order"] = "big_endian"
+    _write_json(witness_path, witnesses)
+    _refresh_manifest_entry(out_dir, "minimal_witnesses.json")
+
+    result = _verify(out_dir)
+
+    assert result.returncode != 0
+    assert "atom_order" in result.stderr
+
+
+def test_verify_paper_artifacts_catches_label_mismatch(tmp_path: Path) -> None:
+    out_dir = _reproduce(tmp_path)
+    witness_path = out_dir / "minimal_witnesses.json"
+    witnesses = json.loads(witness_path.read_text(encoding="utf-8"))
+    witnesses["cases"][0]["labels"][0] = "renamed_filter"
+    _write_json(witness_path, witnesses)
+    _refresh_manifest_entry(out_dir, "minimal_witnesses.json")
+
+    result = _verify(out_dir)
+
+    assert result.returncode != 0
+    assert "labels" in result.stderr or "guardrails" in result.stderr
+
+
+def test_verify_paper_artifacts_catches_query_mutation(tmp_path: Path) -> None:
+    out_dir = _reproduce(tmp_path)
+    bounds_path = out_dir / "minimal_bounds.json"
+    witness_path = out_dir / "minimal_witnesses.json"
+    bounds = json.loads(bounds_path.read_text(encoding="utf-8"))
+    witnesses = json.loads(witness_path.read_text(encoding="utf-8"))
+    bounds["cases"][0]["query"]["coefficients"][0] = 1.0
+    witnesses["cases"][0]["query"]["coefficients"][0] = 1.0
+    _write_json(bounds_path, bounds)
+    _write_json(witness_path, witnesses)
+    _refresh_manifest_entry(out_dir, "minimal_bounds.json")
+    _refresh_manifest_entry(out_dir, "minimal_witnesses.json")
+
+    result = _verify(out_dir)
+
+    assert result.returncode != 0
+    assert "query" in result.stderr or "proof_context" in result.stderr
+
+
 def _reproduce(tmp_path: Path) -> Path:
     out_dir = tmp_path / "paper"
     result = subprocess.run(

@@ -62,6 +62,11 @@ FIXED_REPRODUCIBILITY_TIMESTAMP = "1970-01-01T00:00:00Z"
 FAILURE_EVENT_CONVENTION = "Z_i=1 denotes a guardrail failure or unsafe pass."
 DEFAULT_OUTPUT_DIR = Path("artifacts/paper")
 NUMERIC_TOL = 1.0e-8
+ATOM_ORDER = "little_endian"
+BOUNDS_SCHEMA_VERSION = "cc.paper.bounds.v2"
+WITNESSES_SCHEMA_VERSION = "cc.paper.witnesses.v2"
+BUNDLE_SCHEMA_VERSION = "cc.paper.bundle.v2"
+PROOF_CONTEXT_SCHEMA_VERSION = "cc.paper.proof_context.v1"
 
 
 def main() -> int:
@@ -121,6 +126,16 @@ def _build_minimal_cases() -> list[dict[str, Any]]:
     cases: list[dict[str, Any]] = []
     for case_id, event, observed, query in specs:
         result = identified_region(query, assumptions)
+        assumptions_payload = _assumptions_payload(assumptions)
+        query_payload = _query_payload(query, event=event, events=labels)
+        proof_context = _proof_context_payload(
+            labels=labels,
+            atom_order=ATOM_ORDER,
+            query=query_payload,
+            constraints=assumptions_payload["constraints"],
+            assumptions_hash=result.assumptions_hash,
+            tolerance=NUMERIC_TOL,
+        )
         independent = independent_event_probability(marginals, query, labels=labels)
         lower_regret = independence_regret(result.lower_bound, independent)
         upper_regret = independence_regret(result.upper_bound, independent)
@@ -130,9 +145,12 @@ def _build_minimal_cases() -> list[dict[str, Any]]:
                 "event": event,
                 "labels": list(labels),
                 "declared_marginals": dict(marginals),
-                "assumptions": _assumptions_payload(assumptions),
+                "atom_order": ATOM_ORDER,
+                "tolerance": NUMERIC_TOL,
+                "assumptions": assumptions_payload,
                 "assumptions_hash": result.assumptions_hash,
-                "query": _query_payload(query, event=event, events=labels),
+                "query": query_payload,
+                "proof_context": proof_context,
                 "lower_bound": result.lower_bound,
                 "upper_bound": result.upper_bound,
                 "fh_width": fh_width(result.lower_bound, result.upper_bound),
@@ -284,6 +302,8 @@ def _write_table_3(path: Path, cases: Sequence[dict[str, Any]]) -> None:
     rows: list[dict[str, Any]] = []
     for case in cases:
         query = np.asarray(case["query"]["coefficients"], dtype=float)
+        proof_context_sha256 = case["proof_context"]["proof_context_sha256"]
+        tolerance = float(case["tolerance"])
         for endpoint in ("lower", "upper"):
             witness = case["witnesses"][endpoint]
             distribution = np.asarray(witness["distribution"], dtype=float)
@@ -301,6 +321,8 @@ def _write_table_3(path: Path, cases: Sequence[dict[str, Any]]) -> None:
                     "passed": abs(query_value - reported) <= NUMERIC_TOL
                     and float(np.min(distribution)) >= -NUMERIC_TOL
                     and abs(float(np.sum(distribution)) - 1.0) <= NUMERIC_TOL,
+                    "proof_context_sha256": proof_context_sha256,
+                    "tolerance": tolerance,
                 }
             )
     _write_csv(
@@ -314,6 +336,8 @@ def _write_table_3(path: Path, cases: Sequence[dict[str, Any]]) -> None:
             "reported_bound",
             "absolute_error",
             "passed",
+            "proof_context_sha256",
+            "tolerance",
         ),
         rows,
     )
@@ -518,15 +542,20 @@ def _benchmark_example_payload() -> dict[str, Any]:
 
 def _minimal_bounds_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "schema_version": "cc.paper.bounds.v1",
+        "schema_version": BOUNDS_SCHEMA_VERSION,
         "failure_event_convention": FAILURE_EVENT_CONVENTION,
+        "atom_order": ATOM_ORDER,
+        "tolerance": NUMERIC_TOL,
         "cases": [
             {
                 "case_id": case["case_id"],
                 "event": case["event"],
                 "labels": case["labels"],
+                "atom_order": case["atom_order"],
+                "tolerance": case["tolerance"],
                 "declared_marginals": case["declared_marginals"],
                 "query": case["query"],
+                "proof_context": case["proof_context"],
                 "lower_bound": case["lower_bound"],
                 "upper_bound": case["upper_bound"],
                 "fh_width": case["fh_width"],
@@ -546,18 +575,21 @@ def _minimal_bounds_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 def _minimal_witnesses_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "schema_version": "cc.paper.witnesses.v1",
-        "atom_order": "little_endian",
+        "schema_version": WITNESSES_SCHEMA_VERSION,
+        "atom_order": ATOM_ORDER,
         "tolerance": NUMERIC_TOL,
         "cases": [
             {
                 "case_id": case["case_id"],
                 "event": case["event"],
                 "labels": case["labels"],
+                "atom_order": case["atom_order"],
+                "tolerance": case["tolerance"],
                 "declared_marginals": case["declared_marginals"],
                 "assumptions": case["assumptions"],
                 "assumptions_hash": case["assumptions_hash"],
                 "query": case["query"],
+                "proof_context": case["proof_context"],
                 "bounds": {
                     "lower": case["lower_bound"],
                     "upper": case["upper_bound"],
@@ -571,8 +603,10 @@ def _minimal_witnesses_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any
 
 def _minimal_bundle_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "schema_version": "cc.paper.bundle.v1",
+        "schema_version": BUNDLE_SCHEMA_VERSION,
         "failure_event_convention": FAILURE_EVENT_CONVENTION,
+        "atom_order": ATOM_ORDER,
+        "tolerance": NUMERIC_TOL,
         "artifact_files": list(ARTIFACT_FILENAMES),
         "bounds_file": "minimal_bounds.json",
         "witnesses_file": "minimal_witnesses.json",
@@ -582,6 +616,10 @@ def _minimal_bundle_payload(cases: Sequence[dict[str, Any]]) -> dict[str, Any]:
             {
                 "case_id": case["case_id"],
                 "event": case["event"],
+                "atom_order": case["atom_order"],
+                "tolerance": case["tolerance"],
+                "assumptions_hash": case["assumptions_hash"],
+                "proof_context_sha256": case["proof_context"]["proof_context_sha256"],
                 "lower_bound": case["lower_bound"],
                 "upper_bound": case["upper_bound"],
                 "fh_width": case["fh_width"],
@@ -674,6 +712,29 @@ def _query_payload(query: LinearQuery, *, event: str, events: Sequence[str]) -> 
     }
 
 
+def _proof_context_payload(
+    *,
+    labels: Sequence[str],
+    atom_order: str,
+    query: Mapping[str, Any],
+    constraints: Sequence[Mapping[str, Any]],
+    assumptions_hash: str,
+    tolerance: float,
+) -> dict[str, Any]:
+    context = {
+        "schema_version": PROOF_CONTEXT_SCHEMA_VERSION,
+        "atom_order": atom_order,
+        "labels": list(labels),
+        "labels_sha256": _canonical_sha256({"labels": list(labels)}),
+        "query_sha256": _canonical_sha256({"query": query}),
+        "constraints_sha256": _canonical_sha256({"constraints": list(constraints)}),
+        "assumptions_hash": assumptions_hash,
+        "tolerance": float(tolerance),
+    }
+    context["proof_context_sha256"] = _canonical_sha256(context)
+    return context
+
+
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
@@ -683,7 +744,7 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 def _write_csv(path: Path, fieldnames: Sequence[str], rows: Sequence[Mapping[str, Any]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow(
@@ -723,6 +784,10 @@ def _sha256_file(path: Path) -> str:
 def _hash_manifest_payload(manifest: Mapping[str, Any]) -> str:
     payload = dict(manifest)
     payload.pop("manifest_payload_sha256", None)
+    return _canonical_sha256(payload)
+
+
+def _canonical_sha256(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(
         payload,
         sort_keys=True,

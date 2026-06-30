@@ -1,5 +1,5 @@
-case_id,endpoint,probability_sum,min_probability,query_value,reported_bound,absolute_error,passed
-minimal_and,lower,1,0,0,0,0,true
-minimal_and,upper,1,0,0.20000000000000001,0.20000000000000001,0,true
-minimal_or,lower,1,0,0.34999999999999998,0.34999999999999998,0,true
-minimal_or,upper,1,0,0.55000000000000004,0.55000000000000004,0,true
+case_id,endpoint,probability_sum,min_probability,query_value,reported_bound,absolute_error,passed,proof_context_sha256,tolerance
+minimal_and,lower,1,0,0,0,0,true,e8cc3dd966cce391bae19083e03d849408f42d39167daa5f9096658fabfc682b,1e-08
+minimal_and,upper,1,0,0.20000000000000001,0.20000000000000001,0,true,e8cc3dd966cce391bae19083e03d849408f42d39167daa5f9096658fabfc682b,1e-08
+minimal_or,lower,1,0,0.34999999999999998,0.34999999999999998,0,true,cf37d0def1512f829b7a9e274bbbbcbe9b89110d9d60c0cf750773b5fa78e5e6,1e-08
+minimal_or,upper,1,0,0.55000000000000004,0.55000000000000004,0,true,cf37d0def1512f829b7a9e274bbbbcbe9b89110d9d60c0cf750773b5fa78e5e6,1e-08
