@@ -2,6 +2,9 @@
 
 from cc.reporting.canonical import canonical_json_bytes, sha256_canonical
 from cc.reporting.report import (
+    ALLOWED_CLAIM_LEVELS,
+    CLAIM_LEVEL_DESCRIPTIONS,
+    CLAIM_LEVELS,
     CalibrationSummary,
     ClaimSummary,
     EnvironmentMetadata,
@@ -15,6 +18,9 @@ from cc.reporting.report import (
 )
 
 __all__ = [
+    "ALLOWED_CLAIM_LEVELS",
+    "CLAIM_LEVELS",
+    "CLAIM_LEVEL_DESCRIPTIONS",
     "CalibrationSummary",
     "ClaimSummary",
     "EnvironmentMetadata",

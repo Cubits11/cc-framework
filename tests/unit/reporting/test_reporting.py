@@ -12,6 +12,8 @@ from jsonschema import Draft202012Validator
 
 from cc.reporting.canonical import canonical_json_bytes, sha256_canonical
 from cc.reporting.report import (
+    CANONICALIZATION_METHOD,
+    CLAIM_LEVELS,
     CalibrationSummary,
     ClaimSummary,
     EnvironmentMetadata,
@@ -48,9 +50,8 @@ def test_receipt_hash_excludes_canonical_hash_field() -> None:
 
 def test_report_builder_happy_path_validates_against_schema() -> None:
     report = _report()
-    schema = json.loads((ROOT / "schemas" / "cc_report.schema.json").read_text(encoding="utf-8"))
 
-    Draft202012Validator(schema).validate(report)
+    Draft202012Validator(_schema()).validate(report)
 
     assert report["schema_version"] == "cc.report.v0.3.1"
     assert report["receipt"]["hash_algorithm"] == "sha256"
@@ -69,6 +70,25 @@ def test_report_builder_rejects_invalid_interval_ordering() -> None:
                 confidence_level=0.95,
                 interval_method="FH-Bernstein",
                 sample_sizes={"n1": 10, "n0": 10},
+            )
+        )
+
+
+def test_report_builder_rejects_blank_claim_contract_text() -> None:
+    with pytest.raises(ReportValidationError, match=r"claim\.statement"):
+        _report(
+            claim=ClaimSummary(
+                statement="  ",
+                allowed_claim_level="diagnostic",
+            )
+        )
+
+    with pytest.raises(ReportValidationError, match=r"claim\.non_claims"):
+        _report(
+            claim=ClaimSummary(
+                statement="Diagnostic receipt for fixture review.",
+                allowed_claim_level="diagnostic",
+                non_claims=["  "],
             )
         )
 
@@ -93,6 +113,8 @@ def test_cli_builds_deterministic_report_from_fixture_inputs(tmp_path: Path) -> 
     report1 = json.loads(out1.read_text(encoding="utf-8"))
     report2 = json.loads(out2.read_text(encoding="utf-8"))
 
+    Draft202012Validator(_schema()).validate(report1)
+    Draft202012Validator(_schema()).validate(report2)
     assert report1 == report2
     assert report1["receipt"]["canonical_hash"] == sha256_canonical(report1)
 
@@ -110,20 +132,37 @@ def test_cli_missing_evidence_returns_nonzero(tmp_path: Path) -> None:
 
 def test_checked_in_example_report_is_valid() -> None:
     report = json.loads(
-        (ROOT / "examples" / "reporting" / "minimal_cc_report.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "examples" / "reporting" / "minimal_cc_report.json").read_text(encoding="utf-8")
     )
-    schema = json.loads((ROOT / "schemas" / "cc_report.schema.json").read_text(encoding="utf-8"))
 
-    Draft202012Validator(schema).validate(report)
+    Draft202012Validator(_schema()).validate(report)
 
     assert report["receipt"]["canonical_hash"] == sha256_canonical(report)
+
+
+def test_schema_contract_matches_report_builder_constants() -> None:
+    schema = _schema()
+    schema_claim_levels = tuple(
+        option["const"] for option in schema["$defs"]["claim_level"]["oneOf"]
+    )
+
+    assert schema_claim_levels == CLAIM_LEVELS
+    assert (
+        schema["properties"]["receipt"]["properties"]["canonicalization_method"]["const"]
+        == CANONICALIZATION_METHOD
+    )
+
+    report = _report()
+    report["claim"]["non_claims"] = []
+    errors = list(Draft202012Validator(schema).iter_errors(report))
+
+    assert any(error.validator == "minItems" for error in errors)
 
 
 def _report(
     *,
     measurement: MeasurementSummary | None = None,
+    claim: ClaimSummary | None = None,
 ) -> dict[str, Any]:
     return build_cc_report(
         run=RunSummary(
@@ -151,7 +190,8 @@ def _report(
             interval_method="FH-Bernstein",
             sample_sizes={"n1": 200, "n0": 200},
         ),
-        claim=ClaimSummary(
+        claim=claim
+        or ClaimSummary(
             statement=(
                 "At the pinned operating point, the composed guardrail has a bounded "
                 "empirical CC interval under the stated assumptions."
@@ -255,3 +295,7 @@ def _run_cli(args: list[str]) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
+
+
+def _schema() -> dict[str, Any]:
+    return json.loads((ROOT / "schemas" / "cc_report.schema.json").read_text(encoding="utf-8"))

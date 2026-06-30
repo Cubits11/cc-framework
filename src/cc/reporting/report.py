@@ -22,9 +22,23 @@ CANONICALIZATION_METHOD = (
     "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); "
     "receipt.canonical_hash excluded"
 )
-ALLOWED_CLAIM_LEVELS = frozenset(
-    {"diagnostic", "bounded_empirical", "reproducible_run", "release_claim"}
-)
+CLAIM_LEVELS = ("diagnostic", "bounded_empirical", "reproducible_run", "release_claim")
+ALLOWED_CLAIM_LEVELS = frozenset(CLAIM_LEVELS)
+CLAIM_LEVEL_DESCRIPTIONS = {
+    "diagnostic": "Exploratory or debugging evidence only; not a release or safety claim.",
+    "bounded_empirical": (
+        "A measured bound or interval scoped to the named run, evaluation distribution, "
+        "calibration window, and assumptions."
+    ),
+    "reproducible_run": (
+        "A receipt for rerunning or auditing the named run and artifacts; not a claim "
+        "that conclusions transfer outside that setup."
+    ),
+    "release_claim": (
+        "A release-gate claim only within an external review process; not standalone "
+        "certification of production safety or compliance."
+    ),
+}
 CALIBRATION_STATUSES = frozenset({"pass", "fail"})
 
 
@@ -275,15 +289,23 @@ def _validate_inputs(
     if measurement.interval_lower > measurement.interval_upper:
         raise ReportValidationError("measurement interval lower cannot exceed upper")
 
+    if not claim.statement.strip():
+        raise ReportValidationError("claim.statement cannot be empty")
+    non_claims = list(claim.non_claims)
+    if any(not isinstance(item, str) or not item.strip() for item in non_claims):
+        raise ReportValidationError("claim.non_claims must contain non-empty strings")
+
     if claim.allowed_claim_level not in ALLOWED_CLAIM_LEVELS:
         allowed = ", ".join(sorted(ALLOWED_CLAIM_LEVELS))
         raise ReportValidationError(f"claim.allowed_claim_level must be one of: {allowed}")
     if claim.allowed_claim_level != "diagnostic":
-        if not (measurement.interval_lower <= measurement.point_estimate <= measurement.interval_upper):
+        if not (
+            measurement.interval_lower <= measurement.point_estimate <= measurement.interval_upper
+        ):
             raise ReportValidationError(
                 "measurement point_estimate must lie within interval for non-diagnostic claims"
             )
-        if not [item for item in claim.non_claims if item.strip()]:
+        if not non_claims:
             raise ReportValidationError("non-diagnostic claims require explicit non_claims")
 
     for label, sample_size in measurement.sample_sizes.items():

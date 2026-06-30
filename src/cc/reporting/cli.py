@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from cc.reporting.report import (
+    CLAIM_LEVEL_DESCRIPTIONS,
+    CLAIM_LEVELS,
     CalibrationSummary,
     ClaimSummary,
     EnvironmentMetadata,
@@ -25,7 +27,14 @@ from cc.reporting.report import (
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build machine-checkable CC reports.")
+    claim_level_help = "\n".join(
+        f"  {level}: {CLAIM_LEVEL_DESCRIPTIONS[level]}" for level in CLAIM_LEVELS
+    )
+    parser = argparse.ArgumentParser(
+        description="Build machine-checkable CC reports.",
+        epilog=f"Allowed claim levels:\n{claim_level_help}",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     build = subparsers.add_parser("build-report", help="Build a CC report JSON file.")
@@ -39,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument(
         "--claim-level",
         required=True,
-        choices=["diagnostic", "bounded_empirical", "reproducible_run", "release_claim"],
+        choices=CLAIM_LEVELS,
     )
     build.add_argument("--non-claim", action="append", default=[])
     build.add_argument("--assumption", action="append", default=[])

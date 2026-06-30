@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc-framework.local/schemas/cc_report.schema.json",
   "title": "CC Report v0.3.1",
+  "description": "Machine-checkable receipt for one scoped CC claim. The schema fixes the report version, evidence hashes, allowed claim level, explicit non-claims, and canonical receipt fields without certifying production safety.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,6 +22,7 @@
   ],
   "properties": {
     "schema_version": {
+      "description": "Report contract version. A verifier should treat a different value as a different receipt contract.",
       "const": "cc.report.v0.3.1"
     },
     "report_id": {
@@ -235,6 +237,7 @@
     },
     "evidence": {
       "type": "object",
+      "description": "Evidence references bound by SHA-256 hashes. These hashes identify bytes for audit; they do not prove that the evidence is sufficient for release or compliance.",
       "additionalProperties": false,
       "required": ["artifacts", "audit_log", "figure_manifest"],
       "properties": {
@@ -268,27 +271,50 @@
     },
     "claim": {
       "type": "object",
+      "description": "The single claim this report is allowed to support, plus explicit boundaries on what the report does not claim.",
       "additionalProperties": false,
       "required": ["statement", "allowed_claim_level", "non_claims"],
       "properties": {
         "statement": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "allowed_claim_level": {
-          "enum": ["diagnostic", "bounded_empirical", "reproducible_run", "release_claim"]
+          "$ref": "#/$defs/claim_level"
         },
         "non_claims": {
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["allowed_claim_level"],
+            "properties": {
+              "allowed_claim_level": {
+                "enum": ["bounded_empirical", "reproducible_run", "release_claim"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "non_claims": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
     },
     "receipt": {
       "type": "object",
+      "description": "Canonical SHA-256 receipt over the report JSON after excluding only receipt.canonical_hash.",
       "additionalProperties": false,
       "required": [
         "canonical_hash",
@@ -298,6 +324,7 @@
       ],
       "properties": {
         "canonical_hash": {
+          "description": "SHA-256 digest of the canonical report JSON with receipt.canonical_hash removed.",
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
@@ -305,8 +332,8 @@
           "const": "sha256"
         },
         "canonicalization_method": {
-          "type": "string",
-          "minLength": 1
+          "description": "Exact deterministic JSON method used before hashing. All report fields except receipt.canonical_hash are included.",
+          "const": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded"
         },
         "previous_hash": {
           "type": ["string", "null"],
@@ -316,8 +343,30 @@
     }
   },
   "$defs": {
+    "claim_level": {
+      "description": "Maximum claim strength the report is allowed to support. Reviewers may accept a weaker interpretation, but should not infer a stronger one from the receipt.",
+      "oneOf": [
+        {
+          "const": "diagnostic",
+          "description": "Exploratory or debugging evidence only; not a release, compliance, or safety claim."
+        },
+        {
+          "const": "bounded_empirical",
+          "description": "A measured bound or interval scoped to the named run, evaluation distribution, calibration window, and assumptions."
+        },
+        {
+          "const": "reproducible_run",
+          "description": "A receipt for rerunning or auditing the named run and artifacts; not a claim that conclusions transfer outside that setup."
+        },
+        {
+          "const": "release_claim",
+          "description": "A release-gate claim only within an external review process; not standalone certification of production safety or compliance."
+        }
+      ]
+    },
     "evidence_artifact": {
       "type": "object",
+      "description": "Named evidence file with its byte count and SHA-256 digest.",
       "additionalProperties": false,
       "required": ["path", "sha256", "bytes", "role"],
       "properties": {
