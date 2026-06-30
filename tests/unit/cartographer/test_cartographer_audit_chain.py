@@ -43,6 +43,74 @@ def test_chain_two_records_and_verify(tmp_path):
     audit.verify_chain(str(p))
 
 
+def test_append_jsonl_many_matches_single_appends_byte_for_byte(tmp_path):
+    records = [{"idx": i, "payload": {"value": i * 2}} for i in range(100)]
+    single = tmp_path / "single.jsonl"
+    batch = tmp_path / "batch.jsonl"
+
+    single_shas = [audit.append_jsonl(str(single), rec) for rec in records]
+    batch_shas = audit.append_jsonl_many(batch, records)
+
+    assert batch_shas == single_shas
+    assert batch.read_bytes() == single.read_bytes()
+    audit.verify_chain(str(batch))
+
+
+def test_append_jsonl_many_prev_chain_and_second_batch_tail(tmp_path):
+    p = tmp_path / "audit.jsonl"
+
+    first_shas = audit.append_jsonl_many(p, [{"event": "a"}, {"event": "b"}])
+    second_shas = audit.append_jsonl_many(p, [{"event": "c"}])
+
+    lines = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines()]
+    assert lines[0]["prev_sha256"] is None
+    assert lines[1]["prev_sha256"] == first_shas[0]
+    assert lines[2]["prev_sha256"] == first_shas[1]
+    assert second_shas == [lines[2]["sha256"]]
+    audit.verify_chain(str(p))
+
+
+def test_append_jsonl_many_ignores_reserved_sha_fields(tmp_path):
+    p = tmp_path / "audit.jsonl"
+    shas = audit.append_jsonl_many(
+        p,
+        [
+            {
+                "payload": {"x": 1},
+                "sha256": "caller-sha",
+                "prev_sha256": "caller-prev",
+                "record_hash": "legacy-sha",
+                "prev_hash": "legacy-prev",
+            }
+        ],
+    )
+
+    [obj] = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines()]
+    assert obj["sha256"] == shas[0]
+    assert obj["sha256"] != "caller-sha"
+    assert obj["prev_sha256"] is None
+    assert "record_hash" not in obj
+    assert "prev_hash" not in obj
+    audit.verify_chain(str(p))
+
+
+def test_append_jsonl_many_empty_iterable_calls_tail_once_without_output(tmp_path, monkeypatch):
+    p = tmp_path / "audit.jsonl"
+    calls = 0
+
+    def fake_tail_sha(path: str) -> str | None:
+        nonlocal calls
+        calls += 1
+        assert path == str(p)
+        return None
+
+    monkeypatch.setattr(audit, "tail_sha", fake_tail_sha)
+
+    assert audit.append_jsonl_many(p, []) == []
+    assert calls == 1
+    assert not p.exists()
+
+
 def test_verify_chain_detects_tamper(tmp_path):
     p = tmp_path / "audit.jsonl"
     audit.append_jsonl(str(p), {"payload": {"x": 1}})
