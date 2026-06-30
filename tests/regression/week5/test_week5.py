@@ -27,15 +27,17 @@ REQUIRED_COLUMNS = [
     "bhy_call",
 ]
 
-SCAN_PATH = Path("results/week5_scan/scan.csv")
+SCAN_PATH = Path("tests/fixtures/week5_scan/scan.csv")
 
 
 @pytest.fixture(scope="session")
 def ensure_week5_scan(tmp_path_factory: pytest.TempPathFactory) -> Path:
     if os.environ.get("CC_REFRESH_GOLDEN_ARTIFACTS") == "1":
         subprocess.run(["make", "week5-pilot"], check=True)
-        if not SCAN_PATH.exists():
+        generated_scan = Path("results/week5_scan/scan.csv")
+        if not generated_scan.exists():
             raise RuntimeError("Week5 scan did not produce scan.csv")
+        shutil.copyfile(generated_scan, SCAN_PATH)
         return SCAN_PATH
 
     if not SCAN_PATH.exists():

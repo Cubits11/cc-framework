@@ -17,12 +17,22 @@ coverage.*
 htmlcov/
 site/
 
-# results & runs (keep artifacts small)
-results/raw/
-results/aggregates/
-runs/
-runs/*.jsonl
-runs/*.jsonl.bak
+# runtime outputs (tracked artifacts live in explicit fixture/archive/release dirs)
+/results/**
+!/results/
+!/results/README.md
+/checkpoints/**
+!/checkpoints/
+!/checkpoints/README.md
+/runs/**
+!/runs/
+!/runs/README.md
+/figs/**
+!/figs/
+!/figs/README.md
+/figures/**
+!/figures/
+!/figures/README.md
 
 # notebooks
 *.ipynb_checkpoints/
@@ -41,10 +51,6 @@ cdk.out/
 *.swp
 *.swo
 *~
-
-# plots (source-of-truth is code)
-figures/*.pdf
-figures/*.png
 
 # runtime logs
 protocol_*.jsonl

@@ -33,6 +33,9 @@ These surfaces are inside the Paper Core v0.3 release-candidate boundary:
   paper-facing examples, artifact generators, and artifact verifiers.
 - Paper artifact scripts and verifiers for deterministic generated outputs
   under `artifacts/paper`.
+- Generated artifact boundary documentation and checks in
+  `docs/release/ARTIFACT_BOUNDARY.md` and
+  `scripts/check_artifact_boundary.py`.
 - Documentation that defines the paper-core claim boundary:
   `docs/research/PAPER_CORE.md`, `docs/research/NON_CLAIMS.md`,
   `docs/validation_matrix.md`, and `docs/theory/theorem_ledger.md`.
@@ -69,6 +72,8 @@ Local environment for this record:
 
 | Command | Track | Required for rc1 | Status | Notes |
 | --- | --- | --- | --- | --- |
+| `make check-artifact-boundary` | Repository hygiene | Yes | Pass | Verified tracked artifact locations, runtime-only roots, fixtures, archive markers, and paper artifact manifest membership. |
+| `make check-repro-clean` | Repository hygiene | Yes | Pass | Ran a short reproduction sequence into a temporary directory and checked for new generated diffs. |
 | `make test-kernel` | Paper Core v0.3 | Yes | Pass | Kernel unit tests passed; focused strict mypy reported no issues in 11 source files; focused ruff passed. |
 | `make test-release` | Paper Core v0.3 | Yes | Pass | Re-ran `make test-kernel`, ran `examples/minimal/run_bounds.py`, and passed 10 paper reproduction / artifact-verifier integration tests. |
 | `make test-reporting` | Reporting receipts | Yes | Pass | CC report/receipt unit tests passed. |

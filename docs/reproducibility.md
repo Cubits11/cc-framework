@@ -34,6 +34,10 @@ pip freeze > runs/requirements.lock
 * Run manifests live under `runs/<shard>/<hash>/manifest.json` and include config + dataset hashes.
 * Results live under `results/<shard>/<hash>/` with figures under `figures/<shard>/<hash>/`.
 * Deterministic hashes mean identical inputs land in the same storage path.
+* Runtime roots are ignored by git. Promote reviewed outputs into
+  `tests/fixtures/`, `docs/archive/`, `paper/figures/`, or `artifacts/paper/`
+  only when their role is explicit; see
+  [release/ARTIFACT_BOUNDARY.md](release/ARTIFACT_BOUNDARY.md).
 * Use `make verify-statistics` to validate statistical assumptions.
 
 ### Synthetic demo dataset provenance

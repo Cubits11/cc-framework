@@ -69,6 +69,7 @@ ENTERPRISE_TESTS := tests/integration/test_enterprise_aws_emulation.py tests/e2e
 
 # -------- Phony ----------
 .PHONY: help dev install setup lock deps fmt lint type security test test-kernel test-release test-reporting test-week3 test-unit test-int cov bench \
+        check-artifact-boundary check-repro-clean \
         enterprise-smoke \
         reproduce-smoke reproduce-mvp reproduce-figures figures reports docs docs-serve \
         reproduce-paper verify-paper-artifacts paper-smoke \
@@ -108,6 +109,8 @@ help:
 	@echo "test-reporting      CC report/receipt unit tests and CLI fixture smoke"
 	@echo "test-week3          Run Week-3 unit tests only"
 	@echo "enterprise-smoke    Install enterprise deps, prep dashboard, run strict AWS+dashboard smoke"
+	@echo "check-artifact-boundary Verify tracked/generated artifact boundary"
+	@echo "check-repro-clean   Run a short repro lane and fail on new generated diffs"
 	@echo "reproduce-paper     Build deterministic paper artifacts under $(PAPER_ARTIFACT_DIR)"
 	@echo "verify-paper-artifacts Verify hashes, schemas, metrics, and LP witnesses"
 	@echo "paper-smoke         Static Paper-1 source checks; compile if latexmk exists"
@@ -291,6 +294,19 @@ reproduce-paper:
 
 verify-paper-artifacts:
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_paper_artifacts.py --artifact-dir $(PAPER_ARTIFACT_DIR)
+
+check-artifact-boundary:
+	$(PY) scripts/check_artifact_boundary.py --static
+
+check-repro-clean: check-artifact-boundary
+	baseline=$$(mktemp); \
+	tmpdir=$$(mktemp -d); \
+	trap 'rm -f "$$baseline"; rm -rf "$$tmpdir"' EXIT; \
+	git status --porcelain=v1 --untracked-files=all > "$$baseline"; \
+	PYTHONPATH=src $(VENV_DIR)/bin/python examples/minimal/run_bounds.py >/dev/null; \
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/reproduce_paper.py --output-dir "$$tmpdir/paper" >/dev/null; \
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_paper_artifacts.py --artifact-dir "$$tmpdir/paper"; \
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/check_artifact_boundary.py --after-run --baseline "$$baseline"
 
 # -------- Analysis / Figures / Reports ---
 figures: reproduce-figures

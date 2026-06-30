@@ -4,7 +4,7 @@
 
 We executed the Week 5 pilot using the deterministic two-world runner. Prior to running the 150 pilot episodes we called `scripts/calibrate_guardrail.py` to tune the toy threshold guardrail against the benign corpus plus synthetic prompts derived from the attacker's benign vocabulary. The calibration summary (written to `results/week5_scan/calibration_summary.json`) records the tuned threshold, achieved false positive rate, and the alpha ceiling (0.05) that constrains subsequent inference.
 
-Pilot episodes were dispatched via `make week5-pilot`, which wraps calibration, the two-world execution, and post-processing. The command produces:
+Pilot episodes were dispatched via `make week5-pilot`, which wraps calibration, the two-world execution, and post-processing. The command produces runtime files that are ignored by git:
 
 - `results/week5_scan/scan.csv` — per-session metrics with Wilson and bootstrap confidence intervals.
 - `runs/audit_week5.jsonl` — chained audit entries covering calibration and the experiment run.
@@ -14,7 +14,13 @@ We fixed all random seeds (NumPy, Python) to guarantee reproducibility and logge
 
 ## 2. Results
 
-Table 1 summarises the Week 5 pilot results once the pipeline is executed. Fill in the numeric entries with the last row from `results/week5_scan/scan.csv`.
+Table 1 summarises the Week 5 pilot results once the pipeline is executed. Fill
+in the numeric entries with the last row from `results/week5_scan/scan.csv`, or
+use the committed fixture path below when reviewing the archived run.
+
+The committed golden scan used by regression tests lives at
+`tests/fixtures/week5_scan/scan.csv`. Historical companion JSON outputs are
+archived under `docs/archive/generated-results/week5_scan/`.
 
 | Metric | Estimate | CI (lo) | CI (hi) | Notes |
 | --- | --- | --- | --- | --- |

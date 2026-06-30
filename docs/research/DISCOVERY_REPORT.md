@@ -160,6 +160,11 @@ experiments as if they were the same level of mathematical evidence.
 - Full local pytest generated tracked diffs and a new checkpoint directory.
   This is an artifact hygiene problem.
 
+Post-audit hardening moved the tracked Week 5 golden scan to
+`tests/fixtures/week5_scan/scan.csv`, moved companion generated results and
+checkpoint examples under `docs/archive/`, and made root `results/`,
+`checkpoints/`, `runs/`, `figs/`, and `figures/` runtime-only.
+
 ## 3. Validation Snapshot
 
 Initial state:

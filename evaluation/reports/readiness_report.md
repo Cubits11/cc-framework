@@ -9,7 +9,7 @@
 ## Recent Artifacts
 - evaluation/ccc/addenda/example__AND.png
 - evaluation/ccc/addenda/ccc_addendum.csv
-- results/aggregates/summary.csv
+- results/aggregates/summary.csv (runtime-only, ignored)
 
 ## Sample CCC Rows
 | rail_a | rail_b | mode | L | I | U | C_hat | CCC | (C_hat-L)/(U-L) | headroom | lift |

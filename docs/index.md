@@ -16,6 +16,10 @@ Validation is split into explicit lanes in the
 Paper Core v0.3; Enterprise Reference v0.1 is a separate evidence-integrity
 reference architecture, not a deployment safety certification.
 
+Generated outputs are governed by the
+[Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md), which defines what
+may be tracked as a release artifact, fixture, archive, or runtime-only output.
+
 ## 1. Architectural Overview
 
 * **`cc.kernel.strict`** – narrow Paper Core import surface for finite binary
@@ -78,6 +82,7 @@ The experiment flow is illustrated in
 * [Public Research Framing](research/public-framing.md)
 * [Business and Audit Brief](research/business-audit-brief.md)
 * [Validation Matrix](validation_matrix.md)
+* [Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
 * [Experiments Guide](experiments-guide.md)
 * [Reproducibility Notes](reproducibility.md)

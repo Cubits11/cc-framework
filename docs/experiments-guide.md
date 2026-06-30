@@ -19,7 +19,10 @@ make reproduce-smoke
 make reproduce-mvp
 ```
 
-Results are written to `results/` and figures to `paper/figures/`.
+Results are written to ignored runtime directories such as `results/`, `runs/`,
+`figs/`, and `figures/`. Paper-source figures are the exception and live under
+`paper/figures/`; see [release/ARTIFACT_BOUNDARY.md](release/ARTIFACT_BOUNDARY.md)
+before promoting generated output into git.
 
 ## 3. Custom Experiments
 
