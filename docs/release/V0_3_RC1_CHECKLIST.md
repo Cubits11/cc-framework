@@ -1,135 +1,171 @@
 # v0.3-rc1 Release Candidate Checklist
 
-This checklist is for the paper-core artifact chain only. It does not expand the
-release scope beyond the finite-atom kernel, canonical metrics, documentation
-spine, and deterministic paper artifacts.
+Date: 2026-06-30
 
-Track: **Paper Core v0.3**. Enterprise, dashboard, security, and optional vendor
-lanes are documented in [Validation Matrix](../validation_matrix.md) but are not
-promoted into this release candidate unless a release note explicitly says so.
+This document is the sober release narrative for v0.3-rc1. It separates the
+release-candidate paper core from experimental reference architecture work,
+records the validation commands that were run, names skipped or out-of-scope
+lanes, and restates the non-claims.
 
-## Required validation commands
+## Release Classification
 
-Run these commands from the repository root:
+| Track | Status in v0.3-rc1 | Included scope | Not included |
+| --- | --- | --- | --- |
+| Paper Core v0.3 | Release-candidate quality | Finite binary atom kernel, canonical metrics, endpoint witnesses, deterministic paper artifacts, documentation spine, validation matrix, and claim-bounded CC report receipts. | Deployment safety, certification, causal validity, dataset representativeness, production operations, vendor integrations, dashboard release, or cloud release. |
+| Enterprise Reference v0.1 | Experimental reference architecture | Moto-backed AWS evidence-integrity emulation, signed evidence bundle flow, chain-head update checks, and dashboard smoke path when `make enterprise-smoke` is run. | Paper-core evidence, deployment safety certification, compliance certification, operational readiness, model correctness, or policy correctness. |
+| Legacy and exploratory surfaces | Experimental or historical | Older protocol/workflow surfaces, notebooks, experiments, adapters, dashboard views, and performance lanes. | Stable public API guarantees or first-paper claims unless promoted by a future release note. |
 
-```bash
-git status --short
-make test-kernel
-make test-release
-rm -rf artifacts/paper && make reproduce-paper && make verify-paper-artifacts
-make verify-paper-artifacts
-env PYTHONPATH=src .venv/bin/pytest -q
-env PYTHONPATH=src .venv/bin/mypy src/cc/kernel --strict
-.venv/bin/ruff check src/cc/kernel tests/unit/kernel tests/integration scripts
-.venv/bin/mkdocs build --strict --site-dir /tmp/cc-framework-mkdocs-site
-git status --short
-```
+## Stable For This RC
 
-Expected behavior:
+These surfaces are inside the Paper Core v0.3 release-candidate boundary:
 
-- The initial `git status --short` should show only intentional local work.
-- `make test-kernel` must pass.
-- `make test-release` must pass.
-- `make reproduce-paper` must create a fresh `artifacts/paper` tree.
-- Both `make verify-paper-artifacts` runs must pass, including the second run
-  without regeneration.
-- Full pytest must not create tracked diffs or new checkpoint artifacts.
-- The final `git status --short` should show only intentional source,
-  documentation, or regenerated paper-artifact changes.
+- `src/cc/kernel/sensitivity.py`: finite binary atom LP, linear assumptions,
+  sharp identified intervals, infeasibility detection, and endpoint witnesses.
+- `src/cc/kernel/metrics.py`: canonical estimand-layer diagnostics including
+  `fh_width`, `fh_position`, `independent_event_probability`,
+  `independence_regret`, `cc_gain`, and `cc_shift`.
+- `src/cc/kernel/frechet_classes.py`: classical Frechet special cases and
+  side-constrained finite Bernoulli bounds.
+- `src/cc/kernel/sample_complexity.py`: Hoeffding-style sample-size and radius
+  helpers for singleton and pairwise Bernoulli rates.
+- Paper artifact scripts and verifiers for deterministic generated outputs
+  under `artifacts/paper`.
+- Documentation that defines the paper-core claim boundary:
+  `docs/research/PAPER_CORE.md`, `docs/research/NON_CLAIMS.md`,
+  `docs/validation_matrix.md`, and `docs/theory/theorem_ledger.md`.
 
-## Optional dependency skips
+Stable here means suitable for release-candidate review. It does not mean the
+project is production-ready or that every non-kernel module is promoted into
+the paper-core contract.
 
-- Optional notebooks, dashboard, cloud, and adapter paths are outside this
-  release candidate.
-- Enterprise Reference v0.1 evidence should use `make enterprise-smoke`. That
-  target installs/checks `.[enterprise,test]`, prepares dashboard dependencies,
-  and fails if the moto-backed AWS emulation or dashboard e2e smoke cannot run.
-  A skip from an ad hoc pytest command does not prove the enterprise lane
-  passed.
-- Optional vendor adapter checks may skip when packages such as `guardrails-ai`
-  or vendor credentials are unavailable; that skip does not prove the vendor
-  lane passed.
-- Serialization-specific checks may skip when `fastavro`, `protobuf`, or
-  `sqlalchemy` are unavailable; that skip does not prove those optional
-  serialization lanes passed.
-- Experiment and performance checks may skip unless `CC_RUN_EXPERIMENTS=1` or
-  `CC_RUN_PERF=1` is set.
-- Pandoc-dependent PDF memo generation is optional unless a release note
-  explicitly promotes it.
-- LaTeX compilation inside `make paper-smoke` is optional when `latexmk` is not
-  installed.
-- The release is not blocked by unavailable optional plotting backends when the
-  required validation commands above pass.
+## Experimental Or Separate
 
-## Artifact verification procedure
+These surfaces remain separate from the Paper Core v0.3 release candidate:
 
-1. Verify the committed artifact state before regenerating:
+- Enterprise Reference v0.1: use `make enterprise-smoke` for its own lane.
+- Dashboard views and browser verification UI.
+- Vendor adapters and optional vendor dependency tests.
+- Security, serialization, performance, experiment, notebook, and cloud lanes.
+- Historical `src/cc/core`, `src/cc/exp`, `src/cc/cartographer`, notebooks, and
+  exploratory scripts unless a specific release note says otherwise.
 
-   ```bash
-   make verify-paper-artifacts
-   ```
+Skipped optional tests in the full Python suite should be read as lane
+exclusions, not proof that those optional lanes passed.
 
-2. Regenerate the paper artifacts from scratch:
+## Required Validation Record
 
-   ```bash
-   rm -rf artifacts/paper
-   make reproduce-paper
-   ```
+Run commands from the repository root in the listed order. The status column is
+updated only after the command has actually run for this RC.
 
-3. Verify the regenerated artifacts:
+Local environment for this record:
 
-   ```bash
-   make verify-paper-artifacts
-   make verify-paper-artifacts
-   ```
+- Date: 2026-06-30.
+- Python: 3.13.1 from `.venv`.
+- Working tree after validation: only intentional release-documentation edits.
 
-The artifact directory is intended to be tracked for v0.3-rc1. Its manifest,
-schema versions, hashes, witness distributions, tables, figures, and environment
-metadata must be internally consistent.
+| Command | Track | Required for rc1 | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `make test-kernel` | Paper Core v0.3 | Yes | Pass | Kernel unit tests passed; focused strict mypy reported no issues in 10 source files; focused ruff passed. |
+| `make test-release` | Paper Core v0.3 | Yes | Pass | Re-ran `make test-kernel`, ran `examples/minimal/run_bounds.py`, and passed 10 paper reproduction / artifact-verifier integration tests. |
+| `make docs` | Shared docs | Yes | Pass | Strict MkDocs build completed. MkDocs Material printed its upstream MkDocs 2.0 warning; the build still exited successfully. |
+| `PYTHONPATH=src .venv/bin/pytest -q` | Full Python regression | Yes | Pass with skips | Full pytest exited successfully with 7 optional skips and 2 expected warnings from tests that drop non-finite bootstrap samples. |
 
-## Fresh-venv validation notes
+## Artifact Verification
 
-For a fresh environment:
+The paper artifact lane is part of Paper Core v0.3, but it is tracked
+separately from the four rc1 commands above because regeneration can update
+tracked artifacts.
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip wheel setuptools
-.venv/bin/pip install -e '.[dev,docs]'
-```
+Checklist:
 
-Then run the required validation commands above. Do not treat missing optional
-notebook, dashboard, cloud, or adapter dependencies as release blockers for this
-paper-core RC.
+- [ ] Verify committed artifact state: `make verify-paper-artifacts`.
+- [ ] Regenerate from scratch: `rm -rf artifacts/paper && make reproduce-paper`.
+- [ ] Verify regenerated artifacts: `make verify-paper-artifacts`.
+- [ ] Run a second verification without regeneration: `make verify-paper-artifacts`.
 
-Python support for this RC follows the package floor and CI policy: Python
-3.10+ locally, with code and docs CI running on Python 3.10, 3.11, 3.12, and
-3.13.
+Status for this release-doc pass: not run. The required `make test-release`
+command did run the paper reproduction and artifact-verifier integration tests,
+but it did not replace the explicit artifact regeneration procedure above.
 
-## Non-claims
+Expected artifact behavior:
 
-This release candidate does not claim:
+- Manifest hashes, schema versions, metrics, LP witnesses, tables, figures, and
+  environment metadata are internally consistent.
+- Endpoint witness distributions satisfy the declared constraints and achieve
+  the reported LP endpoints.
+- Artifact verification does not claim empirical representativeness,
+  deployment safety, or certification.
 
-- deployment safety,
-- certification of deployed models,
-- causal inference without causal assumptions,
-- dataset representativeness,
-- production readiness,
-- enterprise readiness,
-- a dashboard, cloud, or adapter release,
-- a completed LaTeX manuscript.
+## Optional Skips And Not-Run Lanes
 
-The canonical paper-core narrative is `docs/research/PAPER_CORE.md`; generated
-kernel artifacts live in `artifacts/paper`.
+The following lanes are not promoted into Paper Core v0.3 by this checklist:
 
-## Release blockers
+- `make enterprise-smoke`: separate Enterprise Reference v0.1 lane.
+- `make security`: shared package hygiene lane, not paper-core proof.
+- Vendor adapter tests requiring packages, credentials, or provider services.
+- Serialization-specific tests requiring `fastavro`, `protobuf`, or
+  `sqlalchemy`.
+- Experiment and performance tests gated by `CC_RUN_EXPERIMENTS=1` or
+  `CC_RUN_PERF=1`.
+- Notebook, Pandoc/PDF, and LaTeX compilation paths when their optional tools
+  are absent. `make paper-smoke` may skip LaTeX compilation when `latexmk` is
+  unavailable.
+
+If any optional lane is run and fails, record it as a separate lane result. Do
+not relabel a failed optional lane as a Paper Core pass.
+
+Full pytest skipped these optional items in the local validation run:
+
+- `tests/experiments/test_experiment_leak_metrics.py`: requires
+  `CC_RUN_EXPERIMENTS=1`.
+- `tests/performance/test_adapter_perf.py`: requires `CC_RUN_PERF=1`.
+- `tests/unit/adapters/test_guardrails_ai_adapter.py`: requires
+  `guardrails-ai`.
+- `tests/unit/core/models/test_models_base.py`: one `fastavro` check skipped.
+- `tests/unit/core/models/test_models_base.py`: two `protobuf` checks skipped.
+- `tests/unit/core/models/test_models_base.py`: one `SQLAlchemy` check skipped.
+
+Not run for this paper-core rc1 record:
+
+- `make enterprise-smoke`.
+- `make security`.
+- Direct vendor, performance, experiment, notebook, Pandoc/PDF, and LaTeX-only
+  lanes outside the commands listed above.
+
+## Non-Claims
+
+v0.3-rc1 does not claim:
+
+- deployed AI systems are safe,
+- deployed models are certified,
+- the method infers causality without causal assumptions,
+- benchmark or fixture data are representative of future deployments,
+- cryptographic hashes or receipts make evidence statistically valid,
+- Enterprise Reference v0.1 is production-ready,
+- dashboards, adapters, cloud resources, or vendor integrations are part of the
+  Paper Core v0.3 release boundary,
+- the LaTeX manuscript is complete or archival.
+
+## Release Blockers
 
 Block v0.3-rc1 if any of the following are true:
 
-- `artifacts/paper` fails verification before or after regeneration.
-- Ordinary pytest creates tracked diffs or new checkpoint artifacts.
-- The README describes `reproduce-paper` as merely planned.
-- Public research docs or experiment READMEs make deployment, certification, or
-  production-ready claims.
-- `paper/main.tex` is presented as current while it references missing or stale
-  section files.
-- Mathematical behavior changes without a documented failing test and review.
+- A required validation command fails.
+- Full pytest creates tracked diffs or new checkpoint artifacts.
+- Skipped optional dependencies are presented as successful optional lanes.
+- Public docs imply deployment safety, certification, production readiness, or
+  dataset representativeness.
+- The README blurs Paper Core v0.3 with Enterprise Reference v0.1.
+- Mathematical behavior changes without a focused test and release-note entry.
+- Paper artifact verification fails before or after regeneration when the
+  artifact lane is being claimed.
+
+## Release Decision Checklist
+
+- [x] Required validation record is complete.
+- [x] Optional skips and not-run lanes are named.
+- [x] Paper Core v0.3 and Enterprise Reference v0.1 remain separate in README,
+  changelog, and release docs.
+- [x] Non-claims are visible in release-facing docs.
+- [x] Final `git status --short` contains only intentional release-doc changes
+  and any explicitly accepted artifact updates.

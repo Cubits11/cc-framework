@@ -21,14 +21,18 @@ certificate, not a product platform, and not an AI alignment solution.
 
 The validation tracks are intentionally separated:
 
-- **Paper Core v0.3** is the active research track for the finite-atom kernel,
-  canonical metrics, paper artifacts, and documentation spine.
-- **Enterprise Reference v0.1** is a minimum credible AWS reference
-  architecture for preserving evidence integrity around bundles. It is not the
-  paper core and does not certify deployment safety.
+- **Paper Core v0.3** is release-candidate quality in v0.3-rc1 for the
+  finite-atom kernel, canonical metrics, endpoint witnesses, deterministic
+  paper artifacts, and documentation spine.
+- **Enterprise Reference v0.1** is an experimental reference architecture for
+  preserving evidence integrity around bundles. It is not the paper core and
+  does not certify deployment safety.
 
 See [docs/validation_matrix.md](docs/validation_matrix.md) for the command
 matrix that states which commands prove which claim.
+
+For the v0.3-rc1 release narrative and checklist, see
+[docs/release/V0_3_RC1_CHECKLIST.md](docs/release/V0_3_RC1_CHECKLIST.md).
 
 ## Core Thesis
 
@@ -225,6 +229,7 @@ available.
 - [Metric Taxonomy](docs/theory/metric_taxonomy.md)
 - [Theorem Ledger](docs/theory/theorem_ledger.md)
 - [Reproducibility Notes](docs/reproducibility.md)
+- [v0.3-rc1 Checklist](docs/release/V0_3_RC1_CHECKLIST.md)
 
 ## Repository Structure
 
@@ -272,11 +277,13 @@ make paper-smoke
 ```
 
 Release-facing validation lanes are documented in
-[docs/validation_matrix.md](docs/validation_matrix.md). The short version:
-`make test-kernel`, `make test-release`, `make reproduce-paper`, and
-`make verify-paper-artifacts` support Paper Core v0.3; enterprise, dashboard,
-security, and vendor checks are separate lanes with their own optional
-dependencies and non-claims.
+[docs/validation_matrix.md](docs/validation_matrix.md) and summarized in the
+[v0.3-rc1 checklist](docs/release/V0_3_RC1_CHECKLIST.md). The short version:
+`make test-kernel`, `make test-release`, `make docs`, and
+`PYTHONPATH=src .venv/bin/pytest -q` support the v0.3-rc1 evidence record;
+`make reproduce-paper` and `make verify-paper-artifacts` support deterministic
+paper artifacts. Enterprise, dashboard, security, and vendor checks are
+separate lanes with their own optional dependencies and non-claims.
 
 Paper 1 benchmark summaries can be generated with:
 
