@@ -120,6 +120,10 @@ regardless of singleton direction. It is not defined in a one-world analysis.
 
 ## Deprecated Name Mapping
 
+These names are legacy exploratory compatibility surfaces. They are not
+Paper Core partial-identification claims, not evidence of safety, and not used
+for Paper Core theorem statements.
+
 | Old name | Status | Canonical guidance |
 | --- | --- | --- |
 | `cc_max` | Deprecated; legacy formula preserved until v0.4. | Use `cc_gain` only when using failure-risk normalization with matching domain assumptions. |

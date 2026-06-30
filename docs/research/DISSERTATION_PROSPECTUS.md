@@ -9,22 +9,23 @@ Dependence-Aware Partial Identification for Composed AI Safety Systems
 Layered AI safety systems cannot be evaluated by isolated guardrail scores
 alone. When guardrail failures are dependent, composed risk is generally only
 partially identified. This dissertation develops theory, algorithms, empirical
-protocols, and proof-carrying artifacts that compute sharp risk intervals,
-expose endpoint witnesses, propagate finite-sample uncertainty, search for
+protocols, and witness-carrying artifacts that compute sharp risk intervals,
+expose endpoint witnesses, convert finite-sample count uncertainty into
+simultaneous interval constraints, search for
 dependence amplification, and package claim-bounded evidence without claiming
-deployment safety certification.
+deployment safety approval.
 
 ## Research Principles
 
 - Identification before optimization: the composition event and feasible
   dependence class must be explicit before tuning or comparing a guardrail
   stack.
-- Proof-carrying evaluation: reported intervals should carry labels, atom
+- Witness-carrying evaluation: reported intervals should carry labels, atom
   order, constraints, assumption hashes, query coefficients, tolerance, and
   endpoint witnesses.
-- Finite-sample propagation: estimated singleton and pairwise rates should
-  become simultaneous confidence intervals before they become composition
-  constraints.
+- Finite-sample interval construction: estimated singleton and pairwise rates
+  should become simultaneous confidence intervals before they become
+  composition constraints, under stated sampling assumptions.
 - Dependence stress testing: product coupling is a named baseline, not the
   default truth.
 - Claim-bounded assurance: receipts preserve evidence integrity and scope; they
@@ -50,7 +51,7 @@ deployment safety certification.
 6. Sequential and Agentic Monitoring: time-indexed guardrail failures require
    anytime-valid monitoring and path-level estimands rather than static batch
    claims alone.
-7. Proof-Carrying Assurance Artifacts: reports, Merkle logs, receipts, and
+7. Witness-Carrying Assurance Artifacts: reports, Merkle logs, receipts, and
    SACM/GSN-style cases can make evidence auditable while keeping non-claims
    explicit.
 
@@ -72,7 +73,7 @@ deployment safety certification.
 | --- | --- | --- |
 | Paper tables and figures | Implemented | `make reproduce-paper`; `make verify-paper-artifacts` |
 | Minimal bounds and witnesses | Implemented | `artifacts/paper/minimal_bounds.json`; `minimal_witnesses.json` |
-| Proof-context bundle and manifest | Implemented | `artifacts/paper/minimal_bundle.json`; `manifest.json` |
+| Verification-context bundle and manifest | Implemented | `artifacts/paper/minimal_bundle.json`; `manifest.json` |
 | CC report receipts | Implemented | `make test-reporting` |
 | Dependence benchmark summary | Implemented smoke | `tests/integration/test_dependence_benchmark_example.py` |
 | Active dependence red-team protocol | Planned | Requires held-out baseline and redaction policy |
@@ -95,7 +96,7 @@ deployment safety certification.
 
 ## Non-Claims
 
-- No deployment safety certification.
+- No deployment safety approval.
 - No guarantee of dataset representativeness.
 - No causal conclusion without causal assumptions.
 - No production-readiness claim for dashboards, cloud infrastructure, or vendor
@@ -115,6 +116,6 @@ deployment safety certification.
 | 7 | Add optional Inspect-compatible file ingestion and adapter tests. |
 | 8 | Draft dependence stress and cliff chapter with benchmark evidence. |
 | 9 | Extend sequential monitoring experiments and document anytime-valid limits. |
-| 10 | Package proof-carrying assurance receipts and SACM/GSN-style cases. |
+| 10 | Package witness-carrying assurance receipts and SACM/GSN-style cases. |
 | 11 | Integrate chapters, theorem ledger, artifact ledger, and limitations. |
 | 12 | Dissertation polish, defense materials, and reproducibility audit. |

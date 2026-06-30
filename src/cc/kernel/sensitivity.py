@@ -815,16 +815,17 @@ def _solve_query_lp(
 
 
 def _clean_solution(solution: FloatArray, tol: float) -> FloatArray:
+    effective_tol = _effective_validation_tol(tol)
     cleaned = np.asarray(solution, dtype=float).copy()
-    cleaned[(cleaned < 0.0) & (cleaned >= -tol)] = 0.0
-    cleaned[(cleaned > 1.0) & (cleaned <= 1.0 + tol)] = 1.0
-    if np.any(cleaned < -tol):
+    cleaned[(cleaned < 0.0) & (cleaned >= -effective_tol)] = 0.0
+    cleaned[(cleaned > 1.0) & (cleaned <= 1.0 + effective_tol)] = 1.0
+    if np.any(cleaned < -effective_tol):
         raise IdentificationInfeasibleError("LP returned negative atom probabilities.")
-    if np.any(cleaned > 1.0 + tol):
+    if np.any(cleaned > 1.0 + effective_tol):
         raise IdentificationInfeasibleError("LP returned atom probabilities above 1.")
     total = float(np.sum(cleaned))
     correction = 1.0 - total
-    if 0.0 < abs(correction) <= tol:
+    if 0.0 < abs(correction) <= effective_tol:
         pivot = int(np.argmax(cleaned))
         cleaned[pivot] = cleaned[pivot] + correction
     cleaned = cleaned.astype(np.float64, copy=False)
@@ -842,30 +843,35 @@ def _validate_lp_solution(
     *,
     label: str,
 ) -> None:
+    effective_tol = _effective_validation_tol(tol)
     if solution.ndim != 1:
         raise IdentificationInfeasibleError(f"{label} is not a probability vector.")
     if not np.all(np.isfinite(solution)):
         raise IdentificationInfeasibleError(f"{label} contains non-finite atom probabilities.")
-    if np.any(solution < -tol):
+    if np.any(solution < -effective_tol):
         raise IdentificationInfeasibleError(f"{label} has negative atom mass.")
-    if np.any(solution > 1.0 + tol):
+    if np.any(solution > 1.0 + effective_tol):
         raise IdentificationInfeasibleError(f"{label} has atom mass above 1.")
     total = float(np.sum(solution))
-    if abs(total - 1.0) > tol:
+    if abs(total - 1.0) > effective_tol:
         raise IdentificationInfeasibleError(
             f"{label} atom probabilities sum to {total}, not 1."
         )
     eq_residual = float(np.max(np.abs(a_eq @ solution - b_eq)))
-    if eq_residual > tol:
+    if eq_residual > effective_tol:
         raise IdentificationInfeasibleError(
             f"{label} violates equality constraints by {eq_residual:.3e}."
         )
     if a_ub is not None and b_ub is not None:
         ub_residual = float(np.max(a_ub @ solution - b_ub))
-        if ub_residual > tol:
+        if ub_residual > effective_tol:
             raise IdentificationInfeasibleError(
                 f"{label} violates inequality constraints by {ub_residual:.3e}."
             )
+
+
+def _effective_validation_tol(tol: float) -> float:
+    return float(tol + 100.0 * np.finfo(np.float64).eps)
 
 
 def _active_constraint_names(

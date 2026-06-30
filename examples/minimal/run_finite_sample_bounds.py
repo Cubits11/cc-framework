@@ -56,6 +56,11 @@ def _summary(result: Any) -> dict[str, Any]:
                 "lower": interval.lower,
                 "upper": interval.upper,
                 "radius": interval.radius,
+                "moment_kind": interval.moment_kind,
+                "role": interval.role,
+                "confidence_method": interval.confidence_method,
+                "simultaneous_correction": interval.simultaneous_correction,
+                "alpha_allocation": interval.alpha_allocation,
             }
             for interval in result.intervals
         ],

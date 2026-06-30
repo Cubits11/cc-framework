@@ -1,5 +1,10 @@
 # src/cc/exp/run_two_world.py
-"""Main experiment runner for the two-world protocol (deterministic + audit-friendly)."""
+"""Main experiment runner for the legacy two-world protocol.
+
+This workflow is deterministic and audit-friendly, but its CC/J composition
+metrics are legacy exploratory outputs. They are preserved for compatibility
+and are not Paper Core partial-identification claims or evidence of safety.
+"""
 
 from __future__ import annotations
 
@@ -283,6 +288,10 @@ def analyze_results(
             "confidence_interval": {"lower": j_ci[0], "upper": j_ci[1], "method": "bootstrap"},
         },
         "composability_metrics": {"cc_max": cc_max_value, "delta_add": delta_add_value},
+        "legacy_metric_notice": (
+            "cc_max and delta_add are legacy exploratory metrics, not Paper Core "
+            "partial-identification claims or evidence of safety."
+        ),
         "metrics_for_audit": metrics,  # exact block to drop into the audit event
     }
 

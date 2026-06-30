@@ -57,10 +57,10 @@ What this is:
 
 What this is not:
 
-- Not a certification system for deployed models.
+- Not a deployment approval system for deployed models.
 - Not proof of deployment safety.
 - Not causal inference without causal assumptions.
-- Not a guarantee of dataset representativeness or future performance.
+- Not evidence of dataset representativeness or future performance.
 - Not a replacement for red teaming or human governance.
 - Not an enterprise, dashboard, AWS, or adapter-centered project.
 
@@ -122,7 +122,8 @@ The current publication-facing kernel surface is intentionally small:
   classical Frechet special cases and side-constrained finite Bernoulli bounds.
 - [src/cc/kernel/sample_complexity.py](src/cc/kernel/sample_complexity.py):
   Hoeffding-style sample-size and radius helpers for singleton and pairwise
-  Bernoulli failure-rate estimates.
+  Bernoulli failure-rate estimates, with explicit metadata for count-derived
+  interval constraints and modeling assumptions.
 - [src/cc/evals/dependence_benchmark.py](src/cc/evals/dependence_benchmark.py):
   benchmark ingestion and Paper 1 example summaries using the repository
   convention that `Z_i=1` means unsafe pass / guardrail failure.
@@ -130,6 +131,8 @@ The current publication-facing kernel surface is intentionally small:
   metric domains and deprecated-name mapping.
 - [docs/theory/theorem_ledger.md](docs/theory/theorem_ledger.md): mathematical
   claims, implementation witnesses, tests, and non-claims.
+- [docs/theory/finite_sample_identification.md](docs/theory/finite_sample_identification.md):
+  finite-sample outer-confidence theorem and sampling assumptions.
 
 Other modules remain useful but should be described more carefully:
 
@@ -146,12 +149,13 @@ least one declared guardrail failure occurs, given exact singleton failure
 marginals and no dependence assumption.
 
 ```python
-from cc.kernel.metrics import (
+from cc.kernel.strict import (
+    AssumptionSet,
+    LinearQuery,
     fh_width,
     independence_regret,
     independent_event_probability,
 )
-from cc.kernel.sensitivity import AssumptionSet, LinearQuery
 
 labels = ("input_filter_failure", "policy_judge_failure")
 marginals = {
@@ -329,7 +333,7 @@ Non-claims:
 - The project does not prove deployment safety.
 - The project does not certify deployed models.
 - The project does not infer causality without causal assumptions.
-- The project does not guarantee dataset representativeness or future behavior.
+- The project does not establish dataset representativeness or future behavior.
 - The project does not make cryptographic integrity equivalent to statistical
   validity.
 

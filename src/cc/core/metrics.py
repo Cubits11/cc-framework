@@ -12,7 +12,10 @@ Overview
 --------
 This module keeps the original API surface (`youden_j`, `delta_add`, `cc_max`)
 **fully backward compatible** while adding a comprehensive, numerically stable
-toolkit for evaluating guardrails and classifiers.
+toolkit for evaluating guardrails and classifiers. The `cc_max`, `cc_rel`,
+`delta_add`, and `delta_mult` functions are legacy exploratory metrics. They
+are not Paper Core partial-identification claims, not evidence of safety, and
+not used for Paper Core theorem statements.
 
 Key features
 ------------
@@ -78,8 +81,10 @@ EPS = 1e-12
 def _warn_legacy_metric(name: str, replacement: str) -> None:
     warnings.warn(
         (
-            f"{name} is deprecated and will be removed in v0.4. "
-            f"{replacement} Legacy semantics are preserved for this call."
+            f"{name} is a legacy exploratory metric and will be removed in v0.4. "
+            "It is not a Paper Core partial-identification claim and is not "
+            f"evidence of safety. {replacement} Legacy semantics are preserved "
+            "for this call."
         ),
         FutureWarning,
         stacklevel=2,
@@ -110,7 +115,9 @@ def delta_add(j_comp: float, j_a: float, j_b: float) -> float:
     """
     Additive deviation:
     Δ_add = J_comp - (J_A + J_B - J_A * J_B).
-    Positive values indicate **super-additive** composition (synergy).
+
+    Legacy exploratory metric. Not a Paper Core partial-identification claim,
+    not evidence of safety, and not used for Paper Core theorem claims.
     """
     _warn_legacy_metric(
         "delta_add",
@@ -128,7 +135,8 @@ def cc_max(j_comp: float, j_a: float, j_b: float) -> float:
     """
     CC_max = J_comp / max(J_A, J_B); returns +∞ if both are 0.
 
-    Interpret as: how much does the composed rail outperform the best singleton rail?
+    Legacy exploratory metric. Not a Paper Core partial-identification claim,
+    not evidence of safety, and not used for Paper Core theorem claims.
     """
     _warn_legacy_metric(
         "cc_max",

@@ -1,5 +1,10 @@
 # Composability Coefficient Derivations
 
+> Legacy/background note: this document describes the older Youden-J
+> composability coefficient workflow. It is preserved for historical context
+> and compatibility only. It is not the Paper Core partial-identification
+> theorem stack, not evidence of safety, and not used for Paper Core claims.
+
 This document provides a self-contained derivation of the Composability Coefficient (CC) used to quantify interactions between AI safety guardrails. It also lists underlying assumptions and includes symbolic verification examples using `sympy`.
 
 ## Assumptions

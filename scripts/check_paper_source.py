@@ -18,6 +18,12 @@ FORBIDDEN_PATTERNS = (
     "J statistic",
     "Youden",
     "\\mathrm{CC}_{\\max}",
+    "proof-carrying",
+    "Proof-carrying",
+    "scalarization impossibility",
+    "Scalarization impossibility",
+    "dependence cliff",
+    "dependence cliffs",
 )
 
 

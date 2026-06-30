@@ -470,6 +470,21 @@ class TestIdentifiedRegionMonotonicity:
         assert result.active_constraints_upper == ("marginal:A:upper",)
         assert result.active_constraints == ("marginal:A:lower", "marginal:A:upper")
 
+    def test_boundary_monotonicity_tolerates_solver_roundoff(self) -> None:
+        guardrails = ("A", "B")
+        assumptions = (
+            AssumptionSet.empty(guardrails)
+            .with_monotonicity("A", "B")
+            .with_marginal_interval("A", 1.0e-9, 1.0e-9)
+            .with_marginal_interval("B", 1.0, 1.0)
+        )
+
+        result = identified_region(LinearQuery.union(guardrails, guardrails), assumptions)
+
+        assert result.lower_bound == pytest.approx(1.0, abs=ASSERT_TOL)
+        assert result.upper_bound == pytest.approx(1.0, abs=ASSERT_TOL)
+        _assert_result_solutions_feasible(result, assumptions)
+
     def test_valid_side_constraints_only_narrow_identified_intervals(self) -> None:
         guardrails = ("A", "B", "C")
         distribution = np.asarray([0.05, 0.10, 0.15, 0.05, 0.20, 0.10, 0.15, 0.20])

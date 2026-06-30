@@ -11,8 +11,10 @@ PAPER_FACING_FILES = (
     ROOT / "scripts" / "reproduce_paper.py",
     ROOT / "scripts" / "verify_paper_artifacts.py",
     ROOT / "examples" / "minimal" / "run_bounds.py",
+    ROOT / "examples" / "minimal" / "run_finite_sample_bounds.py",
 )
 DISALLOWED_PAPER_IMPORTS = {
+    "cc.core.metrics",
     "cc.kernel.causal",
     "cc.kernel.ccf_models",
     "cc.kernel.cliff",
@@ -23,6 +25,7 @@ DISALLOWED_PAPER_IMPORTS = {
     "cc.kernel.sequential",
     "cc.kernel.stress",
 }
+DISALLOWED_STRICT_EXPORTS = {"cc_max", "cc_rel", "delta_add", "delta_mult", "youden_j"}
 
 
 def test_strict_surface_excludes_experimental_kernel_symbols() -> None:
@@ -34,10 +37,12 @@ def test_strict_surface_excludes_experimental_kernel_symbols() -> None:
     assert "cliff" not in exported
     assert "sequential" not in exported
     assert "stress" not in exported
+    assert exported.isdisjoint(DISALLOWED_STRICT_EXPORTS)
     assert "AssumptionSet" in exported
     assert "LinearQuery" in exported
     assert "identified_region" in exported
     assert "composition_bounds_from_counts" in exported
+    assert "PolicyCap" in exported
 
 
 def test_broad_kernel_remains_backward_compatible() -> None:
@@ -56,6 +61,13 @@ def test_paper_facing_code_imports_kernel_through_strict_surface() -> None:
         }
         assert "cc.kernel.strict" in imported_modules
         assert imported_modules.isdisjoint(DISALLOWED_PAPER_IMPORTS)
+        imported_names = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module == "cc.kernel.strict"
+            for alias in node.names
+        }
+        assert imported_names.isdisjoint(DISALLOWED_STRICT_EXPORTS)
 
 
 def test_paper_core_docs_name_strict_kernel_surface() -> None:

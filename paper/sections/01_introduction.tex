@@ -15,11 +15,18 @@ The contribution is intentionally narrow. We do not introduce new copula theory,
 new partial-identification theory, or a deployment-safety certificate. We adapt
 classical coupling and partial-identification machinery to composed AI
 guardrail evaluation, define a reproducible artifact discipline around endpoint
-witnesses, and show how an independence baseline can be reported as an
+witnesses, and show how a product-coupling baseline can be reported as an
 assumption-sensitive diagnostic rather than a default truth model.
+
+The clean claim is this: finite binary guardrail failure events under unknown
+dependence admit sharp, auditable partial-identification intervals via atom
+LPs. Endpoint witnesses and manifests make the reported mathematical bounds
+reproducible. Count-derived simultaneous confidence intervals yield outer
+confidence intervals for the target composition risk under stated sampling
+assumptions. Product coupling is a baseline, not truth.
 
 The most important negative result is practical: sharp bounds can be wide. A
 wide interval is still useful when it shows that singleton evidence is
-insufficient for a claimed composition guarantee. The interval tells a reviewer
+insufficient for a claimed composition conclusion. The interval tells a reviewer
 which additional dependence evidence would be needed to make the conclusion
 decisive.

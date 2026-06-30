@@ -39,8 +39,10 @@ from cc.kernel.metrics import (
 )
 from cc.kernel.sample_complexity import (
     BernoulliRateInterval,
+    ConstraintSourceMetadata,
     FiniteSampleIdentificationResult,
     PairwiseCountEvidence,
+    PolicyCap,
     SingletonCountEvidence,
     assumption_set_from_counts,
     bernoulli_confidence_interval,
@@ -65,6 +67,7 @@ from cc.kernel.sensitivity import (
 __all__ = [
     "AssumptionSet",
     "BernoulliRateInterval",
+    "ConstraintSourceMetadata",
     "DependenceKind",
     "EventKind",
     "FiniteSampleIdentificationResult",
@@ -78,6 +81,7 @@ __all__ = [
     "PairwiseCountEvidence",
     "PairwiseDependence",
     "PairwiseJointConstraint",
+    "PolicyCap",
     "SingletonCountEvidence",
     "assumption_set_from_counts",
     "atom_matrix",

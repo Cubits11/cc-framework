@@ -1,10 +1,10 @@
 # CC-Framework Theorem Ledger
 
 ## Canonical Paper 1 Theorems
-- Theorem 1: Two-Rail FH Envelope Sharpness
-- Theorem 2: Dependence Coordinate Representation
-- Theorem 3: Finite-Sample Identification and Affine Stress
-- Theorem 4: Completeness of Interval Release Triage
+- Theorem 1: Finite Atom LP Sharpness
+- Theorem 2: Classical FH Recovery
+- Theorem 3: Finite-Sample Outer Confidence Interval
+- Theorem 4: Endpoint Witness Verification
 
 ## Finite Binary Partial Identification by Atom LP
 
@@ -33,9 +33,35 @@ Limitations:
 - Computational cost grows as `O(2^K)` atoms, so this is intended for small K
   strict-kernel verification and theorem validation, not large-scale arbitrary
   guardrail ensembles without structure.
-- Guarantees are only as valid as the declared linear assumptions.
+- Bounds are only as valid as the declared linear assumptions.
 - This is a partial-identification interval, not a claim that the true deployed
   distribution is safe.
+
+## Finite-Sample Outer Confidence Interval
+
+Status: implemented and unit-tested in the strict kernel finite-sample helpers.
+
+Statement: If count-derived Bernoulli intervals cover all true estimated
+moments simultaneously with probability at least `1 - alpha`, and declared
+exact assumptions are true, then the atom-LP interval computed from those
+intervals contains the true target query with probability at least
+`1 - alpha`.
+
+Assumptions:
+- The labels, failure events, estimated moments, and target query are fixed
+  before sampling and interval construction.
+- Estimated moments are iid Bernoulli samples from the same named target
+  population, unless a separately justified alternative is used.
+- No uncorrected adaptive target selection is used.
+- Label noise is not modeled.
+- Policy caps are assumptions, not empirical estimates.
+
+Implementation file: `src/cc/kernel/sample_complexity.py`
+
+Test file: `tests/unit/kernel/test_finite_sample_constraints.py`
+
+Artifact / documentation: `docs/theory/finite_sample_identification.md` and
+`artifacts/paper/table_4_sample_complexity.csv`
 
 ## Archived / Future Theorems
 - Impossibility of a Single Scalar Metric
@@ -48,4 +74,4 @@ Limitations:
 - “certifies safety”
 - “proves system is safe”
 - “one score summarizes safety”
-- “independence baseline” unless explicitly labeled as assumption
+- “product coupling” unless explicitly labeled as a baseline

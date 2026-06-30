@@ -1,6 +1,11 @@
 The kernel consumes Bernoulli rates. Estimating those rates from data is a
-separate statistical problem. For one Bernoulli rate estimated from $n$ samples,
-Hoeffding's inequality gives
+separate statistical problem. The finite-sample statement used here assumes
+that the binary labels, estimated moments, and target query are fixed before
+sampling; each estimated moment is measured from iid Bernoulli samples from the
+same named target population; and no uncorrected adaptive target selection is
+performed. Label noise and population shift are outside this theorem.
+
+For one Bernoulli rate estimated from $n$ samples, Hoeffding's inequality gives
 \[
   \Prob(|\hat p-p| > \epsilon) \le 2\exp(-2n\epsilon^2).
 \]
@@ -21,6 +26,15 @@ $\delta$ by $\delta/k$, yielding
 \]
 For $m$ guardrails, the number of singleton plus pairwise rates is
 $m + m(m-1)/2$.
+
+The link between these intervals and the atom LP is simple. Suppose all exact
+constraints are true and the reported Bernoulli intervals cover their true
+moments simultaneously with probability at least $1-\alpha$. On that event, the
+true atom law is feasible for the relaxed LP that uses those intervals, so the
+LP lower endpoint is no larger than the true query value and the LP upper
+endpoint is no smaller. Therefore the computed LP interval is an outer
+confidence interval for the target composition risk under the stated sampling
+assumptions.
 
 Computational scaling has a different source. Marginal-only AND and OR bounds
 have closed forms. The general finite-atom LP enumerates all $2^m$ atoms, so it
