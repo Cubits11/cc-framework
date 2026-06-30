@@ -43,15 +43,21 @@ Additional runtime/type dependencies needed for fuller local coverage included:
 - pandas-stubs
 - types-jsonschema
 
-This suggests that the repository needs clearer optional dependency groups such as `test`, `type`, `stats`, `viz`, and possibly `full`.
+Current packaging already exposes several optional groups, including `test`,
+`stats`, `viz`, `data`, `ml`, `docs`, `enterprise`, and `security`. Release
+evidence should choose a lane from [Validation Matrix](../validation_matrix.md)
+instead of implying that all optional surfaces were exercised by one command.
 
-Recommended future install target:
+Useful install targets:
 
 ```bash
-python -m pip install -e ".[dev,docs,test,type]"
+python -m pip install -e ".[dev,docs]"
+python -m pip install -e ".[enterprise,test]"
+python -m pip install -e ".[security]"
 ```
 
-The exact extras should be introduced in a dedicated packaging PR, not mixed into documentation or typing cleanup.
+Optional dependency changes should still happen in dedicated packaging PRs, not
+be mixed into typing or architecture cleanup.
 
 ## Typing and API-contract drift
 
@@ -80,6 +86,24 @@ The staged cleanup should proceed in small PRs:
 5. strict-kernel contract documentation,
 6. focused typing repairs by subsystem,
 7. source-level refactors only after contracts are explicit.
+
+## Validation lanes
+
+The active validation split is:
+
+| Lane | Track | Primary command evidence |
+| --- | --- | --- |
+| Paper Core | Paper Core v0.3 | `make test-kernel`, `make test-release`, `make reproduce-paper`, `make verify-paper-artifacts`, `make paper-smoke` |
+| Full Python | Paper Core v0.3 plus broader regression coverage | `PYTHONPATH=src .venv/bin/pytest -q` |
+| Enterprise Reference | Enterprise Reference v0.1 | `PYTHONPATH=src .venv/bin/pytest tests/integration/test_enterprise_aws_emulation.py -q` with `.[enterprise,test]` |
+| Dashboard | Enterprise Reference v0.1 application surface | `npm run build` in `apps/dashboard` plus `PYTHONPATH=src .venv/bin/pytest tests/e2e/test_enterprise_smoke.py -q` |
+| Docs | Shared | `make docs` |
+| Security | Shared package/source hygiene | `make security` |
+| Optional Vendor | Optional adapter/vendor surfaces | Targeted adapter or performance tests with their vendor packages and gates installed |
+
+Enterprise Reference evidence checks preserve evidence integrity. They do not
+certify deployment safety, compliance, model correctness, policy correctness,
+or operational readiness.
 
 ## Non-goals for this baseline
 

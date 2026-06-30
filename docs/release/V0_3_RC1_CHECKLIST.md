@@ -4,6 +4,10 @@ This checklist is for the paper-core artifact chain only. It does not expand the
 release scope beyond the finite-atom kernel, canonical metrics, documentation
 spine, and deterministic paper artifacts.
 
+Track: **Paper Core v0.3**. Enterprise, dashboard, security, and optional vendor
+lanes are documented in [Validation Matrix](../validation_matrix.md) but are not
+promoted into this release candidate unless a release note explicitly says so.
+
 ## Required validation commands
 
 Run these commands from the repository root:
@@ -37,8 +41,22 @@ Expected behavior:
 
 - Optional notebooks, dashboard, cloud, and adapter paths are outside this
   release candidate.
+- Enterprise Reference v0.1 checks require `.[enterprise,test]` and may skip
+  when `moto` is absent; that skip does not prove the enterprise lane passed.
+- Dashboard smoke checks require Node.js/npm dashboard dependencies and
+  enterprise Python extras; that skip does not prove the dashboard lane passed.
+- Optional vendor adapter checks may skip when packages such as `guardrails-ai`
+  or vendor credentials are unavailable; that skip does not prove the vendor
+  lane passed.
+- Serialization-specific checks may skip when `fastavro`, `protobuf`, or
+  `sqlalchemy` are unavailable; that skip does not prove those optional
+  serialization lanes passed.
+- Experiment and performance checks may skip unless `CC_RUN_EXPERIMENTS=1` or
+  `CC_RUN_PERF=1` is set.
 - Pandoc-dependent PDF memo generation is optional unless a release note
   explicitly promotes it.
+- LaTeX compilation inside `make paper-smoke` is optional when `latexmk` is not
+  installed.
 - The release is not blocked by unavailable optional plotting backends when the
   required validation commands above pass.
 
@@ -81,6 +99,10 @@ python3 -m venv .venv
 Then run the required validation commands above. Do not treat missing optional
 notebook, dashboard, cloud, or adapter dependencies as release blockers for this
 paper-core RC.
+
+Python support for this RC follows the package floor and CI policy: Python
+3.10+ locally, with code and docs CI running on Python 3.10, 3.11, 3.12, and
+3.13.
 
 ## Non-claims
 

@@ -151,13 +151,29 @@ executing its checks.
 
 ### 7.1 Lint, Type, and Test Workflow
 
-* **Matrix:** Python 3.9, 3.10, 3.11, and 3.12.
+* **Matrix:** Python 3.10, 3.11, 3.12, and 3.13.
 * **Lint:** `ruff check .` enforces formatting and style rules.
-* **Type check:** `mypy src/cc` validates core package annotations.
+* **Type check:** the focused mypy target validates selected source files on
+  Python 3.12.
 * **Tests:** `pytest -q` runs the test suite quietly to surface regressions.
 
 ### 7.2 Documentation Workflow
 
-* **Matrix:** Python 3.9, 3.10, 3.11, and 3.12.
+* **Matrix:** Python 3.10, 3.11, 3.12, and 3.13.
 * **Docs build:** `make docs` calls the Makefile target, which runs
   `mkdocs build --strict` to treat warnings as failures.
+
+### 7.3 Validation Lanes
+
+Use [Validation Matrix](validation_matrix.md) to keep claims separated:
+
+* **Paper Core v0.3:** `make test-kernel`, `make test-release`,
+  `make reproduce-paper`, `make verify-paper-artifacts`, and `make paper-smoke`
+  validate the finite-atom kernel, canonical metrics, and deterministic paper
+  artifacts.
+* **Full Python:** `PYTHONPATH=src .venv/bin/pytest -q` validates the broader
+  Python suite for the dependencies installed in the local environment.
+* **Enterprise Reference v0.1:** the enterprise emulation and dashboard smoke
+  commands validate evidence-bundle integrity paths, not deployment safety.
+* **Docs/Security/Optional Vendor:** docs, security tooling, and vendor adapter
+  checks are separate lanes with separate extras and skip policies.

@@ -11,6 +11,11 @@ does not prove deployed systems are safe. It helps show when composition claims
 are underidentified unless dependence is measured, bounded, or explicitly
 assumed.
 
+Validation is split into explicit lanes in the
+[Validation Matrix](validation_matrix.md). The main documentation track is
+Paper Core v0.3; Enterprise Reference v0.1 is a separate evidence-integrity
+reference architecture, not a deployment safety certification.
+
 ## 1. Architectural Overview
 
 * **`cc.kernel.sensitivity`** – finite binary atom LP for sharp identified
@@ -44,6 +49,9 @@ The experiment flow is illustrated in
 * Pair every reported sharp interval with endpoint witness checks.
 * Use `make paper-smoke`, `make reproduce-paper`, and
   `make verify-paper-artifacts` for Paper 1 source and artifact checks.
+* Name the validation lane when reporting evidence, especially when optional
+  dependencies caused enterprise, dashboard, vendor, serialization, experiment,
+  or performance tests to skip.
 
 ## 4. Extending the Framework
 
@@ -67,6 +75,7 @@ The experiment flow is illustrated in
 ## 5. Further Reading
 
 * [Public Research Framing](research/public-framing.md)
+* [Validation Matrix](validation_matrix.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
 * [Experiments Guide](experiments-guide.md)
 * [Reproducibility Notes](reproducibility.md)

@@ -19,6 +19,17 @@ finite binary atom kernel for sharp Frechet composition intervals, metric
 diagnostics, and endpoint witness distributions. It is not a deployment safety
 certificate, not a product platform, and not an AI alignment solution.
 
+The validation tracks are intentionally separated:
+
+- **Paper Core v0.3** is the active research track for the finite-atom kernel,
+  canonical metrics, paper artifacts, and documentation spine.
+- **Enterprise Reference v0.1** is a minimum credible AWS reference
+  architecture for preserving evidence integrity around bundles. It is not the
+  paper core and does not certify deployment safety.
+
+See [docs/validation_matrix.md](docs/validation_matrix.md) for the command
+matrix that states which commands prove which claim.
+
 ## Core Thesis
 
 Composed AI safety should be evaluated as a dependence-aware
@@ -239,6 +250,11 @@ python3 -m venv .venv
 .venv/bin/pip install -e '.[dev,docs]'
 ```
 
+Runtime support:
+
+- Local package floor: Python 3.10 or newer.
+- CI code/docs matrix: Python 3.10, 3.11, 3.12, and 3.13.
+
 Run the minimal example:
 
 ```bash
@@ -254,6 +270,13 @@ PYTHONPATH=src .venv/bin/mypy src/cc/kernel --strict
 .venv/bin/mkdocs build --strict
 make paper-smoke
 ```
+
+Release-facing validation lanes are documented in
+[docs/validation_matrix.md](docs/validation_matrix.md). The short version:
+`make test-kernel`, `make test-release`, `make reproduce-paper`, and
+`make verify-paper-artifacts` support Paper Core v0.3; enterprise, dashboard,
+security, and vendor checks are separate lanes with their own optional
+dependencies and non-claims.
 
 Paper 1 benchmark summaries can be generated with:
 

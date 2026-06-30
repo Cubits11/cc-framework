@@ -1,5 +1,10 @@
 # CC Framework Enterprise Reference Architecture
 
+This document describes the **Enterprise Reference v0.1** track. It is separate
+from **Paper Core v0.3**, which remains the README-centered first-paper research
+track for the finite-atom kernel, canonical metrics, paper artifacts, and
+documentation spine.
+
 ## Non-Claims
 
 This architecture does **not** certify AI safety.
@@ -8,7 +13,9 @@ This architecture does **not** provide legal, regulatory, NIST AI RMF, ISO/IEC 4
 
 This architecture does **not** guarantee guardrail correctness, model correctness, policy correctness, or deployment readiness.
 
-This architecture provides verifiable evidence about composition risk under stated assumptions, full stop.
+This architecture provides verifiable evidence-integrity checks around
+composition-risk evidence bundles under stated assumptions, full stop. Evidence
+integrity is not deployment safety certification.
 
 ## Minimum Credible AWS Deployment
 
@@ -36,8 +43,8 @@ The enterprise tests use moto-backed AWS APIs rather than mocks of the project c
 Run the Python emulation test:
 
 ```bash
-python3 -m pip install -e '.[enterprise,test]'
-python3 -m pytest tests/integration/test_enterprise_aws_emulation.py
+.venv/bin/pip install -e '.[enterprise,test]'
+PYTHONPATH=src .venv/bin/pytest tests/integration/test_enterprise_aws_emulation.py -q
 ```
 
 Run the full dashboard smoke path:
@@ -45,6 +52,10 @@ Run the full dashboard smoke path:
 ```bash
 cd apps/dashboard
 npm ci
+npm run build
 cd ../..
-python3 -m pytest tests/e2e/test_enterprise_smoke.py
+PYTHONPATH=src .venv/bin/pytest tests/e2e/test_enterprise_smoke.py -q
 ```
+
+See [docs/validation_matrix.md](docs/validation_matrix.md) for the full lane
+matrix and optional dependency skip policy.

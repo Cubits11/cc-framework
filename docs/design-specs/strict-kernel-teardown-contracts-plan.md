@@ -18,7 +18,7 @@ Top-level areas in the current repository:
 ### 1.2 Packaging identity
 - Project name: `cc-framework`
 - Version: `0.2.0`
-- Python: `>=3.9`
+- Python: `>=3.10`
 - Core dependencies are lightweight (`numpy`, `pydantic`, `pyyaml`, `jsonlines`, `cryptography`, `blake3`), with optional extras for heavier stacks.
 - No active CLI entrypoint in `project.scripts` (currently commented out).
 - `src` layout with package discovery `include = ["cc*"]`.
@@ -31,12 +31,13 @@ Top-level areas in the current repository:
 ### 1.4 Tests + verification stack
 - Pytest is configured in `pyproject.toml` and used across `tests/`.
 - Hypothesis is present in unit/property tests (e.g., core model/hash/time parsing paths), but there is no dedicated strict-kernel invariants suite yet.
-- CI runs lint + mypy + pytest across Python 3.9–3.12.
+- CI runs lint and pytest across Python 3.10, 3.11, 3.12, and 3.13, with the
+  focused mypy target on Python 3.12.
 
 ### 1.5 Docs system and docs build reality
 - `Makefile` docs target uses `mkdocs build --strict`.
 - CI docs workflow runs on changes to `docs/**`, `README.md`, `mkdocs.yml`, etc.
-- In this checkout, root `mkdocs.yml` is not present (workflow references it as a trigger path).
+- Root `mkdocs.yml` is present, and the docs workflow runs `make docs`.
 
 ### 1.6 Experiments + determinism
 - `experiments/run.py` computes config hash, dataset hash, git SHA, and writes a manifest.

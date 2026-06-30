@@ -373,12 +373,12 @@ Avoid / dangerous overclaim:
 | High | Avoid / dangerous overclaim | `experiments/correlation_cliff/README.md` | Claims "Production-ready", "PhD-grade", "actionable insight", "no prior art", and deployed-system audit outputs. The experiment is useful but not validated enough for those claims. | Rewrite as exploratory/prototype; move strong language to hypotheses and planned validation. | Now |
 | Medium | Partially implemented | `src/cc/kernel/__init__.py` | Public `cc.kernel` exports core LP/metrics plus causal, cliff, CCF, sequential, and stress modules, making experimental breadth look like one stable kernel. | Define a narrow `cc.kernel.strict` or docs-facing import surface for paper claims. | Now |
 | Medium | Legacy | `src/cc/core/metrics.py`, `src/cc/cartographer/stats.py`, `src/cc/analysis/*`, `src/cc/exp/run_two_world.py` | `CC_max` and `delta_add` persist in many reports and experiments despite canonical replacement guidance. | Keep compatibility warnings, but prevent these names from appearing in first-paper artifacts except in a legacy appendix. | Now |
-| Medium | Stale | `docs/design-specs/strict-kernel-teardown-contracts-plan.md` | Contains outdated "verified" claims: no `mkdocs.yml`, Python `>=3.9`, strongest implementation in experiments. | Mark as historical or update; do not let it drive current architecture. | Now |
+| Medium | Updated | `docs/design-specs/strict-kernel-teardown-contracts-plan.md` | Earlier text had stale "verified" claims about docs configuration, the Python floor, and the strongest implementation location. | Keep historical planning docs aligned with the active validation matrix when they mention current tooling. | Now |
 | Medium | Stale / duplicate | `docs/research/THEOREM_LEDGER.md` and `docs/theory/theorem_ledger.md` | Two theorem ledgers present different theorem stacks. The theory ledger is better aligned with current kernel. | Consolidate into one canonical theorem ledger; archive the other. | Later |
 | Medium | Legacy / orphaned | `theory/fh_bounds.py`, `theory/test_fh_bounds.py` | Top-level `theory/` is not importable as `cc.theory` and not in pytest `testpaths`. | Archive, migrate required pieces into `src/cc/kernel`, or add explicit sandbox labeling. | Later |
 | Medium | Stale docs | `docs/index.md` | Says adding metrics means defining them in `cc.analysis.metrics`, but canonical metrics now live in `src/cc/kernel/metrics.py`. | Update docs front page to point to strict kernel and canonical metric taxonomy. | Now |
 | Medium | Avoid / language risk | `docs/STACK_ROLE.md` | "Ghost Protocol ecosystem" and "law of physics" language is not paper-safe and can be read as theatrical. | Keep private if desired, but exclude from public research docs; rewrite public-facing copy. | Later |
-| Medium | Optional dependency clarity | full pytest skips | Enterprise, guardrails, avro/protobuf/sql tests skip when optional deps are missing. That is acceptable, but release claims should state which lane was run. | Add a validation matrix table to docs distinguishing core, full, enterprise, optional-vendor lanes. | Later |
+| Medium | Addressed | full pytest skips | Enterprise, guardrails, avro/protobuf/sql tests skip when optional deps are missing. That is acceptable, but release claims should state which lane was run. | Use `docs/validation_matrix.md` to distinguish Paper Core, Full Python, Enterprise Reference, Dashboard, Docs, Security, and Optional Vendor lanes. | Now |
 | Low | Stale | `README.md` | Witness/reproducibility section says final reproduce-paper pipeline is planned, while scripts and Makefile targets now exist. | Update wording from "planned" to "implemented but still maturing." | Now |
 | Low | Generated workspace bloat | `.venv`, `.venv-enterprise`, `apps/dashboard/node_modules`, `apps/dashboard/.next`, `site` | Ignored, not tracked, but noisy for discovery and repo size. | Add cleanup note or `make clean-local` for generated local directories. | Later |
 
@@ -869,7 +869,8 @@ Deliverables:
 - Clean artifact state.
 - Fresh-venv validation notes.
 - Docs build in `/tmp` plus link sanity.
-- Optional dependency matrix.
+- Validation matrix covering Paper Core, Full Python, Enterprise Reference,
+  Dashboard, Docs, Security, and Optional Vendor lanes.
 - Release checklist.
 
 Acceptance criteria:
