@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "cc-framework"
+abstract: >
+  Dependence-aware composition of AI guardrails: statistical bounds
+  (Frechet-Hoeffding), two-world evaluation protocols, and tamper-evident
+  audit evidence for stacked guardrail systems. This metadata does not imply
+  that the software certifies a system as safe; it bounds what the available
+  evidence supports under stated assumptions.
+type: software
+version: "0.3.0-rc1"
+# date-released must be set to the actual release publication date.
+# date-released: "YYYY-MM-DD"
+# Drafted from git history for human confirmation before release.
+authors:
+  - family-names: "Bhave"
+    given-names: "Pranav"
+license: "MIT"
+repository-code: "https://github.com/Cubits11/cc-framework"
+keywords:
+  - ai-safety
+  - guardrails
+  - dependence-modeling
+  - uncertainty-quantification
+  - model-evaluation
+# identifiers:
+#   - type: doi
+#     value: "10.5281/zenodo.XXXXXXX"
