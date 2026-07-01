@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a focused addition or improvement.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to do that cc-framework does not support well today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest useful change and where it might live.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing APIs, workarounds, or designs you have tried.
+    validations:
+      required: false
+  - type: checkboxes
+    id: compatibility
+    attributes:
+      label: Compatibility checks
+      options:
+        - label: This does not require deployment approval claims.
+          required: true
+        - label: This does not collide with the `Claim` envelope schema or established module namespaces.
+          required: true
