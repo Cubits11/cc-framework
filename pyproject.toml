@@ -244,7 +244,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["cc"]
+known-first-party = ["cc", "experiments", "scripts", "theory"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**.py" = [
@@ -273,6 +273,7 @@ exclude = '''
 (
   /(
       \.venv
+    | \.venv-enterprise
     | build
     | dist
     | \.git
@@ -288,7 +289,17 @@ exclude = '''
 [tool.isort]
 profile = "black"
 line_length = 100
-src_paths = ["src", "tests", "experiments"]
+known_first_party = ["cc", "experiments", "scripts", "theory"]
+skip_gitignore = true
+src_paths = ["src", "tests", "examples"]
+skip = [
+  "notebooks",
+  "experiments",
+  "scripts",
+  "deployment/cli",
+  "theory",
+  "src/cc/_legacy",
+]
 
 # -----------------------
 # coverage
