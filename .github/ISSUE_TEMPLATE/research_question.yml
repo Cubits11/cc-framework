@@ -1,0 +1,33 @@
+name: Research question
+description: Ask about the methodology, assumptions, or interpretation.
+title: "[research]: "
+labels: ["research-question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What part of the methodology, assumption set, bound, or interpretation is unclear?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Link to the theorem, README section, code path, paper note, or example you are reading.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What you have already checked
+      description: Mention related docs, examples, or commands you ran.
+    validations:
+      required: false
+  - type: checkboxes
+    id: claim-discipline
+    attributes:
+      label: Claim discipline
+      options:
+        - label: I understand cc-framework bounds what the available evidence supports under stated assumptions; it does not certify a system is safe.
+          required: true

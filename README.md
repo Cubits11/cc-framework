@@ -1,16 +1,54 @@
 # CC-Framework
 
-**Sharp partial-identification bounds for composed AI guardrail failures under unknown dependence.**
+**Dependence-aware composition of AI guardrails: Frechet-Hoeffding bounds on
+stacked-system failure, not a safety certification.**
 
 [![CI](https://github.com/Cubits11/cc-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/Cubits11/cc-framework/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-research%20prototype-orange)
+<!-- DOI badge placeholder: uncomment after Zenodo mints a DOI in Phase 2e. -->
+<!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.TODO.svg)](https://doi.org/10.5281/zenodo.TODO) -->
 
-CC-Framework is research software for dependence-aware partial identification
-of composed AI guardrail failures. It asks what a composed guardrail evaluation
-actually identifies when singleton failure rates are observed but the joint
-dependence structure is unknown or only partially constrained.
+CC-Framework computes what available guardrail evidence supports under stated
+dependence assumptions. It does not certify that a stacked system is safe.
+
+## 60-second quickstart
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[stats]"
+python - <<'PY'
+from cc.kernel.strict import frechet_bounds
+
+failure_rates = {
+    "input_filter": 0.10,
+    "policy_judge": 0.10,
+}
+bounds = frechet_bounds(list(failure_rates.values()), event="and")
+independent = failure_rates["input_filter"] * failure_rates["policy_judge"]
+
+print(f"Stacked failure is bounded by [{bounds.lower:.2%}, {bounds.upper:.2%}]")
+print(f"Independence would estimate {independent:.2%}")
+PY
+```
+
+Expected output:
+
+```text
+Stacked failure is bounded by [0.00%, 10.00%]
+Independence would estimate 1.00%
+```
+
+For deeper context, start with the
+[validation matrix](docs/validation_matrix.md), the
+[finite-sample identification note](docs/theory/finite_sample_identification.md),
+and the runnable [minimal example](examples/minimal/run_bounds.py).
+
+If you use this software, cite it with the metadata in
+[CITATION.cff](CITATION.cff). Contributions should follow
+[CONTRIBUTING.md](CONTRIBUTING.md). GitHub Discussions can be enabled from the
+repository settings before launch.
 
 ## Research Status
 
