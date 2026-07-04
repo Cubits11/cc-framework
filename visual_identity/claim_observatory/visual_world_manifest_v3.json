@@ -1,0 +1,348 @@
+{
+  "cameras": [
+    {
+      "lens": 35,
+      "location": [
+        5.9,
+        -5.7,
+        4.55
+      ],
+      "name": "Camera_WorldHero",
+      "target": [
+        0.05,
+        0.65,
+        1.75
+      ]
+    },
+    {
+      "lens": 38,
+      "location": [
+        0.0,
+        -9.2,
+        2.25
+      ],
+      "name": "Camera_Arrival",
+      "target": [
+        0.0,
+        -5.2,
+        1.55
+      ]
+    },
+    {
+      "lens": 42,
+      "location": [
+        4.65,
+        -5.4,
+        3.05
+      ],
+      "name": "Camera_ClaimCapsule",
+      "target": [
+        0.0,
+        0.0,
+        1.45
+      ]
+    },
+    {
+      "lens": 42,
+      "location": [
+        -7.15,
+        -1.95,
+        2.35
+      ],
+      "name": "Camera_EvidenceVault",
+      "target": [
+        -4.35,
+        0.0,
+        1.45
+      ]
+    },
+    {
+      "lens": 62,
+      "location": [
+        3.25,
+        -3.95,
+        3.95
+      ],
+      "name": "Camera_SupportGraphOrrery",
+      "target": [
+        0.0,
+        0.0,
+        2.95
+      ]
+    },
+    {
+      "lens": 20,
+      "location": [
+        -0.7,
+        1.0,
+        2.05
+      ],
+      "name": "Camera_NonClaimsWall",
+      "target": [
+        -0.7,
+        3.48,
+        1.55
+      ]
+    },
+    {
+      "lens": 38,
+      "location": [
+        8.25,
+        0.15,
+        2.25
+      ],
+      "name": "Camera_DecayClockRoom",
+      "target": [
+        4.4,
+        0.18,
+        1.55
+      ]
+    },
+    {
+      "lens": 32,
+      "location": [
+        6.6,
+        -7.0,
+        3.45
+      ],
+      "name": "Camera_ChallengeRange",
+      "target": [
+        0.25,
+        0.0,
+        1.05
+      ]
+    },
+    {
+      "lens": 35,
+      "location": [
+        0.0,
+        -5.8,
+        4.55
+      ],
+      "name": "Camera_ReplayManifestEngine",
+      "target": [
+        0.0,
+        0.0,
+        0.18
+      ]
+    },
+    {
+      "lens": 48,
+      "location": [
+        7.2,
+        1.25,
+        2.35
+      ],
+      "name": "Camera_HumanReviewTribunal",
+      "target": [
+        4.4,
+        3.1,
+        1.2
+      ]
+    },
+    {
+      "lens": 45,
+      "location": [
+        -7.4,
+        1.25,
+        3.5
+      ],
+      "name": "Camera_LedgerTower",
+      "target": [
+        -4.45,
+        3.45,
+        2.25
+      ]
+    },
+    {
+      "lens": 50,
+      "location": [
+        -6.35,
+        -4.25,
+        2.25
+      ],
+      "name": "Camera_FrechetAtomGarden",
+      "target": [
+        -3.45,
+        -2.15,
+        0.75
+      ]
+    }
+  ],
+  "chambers": [
+    {
+      "collection": "01_ArrivalHall",
+      "concept": "Core thesis entry"
+    },
+    {
+      "collection": "02_ClaimCapsuleChamber",
+      "concept": "Bounded claim body"
+    },
+    {
+      "collection": "03_EvidenceVault",
+      "concept": "Evidence role taxonomy"
+    },
+    {
+      "collection": "04_SupportGraphOrrery",
+      "concept": "Typed support graph"
+    },
+    {
+      "collection": "05_NonClaimsWall",
+      "concept": "Non-claim boundary"
+    },
+    {
+      "collection": "06_DecayClockRoom",
+      "concept": "Freshness and mortality"
+    },
+    {
+      "collection": "07_ChallengeRange",
+      "concept": "Boundary tests"
+    },
+    {
+      "collection": "08_ReplayManifestEngine",
+      "concept": "Replayable manifest"
+    },
+    {
+      "collection": "09_HumanReviewTribunal",
+      "concept": "Scoped accountable review"
+    },
+    {
+      "collection": "10_LedgerTower",
+      "concept": "Future public claim lifecycle"
+    },
+    {
+      "collection": "11_FrechetAtomGarden",
+      "concept": "Frechet endpoint witnesses"
+    }
+  ],
+  "forbidden_interpretations": [
+    "The render is not evidence.",
+    "The render does not claim AI deployment safety.",
+    "Receipt integrity is not statistical validity.",
+    "A PASS verdict is scoped to verifier rules.",
+    "Human review does not upgrade evidence."
+  ],
+  "renders": [
+    {
+      "camera": "Camera_WorldHero",
+      "frame": 660,
+      "path": "visual_identity/claim_observatory/renders/world_v3_hero.png",
+      "resolution": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "camera": "Camera_ClaimCapsule",
+      "frame": 60,
+      "path": "visual_identity/claim_observatory/renders/world_v3_claim_capsule.png",
+      "resolution": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "camera": "Camera_NonClaimsWall",
+      "frame": 240,
+      "path": "visual_identity/claim_observatory/renders/world_v3_nonclaims_wall.png",
+      "resolution": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "camera": "Camera_DecayClockRoom",
+      "frame": 300,
+      "path": "visual_identity/claim_observatory/renders/world_v3_decay_clock.png",
+      "resolution": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "camera": "Camera_SupportGraphOrrery",
+      "frame": 180,
+      "path": "visual_identity/claim_observatory/renders/world_v3_support_graph.png",
+      "resolution": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "camera": "Camera_ReplayManifestEngine",
+      "frame": 420,
+      "path": "visual_identity/claim_observatory/renders/world_v3_replay_engine.png",
+      "resolution": [
+        1920,
+        1080
+      ]
+    }
+  ],
+  "schema": "cc.visual_claim_observatory_world.v3",
+  "semantic_mappings": {
+    "allowed_claim_level": "bounded_empirical",
+    "decay_status": "fresh",
+    "evaluated_at": "2026-01-02T00:00:00Z",
+    "fixed_now": "2026-01-02T00:00:00Z",
+    "freshness_status": "fresh",
+    "integrity_only_edges": 1,
+    "pass_caveat": "PASS means internal consistency under verifier rules; it does not mean the AI system is safe in deployment.",
+    "relation_counts": {
+      "bounds": 4,
+      "confirmatory_tests": 2,
+      "integrity_binds": 1,
+      "qualifies": 3
+    },
+    "report_receipt_sha256": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "required_human_review": false,
+    "seed": 314159,
+    "support_edge_count": 10,
+    "verdict": "pass"
+  },
+  "source_artifacts": {
+    "bounds": "examples/claim_governance_capsule/expected/bounds.json",
+    "cc_report": "examples/claim_governance_capsule/expected/cc_report.json",
+    "claim_envelope": "examples/claim_governance_capsule/expected/claim_envelope.json",
+    "claim_governance_audit": "examples/claim_governance_capsule/expected/claim_governance_audit.json",
+    "confirmatory_failure_matrix": "examples/claim_governance_capsule/expected/confirmatory_failure_matrix.json",
+    "confirmatory_protocol": "examples/claim_governance_capsule/expected/confirmatory_protocol.json",
+    "decay_policy": "examples/claim_governance_capsule/expected/decay_policy.json",
+    "extremal_lower": "examples/claim_governance_capsule/expected/extremal_lower.json",
+    "extremal_upper": "examples/claim_governance_capsule/expected/extremal_upper.json",
+    "manifest": "examples/claim_governance_capsule/manifest.expected.json"
+  },
+  "visual_objects": [
+    {
+      "maps_to": "examples/claim_governance_capsule/expected/claim_envelope.json",
+      "name": "ClaimCapsule_BoundedArtifactBody"
+    },
+    {
+      "maps_to": "report_receipt_sha256",
+      "name": "EvidenceVault_ReceiptIntegrityTablet"
+    },
+    {
+      "maps_to": "claim_envelope.support_graph.support_edges",
+      "name": "SupportGraphOrrery_Edge_*"
+    },
+    {
+      "maps_to": "claim_governance_audit.non_claims",
+      "name": "NonClaimsWall_MonumentalSemanticFirewall"
+    },
+    {
+      "maps_to": "claim_governance_audit.decay.status",
+      "name": "DecayClockRoom_CurrentStatusMarker_fresh"
+    },
+    {
+      "maps_to": "manifest.expected.json.files",
+      "name": "ReplayManifestEngine_FileTile_*"
+    },
+    {
+      "maps_to": "claim_governance_audit.required_human_review",
+      "name": "HumanReviewTribunal_AccountabilityConsole"
+    },
+    {
+      "maps_to": "extremal_lower.atom_table",
+      "name": "FrechetAtomGarden_Atom_*"
+    }
+  ]
+}
