@@ -139,6 +139,22 @@ def _assert_key_outside_output(private_key_path: Path, output_dir: Path) -> None
         )
 
 
+def _resolve_run_output_dir(output_root: Path, run_id: str) -> Path:
+    """Resolve a run directory while preventing run_id path traversal."""
+
+    if not run_id.strip():
+        raise ValueError("run_id must be non-empty.")
+    run_id_path = Path(run_id)
+    if run_id_path.is_absolute() or any(part == ".." for part in run_id_path.parts):
+        raise ValueError("run_id must be a relative name inside output_dir.")
+
+    root = output_root.expanduser().resolve()
+    output_dir = (root / run_id_path).resolve()
+    if output_dir == root or not output_dir.is_relative_to(root):
+        raise ValueError("run_id must resolve inside output_dir.")
+    return output_dir
+
+
 def _attestation_signing_payload(attestation: Mapping[str, Any]) -> dict[str, Any]:
     payload = dict(attestation)
     payload["signature"] = None
@@ -260,7 +276,7 @@ def _render_block_rate_plot(path: Path, labels: Sequence[str], values: Sequence[
 
 def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
     run_id = config.run_id or f"bundle_{uuid4().hex[:12]}"
-    output_dir = config.output_dir / run_id
+    output_dir = _resolve_run_output_dir(config.output_dir, run_id)
 
     if config.private_key_path is None and not config.unsigned:
         raise ValueError(

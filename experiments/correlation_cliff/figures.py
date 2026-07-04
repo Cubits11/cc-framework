@@ -6,7 +6,7 @@ Correlation Cliff — Figures Module
 ==================================
 
 This module turns *theory/population curves* and *finite-sample simulation outputs*
-into publication-grade figures.
+into paper-style diagnostic figures.
 
 Design principles
 -----------------

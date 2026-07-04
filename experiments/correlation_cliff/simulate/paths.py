@@ -5,7 +5,7 @@ from __future__ import annotations
 simulate.paths
 ==============
 
-PhD/enterprise-grade dependence-path primitives for Correlation Cliff experiments.
+Research dependence-path primitives for Correlation Cliff experiments.
 
 Goal
 ----
@@ -315,7 +315,7 @@ def p11_from_path(
     path_params: Mapping[str, Any],
 ) -> tuple[float, dict[str, float]]:
     """
-    Enterprise-grade p11 constructor with explicit invariants and audit fields.
+    Research p11 constructor with explicit invariants and audit fields.
 
     Returns:
       (p11, meta) where meta is NUMERIC-ONLY by design.

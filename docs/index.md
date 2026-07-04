@@ -46,7 +46,8 @@ The experiment flow is illustrated in
   product-coupling baseline.
 * **Witness distributions**: return endpoint joint laws that verify reported
   lower and upper bounds.
-* **Correlation cliffs**: detect dependence-driven jumps in composed risk.
+* **Correlation cliffs**: characterize dependence-driven jumps in composed risk
+  under declared models or measurements.
 * **Claim-bounded receipts**: bind claims to evidence while separating evidence
   integrity from statistical validity.
 * **Evidence-bound claims**: govern safety statements as scoped claims with
@@ -88,7 +89,7 @@ The experiment flow is illustrated in
 
 * [Public Research Framing](research/public-framing.md)
 * [Business and Audit Brief](research/business-audit-brief.md)
-* [Claim Governance OS](research/CLAIM_GOVERNANCE_OS.md)
+* [Evidence-Bound Claim Governance Memo](research/CLAIM_GOVERNANCE_OS.md)
 * [Evidence Role Ontology](design-specs/evidence_role_ontology.md)
 * [Validation Matrix](validation_matrix.md)
 * [Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md)

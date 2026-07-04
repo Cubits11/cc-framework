@@ -26,3 +26,35 @@ merge distinct responsibilities just because names overlap.
 When adding a new audit-like surface, state which layer owns it and which layer
 consumes it. If a module crosses layers, document the direction of dependency
 and add a focused test for the serialized contract it exports.
+
+## Security Vocabulary
+
+- A **digest** is a canonical hash of serialized content. It can identify byte
+  changes when the canonicalization rule is stable.
+- A **signature** is a key-backed attestation over a specific serialized
+  payload. It identifies the signing key and payload, not the truth of the
+  payload's research interpretation.
+- A **receipt** is a structured evidence record that may include digests,
+  signatures, schema versions, key identity, run context, and non-claims.
+- A **chain** is an append-only sequence where each record binds the previous
+  record hash or a previous root.
+- **Auditability** means provenance can be inspected and replayed from recorded
+  artifacts.
+- **Validity** means the statistical, mathematical, or research claim is
+  correct under its stated assumptions.
+
+Hashes do not prove validity. Signatures do not prove statistical correctness.
+Receipts do not prove safety. Enterprise verification endpoints transport and
+check evidence-integrity records; they do not validate deployment safety.
+
+## Minimum Evidence-Security Checks
+
+Public evidence or receipt code should keep tests for canonical serialization
+stability, reserved hash-key rejection, signature verification, replay/context
+binding, Merkle inclusion or consistency tampering, and output path containment.
+For current coverage, see:
+
+- `tests/unit/core/test_evidence_bundle.py`
+- `tests/unit/core/test_audit_runner.py`
+- `tests/unit/evidence/test_transparency_log_adversarial.py`
+- `tests/unit/cartographer/test_cartographer_audit_chain.py`

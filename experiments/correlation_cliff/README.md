@@ -30,7 +30,7 @@ python run_all.py --config config_s1.yaml
 #   - sim_long.csv               (replicate-level data)
 #   - sim_summary.csv            (per-lambda aggregates with CIs)
 #   - thresholds.json            (λ* estimates)
-#   - figures/cc_vs_dependence.pdf    (THE MONEY PLOT)
+#   - figures/cc_vs_dependence.pdf    (primary diagnostic plot)
 #   - manifest.json              (reproducibility metadata)
 ```
 
@@ -61,7 +61,7 @@ pip install scipy  # optional, for gaussian_copula path
 
 ### Why This Matters
 
-1. **Nobody measures this**: Industry evaluates guardrails in isolation, then composes them blindly
+1. **This is often undermeasured**: Guardrails are frequently evaluated in isolation before composition
 2. **The risk is hidden**: Two "90% accurate" guardrails composed with AND can perform WORSE than either alone if their failures overlap
 3. **Prior-work positioning required**: The experiment is a repo-local scaffold and should be positioned against related work before publication
 
@@ -78,9 +78,9 @@ pip install scipy  # optional, for gaussian_copula path
 
 **Why this scaffold is useful**:
 - ✅ Theory-backed: FH bounds are provably tight for marginal-constrained copulas
-- ✅ Statistically sound: BCa bootstrap + jackknife acceleration for proper inference
+- ✅ Uncertainty scaffold: BCa bootstrap + jackknife acceleration for exploratory inference
 - ✅ Falsifiable within the stated setup: empirical J_C is checked against the FH envelope
-- ✅ Reproducible: Deterministic RNG, config snapshots, cryptographic audit logs (in CC-Framework)
+- ✅ Reproducible: deterministic RNG, config snapshots, and hash-chained audit logs
 
 ---
 
@@ -92,7 +92,7 @@ experiments/correlation_cliff/
 ├── theory.py                   # Mathematical core (FH bounds, metrics, closed forms)
 ├── simulate.py                 # Multinomial sampling, empirical estimates
 ├── analyze_bootstrap.py        # BCa confidence intervals (optional but recommended)
-├── figures.py                  # Publication-grade plots
+├── figures.py                  # Paper-style diagnostic plots
 ├── run_all.py                  # End-to-end orchestrator (THIS IS YOUR ENTRY POINT)
 ├── README.md                   # This file
 └── artifacts/                  # Generated outputs (gitignored)
@@ -127,8 +127,8 @@ experiments/correlation_cliff/
 - `fh_scurve`: Logistic-transformed sweep (sharp transition at λ=0.5)
 - `gaussian_copula`: Bernoulli margins via latent Gaussian (requires SciPy)
 
-**Mathematical novelty**: 
-- Proves J_C(λ) is piecewise affine under FH-linear + no-sign-flip condition
+**Mathematical notes**:
+- Derives when J_C(λ) is piecewise affine under FH-linear + no-sign-flip condition
 - Implements Kendall τ_a for 2×2 tables (concordance functional)
 - Provides delta-method variance formulas for fast analytic CIs
 
@@ -178,10 +178,10 @@ python analyze_bootstrap.py \
 ```
 
 #### `figures.py` (400 lines)
-**Purpose**: Turn tables into publication-grade PDFs.
+**Purpose**: Turn tables into paper-style diagnostic PDFs.
 
 **Generated figures**:
-1. **`cc_vs_dependence.pdf`**: The money plot
+1. **`cc_vs_dependence.pdf`**: Primary diagnostic plot
    - CC(λ) with empirical mean + CI band
    - Population theory overlay (dashed)
    - Neutrality band (CC ∈ [0.95, 1.05])
@@ -482,7 +482,7 @@ A: Yes, but current code is single-threaded by design (reproducibility via fixed
 1. ✅ Run `python run_all.py --config config_s1.yaml` with YOUR S1 marginals
 2. ✅ Generate figures → review cc_vs_dependence.pdf
 3. ✅ Check λ\* and phi\* → interpret for your use case
-4. ✅ Run BCa bootstrap for publication-grade CIs
+4. ✅ Run BCa bootstrap for exploratory CIs
 
 **Short-term (Week 1)**:
 1. Test sensitivity: Re-run with n=5000, 10000, 40000 → verify λ\* convergence

@@ -73,6 +73,21 @@ def test_evidence_bundle_requires_key_or_explicit_unsigned_mode(
         run_evidence_bundle(config)
 
 
+def test_evidence_bundle_rejects_run_id_path_traversal(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    config = _bundle_config(tmp_path)
+    config.run_id = "../escaped"
+
+    with pytest.raises(ValueError, match="run_id"):
+        run_evidence_bundle(config)
+
+    assert not (tmp_path.parent / "escaped").exists()
+
+
 def test_evidence_bundle_signs_with_external_key(tmp_path: Path, monkeypatch) -> None:
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ed25519

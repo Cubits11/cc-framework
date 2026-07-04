@@ -261,7 +261,7 @@ def run_fh_atlas(config: FHAtlasConfig) -> Path:
                                         path=str(certificate_path.relative_to(output_root)),
                                         sha256=hash_file(certificate_path),
                                         size_bytes=certificate_path.stat().st_size,
-                                        description="Certified J lower bound",
+                                        description="Computed J lower bound under declared assumptions",
                                     )
                                 )
 

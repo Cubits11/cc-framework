@@ -30,5 +30,12 @@ jobs:
           pip install -e .[security]
       - name: Bandit static scan
         run: bandit -q -r src/cc -x src/cc/_legacy --severity-level medium
+      - name: Secret scan
+        run: |
+          detect-secrets scan \
+            src scripts .github pyproject.toml Makefile README.md README_ENTERPRISE.md SECURITY.md docs \
+            --exclude-files '(^|/)(artifacts/paper|docs/archive|docs/assets|site|node_modules|cdk\.out)(/|$)|package-lock\.json$' \
+            > detect-secrets.json
+          python scripts/check_detect_secrets_results.py detect-secrets.json
       - name: Dependency audit
         run: pip-audit --skip-editable

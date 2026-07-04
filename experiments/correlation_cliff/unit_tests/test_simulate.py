@@ -1,5 +1,5 @@
 """
-Enterprise-grade unit tests for experiments/correlation_cliff/simulate.py
+Research-focused unit tests for experiments/correlation_cliff/simulate.py
 
 Goals
 -----

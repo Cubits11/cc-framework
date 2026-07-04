@@ -105,7 +105,7 @@ Avoid:
 
 ## Non-Claims
 
-CC-Framework does not prove that an AI system is safe. It proves that many
+CC-Framework does not prove that an AI system is safe. It shows that many
 safety-composition claims are underidentified unless dependence is measured or
 bounded.
 

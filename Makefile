@@ -111,7 +111,7 @@ GOV_CAPSULE_TESTS    := tests/integration/test_claim_governance_capsule.py
 .PHONY: \
 	help \
 	dev install setup init lock deps \
-	fmt lint type security \
+	fmt lint type security package-build \
 	test test-unit test-int test-kernel test-release test-reporting test-week3 test-week6 cov bench \
 	check-artifact-boundary check-repro-clean \
 	enterprise-smoke \
@@ -162,7 +162,8 @@ help:
 	@echo "demo                Run lightweight rails baseline demo"
 	@echo "lock                Freeze deps -> requirements.lock.txt"
 	@echo "fmt / lint / type   Code quality: ruff/isort/black/mypy"
-	@echo "security            Run Bandit and pip-audit"
+	@echo "security            Run Bandit, detect-secrets, and pip-audit"
+	@echo "package-build       Build sdist/wheel and check package metadata"
 	@echo "test                Unit+integration + coverage >= $(COV_MIN)%"
 	@echo "test-kernel         Kernel-only unit tests, strict mypy, and focused ruff"
 	@echo "test-release        Kernel lane + paper reproduction integration checks"
@@ -256,7 +257,18 @@ type: install
 security: install
 	$(ACT); $(PIP) install -e ".[security]" || $(PIP) install bandit pip-audit
 	$(ACT); bandit -q -r $(SRC_DIR) -x src/cc/_legacy --severity-level medium
+	$(ACT); detect-secrets scan \
+		src scripts .github pyproject.toml Makefile README.md README_ENTERPRISE.md SECURITY.md docs \
+		--exclude-files '(^|/)(artifacts/paper|docs/archive|docs/assets|site|node_modules|cdk\.out)(/|$$)|package-lock\.json$$' \
+		> .detect-secrets.tmp.json
+	$(ACT); python scripts/check_detect_secrets_results.py .detect-secrets.tmp.json
+	rm -f .detect-secrets.tmp.json
 	$(ACT); pip-audit --skip-editable
+
+package-build: install
+	$(ACT); $(PIP) install -e ".[dev]"
+	$(ACT); python -m build
+	$(ACT); python -m twine check dist/*
 
 # ======================================================================
 # Tests

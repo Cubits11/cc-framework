@@ -29,8 +29,8 @@ _DEFAULT_NON_CLAIMS = (
     "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
     "This scenario does not certify production safety or legal compliance.",
     "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or "
-    "records a feasible endpoint/fitted scenario under the stated assumptions.",
+    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records "
+    "a feasible endpoint/fitted scenario under the stated assumptions.",
 )
 
 

@@ -9,15 +9,29 @@ stacked-system failure, not a safety certification.**
 <!-- DOI badge placeholder: uncomment after Zenodo mints a DOI in Phase 2e. -->
 <!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.TODO.svg)](https://doi.org/10.5281/zenodo.TODO) -->
 
-CC-Framework computes what available guardrail evidence supports under stated
-dependence assumptions. It does not certify that a stacked system is safe.
+CC-Framework is a Python research framework for dependence-aware analysis of
+composed binary guardrail failures. It computes what available guardrail
+evidence supports under stated dependence assumptions. It does not certify that
+a stacked system is safe.
+
+## Public Boundary
+
+| Surface | Role | Claim boundary |
+| --- | --- | --- |
+| Paper Core | Manuscript, deterministic paper artifacts, theorem ledger, and validation matrix. | Supports the v0.3 finite-atom partial-identification claim only. |
+| Research Kernel | `cc.kernel.strict`, atom LPs, Frechet helpers, canonical metrics, endpoint witnesses, and finite-sample helpers. | Bounds composed binary failure probability under declared assumptions. |
+| Evidence Governance | Claim envelopes, evidence roles, Merkle logs, receipts, confirmatory protocol, and decay semantics. | Supports replayable evidence records; hashes and signatures do not prove validity or safety. |
+| Ecosystem Bridges | Optional adapters for external guardrail or evaluation tools. | Interop only; not paper-core evidence unless promoted by a release note. |
+| Enterprise Reference | AWS/KMS/S3/DynamoDB/API reference and moto-backed smoke tests. | Experimental evidence-integrity reference; not an enterprise product or compliance claim. |
+| Dashboard/Demo | Next.js dashboard and Claim Observatory visual material. | Demonstrates reports and evidence bundles; it does not define the research kernel. |
+| Experimental/Archive | Experiments, notebooks, historical generated results, and preserved side branches. | Useful research material outside the release claim path unless explicitly promoted. |
 
 ## 60-second quickstart
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e ".[stats]"
+python -m pip install -e .
 python - <<'PY'
 from cc.kernel.strict import frechet_bounds
 
@@ -266,7 +280,7 @@ available.
 
 - [Research Program](docs/research/RESEARCH_PROGRAM.md)
 - [Paper Core](docs/research/PAPER_CORE.md)
-- [Claim Governance OS](docs/research/CLAIM_GOVERNANCE_OS.md)
+- [Evidence-Bound Claim Governance Memo](docs/research/CLAIM_GOVERNANCE_OS.md)
 - [Non-Claims](docs/research/NON_CLAIMS.md)
 - [Roadmap](docs/research/ROADMAP.md)
 - [Metric Taxonomy](docs/theory/metric_taxonomy.md)

@@ -43,8 +43,32 @@ jobs:
             src/cc/io/storage.py \
             src/cc/utils/artifacts.py \
             src/cc/utils/timing.py
+      - name: Artifact boundary
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_artifact_boundary.py --static
+      - name: Minimal example
+        if: matrix.python-version == '3.12'
+        run: python examples/minimal/run_bounds.py
       - name: Tests
         run: pytest -q
+
+  package-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build tooling
+        run: |
+          python -m pip install -U pip
+          pip install -e '.[dev]'
+      - name: Build package
+        run: python -m build
+      - name: Check distributions
+        run: python -m twine check dist/*
 
   enterprise-smoke:
     runs-on: ubuntu-latest

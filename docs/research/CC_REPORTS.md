@@ -40,11 +40,13 @@ Any claim above `diagnostic` must include explicit non-claims. In review, these
 non-claims are part of the receipt contract: they say which tempting conclusions
 the report is deliberately not making.
 
-## What The Receipt Proves
+## What The Receipt Verifies
 
-The receipt proves that a verifier using the same canonicalization method sees
+The receipt verifies that a checker using the same canonicalization method sees
 the same report JSON. The report also records SHA-256 hashes of named evidence
-files, so a verifier can check whether those files match the report.
+files, so a verifier can check whether those files match the report. This is a
+byte-integrity statement, not a claim that the evidence is statistically valid
+or deployment-safety sufficient.
 
 The hash deliberately excludes `receipt.canonical_hash` to avoid a circular
 definition. All other report fields are included, including `schema_version`,

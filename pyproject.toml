@@ -8,7 +8,7 @@ version = "0.3.0-rc1"
 description = "Dependence-aware partial-identification bounds for composed AI guardrail failures"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Pranav Bhave" }]
 keywords = ["AI safety", "guardrails", "security", "evaluation", "statistics", "composability"]
 classifiers = [
@@ -17,16 +17,17 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Topic :: Security",
   "Topic :: Scientific/Engineering",
 ]
 
-# CORE = minimal install required to run theory + core data layer.
-# Heavy scientific stack moved to extras so users/reviewers can opt in.
+# CORE = minimal install required for the advertised kernel, protocol, and
+# evidence-governance import surfaces. SciPy is core because atom LP solving
+# imports scipy.optimize.linprog directly.
 dependencies = [
   "numpy>=1.26",
+  "scipy>=1.11",
   "pydantic>=2.0",
   "pyyaml>=6.0.1",
   "jsonlines>=3.0",
@@ -37,9 +38,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Scientific stack used by theory + inference utilities (optional by design)
+# Statistical convenience stack used by non-kernel inference utilities.
 stats = [
-  "scipy>=1.11",
   "statsmodels>=0.14",
 ]
 
@@ -94,6 +94,8 @@ dev = [
   "isort>=5.13",
   "mypy>=1.10",
   "pre-commit>=4.0",
+  "build>=1.2",
+  "twine>=5.1",
   "types-PyYAML>=6.0.12",
   "types-jsonschema>=4.22",
 ]

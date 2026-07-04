@@ -8,6 +8,10 @@ connects the finite-atom dependence kernel, endpoint witnesses, CC reports,
 claim decay artifacts, non-claims, and human review into one governing object:
 the evidence-bound claim.
 
+Filename note: this historical path uses an older shorthand. The public
+boundary is evidence-bound claim governance, not a governance operating system
+or compliance product.
+
 North star:
 
 ```text

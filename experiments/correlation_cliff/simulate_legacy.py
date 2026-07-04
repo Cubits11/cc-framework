@@ -375,7 +375,7 @@ class SimConfig:
 
 def _validate_cfg(cfg: SimConfig) -> None:
     """
-    Enterprise-grade config validation.
+    Research/prototype config validation.
 
     Philosophy:
     - No silent fixing.
@@ -834,7 +834,7 @@ def p11_from_path(
     path_params: dict[str, Any],
 ) -> tuple[float, dict[str, float]]:
     """
-    V3: Research/enterprise-grade p11 constructor with explicit invariants and audit fields.
+    V3: Research p11 constructor with explicit invariants and audit fields.
 
     Returns (p11, meta) where meta is NUMERIC-ONLY by design (downstream-safe).
     Required meta keys for ALL paths:
@@ -2205,7 +2205,7 @@ def build_linear_lambda_grid(
 
 
 # -----------------------------------------------------------------------------
-# CLI config loading (enterprise-grade, schema-aware)
+# CLI config loading (schema-aware research prototype)
 # -----------------------------------------------------------------------------
 def _load_yaml(path: str) -> dict[str, Any]:
     """
@@ -2537,7 +2537,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     CLI entrypoint for simulate.py.
 
-    Enterprise-grade behavior:
+    Research/prototype behavior:
       - Strong config error messages and non-zero exit codes
       - Deterministic outputs (cfg-driven), with atomic writes to avoid partial files
       - Optional "out_dir" that writes a complete artifact bundle:

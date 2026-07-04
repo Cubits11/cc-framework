@@ -36,6 +36,18 @@ The dashboard in `apps/dashboard` has exactly three views:
 
 The browser verification path does not trust the backend endpoint. The backend endpoint is operational convenience; the proof check is independently recomputed from the uploaded bundle.
 
+## Known Non-Release Gaps
+
+This reference is intentionally not an enterprise product. Before making any
+stronger infrastructure claim, add and verify at least:
+
+- a written threat model for evidence-bundle integrity and verifier misuse,
+- CloudTrail or equivalent audit logging for deployed AWS accounts,
+- CDK Nag, checkov, or an equivalent IaC security gate,
+- explicit KMS key administration and rotation policy,
+- replay and tamper tests against deployed verifier payloads, not only local
+  moto emulation.
+
 ## Local Emulation And Smoke Test
 
 The enterprise tests use moto-backed AWS APIs rather than mocks of the project code. They create the S3 bucket, KMS key, and DynamoDB table through boto3, run one local evaluation, export a signed evidence bundle, upload it, advance the chain head with a conditional write, and verify the bundle.

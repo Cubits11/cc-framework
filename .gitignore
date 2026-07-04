@@ -12,6 +12,7 @@ __pycache__/
 build/
 .mypy_cache/
 .pytest_cache/
+.detect-secrets.tmp.json
 .coverage
 coverage.*
 htmlcov/

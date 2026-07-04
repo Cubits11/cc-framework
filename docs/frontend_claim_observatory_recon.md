@@ -829,7 +829,7 @@ and retired.
 | --- | --- | --- | --- | --- | --- | --- |
 | Claim Ledger | `capsule_manifest.json`, future Merkle lifecycle records, enterprise chain head | Claim event model; lifecycle event schema | Verify status grid style | `ClaimLedgerView` | approved, certified, trusted | events ordered; caveat visible; no safety status |
 | Claim Anatomy | `claim_envelope.identity`, `proposition.fragments`, `cc_report.claim` | `ClaimEnvelope` TS parser | `DashboardShell` tabs | `ClaimAnatomyView` | safe claim, certified claim | statement, level, fragments render |
-| Evidence Body | `cc_report.evidence`, `claim_envelope.support_graph.*_refs`, audit artifact statuses | artifact normalizer | Assurance tree node styling | `EvidenceBodyView`, `ArtifactCard` | evidence proves safety | role, hash, bytes, status render |
+| Evidence Body | `cc_report.evidence`, `claim_envelope.support_graph.*_refs`, audit artifact statuses | artifact normalizer | Assurance tree node styling | `EvidenceBodyView`, `ArtifactCard` | evidence implies safety | role, hash, bytes, status render |
 | Support Graph | `claim_envelope.support_graph.support_edges` | support-edge graph model | tree layout concepts | `SupportGraphView` | proof of safety | edges render relation/strength/non-claims |
 | Non-Claims Wall | `claim_envelope.boundary.non_claims`, `audit.non_claims` | non-claim merger and source labels | panel layout | `NonClaimsWall` | limitations hidden in tooltip | all non-claims visible/searchable |
 | Decay Clock | `decay_policy.json`, `claim_governance_audit.decay` | decay status adapter | status cards | `DecayClock` | currently safe, valid deployment | states render caveats; version triggers render |
