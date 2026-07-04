@@ -1,0 +1,125 @@
+name: Repository Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: "Apply changes. Leave false for a dry-run plan."
+        required: true
+        type: boolean
+        default: false
+      merge_branches:
+        description: "Comma or newline separated branches to merge into main before cleanup."
+        required: false
+        type: string
+        default: "launch-hardening/phase-1-legibility"
+      merge_all_side_branches:
+        description: "Merge every side branch before cleanup."
+        required: true
+        type: boolean
+        default: false
+      delete_side_branches:
+        description: "Delete local and remote branches other than main after verification."
+        required: true
+        type: boolean
+        default: true
+      apply_branch_protection:
+        description: "Apply branch protection to main after the consolidation push."
+        required: true
+        type: boolean
+        default: true
+      require_ci_status_checks:
+        description: "Require the default CI and Pre-Commit contexts in branch protection."
+        required: true
+        type: boolean
+        default: false
+      allow_delete_unmerged:
+        description: "Dangerous: allow cleanup to delete branches not reachable from main."
+        required: true
+        type: boolean
+        default: false
+      quality_commands:
+        description: "Newline separated quality gates that must pass before pushing."
+        required: false
+        type: string
+        default: |
+          ruff check .
+          make type
+          pytest -q
+
+permissions:
+  contents: write
+  checks: read
+  statuses: read
+  pull-requests: read
+
+concurrency:
+  group: repo-maintenance-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.REPO_MAINTENANCE_TOKEN || github.token }}
+      MERGE_BRANCHES: ${{ inputs.merge_branches }}
+      QUALITY_COMMANDS: ${{ inputs.quality_commands }}
+    steps:
+      - name: Checkout full repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.REPO_MAINTENANCE_TOKEN || github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install quality tooling
+        run: |
+          python -m pip install -U pip
+          pip install -e '.[dev]'
+
+      - name: Configure bot identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run guarded repository maintenance
+        run: |
+          args=(
+            --main main
+            --remote origin
+            --repo "${GITHUB_REPOSITORY}"
+            --merge-branches "${MERGE_BRANCHES}"
+            --quality-commands "${QUALITY_COMMANDS}"
+          )
+
+          if [[ "${{ inputs.execute }}" == "true" ]]; then
+            args+=(--execute)
+          fi
+
+          if [[ "${{ inputs.merge_all_side_branches }}" == "true" ]]; then
+            args+=(--merge-all-side-branches)
+          fi
+
+          if [[ "${{ inputs.delete_side_branches }}" != "true" ]]; then
+            args+=(--skip-delete)
+          fi
+
+          if [[ "${{ inputs.apply_branch_protection }}" != "true" ]]; then
+            args+=(--skip-protection)
+          fi
+
+          if [[ "${{ inputs.require_ci_status_checks }}" == "true" ]]; then
+            args+=(--require-ci-status-checks)
+          fi
+
+          if [[ "${{ inputs.allow_delete_unmerged }}" == "true" ]]; then
+            args+=(--allow-delete-unmerged)
+          fi
+
+          python scripts/repo_maintenance.py "${args[@]}"
