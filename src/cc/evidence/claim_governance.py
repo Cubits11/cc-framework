@@ -1,0 +1,920 @@
+"""Read-only governance verifier for evidence-bound CC claims."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping, Sequence
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from cc.evidence.decay import ClaimDecayRecord, DecayState, VersionWatchSet, evaluate_claim_decay
+from cc.evidence.extremal_scenario import ExtremalScenario, ScenarioKind
+from cc.reporting.canonical import sha256_canonical
+from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION, sha256_file
+
+CLAIM_GOVERNANCE_AUDIT_SCHEMA = "cc/claim-governance-audit.v1"
+
+ROLE_SUPPORT_MATRIX: dict[str, dict[str, list[str]]] = {
+    "claim_decay": {
+        "supports": ["time_bounding", "staleness_review"],
+        "does_not_support": ["deployment_safety", "statistical_validity"],
+        "requires_review_if": ["expired", "degraded", "triggered_versions"],
+    },
+    "extremal_scenario": {
+        "supports": ["dependence_endpoint_explanation", "counterfactual_feasibility"],
+        "does_not_support": ["likelihood", "deployment_realization"],
+        "requires_review_if": ["excluded_evidence_fields", "fitted_without_confirmation"],
+    },
+}
+
+_NEUTRAL_EVIDENCE_ROLES = frozenset({"artifact", "audit_log", "figure_manifest"})
+_KNOWN_EVIDENCE_ROLES = frozenset(ROLE_SUPPORT_MATRIX) | _NEUTRAL_EVIDENCE_ROLES
+_EXPLORATORY_INTERVAL_FIELDS = frozenset(
+    {
+        "adaptive_search_ci",
+        "certificate_ci",
+        "exploratory_certificate_ci",
+        "exploratory_ci",
+        "non_confirmatory_ci",
+    }
+)
+_REQUIRED_ROLES_BY_CLAIM_LEVEL: dict[str, tuple[str, ...]] = {
+    "diagnostic": (),
+    "bounded_empirical": ("claim_decay", "extremal_scenario"),
+    "reproducible_run": ("claim_decay",),
+    "release_claim": ("claim_decay", "extremal_scenario"),
+}
+
+
+class GovernanceVerdict(str, Enum):
+    """Conservative verdict for an evidence-bound claim package."""
+
+    PASS = "pass"
+    NEEDS_REVIEW = "needs_review"
+    FAIL = "fail"
+
+
+class EvidenceRoleStatus(str, Enum):
+    """Verification status for one report-bound evidence artifact."""
+
+    PRESENT = "present"
+    MISSING = "missing"
+    INVALID = "invalid"
+    UNREADABLE = "unreadable"
+    UNKNOWN_ROLE = "unknown_role"
+
+
+class ClaimFreshnessStatus(str, Enum):
+    """Verification-time claim freshness state."""
+
+    NOT_EVALUATED = "not_evaluated"
+    FRESH = "fresh"
+    DEGRADED = "degraded"
+    EXPIRED = "expired"
+
+
+class _StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class EvidenceArtifactAudit(_StrictModel):
+    path: str
+    role: str
+    sha256_expected: str
+    sha256_actual: str | None
+    bytes_expected: int | None
+    bytes_actual: int | None
+    status: EvidenceRoleStatus
+    reason: str
+
+
+class DecayAudit(_StrictModel):
+    present: bool
+    status: ClaimFreshnessStatus
+    reason: str
+    evaluated_at: str | None
+    trigger_summary: list[str] = Field(default_factory=list)
+    non_claims: list[str] = Field(default_factory=list)
+
+
+class ScenarioAudit(_StrictModel):
+    present: bool
+    scenario_count: int
+    scenario_ids: list[str]
+    kinds: list[str]
+    infeasible_count: int
+    excluded_evidence_fields: list[dict[str, Any]]
+    non_claims: list[str] = Field(default_factory=list)
+
+
+class BoundaryAudit(_StrictModel):
+    claim_non_claim_count: int
+    artifact_non_claim_count: int
+    mandatory_non_claims_missing: list[str]
+    unresolved_defeaters_or_gaps: list[str] = Field(default_factory=list)
+
+
+class ReceiptAudit(_StrictModel):
+    report_hash_verified: bool | None
+    artifact_hashes_verified: bool
+    canonical_hash: str | None
+    reason: str
+
+
+class ClaimGovernanceAudit(_StrictModel):
+    schema: Literal["cc/claim-governance-audit.v1"] = CLAIM_GOVERNANCE_AUDIT_SCHEMA
+    report_id: str
+    evaluated_at: str
+    verdict: GovernanceVerdict
+    allowed_claim_level: str
+    claim_statement: str
+    receipt: ReceiptAudit
+    evidence_artifacts: list[EvidenceArtifactAudit]
+    decay: DecayAudit
+    scenarios: ScenarioAudit
+    boundary: BoundaryAudit
+    required_human_review: bool
+    reasons: list[str]
+    non_claims: list[str]
+
+
+def verify_claim_governance(
+    report_path: Path,
+    *,
+    now: datetime | None = None,
+    base_dir: Path | None = None,
+    strict_unknown_roles: bool = False,
+) -> ClaimGovernanceAudit:
+    """Verify a CC report's evidence-bound claim package without mutating artifacts.
+
+    A PASS verdict means the evidence-bound claim package is internally
+    consistent under this verifier's rules. It does not mean the AI system is
+    safe in deployment.
+    """
+
+    report_file = Path(report_path)
+    evaluation_time = _verification_time(now)
+    if evaluation_time is None:
+        return _failure_audit(
+            report_id=report_file.stem or "<unknown>",
+            evaluated_at=_utc_iso(datetime.now(timezone.utc)),
+            reason="Verification time must be timezone-aware.",
+        )
+
+    evaluated_at = _utc_iso(evaluation_time)
+    try:
+        report = json.loads(report_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return _failure_audit(
+            report_id=report_file.stem or "<unreadable>",
+            evaluated_at=evaluated_at,
+            reason=f"Report cannot be read as JSON: {exc}",
+        )
+
+    if not isinstance(report, dict):
+        return _failure_audit(
+            report_id=report_file.stem or "<unusable>",
+            evaluated_at=evaluated_at,
+            reason="Report is structurally unusable: top-level JSON value is not an object.",
+        )
+
+    shape_errors = _basic_report_shape_errors(report)
+    if shape_errors:
+        return _failure_audit(
+            report_id=str(report.get("report_id") or report_file.stem or "<unusable>"),
+            evaluated_at=evaluated_at,
+            reason="Report is structurally unusable: " + "; ".join(shape_errors),
+            allowed_claim_level=_nested_str(report, ("claim", "allowed_claim_level"), "unknown"),
+            claim_statement=_nested_str(report, ("claim", "statement"), ""),
+        )
+
+    report_id = str(report["report_id"])
+    claim = report["claim"]
+    claim_statement = str(claim["statement"])
+    allowed_claim_level = str(claim["allowed_claim_level"])
+    root_dir = Path(base_dir) if base_dir is not None else report_file.parent
+
+    reasons: list[str] = []
+    fail_reasons: list[str] = []
+    review_reasons: list[str] = []
+    unresolved: list[str] = []
+
+    raw_entries = _report_evidence_entries(report)
+    evidence_audits: list[EvidenceArtifactAudit] = []
+    semantic_payloads: list[tuple[Mapping[str, Any], EvidenceArtifactAudit]] = []
+
+    for raw_entry in raw_entries:
+        artifact_audit = _audit_artifact(raw_entry, base_dir=root_dir)
+        evidence_audits.append(artifact_audit)
+        role = artifact_audit.role
+
+        if artifact_audit.status in {EvidenceRoleStatus.UNREADABLE, EvidenceRoleStatus.INVALID}:
+            fail_reasons.append(artifact_audit.reason)
+            continue
+        if role not in _KNOWN_EVIDENCE_ROLES:
+            artifact_audit.status = EvidenceRoleStatus.UNKNOWN_ROLE
+            artifact_audit.reason = (
+                "Hash verified, but evidence role is not in the governance verifier v0 "
+                "support matrix."
+            )
+            message = f"Unknown evidence role {role!r} on {artifact_audit.path}."
+            if strict_unknown_roles:
+                fail_reasons.append(message)
+            else:
+                review_reasons.append(message)
+            continue
+        if role in ROLE_SUPPORT_MATRIX:
+            try:
+                payload = json.loads(_resolve_path(artifact_audit.path, root_dir).read_text())
+            except Exception as exc:
+                artifact_audit.status = EvidenceRoleStatus.UNREADABLE
+                artifact_audit.reason = f"Artifact could not be parsed as JSON: {exc}"
+                fail_reasons.append(artifact_audit.reason)
+                continue
+            if isinstance(payload, Mapping):
+                semantic_payloads.append((payload, artifact_audit))
+            else:
+                artifact_audit.status = EvidenceRoleStatus.INVALID
+                artifact_audit.reason = "Semantic evidence artifact JSON is not an object."
+                if role == "extremal_scenario" or strict_unknown_roles:
+                    fail_reasons.append(artifact_audit.reason)
+                else:
+                    review_reasons.append(artifact_audit.reason)
+
+    receipt = _audit_receipt(report, evidence_audits)
+    if receipt.report_hash_verified is False:
+        fail_reasons.append(receipt.reason)
+
+    roles_present = {
+        audit.role for audit in evidence_audits if audit.status is not EvidenceRoleStatus.MISSING
+    }
+    missing_roles = [
+        role
+        for role in _REQUIRED_ROLES_BY_CLAIM_LEVEL.get(allowed_claim_level, ())
+        if role not in roles_present
+    ]
+    for role in missing_roles:
+        message = (
+            f"Claim level {allowed_claim_level!r} conservatively requires evidence role {role!r}."
+        )
+        review_reasons.append(message)
+        unresolved.append(message)
+
+    decay_audit = _audit_decay_artifacts(
+        semantic_payloads,
+        report=report,
+        evaluated_at=evaluated_at,
+        now=evaluation_time,
+    )
+    scenario_audit = _audit_scenario_artifacts(semantic_payloads)
+
+    for audit in evidence_audits:
+        if audit.role not in ROLE_SUPPORT_MATRIX or audit.status is not EvidenceRoleStatus.INVALID:
+            continue
+        if audit.role == "extremal_scenario" or strict_unknown_roles:
+            fail_reasons.append(audit.reason)
+        else:
+            review_reasons.append(audit.reason)
+
+    if decay_audit.present:
+        if decay_audit.status is ClaimFreshnessStatus.EXPIRED:
+            fail_reasons.append(f"Claim decay status is expired: {decay_audit.reason}")
+        elif decay_audit.status is ClaimFreshnessStatus.DEGRADED:
+            review_reasons.append(f"Claim decay status is degraded: {decay_audit.reason}")
+
+    if scenario_audit.infeasible_count:
+        fail_reasons.append("One or more extremal_scenario artifacts are infeasible.")
+    if scenario_audit.excluded_evidence_fields:
+        message = "Endpoint or fitted scenarios contain excluded evidence fields requiring review."
+        review_reasons.append(message)
+        unresolved.append(message)
+    if _has_fitted_without_confirmation(semantic_payloads):
+        message = "Fitted empirical scenario exists without confirmatory evidence."
+        review_reasons.append(message)
+        unresolved.append(message)
+
+    leakage_paths = _exploratory_leakage_paths(report, semantic_payloads)
+    if leakage_paths:
+        fail_reasons.append(
+            "Exploratory evidence leaked into confirmatory surface: "
+            + ", ".join(sorted(leakage_paths))
+        )
+
+    non_claims = _collect_non_claims(report, decay_audit, scenario_audit)
+    mandatory_missing = _mandatory_non_claims_missing(
+        roles_present=roles_present,
+        non_claims=non_claims,
+        exploratory_boundary_present=bool(scenario_audit.excluded_evidence_fields or leakage_paths),
+    )
+    if mandatory_missing:
+        message = "Mandatory non-claims are missing: " + ", ".join(mandatory_missing)
+        review_reasons.append(message)
+        unresolved.append(message)
+
+    if allowed_claim_level == "release_claim":
+        message = "release_claim packages require accountable external human review."
+        review_reasons.append(message)
+        unresolved.append(message)
+
+    artifact_non_claims = decay_audit.non_claims + scenario_audit.non_claims
+    boundary = BoundaryAudit(
+        claim_non_claim_count=len(_claim_non_claims(report)),
+        artifact_non_claim_count=len(artifact_non_claims),
+        mandatory_non_claims_missing=mandatory_missing,
+        unresolved_defeaters_or_gaps=_dedupe(unresolved),
+    )
+
+    reasons = _dedupe([*fail_reasons, *review_reasons, *reasons])
+    if fail_reasons:
+        verdict = GovernanceVerdict.FAIL
+    elif review_reasons:
+        verdict = GovernanceVerdict.NEEDS_REVIEW
+    else:
+        verdict = GovernanceVerdict.PASS
+
+    return ClaimGovernanceAudit(
+        report_id=report_id,
+        evaluated_at=evaluated_at,
+        verdict=verdict,
+        allowed_claim_level=allowed_claim_level,
+        claim_statement=claim_statement,
+        receipt=receipt,
+        evidence_artifacts=evidence_audits,
+        decay=decay_audit,
+        scenarios=scenario_audit,
+        boundary=boundary,
+        required_human_review=verdict is not GovernanceVerdict.PASS,
+        reasons=reasons,
+        non_claims=non_claims,
+    )
+
+
+def _failure_audit(
+    *,
+    report_id: str,
+    evaluated_at: str,
+    reason: str,
+    allowed_claim_level: str = "unknown",
+    claim_statement: str = "",
+) -> ClaimGovernanceAudit:
+    return ClaimGovernanceAudit(
+        report_id=report_id,
+        evaluated_at=evaluated_at,
+        verdict=GovernanceVerdict.FAIL,
+        allowed_claim_level=allowed_claim_level,
+        claim_statement=claim_statement,
+        receipt=ReceiptAudit(
+            report_hash_verified=None,
+            artifact_hashes_verified=False,
+            canonical_hash=None,
+            reason="Report-level verification could not be completed.",
+        ),
+        evidence_artifacts=[],
+        decay=DecayAudit(
+            present=False,
+            status=ClaimFreshnessStatus.NOT_EVALUATED,
+            reason="Report-level verification failed before decay artifacts could be evaluated.",
+            evaluated_at=None,
+        ),
+        scenarios=ScenarioAudit(
+            present=False,
+            scenario_count=0,
+            scenario_ids=[],
+            kinds=[],
+            infeasible_count=0,
+            excluded_evidence_fields=[],
+        ),
+        boundary=BoundaryAudit(
+            claim_non_claim_count=0,
+            artifact_non_claim_count=0,
+            mandatory_non_claims_missing=[],
+        ),
+        required_human_review=True,
+        reasons=[reason],
+        non_claims=[],
+    )
+
+
+def _verification_time(now: datetime | None) -> datetime | None:
+    value = now or datetime.now(timezone.utc)
+    if value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return value.astimezone(timezone.utc)
+
+
+def _basic_report_shape_errors(report: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for field in ("schema_version", "report_id", "claim", "evidence", "receipt"):
+        if field not in report:
+            errors.append(f"missing {field}")
+    if report.get("schema_version") != SCHEMA_VERSION:
+        errors.append(f"schema_version must be {SCHEMA_VERSION}")
+    claim = report.get("claim")
+    if not isinstance(claim, Mapping):
+        errors.append("claim must be an object")
+    else:
+        for field in ("statement", "allowed_claim_level", "non_claims"):
+            if field not in claim:
+                errors.append(f"missing claim.{field}")
+        if claim.get("allowed_claim_level") not in ALLOWED_CLAIM_LEVELS:
+            errors.append("claim.allowed_claim_level is not supported")
+        if not isinstance(claim.get("non_claims"), list):
+            errors.append("claim.non_claims must be a list")
+    evidence = report.get("evidence")
+    if not isinstance(evidence, Mapping):
+        errors.append("evidence must be an object")
+    elif not isinstance(evidence.get("artifacts"), list):
+        errors.append("evidence.artifacts must be a list")
+    else:
+        for idx, item in enumerate(evidence.get("artifacts", [])):
+            if not isinstance(item, Mapping):
+                errors.append(f"evidence.artifacts[{idx}] must be an object")
+        for field in ("audit_log", "figure_manifest"):
+            item = evidence.get(field)
+            if item is not None and not isinstance(item, Mapping):
+                errors.append(f"evidence.{field} must be an object or null")
+    receipt = report.get("receipt")
+    if not isinstance(receipt, Mapping):
+        errors.append("receipt must be an object")
+    return errors
+
+
+def _report_evidence_entries(report: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    evidence = report["evidence"]
+    assert isinstance(evidence, Mapping)
+    entries: list[Mapping[str, Any]] = []
+    for item in evidence.get("artifacts", []):
+        if isinstance(item, Mapping):
+            entries.append(item)
+    for key, role in (("audit_log", "audit_log"), ("figure_manifest", "figure_manifest")):
+        item = evidence.get(key)
+        if isinstance(item, Mapping):
+            entry = dict(item)
+            entry["role"] = str(entry.get("role") or role)
+            entries.append(entry)
+    return entries
+
+
+def _audit_artifact(raw_entry: Mapping[str, Any], *, base_dir: Path) -> EvidenceArtifactAudit:
+    path = str(raw_entry.get("path") or "")
+    role = str(raw_entry.get("role") or "")
+    expected_hash = str(raw_entry.get("sha256") or "")
+    expected_bytes = raw_entry.get("bytes")
+    bytes_expected = int(expected_bytes) if isinstance(expected_bytes, int) else None
+    if not path or not role or not expected_hash or bytes_expected is None:
+        return EvidenceArtifactAudit(
+            path=path,
+            role=role,
+            sha256_expected=expected_hash,
+            sha256_actual=None,
+            bytes_expected=bytes_expected,
+            bytes_actual=None,
+            status=EvidenceRoleStatus.INVALID,
+            reason="Evidence artifact entry is missing path, role, sha256, or bytes.",
+        )
+
+    resolved = _resolve_path(path, base_dir)
+    try:
+        actual_hash = sha256_file(resolved)
+        actual_bytes = resolved.stat().st_size
+    except Exception as exc:
+        return EvidenceArtifactAudit(
+            path=path,
+            role=role,
+            sha256_expected=expected_hash,
+            sha256_actual=None,
+            bytes_expected=bytes_expected,
+            bytes_actual=None,
+            status=EvidenceRoleStatus.UNREADABLE,
+            reason=f"Evidence artifact is unreadable: {exc}",
+        )
+
+    if actual_hash != expected_hash:
+        return EvidenceArtifactAudit(
+            path=path,
+            role=role,
+            sha256_expected=expected_hash,
+            sha256_actual=actual_hash,
+            bytes_expected=bytes_expected,
+            bytes_actual=actual_bytes,
+            status=EvidenceRoleStatus.INVALID,
+            reason="Evidence artifact SHA-256 does not match the report.",
+        )
+    if actual_bytes != bytes_expected:
+        return EvidenceArtifactAudit(
+            path=path,
+            role=role,
+            sha256_expected=expected_hash,
+            sha256_actual=actual_hash,
+            bytes_expected=bytes_expected,
+            bytes_actual=actual_bytes,
+            status=EvidenceRoleStatus.INVALID,
+            reason="Evidence artifact byte count does not match the report.",
+        )
+    return EvidenceArtifactAudit(
+        path=path,
+        role=role,
+        sha256_expected=expected_hash,
+        sha256_actual=actual_hash,
+        bytes_expected=bytes_expected,
+        bytes_actual=actual_bytes,
+        status=EvidenceRoleStatus.PRESENT,
+        reason="Evidence artifact hash and byte count verified.",
+    )
+
+
+def _audit_receipt(
+    report: Mapping[str, Any],
+    evidence_audits: Sequence[EvidenceArtifactAudit],
+) -> ReceiptAudit:
+    receipt = report.get("receipt")
+    canonical_hash = receipt.get("canonical_hash") if isinstance(receipt, Mapping) else None
+    hash_verified: bool | None
+    reason_parts: list[str] = []
+    if isinstance(canonical_hash, str):
+        try:
+            computed_hash = sha256_canonical(report)
+            hash_verified = computed_hash == canonical_hash
+            if hash_verified:
+                reason_parts.append("Canonical report hash verified.")
+            else:
+                reason_parts.append(
+                    f"Canonical report hash mismatch: expected {canonical_hash}, "
+                    f"computed {computed_hash}."
+                )
+        except Exception as exc:
+            hash_verified = False
+            reason_parts.append(f"Canonical report hash verification failed: {exc}")
+    else:
+        hash_verified = None
+        reason_parts.append("Canonical report hash is absent or not a string.")
+
+    artifact_hashes_verified = all(
+        audit.sha256_actual == audit.sha256_expected and audit.bytes_actual == audit.bytes_expected
+        for audit in evidence_audits
+    )
+    if artifact_hashes_verified:
+        reason_parts.append("Evidence artifact hashes verified.")
+    else:
+        reason_parts.append("One or more evidence artifact hashes or byte counts did not verify.")
+    reason_parts.append(
+        "Receipt verification checks integrity only; it does not prove statistical validity "
+        "or deployment safety."
+    )
+    return ReceiptAudit(
+        report_hash_verified=hash_verified,
+        artifact_hashes_verified=artifact_hashes_verified,
+        canonical_hash=canonical_hash if isinstance(canonical_hash, str) else None,
+        reason=" ".join(reason_parts),
+    )
+
+
+def _audit_decay_artifacts(
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+    *,
+    report: Mapping[str, Any],
+    evaluated_at: str,
+    now: datetime,
+) -> DecayAudit:
+    states: list[DecayState] = []
+    reasons: list[str] = []
+    trigger_summary: list[str] = []
+    non_claims: list[str] = []
+    observed_versions = _observed_versions_from_report(report)
+    count = 0
+    for payload, artifact in semantic_payloads:
+        if artifact.role != "claim_decay":
+            continue
+        count += 1
+        try:
+            record = ClaimDecayRecord.model_validate(payload)
+            version_changes = (
+                record.version_watch_set.changes_from(observed_versions)
+                if observed_versions is not None
+                else ()
+            )
+            state = evaluate_claim_decay(record, now=now, current_versions=observed_versions)
+        except Exception as exc:
+            artifact.status = EvidenceRoleStatus.INVALID
+            artifact.reason = f"claim_decay artifact is semantically invalid: {exc}"
+            reasons.append(artifact.reason)
+            continue
+        states.append(state)
+        non_claims.extend(record.non_claims)
+        trigger_summary.extend(_decay_trigger_summary(record, now=now, state=state))
+        trigger_summary.extend(f"version_changed:{item}" for item in version_changes)
+        reasons.append(f"{artifact.path} evaluated as {state.value}.")
+
+    if count == 0:
+        return DecayAudit(
+            present=False,
+            status=ClaimFreshnessStatus.NOT_EVALUATED,
+            reason="No claim_decay artifact was present.",
+            evaluated_at=None,
+        )
+    if not states:
+        return DecayAudit(
+            present=True,
+            status=ClaimFreshnessStatus.NOT_EVALUATED,
+            reason="; ".join(reasons) or "No valid claim_decay artifact could be evaluated.",
+            evaluated_at=evaluated_at,
+            non_claims=_dedupe(non_claims),
+        )
+    if DecayState.EXPIRED in states:
+        status = ClaimFreshnessStatus.EXPIRED
+    elif DecayState.DEGRADED in states:
+        status = ClaimFreshnessStatus.DEGRADED
+    else:
+        status = ClaimFreshnessStatus.FRESH
+    return DecayAudit(
+        present=True,
+        status=status,
+        reason="; ".join(reasons),
+        evaluated_at=evaluated_at,
+        trigger_summary=_dedupe(trigger_summary),
+        non_claims=_dedupe(non_claims),
+    )
+
+
+def _observed_versions_from_report(report: Mapping[str, Any]) -> VersionWatchSet | None:
+    environment = report.get("environment")
+    if not isinstance(environment, Mapping):
+        return None
+    package_snapshot = environment.get("package_snapshot")
+    if not isinstance(package_snapshot, Mapping):
+        return None
+    dependency_versions = {
+        str(key): str(value)
+        for key, value in package_snapshot.items()
+        if str(key).strip() and str(value).strip()
+    }
+    if not dependency_versions:
+        return None
+    return VersionWatchSet(dependency_versions=dependency_versions)
+
+
+def _decay_trigger_summary(
+    record: ClaimDecayRecord,
+    *,
+    now: datetime,
+    state: DecayState,
+) -> list[str]:
+    age_days = (now - record.issued_at).total_seconds() / 86400.0
+    summary = [f"age_days={age_days:.6g}", f"policy_id={record.policy.policy_id}"]
+    if state is DecayState.DEGRADED:
+        summary.append("age crossed a degraded threshold")
+    if state is DecayState.EXPIRED:
+        summary.append("age crossed an expiry threshold or a watched version changed")
+    if not record.version_watch_set.is_empty:
+        summary.append("version_watch_set present; live observed versions were not supplied")
+    return summary
+
+
+def _audit_scenario_artifacts(
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+) -> ScenarioAudit:
+    scenario_ids: list[str] = []
+    kinds: list[str] = []
+    infeasible_count = 0
+    excluded_fields: list[dict[str, Any]] = []
+    non_claims: list[str] = []
+    count = 0
+
+    for payload, artifact in semantic_payloads:
+        if artifact.role != "extremal_scenario":
+            continue
+        count += 1
+        try:
+            scenario = _validate_extremal_scenario_json(payload)
+        except Exception as exc:
+            artifact.status = EvidenceRoleStatus.INVALID
+            artifact.reason = f"extremal_scenario artifact is semantically invalid: {exc}"
+            infeasible_count += 1
+            continue
+        scenario_ids.append(scenario.scenario_id)
+        kinds.append(scenario.kind.value)
+        non_claims.extend(scenario.non_claims)
+        if not scenario.feasibility.is_feasible:
+            infeasible_count += 1
+        for item in scenario.excluded_evidence_fields:
+            excluded_fields.append(item.model_dump(mode="json"))
+            non_claims.append(item.reason)
+
+    return ScenarioAudit(
+        present=count > 0,
+        scenario_count=count,
+        scenario_ids=scenario_ids,
+        kinds=kinds,
+        infeasible_count=infeasible_count,
+        excluded_evidence_fields=excluded_fields,
+        non_claims=_dedupe(non_claims),
+    )
+
+
+def _has_fitted_without_confirmation(
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+) -> bool:
+    for payload, artifact in semantic_payloads:
+        if artifact.role != "extremal_scenario":
+            continue
+        try:
+            scenario = _validate_extremal_scenario_json(payload)
+        except Exception:
+            continue
+        searchable = " ".join(
+            str(item)
+            for item in (
+                scenario.kind.value,
+                scenario.source,
+                scenario.source_kernel,
+                scenario.endpoint,
+            )
+        ).lower()
+        if "empirical" in searchable or "fitted" in searchable:
+            if scenario.kind is ScenarioKind.CONFIRMATORY_FAILURE_MATRIX:
+                if "confirmatory_ci" not in scenario.metadata:
+                    return True
+            elif "confirmatory_ci" not in scenario.metadata:
+                return True
+    return False
+
+
+def _validate_extremal_scenario_json(payload: Mapping[str, Any]) -> ExtremalScenario:
+    return ExtremalScenario.model_validate_json(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False, allow_nan=False)
+    )
+
+
+def _exploratory_leakage_paths(
+    report: Mapping[str, Any],
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+) -> set[str]:
+    paths = set(_find_exploratory_keys(report))
+    for payload, artifact in semantic_payloads:
+        if artifact.role == "extremal_scenario":
+            paths.update(f"{artifact.path}:{path}" for path in _find_exploratory_keys(payload))
+    for entry in _report_evidence_entries(report):
+        role = str(entry.get("role") or "")
+        if role in _EXPLORATORY_INTERVAL_FIELDS:
+            paths.add(f"evidence role {role!r}")
+    return paths
+
+
+def _find_exploratory_keys(value: Any, path: str = "$") -> set[str]:
+    if _path_is_excluded_evidence_field(path):
+        return set()
+    found: set[str] = set()
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            key_str = str(key)
+            child_path = f"{path}.{key_str}"
+            if key_str in _EXPLORATORY_INTERVAL_FIELDS:
+                found.add(child_path)
+            found.update(_find_exploratory_keys(item, child_path))
+    elif isinstance(value, list):
+        for idx, item in enumerate(value):
+            found.update(_find_exploratory_keys(item, f"{path}[{idx}]"))
+    return found
+
+
+def _path_is_excluded_evidence_field(path: str) -> bool:
+    return ".excluded_evidence_fields[" in path or path.startswith("$.excluded_evidence_fields[")
+
+
+def _collect_non_claims(
+    report: Mapping[str, Any],
+    decay: DecayAudit,
+    scenarios: ScenarioAudit,
+) -> list[str]:
+    return _dedupe([*_claim_non_claims(report), *decay.non_claims, *scenarios.non_claims])
+
+
+def _claim_non_claims(report: Mapping[str, Any]) -> list[str]:
+    claim = report.get("claim")
+    if not isinstance(claim, Mapping):
+        return []
+    raw = claim.get("non_claims")
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if str(item).strip()]
+
+
+def _mandatory_non_claims_missing(
+    *,
+    roles_present: set[str],
+    non_claims: Sequence[str],
+    exploratory_boundary_present: bool,
+) -> list[str]:
+    checks: list[tuple[str, tuple[tuple[str, ...], ...]]] = [
+        (
+            "receipt_integrity_not_statistical_validity_or_deployment_safety",
+            (
+                ("receipt", "hash"),
+                ("statistical validity", "deployment safety", "safe"),
+            ),
+        )
+    ]
+    if "claim_decay" in roles_present:
+        checks.append(
+            (
+                "claim_decay_not_current_safety_proof",
+                (
+                    ("claim decay",),
+                    ("does not prove", "not prove"),
+                    ("safe",),
+                ),
+            )
+        )
+    if "extremal_scenario" in roles_present:
+        checks.append(
+            (
+                "extremal_scenario_not_likely_world_proof",
+                (
+                    ("extremal scenario",),
+                    ("does not prove", "not prove"),
+                    ("likely",),
+                ),
+            )
+        )
+    if exploratory_boundary_present:
+        checks.append(
+            (
+                "exploratory_redteam_not_confirmatory_certificate",
+                (
+                    ("exploratory",),
+                    ("confirmatory",),
+                ),
+            )
+        )
+    return [
+        check_id
+        for check_id, phrase_groups in checks
+        if not _non_claim_present(non_claims, phrase_groups)
+    ]
+
+
+def _non_claim_present(
+    non_claims: Sequence[str],
+    phrase_groups: tuple[tuple[str, ...], ...],
+) -> bool:
+    normalized = [_normalize_text(item) for item in non_claims]
+    return any(
+        all(any(_normalize_text(option) in item for option in group) for group in phrase_groups)
+        for item in normalized
+    )
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(value.lower().replace("_", " ").replace("-", " ").split())
+
+
+def _resolve_path(path: str, base_dir: Path) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    return base_dir / candidate
+
+
+def _nested_str(report: Mapping[str, Any], path: tuple[str, ...], default: str) -> str:
+    value: Any = report
+    for key in path:
+        if not isinstance(value, Mapping) or key not in value:
+            return default
+        value = value[key]
+    return str(value)
+
+
+def _utc_iso(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _dedupe(values: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        item = str(value).strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+__all__ = [
+    "CLAIM_GOVERNANCE_AUDIT_SCHEMA",
+    "ROLE_SUPPORT_MATRIX",
+    "BoundaryAudit",
+    "ClaimFreshnessStatus",
+    "ClaimGovernanceAudit",
+    "DecayAudit",
+    "EvidenceArtifactAudit",
+    "EvidenceRoleStatus",
+    "GovernanceVerdict",
+    "ReceiptAudit",
+    "ScenarioAudit",
+    "verify_claim_governance",
+]

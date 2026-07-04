@@ -7,9 +7,11 @@ import json
 import re
 import shlex
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from cc.evidence.claim_governance import GovernanceVerdict, verify_claim_governance
 from cc.reporting.report import (
     CLAIM_LEVEL_DESCRIPTIONS,
     CLAIM_LEVELS,
@@ -74,6 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--previous-hash")
     build.add_argument("--out", required=True, type=Path)
     build.set_defaults(func=_cmd_build_report)
+
+    verify = subparsers.add_parser(
+        "verify-claim-governance",
+        help="Verify a report's evidence-bound claim governance state.",
+    )
+    verify.add_argument("report", type=Path)
+    verify.add_argument("--now")
+    verify.add_argument("--base-dir", type=Path)
+    verify.add_argument("--strict-unknown-roles", action="store_true")
+    verify.add_argument("--out", type=Path)
+    verify.set_defaults(func=_cmd_verify_claim_governance)
     return parser
 
 
@@ -169,6 +182,58 @@ def _cmd_build_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_verify_claim_governance(args: argparse.Namespace) -> int:
+    audit = verify_claim_governance(
+        args.report,
+        now=_parse_optional_datetime(args.now),
+        base_dir=args.base_dir,
+        strict_unknown_roles=args.strict_unknown_roles,
+    )
+
+    hash_valid_count = sum(
+        1
+        for artifact in audit.evidence_artifacts
+        if artifact.sha256_actual == artifact.sha256_expected
+        and artifact.bytes_actual == artifact.bytes_expected
+    )
+    print(f"Claim governance verdict: {audit.verdict.value.upper()}")
+    print(f"Report: {audit.report_id}")
+    print(f"Claim level: {audit.allowed_claim_level}")
+    print(
+        "Evidence artifacts: "
+        f"{len(audit.evidence_artifacts)} checked, {hash_valid_count} hash-valid"
+    )
+    print(f"Decay: {audit.decay.status.value} - {audit.decay.reason}")
+    print(
+        "Scenarios: "
+        f"{audit.scenarios.scenario_count} present, "
+        f"{audit.scenarios.infeasible_count} infeasible, "
+        f"{len(audit.scenarios.excluded_evidence_fields)} excluded evidence fields"
+    )
+    print(f"Human review: {'required' if audit.required_human_review else 'not required'}")
+
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(
+                audit.model_dump(mode="json"),
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"Audit written: {args.out}")
+
+    return {
+        GovernanceVerdict.PASS: 0,
+        GovernanceVerdict.NEEDS_REVIEW: 1,
+        GovernanceVerdict.FAIL: 2,
+    }[audit.verdict]
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"JSON input not found: {path}")
@@ -176,6 +241,12 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return payload
+
+
+def _parse_optional_datetime(raw: str | None) -> datetime | None:
+    if raw is None:
+        return None
+    return datetime.fromisoformat(raw.replace("Z", "+00:00"))
 
 
 def _calibration_from_payload(payload: dict[str, Any]) -> CalibrationSummary:

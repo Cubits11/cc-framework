@@ -483,12 +483,49 @@ governed object inside the system.
 
 ## 13. Immediate Next Move
 
-Keep the next implementation narrow:
+The next implementation is the executable verifier, not another prose layer.
+`cc-report verify-claim-governance` reads an existing `cc.report.v0.3.1`
+package, follows its evidence artifacts, and emits a
+`cc/claim-governance-audit.v1` JSON verdict.
 
-- one theory memo that defines the spine,
-- one demo artifact that shows claim lifecycle,
-- one CLI flow that binds a claim, decay policy, endpoint scenario, and receipt,
-- one visual story that shows hidden endpoint worlds behind a safety score.
+It checks:
 
-Do not scatter into broad product features yet. The strongest move is to make
-the spine legible and reviewable.
+- report readability and core structure,
+- canonical receipt verification when possible,
+- evidence artifact SHA-256 and byte counts,
+- verification-time `claim_decay` freshness,
+- `extremal_scenario` feasibility and exclusions,
+- exploratory/confirmatory firewall boundaries,
+- mandatory non-claims implied by evidence roles.
+
+The v0 evidence-role support matrix is intentionally conservative:
+
+| Role | Supports | Does not support | Review triggers |
+| --- | --- | --- | --- |
+| `claim_decay` | Time bounding, staleness review | Deployment safety, statistical validity | Expired, degraded, triggered versions |
+| `extremal_scenario` | Dependence endpoint explanation, counterfactual feasibility | Likelihood, deployment realization | Excluded evidence fields, fitted evidence without confirmation |
+
+Verifier verdicts are deliberately narrow:
+
+- `PASS`: the evidence-bound claim package is internally consistent under the
+  verifier rules.
+- `NEEDS_REVIEW`: the package is readable, but conservative review triggers are
+  present.
+- `FAIL`: the package is unreadable, tampered, expired, malformed, infeasible,
+  or has exploratory evidence leaking into a confirmatory surface.
+
+A PASS verdict means the evidence-bound claim package is internally consistent
+under the verifier rules. It does not mean the AI system is safe in deployment.
+
+```bash
+cc-report build-report ...
+cc-report verify-claim-governance report.json \
+  --out claim_governance_audit.json
+```
+
+Exit codes are `0` for `PASS`, `1` for `NEEDS_REVIEW`, and `2` for `FAIL`, so
+the command can be used in CI without collapsing review-required and failed
+states.
+
+Do not scatter into broad product features yet. The strongest move is to keep
+the spine executable, legible, and reviewable.

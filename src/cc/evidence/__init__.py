@@ -26,6 +26,11 @@ from cc.evidence.assurance_schema import (
     export_assurance_case_markdown,
     write_assurance_case_exports,
 )
+from cc.evidence.claim_governance import (
+    ClaimGovernanceAudit,
+    GovernanceVerdict,
+    verify_claim_governance,
+)
 from cc.evidence.decay import (
     CLAIM_DECAY_SCHEMA_VERSION,
     ClaimDecayPolicy,
@@ -65,6 +70,7 @@ __all__ = [
     "ClaimCategory",
     "ClaimDecayPolicy",
     "ClaimDecayRecord",
+    "ClaimGovernanceAudit",
     "ConsistencyProof",
     "Context",
     "DecayState",
@@ -74,6 +80,7 @@ __all__ = [
     "Evidence",
     "EvidenceRole",
     "ExtremalScenario",
+    "GovernanceVerdict",
     "GuardrailOutcome",
     "InclusionProof",
     "MerkleLog",
@@ -94,6 +101,7 @@ __all__ = [
     "leaf_hash",
     "root_from_records",
     "verify_anchor",
+    "verify_claim_governance",
     "verify_consistency",
     "verify_inclusion",
     "write_assurance_case_exports",

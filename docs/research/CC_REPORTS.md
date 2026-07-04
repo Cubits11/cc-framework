@@ -118,6 +118,54 @@ Exploratory red-team discovery can find candidate dependence cliffs. It does not
 by itself certify a confidence interval. Confirmatory failure-matrix evidence
 must be generated separately.
 
+## Executable Claim Governance Verifier
+
+`cc-report verify-claim-governance` is a read-only verifier over an existing
+`cc.report.v0.3.1` report and its attached evidence artifacts. It does not
+change the report schema and does not add a new mandatory report field.
+
+The verifier checks:
+
+* the report JSON can be loaded and has the expected core fields;
+* the canonical report receipt verifies, when possible;
+* every report-bound evidence artifact has the recorded SHA-256 and byte count;
+* `claim_decay` artifacts evaluate to `fresh`, `degraded`, or `expired` at the
+  verifier's clock;
+* `extremal_scenario` artifacts parse, expose feasible endpoint/fitted worlds,
+  and record excluded evidence fields;
+* exploratory red-team intervals are not surfaced as confirmatory evidence;
+* mandatory non-claims implied by evidence roles are present.
+
+The verifier does not prove production safety, statistical validity, deployment
+fitness, dataset representativeness, label correctness, or regulatory
+sufficiency. A PASS verdict means the evidence-bound claim package is internally
+consistent under the verifier rules. It does not mean the AI system is safe in
+deployment.
+
+```bash
+cc-report verify-claim-governance report.json \
+  --now 2026-01-02T00:00:00Z \
+  --out claim_governance_audit.json
+```
+
+Exit codes are intended for CI:
+
+* `0`: `PASS`
+* `1`: `NEEDS_REVIEW`
+* `2`: `FAIL`
+
+Interpretation:
+
+* `PASS`: hashes, decay state, scenario artifacts, non-claims, and firewall
+  checks are internally consistent under the v0 rules.
+* `NEEDS_REVIEW`: the package is readable but has conservative review triggers,
+  such as degraded decay, unknown roles, missing mandatory non-claims, scenario
+  exclusions, or evidence weaker than the claim level.
+* `FAIL`: the package cannot be trusted as an internally consistent evidence
+  bundle because the report is unreadable, a hash mismatches, decay has expired,
+  scenario evidence is malformed or infeasible, or exploratory evidence leaked
+  into a confirmatory surface.
+
 ## Fixture Command
 
 ```bash

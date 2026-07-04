@@ -41,10 +41,28 @@ The project does not claim:
   assumptions.
 - An exploratory red-team interval is not a confirmatory certificate unless
   validated by a separate confirmatory procedure.
+- A receipt verifies artifact integrity, not statistical validity or deployment
+  safety.
+- A PASS verdict from `cc-report verify-claim-governance` means the
+  evidence-bound claim package is internally consistent under the verifier
+  rules. It does not mean the AI system is safe in deployment.
 
 Exploratory red-team discovery can find candidate dependence cliffs. It does not
 by itself certify a confidence interval. Confirmatory failure-matrix evidence
 must be generated separately.
+
+## Verifier-Mandated Non-Claims
+
+The claim-governance verifier uses a small v0 non-claims engine. It looks for
+stable substance rather than exact strings, so wording may vary, but the package
+must preserve these boundaries when the corresponding evidence appears:
+
+| Evidence role | Required boundary |
+| --- | --- |
+| receipt | Integrity checks do not prove statistical validity or deployment safety. |
+| `claim_decay` | Decay policy does not prove the system is currently safe; it defines when a claim should be rechecked, degraded, or expired. |
+| `extremal_scenario` | Endpoint or fitted scenarios do not prove the scenario is likely; they record feasible, fitted, stressed, or confirmatory scenarios under stated assumptions. |
+| exploratory red-team evidence | Exploratory intervals are not confirmatory certificates unless validated by a separate confirmatory procedure. |
 
 ## Enforcement Guidance
 
