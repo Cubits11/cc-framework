@@ -1,0 +1,91 @@
+{
+  "capsule_id": "deterministic-claim-governance-capsule",
+  "files": [
+    {
+      "bytes": 442,
+      "filename": "audit_log.jsonl",
+      "role": "audit_log",
+      "sha256": "1841fb3ec3a18fef87d525300f7fec221b8862b85053c24c4589c4cdb62f1abc"
+    },
+    {
+      "bytes": 1224,
+      "filename": "bounds.json",
+      "role": "measurement_evidence",
+      "sha256": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74"
+    },
+    {
+      "bytes": 189,
+      "filename": "calibration.json",
+      "role": "calibration_evidence",
+      "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014"
+    },
+    {
+      "bytes": 4702,
+      "filename": "cc_report.json",
+      "role": "cc_report",
+      "sha256": "a0c0229112006292418a2595ae828b5891215d0a19cdffd9d866d9a523a711bb"
+    },
+    {
+      "bytes": 18930,
+      "filename": "claim_envelope.json",
+      "role": "claim_envelope",
+      "sha256": "7f20f937f882fcd4b6625dbff509efa29c2219281dcaf5a084bee438b0729a16"
+    },
+    {
+      "bytes": 11279,
+      "filename": "claim_governance_audit.json",
+      "role": "claim_governance_audit",
+      "sha256": "62ab6600f6ddfc025398ef4e3bda49b0cba684996590c7280bddae27a0e76cf7"
+    },
+    {
+      "bytes": 3712,
+      "filename": "confirmatory_failure_matrix.json",
+      "role": "confirmatory_failure_matrix",
+      "sha256": "86db598c799cc4fc24bf9ab27536a7093d1c32f9cb4410dc6bcebd0ddc09770b"
+    },
+    {
+      "bytes": 3540,
+      "filename": "confirmatory_protocol.json",
+      "role": "confirmatory_protocol",
+      "sha256": "ec3fe8d311ec20325adc757c5f2c0a146868b5df3717f572004c0a3c965276ed"
+    },
+    {
+      "bytes": 1354,
+      "filename": "decay_policy.json",
+      "role": "claim_decay",
+      "sha256": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35"
+    },
+    {
+      "bytes": 4347,
+      "filename": "extremal_lower.json",
+      "role": "extremal_scenario",
+      "sha256": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516"
+    },
+    {
+      "bytes": 4345,
+      "filename": "extremal_upper.json",
+      "role": "extremal_scenario",
+      "sha256": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a"
+    }
+  ],
+  "fixed_now": "2026-01-02T00:00:00Z",
+  "generated_at": "2026-01-02T00:00:00Z",
+  "governance_verdict": "pass",
+  "inputs": [
+    {
+      "bytes": 2398,
+      "filename": "inputs/capsule_config.json",
+      "sha256": "7342579696302b3673c868baf7affb4ffe794ec00d0e51b70e8e5f61d74639d2"
+    },
+    {
+      "bytes": 352,
+      "filename": "inputs/failure_matrix.csv",
+      "sha256": "1e77c46b95a455be14742424b564584a297668a2cf5f4d3879a8c50632f85174"
+    }
+  ],
+  "pass_caveat": "PASS means internal consistency under verifier rules; it does not mean the AI system is safe in deployment.",
+  "report_id": "cc-claim-governance-capsule",
+  "report_receipt_sha256": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+  "schema_version": "cc.claim_governance_capsule_manifest.v1",
+  "seed": 314159
+}

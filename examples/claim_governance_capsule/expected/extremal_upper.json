@@ -1,0 +1,194 @@
+{
+  "atom_table": [
+    {
+      "atom_index": 0,
+      "event_occurs": false,
+      "failures": [
+        0,
+        0,
+        0
+      ],
+      "probability": 0.2083333333333333
+    },
+    {
+      "atom_index": 1,
+      "event_occurs": false,
+      "failures": [
+        1,
+        0,
+        0
+      ],
+      "probability": 0.16666666666666666
+    },
+    {
+      "atom_index": 2,
+      "event_occurs": false,
+      "failures": [
+        0,
+        1,
+        0
+      ],
+      "probability": 0.20833333333333331
+    },
+    {
+      "atom_index": 3,
+      "event_occurs": false,
+      "failures": [
+        1,
+        1,
+        0
+      ],
+      "probability": 0.041666666666666685
+    },
+    {
+      "atom_index": 4,
+      "event_occurs": false,
+      "failures": [
+        0,
+        0,
+        1
+      ],
+      "probability": 0.125
+    },
+    {
+      "atom_index": 5,
+      "event_occurs": false,
+      "failures": [
+        1,
+        0,
+        1
+      ],
+      "probability": 0.0
+    },
+    {
+      "atom_index": 6,
+      "event_occurs": false,
+      "failures": [
+        0,
+        1,
+        1
+      ],
+      "probability": 0.08333333333333334
+    },
+    {
+      "atom_index": 7,
+      "event_occurs": true,
+      "failures": [
+        1,
+        1,
+        1
+      ],
+      "probability": 0.16666666666666666
+    }
+  ],
+  "bound_value": 0.16666666666666666,
+  "endpoint": "upper",
+  "event": "and",
+  "event_definition": "AND composed binary guardrail-failure event under supplied marginals and side constraints.",
+  "event_probability": 0.16666666666666666,
+  "excluded_evidence_fields": [],
+  "feasibility": {
+    "bound_residual": 0.0,
+    "event_probability_residual": 0.0,
+    "is_feasible": true,
+    "marginal_residual_linf": 0.0,
+    "marginal_residuals": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "max_abs_residual": 0.0,
+    "max_probability": 0.20833333333333331,
+    "min_probability": 0.0,
+    "negative_probability_count": 0,
+    "objective_residual": 0.0,
+    "pairwise_residuals": {
+      "0,1": 0.0,
+      "0,2": 0.0,
+      "1,2": 0.0
+    },
+    "probability_sum": 1.0,
+    "total_probability_residual": 0.0
+  },
+  "guardrail_ids": [
+    "guardrail_keyword",
+    "guardrail_semantic",
+    "guardrail_policy"
+  ],
+  "kind": "frechet_endpoint",
+  "metadata": {
+    "atom_order": "little_endian",
+    "capsule_id": "deterministic-claim-governance-capsule",
+    "constraint_surface": "marginals_plus_pairwise_joint_probabilities",
+    "frechet_lower": 0.04166666666666666,
+    "frechet_upper": 0.16666666666666666,
+    "frechet_width": 0.125
+  },
+  "n_guardrails": 3,
+  "narrative": "Frechet upper endpoint for the capsule AND failure event under the checked-in marginals and pairwise co-failure constraints.",
+  "non_claims": [
+    "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
+    "This scenario does not certify production safety or legal compliance.",
+    "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
+    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions."
+  ],
+  "objective": null,
+  "scenario_id": "scenario-frechet-upper-bff6e6e0b031",
+  "schema": "cc.extremal_scenario.v1",
+  "schema_version": "cc.extremal_scenario.v1",
+  "source": "frechet",
+  "source_hash": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74",
+  "source_kernel": "frechet",
+  "top_outcomes": [
+    {
+      "atom_index": 2,
+      "event_occurs": false,
+      "failures": [
+        0,
+        1,
+        0
+      ],
+      "probability": 0.20833333333333331
+    },
+    {
+      "atom_index": 0,
+      "event_occurs": false,
+      "failures": [
+        0,
+        0,
+        0
+      ],
+      "probability": 0.2083333333333333
+    },
+    {
+      "atom_index": 1,
+      "event_occurs": false,
+      "failures": [
+        1,
+        0,
+        0
+      ],
+      "probability": 0.16666666666666666
+    },
+    {
+      "atom_index": 7,
+      "event_occurs": true,
+      "failures": [
+        1,
+        1,
+        1
+      ],
+      "probability": 0.16666666666666666
+    },
+    {
+      "atom_index": 4,
+      "event_occurs": false,
+      "failures": [
+        0,
+        0,
+        1
+      ],
+      "probability": 0.125
+    }
+  ]
+}

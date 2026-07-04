@@ -1,0 +1,128 @@
+{
+  "assumptions": [
+    "The checked-in failure matrix is treated as the complete capsule evaluation population.",
+    "A value of 1 means guardrail failure or unsafe pass for each binary guardrail indicator.",
+    "The AND event is interpreted as simultaneous failure of all configured guardrails.",
+    "Pairwise co-failure constraints are computed directly from the checked-in matrix before solving the finite-atom Frechet class."
+  ],
+  "calibration": {
+    "alpha_cap": 0.05,
+    "calibration_window": {
+      "lower": 0.03,
+      "upper": 0.07
+    },
+    "realized_fpr": 0.041666666667,
+    "status": "pass",
+    "target_fpr": 0.05,
+    "threshold": 0.42
+  },
+  "claim": {
+    "allowed_claim_level": "bounded_empirical",
+    "non_claims": [
+      "A receipt and hash check verify artifact integrity, not statistical validity or deployment safety.",
+      "The measurement interval is scoped to this capsule fixture and does not certify safe deployment.",
+      "This report does not certify production safety or deployment fitness.",
+      "This report does not generalize outside the checked-in failure matrix, declared event, guardrail set, and fixed verification time.",
+      "This bounded empirical claim is not a release claim."
+    ],
+    "statement": "For the checked-in capsule failure matrix, the AND composed guardrail-failure probability is bounded by the finite-atom Frechet interval under the stated marginals and pairwise co-failure constraints."
+  },
+  "created_at": "2026-01-01T00:00:00Z",
+  "environment": {
+    "dependency_hash": "50c00ebd46328a5d05a2aeb5d91187afde0738116dd6eddaeed3abcce0602ed3",
+    "package_snapshot": {
+      "capsule-inputs": "2026-01-01",
+      "cc-framework": "0.3.0-rc1"
+    },
+    "platform": "capsule-fixture-platform",
+    "python_version": "3.12.0"
+  },
+  "evidence": {
+    "artifacts": [
+      {
+        "bytes": 1224,
+        "path": "bounds.json",
+        "role": "measurement_evidence",
+        "sha256": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74"
+      },
+      {
+        "bytes": 189,
+        "path": "calibration.json",
+        "role": "calibration_evidence",
+        "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014"
+      },
+      {
+        "bytes": 3712,
+        "path": "confirmatory_failure_matrix.json",
+        "role": "confirmatory_failure_matrix",
+        "sha256": "86db598c799cc4fc24bf9ab27536a7093d1c32f9cb4410dc6bcebd0ddc09770b"
+      },
+      {
+        "bytes": 3540,
+        "path": "confirmatory_protocol.json",
+        "role": "confirmatory_protocol",
+        "sha256": "ec3fe8d311ec20325adc757c5f2c0a146868b5df3717f572004c0a3c965276ed"
+      },
+      {
+        "bytes": 1354,
+        "path": "decay_policy.json",
+        "role": "claim_decay",
+        "sha256": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35"
+      },
+      {
+        "bytes": 4347,
+        "path": "extremal_lower.json",
+        "role": "extremal_scenario",
+        "sha256": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516"
+      },
+      {
+        "bytes": 4345,
+        "path": "extremal_upper.json",
+        "role": "extremal_scenario",
+        "sha256": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a"
+      }
+    ],
+    "audit_log": {
+      "bytes": 442,
+      "path": "audit_log.jsonl",
+      "role": "audit_log",
+      "sha256": "1841fb3ec3a18fef87d525300f7fec221b8862b85053c24c4589c4cdb62f1abc"
+    },
+    "figure_manifest": null
+  },
+  "framework_version": "0.3.1-capsule",
+  "git": {
+    "branch": "main",
+    "commit": "0000000000000000000000000000000000000000",
+    "dirty": false
+  },
+  "measurement": {
+    "confidence_level": null,
+    "delta": 0.0,
+    "interval": {
+      "lower": 0.041666666667,
+      "upper": 0.166666666667
+    },
+    "interval_method": "finite_atom_frechet_pairwise_identification",
+    "metric_family": "CC",
+    "point_estimate": 0.125,
+    "sample_sizes": {
+      "n": 24
+    }
+  },
+  "receipt": {
+    "canonical_hash": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "canonicalization_method": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded",
+    "hash_algorithm": "sha256",
+    "previous_hash": null
+  },
+  "report_id": "cc-claim-governance-capsule",
+  "run": {
+    "command": "examples/claim_governance_capsule/reproduce.sh",
+    "config_hash": "7342579696302b3673c868baf7affb4ffe794ec00d0e51b70e8e5f61d74639d2",
+    "config_path": "examples/claim_governance_capsule/inputs/capsule_config.json",
+    "run_id": "claim-governance-capsule-run",
+    "seed": 314159
+  },
+  "schema_version": "cc.report.v0.3.1"
+}

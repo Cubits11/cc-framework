@@ -1,0 +1,259 @@
+{
+  "allowed_claim_level": "bounded_empirical",
+  "boundary": {
+    "artifact_non_claim_count": 6,
+    "claim_non_claim_count": 5,
+    "mandatory_non_claims_missing": [],
+    "unresolved_defeaters_or_gaps": []
+  },
+  "claim_statement": "For the checked-in capsule failure matrix, the AND composed guardrail-failure probability is bounded by the finite-atom Frechet interval under the stated marginals and pairwise co-failure constraints.",
+  "confirmatory_protocols": {
+    "artifact_count": 1,
+    "audits": [
+      {
+        "artifact_id": "capsule-confirmatory-protocol-artifact",
+        "checks": [
+          {
+            "check_id": "plan_and_run_referenced",
+            "reason": "Confirmatory artifact references both a protocol plan and a run.",
+            "status": "pass"
+          },
+          {
+            "check_id": "temporal_validity_check",
+            "reason": "Protocol plan was created before the confirmatory run started.",
+            "status": "pass"
+          },
+          {
+            "check_id": "adaptive_discovery_firewall",
+            "reason": "Discovery may motivate the hypothesis, but the confirmatory run is separately referenced.",
+            "status": "pass"
+          },
+          {
+            "check_id": "held_out_selection",
+            "reason": "Held-out set selection was declared before failure-pattern review.",
+            "status": "pass"
+          },
+          {
+            "check_id": "stopping_rule",
+            "reason": "Stopping rule is pre-declared.",
+            "status": "pass"
+          },
+          {
+            "check_id": "cluster_blocking",
+            "reason": "Cluster blocking obligations are satisfied or no clustered data were declared.",
+            "status": "pass"
+          },
+          {
+            "check_id": "fixed_endpoint",
+            "reason": "Confirmatory run endpoint matches the pre-registered primary endpoint.",
+            "status": "pass"
+          },
+          {
+            "check_id": "fixed_analysis_plan",
+            "reason": "Confirmatory run analysis plan matches the pre-registered frozen plan.",
+            "status": "pass"
+          },
+          {
+            "check_id": "protocol_mode_supported",
+            "reason": "Protocol mode 'held_out_matrix' is supported by the v0 verifier.",
+            "status": "pass"
+          }
+        ],
+        "non_claims": [
+          "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
+          "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
+          "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role."
+        ],
+        "protocol_id": "capsule-confirmatory-protocol-v1",
+        "reasons": [],
+        "run_id": "claim-governance-capsule-run",
+        "schema_version": "cc.confirmatory_protocol_audit.v1",
+        "status": "pass",
+        "temporal_validity_check": true
+      }
+    ],
+    "failed_count": 0,
+    "failed_reasons": [],
+    "non_claims": [
+      "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
+      "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
+      "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role."
+    ],
+    "present": true,
+    "protocol_ids": [
+      "capsule-confirmatory-protocol-v1"
+    ],
+    "review_count": 0,
+    "review_reasons": [],
+    "run_ids": [
+      "claim-governance-capsule-run"
+    ]
+  },
+  "decay": {
+    "evaluated_at": "2026-01-02T00:00:00Z",
+    "non_claims": [
+      "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
+      "A claim_decay artifact records signed policy, not live deployment validity."
+    ],
+    "present": true,
+    "reason": "decay_policy.json evaluated as fresh.",
+    "status": "fresh",
+    "trigger_summary": [
+      "age_days=1",
+      "policy_id=capsule-fixed-ttl"
+    ]
+  },
+  "envelope_support": {
+    "integrity_only_edges": 1,
+    "relation_counts": {
+      "bounds": 4,
+      "confirmatory_tests": 2,
+      "integrity_binds": 1,
+      "qualifies": 3
+    },
+    "review_edges": 0,
+    "schema": "cc.claim_envelope.support_summary.v1",
+    "strength_counts": {
+      "confirmatory": 2,
+      "diagnostic": 7,
+      "integrity_only": 1
+    },
+    "strongest_non_integrity_strength": "confirmatory",
+    "support_edge_count": 10,
+    "unknown_role_refs": 0,
+    "unsupported_role_refs": []
+  },
+  "evaluated_at": "2026-01-02T00:00:00Z",
+  "evidence_artifacts": [
+    {
+      "bytes_actual": 1224,
+      "bytes_expected": 1224,
+      "path": "bounds.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "measurement_evidence",
+      "sha256_actual": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74",
+      "sha256_expected": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 189,
+      "bytes_expected": 189,
+      "path": "calibration.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "calibration_evidence",
+      "sha256_actual": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014",
+      "sha256_expected": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 3712,
+      "bytes_expected": 3712,
+      "path": "confirmatory_failure_matrix.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "confirmatory_failure_matrix",
+      "sha256_actual": "86db598c799cc4fc24bf9ab27536a7093d1c32f9cb4410dc6bcebd0ddc09770b",
+      "sha256_expected": "86db598c799cc4fc24bf9ab27536a7093d1c32f9cb4410dc6bcebd0ddc09770b",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 3540,
+      "bytes_expected": 3540,
+      "path": "confirmatory_protocol.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "confirmatory_protocol",
+      "sha256_actual": "ec3fe8d311ec20325adc757c5f2c0a146868b5df3717f572004c0a3c965276ed",
+      "sha256_expected": "ec3fe8d311ec20325adc757c5f2c0a146868b5df3717f572004c0a3c965276ed",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 1354,
+      "bytes_expected": 1354,
+      "path": "decay_policy.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "claim_decay",
+      "sha256_actual": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35",
+      "sha256_expected": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 4347,
+      "bytes_expected": 4347,
+      "path": "extremal_lower.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "extremal_scenario",
+      "sha256_actual": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516",
+      "sha256_expected": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 4345,
+      "bytes_expected": 4345,
+      "path": "extremal_upper.json",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "extremal_scenario",
+      "sha256_actual": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a",
+      "sha256_expected": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a",
+      "status": "present"
+    },
+    {
+      "bytes_actual": 442,
+      "bytes_expected": 442,
+      "path": "audit_log.jsonl",
+      "reason": "Evidence artifact hash and byte count verified.",
+      "role": "audit_log",
+      "sha256_actual": "1841fb3ec3a18fef87d525300f7fec221b8862b85053c24c4589c4cdb62f1abc",
+      "sha256_expected": "1841fb3ec3a18fef87d525300f7fec221b8862b85053c24c4589c4cdb62f1abc",
+      "status": "present"
+    }
+  ],
+  "non_claims": [
+    "A receipt and hash check verify artifact integrity, not statistical validity or deployment safety.",
+    "The measurement interval is scoped to this capsule fixture and does not certify safe deployment.",
+    "This report does not certify production safety or deployment fitness.",
+    "This report does not generalize outside the checked-in failure matrix, declared event, guardrail set, and fixed verification time.",
+    "This bounded empirical claim is not a release claim.",
+    "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
+    "A claim_decay artifact records signed policy, not live deployment validity.",
+    "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
+    "This scenario does not certify production safety or legal compliance.",
+    "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
+    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions.",
+    "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
+    "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
+    "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
+    "The finite-atom interval is an identification envelope over declared marginals and pairwise co-failures, not a sampling-validity proof.",
+    "Confirmatory failure-matrix evidence is scoped and does not certify deployment safety.",
+    "The held-out matrix binds this capsule run only; it does not prove external validity or representativeness."
+  ],
+  "reasons": [],
+  "receipt": {
+    "artifact_hashes_verified": true,
+    "canonical_hash": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "reason": "Canonical report hash verified. Evidence artifact hashes verified. Receipt verification checks integrity only; it does not prove statistical validity or deployment safety.",
+    "report_hash_verified": true
+  },
+  "report_id": "cc-claim-governance-capsule",
+  "required_human_review": false,
+  "scenarios": {
+    "excluded_evidence_fields": [],
+    "infeasible_count": 0,
+    "kinds": [
+      "frechet_endpoint",
+      "frechet_endpoint"
+    ],
+    "non_claims": [
+      "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
+      "This scenario does not certify production safety or legal compliance.",
+      "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
+      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions."
+    ],
+    "present": true,
+    "scenario_count": 2,
+    "scenario_ids": [
+      "scenario-frechet-lower-7a00219842c1",
+      "scenario-frechet-upper-bff6e6e0b031"
+    ]
+  },
+  "schema": "cc/claim-governance-audit.v1",
+  "verdict": "pass"
+}

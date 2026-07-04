@@ -1,0 +1,38 @@
+{
+  "event": "and",
+  "failure_event_convention": "1 means guardrail failure or unsafe pass.",
+  "guardrails": [
+    "guardrail_keyword",
+    "guardrail_semantic",
+    "guardrail_policy"
+  ],
+  "interval": {
+    "lower": 0.041666666667,
+    "upper": 0.166666666667
+  },
+  "interval_method": "finite_atom_frechet_pairwise_identification",
+  "marginals": {
+    "guardrail_keyword": 0.375,
+    "guardrail_policy": 0.375,
+    "guardrail_semantic": 0.5
+  },
+  "metric_family": "CC",
+  "non_claims": [
+    "The measurement interval is scoped to this capsule fixture and does not certify safe deployment.",
+    "The finite-atom interval is an identification envelope over declared marginals and pairwise co-failures, not a sampling-validity proof."
+  ],
+  "observed_event_rate": 0.125,
+  "pairwise_joint_probabilities": {
+    "guardrail_keyword,guardrail_policy": 0.166666666667,
+    "guardrail_keyword,guardrail_semantic": 0.208333333333,
+    "guardrail_semantic,guardrail_policy": 0.25
+  },
+  "schema_version": "cc.capsule.bounds.v1",
+  "seed": 314159,
+  "source": {
+    "path": "inputs/failure_matrix.csv",
+    "rows": 24,
+    "sha256": "1e77c46b95a455be14742424b564584a297668a2cf5f4d3879a8c50632f85174"
+  },
+  "width": 0.125
+}

@@ -1,0 +1,46 @@
+{
+  "claim_hash": null,
+  "claim_id": "capsule-bounded-empirical-claim",
+  "evidence_refs": [
+    "audit_log.jsonl",
+    "bounds.json",
+    "calibration.json",
+    "cc_report.json",
+    "claim_envelope.json",
+    "claim_governance_audit.json",
+    "confirmatory_failure_matrix.json",
+    "confirmatory_protocol.json",
+    "decay_policy.json",
+    "extremal_lower.json",
+    "extremal_upper.json"
+  ],
+  "hazard_covariates": {
+    "custom": {},
+    "data_drift_score": 0.0,
+    "dependency_update_count": 0,
+    "guardrail_update_count": 0,
+    "model_update_count": 0,
+    "threat_activity_level": 0.0
+  },
+  "issued_at": "2026-01-01T00:00:00Z",
+  "non_claims": [
+    "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
+    "A claim_decay artifact records signed policy, not live deployment validity."
+  ],
+  "notes": [
+    "Verification computes freshness at fixed_now; the signed artifact does not store a live PASS state."
+  ],
+  "policy": {
+    "configured_hazard": null,
+    "degraded_after_days": 30.0,
+    "expires_after_days": 60.0,
+    "policy_id": "capsule-fixed-ttl"
+  },
+  "schema_version": "cc.claim_decay.v1",
+  "version_watch_set": {
+    "data_versions": {},
+    "dependency_versions": {},
+    "guardrail_versions": {},
+    "model_versions": {}
+  }
+}

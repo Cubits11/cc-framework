@@ -1,0 +1,58 @@
+{
+  "analysis_id": "capsule-analysis-v1",
+  "assumptions": [
+    "The checked-in failure matrix is treated as the complete capsule evaluation population.",
+    "A value of 1 means guardrail failure or unsafe pass for each binary guardrail indicator.",
+    "The AND event is interpreted as simultaneous failure of all configured guardrails.",
+    "Pairwise co-failure constraints are computed directly from the checked-in matrix before solving the finite-atom Frechet class."
+  ],
+  "calibration": {
+    "alpha_cap": 0.05,
+    "calibration_window": {
+      "lower": 0.03,
+      "upper": 0.07
+    },
+    "realized_fpr": 0.041666666667,
+    "status": "pass",
+    "target_fpr": 0.05,
+    "threshold": 0.42
+  },
+  "claim_id": "capsule-bounded-empirical-claim",
+  "claim_non_claims": [
+    "A receipt and hash check verify artifact integrity, not statistical validity or deployment safety.",
+    "The measurement interval is scoped to this capsule fixture and does not certify safe deployment.",
+    "This report does not certify production safety or deployment fitness.",
+    "This report does not generalize outside the checked-in failure matrix, declared event, guardrail set, and fixed verification time.",
+    "This bounded empirical claim is not a release claim."
+  ],
+  "claim_statement": "For the checked-in capsule failure matrix, the AND composed guardrail-failure probability is bounded by the finite-atom Frechet interval under the stated marginals and pairwise co-failure constraints.",
+  "confirmatory_protocol_id": "capsule-confirmatory-protocol-v1",
+  "created_at": "2026-01-01T00:00:00Z",
+  "decay_policy": {
+    "degraded_after_days": 30.0,
+    "expires_after_days": 60.0,
+    "policy_id": "capsule-fixed-ttl"
+  },
+  "dependency_snapshot": {
+    "capsule-inputs": "2026-01-01",
+    "cc-framework": "0.3.0-rc1"
+  },
+  "event": "and",
+  "fixed_now": "2026-01-02T00:00:00Z",
+  "framework_version": "0.3.1-capsule",
+  "guardrails": [
+    "guardrail_keyword",
+    "guardrail_semantic",
+    "guardrail_policy"
+  ],
+  "issued_at": "2026-01-01T00:00:00Z",
+  "platform": "capsule-fixture-platform",
+  "protocol_created_at": "2026-01-01T01:00:00Z",
+  "python_version": "3.12.0",
+  "report_id": "cc-claim-governance-capsule",
+  "run_completed_at": "2026-01-01T03:00:00Z",
+  "run_id": "claim-governance-capsule-run",
+  "run_started_at": "2026-01-01T02:00:00Z",
+  "seed": 314159,
+  "target_n": 24
+}

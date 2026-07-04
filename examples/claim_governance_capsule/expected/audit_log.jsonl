@@ -1,0 +1,3 @@
+{"fixed_now": "2026-01-02T00:00:00Z", "input_sha256": "1e77c46b95a455be14742424b564584a297668a2cf5f4d3879a8c50632f85174", "rows": 24, "seed": 314159, "step": "load_inputs"}
+{"event": "and", "lower": 0.041666666667, "observed_event_rate": 0.125, "step": "compute_bounds", "upper": 0.166666666667}
+{"chain": ["bounds", "extremal_scenarios", "decay", "report", "governance_audit", "claim_envelope", "manifest"], "step": "emit_governance_chain"}

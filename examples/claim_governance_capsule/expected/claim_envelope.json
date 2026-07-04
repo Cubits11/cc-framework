@@ -1,0 +1,441 @@
+{
+  "boundary": {
+    "assumptions": [
+      "The checked-in failure matrix is treated as the complete capsule evaluation population.",
+      "A value of 1 means guardrail failure or unsafe pass for each binary guardrail indicator.",
+      "The AND event is interpreted as simultaneous failure of all configured guardrails.",
+      "Pairwise co-failure constraints are computed directly from the checked-in matrix before solving the finite-atom Frechet class."
+    ],
+    "defeaters": [],
+    "invalidation_conditions": [],
+    "non_claims": [
+      "A receipt and hash check verify artifact integrity, not statistical validity or deployment safety.",
+      "The measurement interval is scoped to this capsule fixture and does not certify safe deployment.",
+      "This report does not certify production safety or deployment fitness.",
+      "This report does not generalize outside the checked-in failure matrix, declared event, guardrail set, and fixed verification time.",
+      "This bounded empirical claim is not a release claim.",
+      "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
+      "A claim_decay artifact records signed policy, not live deployment validity.",
+      "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
+      "This scenario does not certify production safety or legal compliance.",
+      "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
+      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions.",
+      "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
+      "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
+      "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
+      "The finite-atom interval is an identification envelope over declared marginals and pairwise co-failures, not a sampling-validity proof.",
+      "Confirmatory failure-matrix evidence is scoped and does not certify deployment safety.",
+      "The held-out matrix binds this capsule run only; it does not prove external validity or representativeness."
+    ],
+    "review_requirements": [
+      {
+        "reason": "Governance verifier did not require human review under its narrow rules.",
+        "required": false,
+        "requirement_id": "review:governance-verdict",
+        "source_ref": "governance.required_human_review",
+        "status": "not_required"
+      }
+    ],
+    "schema": "cc.boundary_envelope.v1",
+    "scope": {
+      "calibration_status": "pass",
+      "config_path": "examples/claim_governance_capsule/inputs/capsule_config.json",
+      "evidence_artifact_ids": [
+        "report:measurement",
+        "report:calibration",
+        "evidence:measurement_evidence:0000:bounds.json",
+        "evidence:calibration_evidence:0001:calibration.json",
+        "evidence:confirmatory_failure_matrix:0002:confirmatory_failure_matrix.json",
+        "evidence:confirmatory_protocol:0003:confirmatory_protocol.json",
+        "evidence:claim_decay:0004:decay_policy.json",
+        "evidence:extremal_scenario:0005:extremal_lower.json",
+        "evidence:extremal_scenario:0006:extremal_upper.json",
+        "evidence:audit_log:0007:audit_log.jsonl"
+      ],
+      "interval_method": "finite_atom_frechet_pairwise_identification",
+      "measurement_interval": {
+        "confidence_level": null,
+        "delta": 0.0,
+        "lower": 0.041666666667,
+        "point_estimate": 0.125,
+        "upper": 0.166666666667
+      },
+      "metric_family": "CC",
+      "report_id": "cc-claim-governance-capsule",
+      "report_schema_version": "cc.report.v0.3.1",
+      "run_id": "claim-governance-capsule-run",
+      "sample_sizes": {
+        "n": 24
+      },
+      "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+    }
+  },
+  "governance_state": {
+    "evaluated_at": "2026-01-02T00:00:00Z",
+    "freshness_status": "fresh",
+    "reasons": [],
+    "required_human_review": false,
+    "schema": "cc.claim_envelope.governance_state.v1",
+    "support_summary": {
+      "integrity_only_edges": 1,
+      "relation_counts": {
+        "bounds": 4,
+        "confirmatory_tests": 2,
+        "integrity_binds": 1,
+        "qualifies": 3
+      },
+      "review_edges": 0,
+      "schema": "cc.claim_envelope.support_summary.v1",
+      "strength_counts": {
+        "confirmatory": 2,
+        "diagnostic": 7,
+        "integrity_only": 1
+      },
+      "strongest_non_integrity_strength": "confirmatory",
+      "support_edge_count": 10,
+      "unknown_role_refs": 0,
+      "unsupported_role_refs": []
+    },
+    "verdict": "pass",
+    "verifier_schema": "cc/claim-governance-audit.v1"
+  },
+  "identity": {
+    "artifact_id": "claim-envelope:cc-claim-governance-capsule",
+    "claim_id": "cc-claim-governance-capsule",
+    "created_at": "2026-01-01T00:00:00Z",
+    "evaluated_at": "2026-01-02T00:00:00Z",
+    "source_report_hash": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "source_report_id": "cc-claim-governance-capsule",
+    "source_report_schema": "cc.report.v0.3.1",
+    "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+  },
+  "proposition": {
+    "allowed_claim_level": "bounded_empirical",
+    "fragments": [
+      {
+        "fragment_id": "claim.confirmatory_boundary",
+        "fragment_type": "confirmatory_boundary",
+        "text": "Exploratory/confirmatory firewall."
+      },
+      {
+        "fragment_id": "claim.endpoint_feasibility",
+        "fragment_type": "endpoint_feasibility",
+        "text": "Endpoint feasibility and counterfactual dependence bounds."
+      },
+      {
+        "fragment_id": "claim.failure_matrix",
+        "fragment_type": "failure_matrix",
+        "text": "Confirmatory failure-matrix evidence."
+      },
+      {
+        "fragment_id": "claim.freshness",
+        "fragment_type": "freshness",
+        "text": "Verification-time freshness state."
+      },
+      {
+        "fragment_id": "claim.integrity.receipt",
+        "fragment_type": "integrity",
+        "text": "Report and evidence-byte integrity."
+      },
+      {
+        "fragment_id": "claim.operating_point",
+        "fragment_type": "operating_point",
+        "text": "Calibration and operating-point scope."
+      },
+      {
+        "fragment_id": "claim.staleness",
+        "fragment_type": "staleness",
+        "text": "Claim freshness, staleness, and review pressure."
+      },
+      {
+        "fragment_id": "claim.statement",
+        "fragment_type": "statement",
+        "text": "Main report claim."
+      },
+      {
+        "fragment_id": "claim.statistical_interval",
+        "fragment_type": "statistical_interval",
+        "text": "Measured interval and point estimate under report scope."
+      },
+      {
+        "fragment_id": "claim.original_text",
+        "fragment_type": "statement",
+        "text": "For the checked-in capsule failure matrix, the AND composed guardrail-failure probability is bounded by the finite-atom Frechet interval under the stated marginals and pairwise co-failure constraints."
+      }
+    ],
+    "statement": "For the checked-in capsule failure matrix, the AND composed guardrail-failure probability is bounded by the finite-atom Frechet interval under the stated marginals and pairwise co-failure constraints."
+  },
+  "schema": "cc.claim_envelope.v1",
+  "support_graph": {
+    "decay_refs": [
+      {
+        "artifact_id": "evidence:claim_decay:0004:decay_policy.json",
+        "bytes": 1354,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "decay_policy.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "claim_decay",
+        "schema": null,
+        "sha256": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      }
+    ],
+    "evidence_refs": [
+      {
+        "artifact_id": "report:measurement",
+        "bytes": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "evaluated_at": null,
+        "metadata": {
+          "source_path": "report.measurement"
+        },
+        "path": null,
+        "reason": null,
+        "role": "measurement_evidence",
+        "schema": "cc.report.measurement.v0.3.1",
+        "sha256": "569331caa16c17cdaf1531a4cbc318f1b6ccf44204dc0d0018dfa1af4a0c261b",
+        "status": null,
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "report:calibration",
+        "bytes": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "evaluated_at": null,
+        "metadata": {
+          "source_path": "report.calibration"
+        },
+        "path": null,
+        "reason": null,
+        "role": "calibration_evidence",
+        "schema": "cc.report.calibration.v0.3.1",
+        "sha256": "ddcac3efd1c201b79546881329a3e6e89a12981225504672b7e7dd739bdf3686",
+        "status": null,
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "evidence:measurement_evidence:0000:bounds.json",
+        "bytes": 1224,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "bounds.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "measurement_evidence",
+        "schema": null,
+        "sha256": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "evidence:calibration_evidence:0001:calibration.json",
+        "bytes": 189,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "calibration.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "calibration_evidence",
+        "schema": null,
+        "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "evidence:confirmatory_failure_matrix:0002:confirmatory_failure_matrix.json",
+        "bytes": 3712,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "confirmatory_failure_matrix.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "confirmatory_failure_matrix",
+        "schema": null,
+        "sha256": "86db598c799cc4fc24bf9ab27536a7093d1c32f9cb4410dc6bcebd0ddc09770b",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "evidence:confirmatory_protocol:0003:confirmatory_protocol.json",
+        "bytes": 3540,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "confirmatory_protocol.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "confirmatory_protocol",
+        "schema": null,
+        "sha256": "ec3fe8d311ec20325adc757c5f2c0a146868b5df3717f572004c0a3c965276ed",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "evidence:audit_log:0007:audit_log.jsonl",
+        "bytes": 442,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "audit_log.jsonl",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "audit_log",
+        "schema": null,
+        "sha256": "1841fb3ec3a18fef87d525300f7fec221b8862b85053c24c4589c4cdb62f1abc",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      }
+    ],
+    "receipt_refs": [
+      {
+        "artifact_id": "receipt:report",
+        "bytes": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "evaluated_at": "2026-01-02T00:00:00Z",
+        "metadata": {},
+        "path": null,
+        "reason": "Canonical report receipt binds the report bytes and named evidence hashes.",
+        "role": "receipt_integrity",
+        "schema": "cc.report.receipt.v0.3.1",
+        "sha256": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+        "status": null,
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      }
+    ],
+    "review_refs": [],
+    "scenario_refs": [
+      {
+        "artifact_id": "evidence:extremal_scenario:0005:extremal_lower.json",
+        "bytes": 4347,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "extremal_lower.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "extremal_scenario",
+        "schema": null,
+        "sha256": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      },
+      {
+        "artifact_id": "evidence:extremal_scenario:0006:extremal_upper.json",
+        "bytes": 4345,
+        "created_at": null,
+        "evaluated_at": null,
+        "metadata": {},
+        "path": "extremal_upper.json",
+        "reason": "Evidence artifact hash and byte count verified.",
+        "role": "extremal_scenario",
+        "schema": null,
+        "sha256": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a",
+        "status": "present",
+        "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
+      }
+    ],
+    "schema": "cc.support_graph.v1",
+    "support_edges": [
+      {
+        "non_claims": [
+          "Receipt evidence binds artifact integrity only; it does not prove statistical validity or deployment safety."
+        ],
+        "rationale": "Receipt hashing binds report and artifact bytes, but only as integrity.",
+        "relation": "integrity_binds",
+        "source_artifact_id": "receipt:report",
+        "strength": "integrity_only",
+        "target_claim_fragment": "claim.integrity.receipt"
+      },
+      {
+        "non_claims": [
+          "Measurement evidence is scoped to the report population, assumptions, calibration window, and interval method; it does not certify deployment safety."
+        ],
+        "rationale": "Report measurement bounds the named metric under stated scope.",
+        "relation": "bounds",
+        "source_artifact_id": "report:measurement",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.statistical_interval"
+      },
+      {
+        "non_claims": [
+          "Measurement evidence is scoped to the report population, assumptions, calibration window, and interval method; it does not certify deployment safety."
+        ],
+        "rationale": "Calibration qualifies the operating point for the report claim.",
+        "relation": "qualifies",
+        "source_artifact_id": "report:calibration",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.operating_point"
+      },
+      {
+        "non_claims": [
+          "Measurement evidence is scoped to the report population, assumptions, calibration window, and interval method; it does not certify deployment safety."
+        ],
+        "rationale": "Report measurement bounds the named metric under stated scope.",
+        "relation": "bounds",
+        "source_artifact_id": "evidence:measurement_evidence:0000:bounds.json",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.statistical_interval"
+      },
+      {
+        "non_claims": [
+          "Measurement evidence is scoped to the report population, assumptions, calibration window, and interval method; it does not certify deployment safety."
+        ],
+        "rationale": "Calibration qualifies the operating point for the report claim.",
+        "relation": "qualifies",
+        "source_artifact_id": "evidence:calibration_evidence:0001:calibration.json",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.operating_point"
+      },
+      {
+        "non_claims": [
+          "Confirmatory failure-matrix evidence remains scoped to its protocol and does not certify deployment safety."
+        ],
+        "rationale": "Confirmatory failure matrices test a predeclared or held-out matrix.",
+        "relation": "confirmatory_tests",
+        "source_artifact_id": "evidence:confirmatory_failure_matrix:0002:confirmatory_failure_matrix.json",
+        "strength": "confirmatory",
+        "target_claim_fragment": "claim.failure_matrix"
+      },
+      {
+        "non_claims": [
+          "Confirmatory protocol evidence remains scoped to its pre-registered plan and run separation; it does not certify deployment safety."
+        ],
+        "rationale": "Confirmatory protocol artifacts bind a pre-registered plan to a separate run.",
+        "relation": "confirmatory_tests",
+        "source_artifact_id": "evidence:confirmatory_protocol:0003:confirmatory_protocol.json",
+        "strength": "confirmatory",
+        "target_claim_fragment": "claim.confirmatory_boundary"
+      },
+      {
+        "non_claims": [
+          "Claim-decay evidence supports staleness, time bounding, or review pressure only; it does not support deployment safety or statistical validity."
+        ],
+        "rationale": "Decay policy qualifies freshness and review timing.",
+        "relation": "qualifies",
+        "source_artifact_id": "evidence:claim_decay:0004:decay_policy.json",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.staleness"
+      },
+      {
+        "non_claims": [
+          "Extremal scenarios support endpoint feasibility or counterfactual bounds; they do not support likelihood or deployment realization."
+        ],
+        "rationale": "Scenario artifacts witness feasible endpoint or counterfactual worlds.",
+        "relation": "bounds",
+        "source_artifact_id": "evidence:extremal_scenario:0005:extremal_lower.json",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.endpoint_feasibility"
+      },
+      {
+        "non_claims": [
+          "Extremal scenarios support endpoint feasibility or counterfactual bounds; they do not support likelihood or deployment realization."
+        ],
+        "rationale": "Scenario artifacts witness feasible endpoint or counterfactual worlds.",
+        "relation": "bounds",
+        "source_artifact_id": "evidence:extremal_scenario:0006:extremal_upper.json",
+        "strength": "diagnostic",
+        "target_claim_fragment": "claim.endpoint_feasibility"
+      }
+    ]
+  }
+}
