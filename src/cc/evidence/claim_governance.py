@@ -11,12 +11,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cc.evidence.claim_envelope import EnvelopeSupportSummary, SupportGraph, compile_claim_envelope
 from cc.evidence.decay import ClaimDecayRecord, DecayState, VersionWatchSet, evaluate_claim_decay
 from cc.evidence.extremal_scenario import ExtremalScenario, ScenarioKind
 from cc.reporting.canonical import sha256_canonical
 from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION, sha256_file
 
-CLAIM_GOVERNANCE_AUDIT_SCHEMA = "cc/claim-governance-audit.v1"
+CLAIM_GOVERNANCE_AUDIT_SCHEMA: Literal["cc/claim-governance-audit.v1"] = (
+    "cc/claim-governance-audit.v1"
+)
 
 ROLE_SUPPORT_MATRIX: dict[str, dict[str, list[str]]] = {
     "claim_decay": {
@@ -126,7 +129,7 @@ class ReceiptAudit(_StrictModel):
 
 
 class ClaimGovernanceAudit(_StrictModel):
-    schema: Literal["cc/claim-governance-audit.v1"] = CLAIM_GOVERNANCE_AUDIT_SCHEMA
+    schema: Literal["cc/claim-governance-audit.v1"] = CLAIM_GOVERNANCE_AUDIT_SCHEMA  # type: ignore[assignment]
     report_id: str
     evaluated_at: str
     verdict: GovernanceVerdict
@@ -140,6 +143,7 @@ class ClaimGovernanceAudit(_StrictModel):
     required_human_review: bool
     reasons: list[str]
     non_claims: list[str]
+    envelope_support: EnvelopeSupportSummary
 
 
 def verify_claim_governance(
@@ -336,7 +340,7 @@ def verify_claim_governance(
     else:
         verdict = GovernanceVerdict.PASS
 
-    return ClaimGovernanceAudit(
+    governance_audit = ClaimGovernanceAudit(
         report_id=report_id,
         evaluated_at=evaluated_at,
         verdict=verdict,
@@ -350,7 +354,9 @@ def verify_claim_governance(
         required_human_review=verdict is not GovernanceVerdict.PASS,
         reasons=reasons,
         non_claims=non_claims,
+        envelope_support=_empty_envelope_support_summary(),
     )
+    return _attach_envelope_support(governance_audit, report)
 
 
 def _failure_audit(
@@ -396,7 +402,30 @@ def _failure_audit(
         required_human_review=True,
         reasons=[reason],
         non_claims=[],
+        envelope_support=_empty_envelope_support_summary(),
     )
+
+
+def _empty_envelope_support_summary() -> EnvelopeSupportSummary:
+    return EnvelopeSupportSummary.from_graph(SupportGraph())
+
+
+def _attach_envelope_support(
+    audit: ClaimGovernanceAudit,
+    report: Mapping[str, Any],
+) -> ClaimGovernanceAudit:
+    try:
+        envelope = compile_claim_envelope(report, governance_audit=audit)
+    except Exception as exc:
+        reasons = _dedupe([*audit.reasons, f"ClaimEnvelope compilation failed: {exc}"])
+        return audit.model_copy(
+            update={
+                "verdict": GovernanceVerdict.FAIL,
+                "required_human_review": True,
+                "reasons": reasons,
+            }
+        )
+    return audit.model_copy(update={"envelope_support": envelope.governance_state.support_summary})
 
 
 def _verification_time(now: datetime | None) -> datetime | None:
@@ -911,6 +940,7 @@ __all__ = [
     "ClaimFreshnessStatus",
     "ClaimGovernanceAudit",
     "DecayAudit",
+    "EnvelopeSupportSummary",
     "EvidenceArtifactAudit",
     "EvidenceRoleStatus",
     "GovernanceVerdict",
