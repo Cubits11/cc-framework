@@ -327,7 +327,9 @@ def verify_consistency(
             return False
         if parsed.old_size < 0 or parsed.new_size < parsed.old_size:
             return False
-        if not all(_is_hash_hex(h) for h in [parsed.old_root, parsed.new_root, trusted_old, trusted_new]):
+        if not all(
+            _is_hash_hex(h) for h in [parsed.old_root, parsed.new_root, trusted_old, trusted_new]
+        ):
             return False
         if old_root is not None and parsed.old_root != old_root:
             return False
@@ -337,7 +339,10 @@ def verify_consistency(
             return False
 
         if parsed.old_size == parsed.new_size:
-            return parsed.old_root == parsed.new_root == trusted_old == trusted_new and not parsed.proof
+            return (
+                parsed.old_root == parsed.new_root == trusted_old == trusted_new
+                and not parsed.proof
+            )
         if parsed.old_size == 0:
             return parsed.old_root == trusted_old == EMPTY_ROOT_HASH and not parsed.proof
 
@@ -380,11 +385,7 @@ def verify_consistency(
             new_hash = _hash_node_bytes(new_hash, sibling)
             sn >>= 1
 
-        return (
-            old_hash.hex() == trusted_old
-            and new_hash.hex() == trusted_new
-            and not hashes
-        )
+        return old_hash.hex() == trusted_old and new_hash.hex() == trusted_new and not hashes
     except Exception:
         return False
 

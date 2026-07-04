@@ -80,6 +80,44 @@ For that reason, any claim above `diagnostic` must include non-claims. The repor
 should make the permitted claim easy to audit and the forbidden claims hard to
 miss.
 
+## Optional Evidence Roles
+
+`cc.report.v0.3.1` can attach optional evidence artifacts without changing the
+report schema. The role is stored on each item in `evidence.artifacts`, so the
+artifact path, byte count, role, and SHA-256 hash are included in the canonical
+receipt.
+
+Supported optional roles include:
+
+* `claim_decay`: a signed decay policy that says when a claim should be
+  rechecked, degraded, or expired. It is not the live claim state.
+* `extremal_scenario`: an endpoint or fitted scenario artifact with atom-table
+  and feasibility diagnostics. It is not a deployment approval.
+
+A signed decay policy is the artifact attached to the receipt. Verification-time
+decay state is computed later by evaluating that policy against a verifier's
+clock and observed versions. A configured statistical hazard score, when present,
+is a configured heuristic risk score, not a fitted or calibrated survival model.
+None of these prove actual deployment validity.
+
+```bash
+cc-report build-report \
+  --decay-policy decay.json \
+  --extremal-scenario upper.json \
+  --extremal-scenario lower.json
+```
+
+Generic role attachment is also available:
+
+```bash
+cc-report build-report \
+  --evidence-role decay.json=claim_decay
+```
+
+Exploratory red-team discovery can find candidate dependence cliffs. It does not
+by itself certify a confidence interval. Confirmatory failure-matrix evidence
+must be generated separately.
+
 ## Fixture Command
 
 ```bash

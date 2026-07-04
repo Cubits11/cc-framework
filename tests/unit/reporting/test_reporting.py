@@ -179,6 +179,42 @@ def test_cli_accepts_decay_extremal_and_generic_evidence_roles(tmp_path: Path) -
     assert roles == ["calibration_source", "claim_decay", "extremal_scenario"]
 
 
+@pytest.mark.parametrize(
+    "role_spec",
+    [
+        "decay.json",
+        "=claim_decay",
+        "decay.json=",
+        "decay.json:claim_decay",
+        "decay.json=bad role with spaces",
+        "decay.json=BadRole",
+        "decay.json=bad-role",
+        " decay.json=claim_decay",
+        "decay.json=claim_decay ",
+    ],
+)
+def test_cli_rejects_invalid_evidence_role_specs(tmp_path: Path, role_spec: str) -> None:
+    out = tmp_path / "report.json"
+    args = _cli_args(out)
+    claim_index = args.index("--claim")
+    args[claim_index:claim_index] = ["--evidence-role", role_spec]
+
+    result = _run_cli(args)
+
+    assert result.returncode != 0
+    assert "--evidence-role" in result.stderr
+
+
+def test_cli_plain_evidence_keeps_default_artifact_role(tmp_path: Path) -> None:
+    out = tmp_path / "report.json"
+
+    result = _run_cli(_cli_args(out))
+
+    assert result.returncode == 0, result.stderr
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["evidence"]["artifacts"][0]["role"] == "artifact"
+
+
 def test_checked_in_example_report_is_valid() -> None:
     report = json.loads(
         (ROOT / "examples" / "reporting" / "minimal_cc_report.json").read_text(encoding="utf-8")

@@ -408,18 +408,12 @@ class DiscoveredCliffReport:
     tail_dependence_shift: float
     objective_value: float
     certificate: CliffCertificate
-    certificate_ci: tuple[float, float]
+    exploratory_ci: tuple[float, float]
     certificate_role: Literal["exploratory_adaptive_selection"] = "exploratory_adaptive_selection"
-    certificate_ci_role: Literal["exploratory_adaptive_selection"] = (
+    exploratory_ci_role: Literal["exploratory_adaptive_selection"] = (
         "exploratory_adaptive_selection"
     )
     confirmatory_evidence: ConfirmatoryCliffEvidence | None = None
-
-    @property
-    def exploratory_certificate_ci(self) -> tuple[float, float]:
-        """Backward-compatible alias that names the adaptive interval correctly."""
-
-        return self.certificate_ci
 
     @property
     def confirmatory_certificate_ci(self) -> tuple[float, float] | None:
@@ -440,10 +434,9 @@ class DiscoveredCliffReport:
             "tail_dependence_shift": self.tail_dependence_shift,
             "objective_value": self.objective_value,
             "certificate": asdict(self.certificate),
-            "certificate_ci": self.certificate_ci,
             "certificate_role": self.certificate_role,
-            "certificate_ci_role": self.certificate_ci_role,
-            "exploratory_certificate_ci": self.exploratory_certificate_ci,
+            "exploratory_ci": self.exploratory_ci,
+            "exploratory_ci_role": self.exploratory_ci_role,
             "confirmatory_evidence": (
                 None if self.confirmatory_evidence is None else self.confirmatory_evidence.to_dict()
             ),
@@ -935,7 +928,7 @@ def run_dependence_search(
         tail_dependence_shift=best_score.tail_shift,
         objective_value=best_score.objective_value,
         certificate=certificate,
-        certificate_ci=ci,
+        exploratory_ci=ci,
         confirmatory_evidence=confirmatory_evidence,
     )
     return DependenceSearchResult(

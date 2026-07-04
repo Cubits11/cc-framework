@@ -182,8 +182,10 @@ def test_adaptive_certificate_ci_is_marked_exploratory() -> None:
 
     payload = result.report.to_dict()
 
-    assert payload["certificate_ci"] == payload["exploratory_certificate_ci"]
-    assert payload["certificate_ci_role"] == "exploratory_adaptive_selection"
+    assert "certificate_ci" not in payload
+    assert "confidence_interval" not in payload
+    assert payload["exploratory_ci"] == (1.0, 1.0)
+    assert payload["exploratory_ci_role"] == "exploratory_adaptive_selection"
     assert payload["certificate_role"] == "exploratory_adaptive_selection"
     assert payload["confirmatory_evidence"] is None
 
@@ -207,7 +209,7 @@ def test_confirmatory_failure_matrix_adds_independent_certificate_evidence() -> 
     assert confirmatory["source"] == "confirmatory_failure_matrix"
     assert confirmatory["certificate_ci"] == (0.5, 0.5)
     assert confirmatory["certificate"]["lambda_hat"] == 0.5
-    assert payload["certificate_ci_role"] == "exploratory_adaptive_selection"
+    assert payload["exploratory_ci_role"] == "exploratory_adaptive_selection"
 
 
 def test_confirmatory_builder_uses_failure_matrix_not_selected_best_score() -> None:

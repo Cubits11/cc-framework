@@ -7,6 +7,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, is_dataclass
+from enum import Enum
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -22,17 +23,35 @@ from cc.kernel.frechet_classes import (
 from cc.kernel.stress import StressTestResult
 
 EXTREMAL_SCENARIO_SCHEMA_VERSION = "cc.extremal_scenario.v1"
+_DISTRIBUTION_TOL = 1.0e-8
+_NEGATIVE_PROBABILITY_TOL = 1.0e-10
 _DEFAULT_NON_CLAIMS = (
     "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
     "This scenario does not certify production safety or legal compliance.",
     "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
+    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or "
+    "records a feasible endpoint/fitted scenario under the stated assumptions.",
 )
 
 
 class ExtremalModel(BaseModel):
     """Strict base model for extremal scenario artifacts."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+        strict=True,
+    )
+
+
+class ScenarioKind(str, Enum):
+    """Kind of endpoint or fitted scenario represented by the evidence object."""
+
+    FRECHET_ENDPOINT = "frechet_endpoint"
+    STRESS_ENDPOINT = "stress_endpoint"
+    CONFIRMATORY_FAILURE_MATRIX = "confirmatory_failure_matrix"
 
 
 class GuardrailOutcome(ExtremalModel):
@@ -54,21 +73,37 @@ class GuardrailOutcome(ExtremalModel):
 class ScenarioFeasibility(ExtremalModel):
     """Residual diagnostics against the scenario's defining constraints."""
 
+    probability_sum: float
+    min_probability: float
+    max_probability: float
+    negative_probability_count: int = Field(ge=0)
     total_probability_residual: float
     marginal_residuals: tuple[float, ...]
+    marginal_residual_linf: float
     pairwise_residuals: dict[str, float] = Field(default_factory=dict)
     event_probability_residual: float | None = None
+    bound_residual: float | None = None
+    objective_residual: float | None = None
     max_abs_residual: float
+    is_feasible: bool = True
 
     @model_validator(mode="after")
     def _require_finite_residuals(self) -> ScenarioFeasibility:
         values = [
+            self.probability_sum,
+            self.min_probability,
+            self.max_probability,
             self.total_probability_residual,
             *self.marginal_residuals,
+            self.marginal_residual_linf,
             *self.pairwise_residuals.values(),
         ]
         if self.event_probability_residual is not None:
             values.append(self.event_probability_residual)
+        if self.bound_residual is not None:
+            values.append(self.bound_residual)
+        if self.objective_residual is not None:
+            values.append(self.objective_residual)
         values.append(self.max_abs_residual)
         if any(not math.isfinite(float(value)) for value in values):
             raise ValueError("feasibility residuals must be finite")
@@ -78,20 +113,32 @@ class ScenarioFeasibility(ExtremalModel):
 class ExcludedEvidenceField(ExtremalModel):
     """Field intentionally excluded from scenario evidence."""
 
-    path: str = Field(min_length=1)
+    field_name: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    status: Literal["excluded"] = "excluded"
+    path: str = Field(min_length=1)
     replacement: str | None = None
 
 
 class ExtremalScenario(ExtremalModel):
     """Full finite-atom extremal scenario with narrative and non-claims."""
 
+    schema_: Literal["cc.extremal_scenario.v1"] = Field(
+        default=EXTREMAL_SCENARIO_SCHEMA_VERSION,
+        alias="schema",
+    )
     schema_version: Literal["cc.extremal_scenario.v1"] = EXTREMAL_SCENARIO_SCHEMA_VERSION
     scenario_id: str = Field(min_length=1)
+    kind: ScenarioKind
+    source: str = Field(min_length=1)
     source_kernel: str = Field(min_length=1)
     source_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    guardrail_ids: tuple[str, ...] = Field(min_length=1)
     endpoint: str = Field(min_length=1)
     event: Literal["and", "or"]
+    event_definition: str | None = None
+    objective: str | None = None
+    bound_value: float | None = None
     n_guardrails: int = Field(ge=1)
     event_probability: float = Field(ge=0.0, le=1.0)
     atom_table: tuple[GuardrailOutcome, ...]
@@ -104,6 +151,8 @@ class ExtremalScenario(ExtremalModel):
 
     @model_validator(mode="after")
     def _validate_atom_table(self) -> ExtremalScenario:
+        if len(self.guardrail_ids) != self.n_guardrails:
+            raise ValueError("guardrail_ids length must match n_guardrails")
         expected = 1 << self.n_guardrails
         if len(self.atom_table) != expected:
             raise ValueError(
@@ -111,11 +160,20 @@ class ExtremalScenario(ExtremalModel):
             )
         if any(len(outcome.failures) != self.n_guardrails for outcome in self.atom_table):
             raise ValueError("all atom outcomes must match n_guardrails")
+        if [outcome.atom_index for outcome in self.atom_table] != list(range(expected)):
+            raise ValueError("atom_table must be ordered by atom_index")
         total = sum(outcome.probability for outcome in self.atom_table)
-        if not math.isclose(total, 1.0, abs_tol=1.0e-8):
+        if not math.isclose(total, 1.0, abs_tol=_DISTRIBUTION_TOL):
             raise ValueError(f"atom_table probabilities must sum to 1, got {total}")
+        if not self.top_outcomes:
+            raise ValueError("top_outcomes must contain at least one outcome")
         if any(outcome not in self.atom_table for outcome in self.top_outcomes):
             raise ValueError("top_outcomes must be drawn from atom_table")
+        expected_top = _top_outcomes(self.atom_table, top_k=len(self.top_outcomes))
+        if self.top_outcomes != expected_top:
+            raise ValueError("top_outcomes must be sorted deterministically from atom_table")
+        if self.event_definition is None and self.objective is None:
+            raise ValueError("scenario must include event_definition or objective")
         return self
 
     @classmethod
@@ -162,10 +220,18 @@ class ExtremalScenario(ExtremalModel):
                     "distribution": [float(item) for item in distribution],
                 },
             ),
+            kind=ScenarioKind.FRECHET_ENDPOINT,
+            source="frechet",
             source_kernel="frechet",
             source_hash=source_hash,
+            guardrail_ids=_default_guardrail_ids(n_guardrails),
             endpoint=endpoint,
             event=result.event,
+            event_definition=(
+                f"{result.event.upper()} composed binary guardrail-failure event "
+                "under supplied marginals and side constraints."
+            ),
+            bound_value=float(target),
             n_guardrails=n_guardrails,
             event_probability=float(event_prob),
             atom_table=atom_table,
@@ -223,10 +289,18 @@ class ExtremalScenario(ExtremalModel):
                     "budget": _jsonable(result.stress_budget),
                 },
             ),
+            kind=ScenarioKind.STRESS_ENDPOINT,
+            source="stress",
             source_kernel="stress",
             source_hash=source_hash,
+            guardrail_ids=_default_guardrail_ids(n_guardrails),
             endpoint=endpoint,
             event=result.event,
+            event_definition=(
+                f"{result.event.upper()} composed binary guardrail-failure event under stress."
+            ),
+            objective="Maximize endpoint event probability under the fixed-marginal stress budget.",
+            bound_value=float(target),
             n_guardrails=n_guardrails,
             event_probability=float(target),
             atom_table=atom_table,
@@ -281,10 +355,18 @@ class ExtremalScenario(ExtremalModel):
                     "confirmatory_ci": list(confirmatory_ci),
                 },
             ),
+            kind=ScenarioKind.CONFIRMATORY_FAILURE_MATRIX,
+            source="empirical_confirmatory",
             source_kernel="empirical_confirmatory",
             source_hash=source_hash,
+            guardrail_ids=_default_guardrail_ids(n_guardrails),
             endpoint="confirmatory_failure_matrix",
             event=event,
+            event_definition=(
+                f"{event.upper()} composed binary guardrail-failure event from a non-adaptive "
+                "confirmatory failure matrix."
+            ),
+            bound_value=float(event_prob),
             n_guardrails=n_guardrails,
             event_probability=float(event_prob),
             atom_table=atom_table,
@@ -309,15 +391,22 @@ def excluded_evidence_fields_from_payload(
     excluded: list[ExcludedEvidenceField] = []
     for path, _value in _walk(payload):
         leaf = path.rsplit(".", 1)[-1]
-        if leaf in {"certificate_ci", "exploratory_certificate_ci"}:
+        if leaf in {
+            "certificate_ci",
+            "exploratory_ci",
+            "adaptive_search_ci",
+            "non_confirmatory_ci",
+            "exploratory_certificate_ci",
+        }:
             excluded.append(
                 ExcludedEvidenceField(
+                    field_name=leaf,
                     path=path,
                     reason=(
-                        "Adaptive red-team certificate intervals are exploratory; fitted "
-                        "empirical scenario evidence must use confirmatory_certificate_ci."
+                        "Adaptive/post-selection interval is exploratory and is not surfaced "
+                        "as confirmatory evidence."
                     ),
-                    replacement="confirmatory_certificate_ci",
+                    replacement="confirmatory_ci",
                 )
             )
     return tuple(excluded)
@@ -365,9 +454,14 @@ def _feasibility(
     expected_event_probability: float | None = None,
     pairwise_targets: Mapping[str, float] | None = None,
 ) -> ScenarioFeasibility:
+    raw_pmf = _raw_distribution(distribution, None)
     pmf = _as_distribution(distribution, None)
     n_events = int(math.log2(pmf.size))
-    total_residual = float(np.sum(pmf) - 1.0)
+    probability_sum = float(np.sum(raw_pmf))
+    total_residual = float(probability_sum - 1.0)
+    min_probability = float(np.min(raw_pmf))
+    max_probability = float(np.max(raw_pmf))
+    negative_probability_count = int(np.sum(raw_pmf < 0.0))
     marginals, pairwise = distribution_moments(pmf, n_events)
     marginal_residuals: tuple[float, ...]
     if expected_marginals is None:
@@ -377,6 +471,9 @@ def _feasibility(
         if expected.shape != marginals.shape:
             raise ValueError("expected_marginals length must match distribution dimension")
         marginal_residuals = tuple(float(item) for item in (marginals - expected))
+    marginal_residual_linf = (
+        max(abs(float(item)) for item in marginal_residuals) if marginal_residuals else 0.0
+    )
 
     pairwise_residuals: dict[str, float] = {}
     for key, expected_value in (pairwise_targets or {}).items():
@@ -393,12 +490,21 @@ def _feasibility(
     residuals = [total_residual, *marginal_residuals, *pairwise_residuals.values()]
     if event_residual is not None:
         residuals.append(event_residual)
+    max_abs_residual = max(abs(float(item)) for item in residuals) if residuals else 0.0
     return ScenarioFeasibility(
+        probability_sum=probability_sum,
+        min_probability=min_probability,
+        max_probability=max_probability,
+        negative_probability_count=negative_probability_count,
         total_probability_residual=total_residual,
         marginal_residuals=marginal_residuals,
+        marginal_residual_linf=marginal_residual_linf,
         pairwise_residuals=pairwise_residuals,
         event_probability_residual=event_residual,
-        max_abs_residual=max(abs(float(item)) for item in residuals) if residuals else 0.0,
+        bound_residual=event_residual,
+        objective_residual=event_residual,
+        max_abs_residual=max_abs_residual,
+        is_feasible=negative_probability_count == 0 and max_abs_residual <= _DISTRIBUTION_TOL,
     )
 
 
@@ -421,12 +527,21 @@ def _as_distribution(
     distribution: ArrayLike,
     n_events: int | None,
 ) -> NDArray[np.float64]:
+    pmf = _raw_distribution(distribution, n_events)
+    total = float(np.sum(pmf))
+    return cast(NDArray[np.float64], np.clip(pmf, 0.0, 1.0) / total)
+
+
+def _raw_distribution(
+    distribution: ArrayLike,
+    n_events: int | None,
+) -> NDArray[np.float64]:
     pmf = np.asarray(distribution, dtype=float)
     if pmf.ndim != 1:
         raise ValueError("distribution must be one-dimensional")
     if not np.all(np.isfinite(pmf)):
         raise ValueError("distribution must be finite")
-    if np.any(pmf < -1.0e-10):
+    if np.any(pmf < -_NEGATIVE_PROBABILITY_TOL):
         raise ValueError("distribution entries must be nonnegative")
     if n_events is None:
         if pmf.size == 0 or pmf.size & (pmf.size - 1):
@@ -435,9 +550,13 @@ def _as_distribution(
     if pmf.size != 1 << int(n_events):
         raise ValueError("distribution length must equal 2**n_events")
     total = float(np.sum(pmf))
-    if not math.isclose(total, 1.0, abs_tol=1.0e-8):
+    if not math.isclose(total, 1.0, abs_tol=_DISTRIBUTION_TOL):
         raise ValueError(f"distribution must sum to 1, got {total}")
-    return cast(NDArray[np.float64], np.clip(pmf, 0.0, 1.0) / total)
+    return cast(NDArray[np.float64], pmf)
+
+
+def _default_guardrail_ids(n_guardrails: int) -> tuple[str, ...]:
+    return tuple(f"guardrail_{idx}" for idx in range(n_guardrails))
 
 
 def _scenario_id(source_kernel: str, endpoint: str, payload: Mapping[str, Any]) -> str:
@@ -484,5 +603,6 @@ __all__ = [
     "ExtremalScenario",
     "GuardrailOutcome",
     "ScenarioFeasibility",
+    "ScenarioKind",
     "excluded_evidence_fields_from_payload",
 ]

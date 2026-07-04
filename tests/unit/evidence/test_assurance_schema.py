@@ -135,6 +135,70 @@ def test_write_assurance_case_exports(tmp_path: Path) -> None:
     assert "Assurance Case" in markdown
 
 
+def test_claim_decay_does_not_clear_statistical_coverage_gap_or_review_status() -> None:
+    case = assurance_case_from_run(
+        {
+            "run_id": "decay-only",
+            "evidence": {
+                "artifacts": [
+                    {
+                        "path": "decay.json",
+                        "sha256": "a" * 64,
+                        "bytes": 123,
+                        "role": "claim_decay",
+                    }
+                ]
+            },
+        }
+    )
+    uncertainty = {claim.category: claim for claim in case.top_claim.subclaims}[
+        ClaimCategory.UNCERTAINTY_HONESTLY_QUANTIFIED
+    ]
+
+    assert any(evidence.role is EvidenceRole.CLAIM_DECAY for evidence in uncertainty.evidence)
+    assert any(
+        "No statistical coverage" in defeater.description for defeater in uncertainty.defeaters
+    )
+    assert uncertainty.review_status is ReviewStatus.NEEDS_HUMAN_REVIEW
+    assert all(
+        evidence.review_status is ReviewStatus.AUTO_POPULATED for evidence in uncertainty.evidence
+    )
+    assert all(evidence.human_review_required is True for evidence in uncertainty.evidence)
+    assert "does not prove claim validity" in uncertainty.evidence[0].description
+
+
+def test_extremal_scenario_does_not_clear_fh_gap_or_review_status() -> None:
+    case = assurance_case_from_run(
+        {
+            "run_id": "extremal-only",
+            "evidence": {
+                "artifacts": [
+                    {
+                        "path": "extremal.json",
+                        "sha256": "b" * 64,
+                        "bytes": 456,
+                        "role": "extremal_scenario",
+                    }
+                ]
+            },
+        }
+    )
+    composition = {claim.category: claim for claim in case.top_claim.subclaims}[
+        ClaimCategory.COMPOSITION_RISK_BOUNDED
+    ]
+
+    assert any(evidence.role is EvidenceRole.EXTREMAL_SCENARIO for evidence in composition.evidence)
+    assert any(
+        "No FH/Frechet-Hoeffding" in defeater.description for defeater in composition.defeaters
+    )
+    assert composition.review_status is ReviewStatus.NEEDS_HUMAN_REVIEW
+    assert all(
+        evidence.review_status is ReviewStatus.AUTO_POPULATED for evidence in composition.evidence
+    )
+    assert all(evidence.human_review_required is True for evidence in composition.evidence)
+    assert "does not prove deployment safety" in composition.evidence[0].description
+
+
 def test_human_review_defeater_defaults_are_explicit() -> None:
     defeater = Defeater(id="defeater-1", description="A reviewer must resolve this challenge.")
 

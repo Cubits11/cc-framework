@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -24,6 +25,8 @@ from cc.reporting.report import (
     sha256_file,
     write_cc_report,
 )
+
+_EVIDENCE_ROLE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -274,13 +277,19 @@ def _optional_float(value: Any) -> float | None:
 def _parse_evidence_roles(entries: list[str]) -> dict[str, str]:
     roles: dict[str, str] = {}
     for entry in entries:
-        if "=" not in entry:
+        if entry.count("=") != 1:
             raise ValueError("--evidence-role entries must be formatted as PATH=ROLE")
         raw_path, raw_role = entry.split("=", 1)
         path = raw_path.strip()
         role = raw_role.strip()
         if not path or not role:
             raise ValueError("--evidence-role entries must include a non-empty PATH and ROLE")
+        if path != raw_path or role != raw_role:
+            raise ValueError(
+                "--evidence-role PATH and ROLE must not include surrounding whitespace"
+            )
+        if _EVIDENCE_ROLE_RE.fullmatch(role) is None:
+            raise ValueError(f"--evidence-role ROLE must match ^[a-z][a-z0-9_]*$ (got {role!r})")
         roles[path] = role
     return roles
 

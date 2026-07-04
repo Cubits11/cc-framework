@@ -106,9 +106,7 @@ class RootCheckpoint:
             tree_size=int(payload["tree_size"]),
             root_hash=str(payload["root_hash"]),
             issued_at=str(payload["issued_at"]),
-            run_nonce=(
-                None if payload.get("run_nonce") is None else str(payload.get("run_nonce"))
-            ),
+            run_nonce=(None if payload.get("run_nonce") is None else str(payload.get("run_nonce"))),
             previous_root_hash=(
                 None
                 if payload.get("previous_root_hash") is None
@@ -254,9 +252,7 @@ def verify_witness_signature(
             return False
         if signature.checkpoint_hash != _sha256_json(checkpoint.to_dict()):
             return False
-        public_key = ed25519.Ed25519PublicKey.from_public_bytes(
-            bytes.fromhex(trusted_public_key)
-        )
+        public_key = ed25519.Ed25519PublicKey.from_public_bytes(bytes.fromhex(trusted_public_key))
         public_key.verify(
             bytes.fromhex(signature.signature),
             _canonical_json_bytes(checkpoint.to_dict()),

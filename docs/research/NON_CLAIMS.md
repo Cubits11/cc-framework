@@ -32,6 +32,20 @@ The project does not claim:
 | The project does not replace red teaming. | Red teaming searches for failures, threat-model gaps, and operational weaknesses. Static bounds over supplied evidence cannot discover every relevant failure mode. | A complementary analysis layer for quantifying dependence and composition risk in evidence produced by evaluations, including red-team exercises. |
 | The project does not replace human governance. | Decisions about acceptable risk, deployment, user impact, legal obligations, and remediation require accountable human judgment. | Structured evidence, non-claims, and review-ready artifacts that help humans make narrower, better-audited decisions. |
 
+## Evidence-Object Non-Claims
+
+- A claim_decay artifact does not prove the system is currently safe; it defines
+  when the claim should be rechecked, degraded, or expired.
+- An extremal_scenario artifact does not prove the endpoint scenario is likely;
+  it proves or records a feasible endpoint/fitted scenario under the stated
+  assumptions.
+- An exploratory red-team interval is not a confirmatory certificate unless
+  validated by a separate confirmatory procedure.
+
+Exploratory red-team discovery can find candidate dependence cliffs. It does not
+by itself certify a confidence interval. Confirmatory failure-matrix evidence
+must be generated separately.
+
 ## Enforcement Guidance
 
 - If a result is conditional on assumptions, state those assumptions.

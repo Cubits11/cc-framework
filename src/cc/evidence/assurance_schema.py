@@ -228,13 +228,19 @@ def assurance_case_from_run(evidence_bundle: Mapping[str, Any] | str | Path) -> 
         _collect_matches(payload, _DECAY_PATTERNS),
         role=EvidenceRole.CLAIM_DECAY,
         id_prefix="ev-decay",
-        description="Claim-decay policy, hazard covariates, or freshness-trigger artifacts.",
+        description=(
+            "Claim-decay policy or freshness-trigger artifacts; supports time-bounding "
+            "only and does not prove claim validity."
+        ),
     )
     extremal_evidence = _evidence_from_matches(
         _collect_matches(payload, _EXTREMAL_PATTERNS),
         role=EvidenceRole.EXTREMAL_SCENARIO,
         id_prefix="ev-extremal",
-        description="Extremal scenario atom-table or endpoint-distribution evidence.",
+        description=(
+            "Extremal scenario atom-table or endpoint-distribution evidence; supports "
+            "dependence-bound explanation only and does not prove deployment safety."
+        ),
     )
 
     run_contexts = _run_contexts(payload, run_id)

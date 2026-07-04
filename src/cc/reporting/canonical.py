@@ -85,8 +85,7 @@ def _normalize_json_value(value: Any, *, path: str) -> JsonValue:
         return out
     if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray, str)):
         return [
-            _normalize_json_value(item, path=f"{path}[{idx}]")
-            for idx, item in enumerate(value)
+            _normalize_json_value(item, path=f"{path}[{idx}]") for idx, item in enumerate(value)
         ]
     raise CanonicalJSONError(
         f"{path} contains non-JSON-native value of type {type(value).__name__}"
