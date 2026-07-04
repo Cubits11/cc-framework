@@ -11,6 +11,7 @@ from typing import Any
 
 from cc.evidence import ClaimGovernanceAudit, GovernanceVerdict, verify_claim_governance
 from cc.evidence.claim_governance import ClaimFreshnessStatus, _empty_envelope_support_summary
+from cc.evidence.claim_envelope import compile_claim_envelope
 from cc.evidence.decay import ClaimDecayPolicy, ClaimDecayRecord, VersionWatchSet
 from cc.evidence.extremal_scenario import ExtremalScenario
 from cc.kernel.frechet_classes import frechet_bounds
@@ -587,3 +588,15 @@ def _run_cli(args: list[str]) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
+
+
+def test_claim_envelope_preserves_governance_audit_schema(tmp_path: Path) -> None:
+    report_path = _write_package(tmp_path)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    envelope = compile_claim_envelope(report, governance_audit=audit)
+
+    assert envelope.governance_state.verifier_schema == "cc/claim-governance-audit.v1"
+    assert envelope.governance_state.verdict == "pass"
+    assert envelope.governance_state.required_human_review is False

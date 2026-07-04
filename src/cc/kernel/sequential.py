@@ -400,9 +400,7 @@ def fixed_sample_size_one_sided(
     _open_probability(power, "power")
     z_alpha = _normal_quantile(1.0 - alpha)
     z_power = _normal_quantile(power)
-    numerator = z_alpha * math.sqrt(p0 * (1.0 - p0)) + z_power * math.sqrt(
-        p1 * (1.0 - p1)
-    )
+    numerator = z_alpha * math.sqrt(p0 * (1.0 - p0)) + z_power * math.sqrt(p1 * (1.0 - p1))
     n = (numerator / (p1 - p0)) ** 2
     return math.ceil(n)
 

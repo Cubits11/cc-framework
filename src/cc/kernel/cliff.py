@@ -595,7 +595,9 @@ def _pseudo_observations(
     return _clip_unit_interval(out)
 
 
-def _marginal_reference_arrays(samples: ArrayLike | Sequence[ArrayLike]) -> tuple[FloatArray, FloatArray]:
+def _marginal_reference_arrays(
+    samples: ArrayLike | Sequence[ArrayLike],
+) -> tuple[FloatArray, FloatArray]:
     if isinstance(samples, np.ndarray):
         arr = _as_2d_float_array(samples)
         return (arr[:, 0], arr[:, 1])

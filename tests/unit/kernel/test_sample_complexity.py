@@ -26,9 +26,7 @@ def test_simultaneous_radius_uses_union_bound_rate_count() -> None:
     expected = math.sqrt(math.log(6 / 0.05) / 400)
 
     assert radius == pytest.approx(expected)
-    assert simultaneous_sample_size(0.1, 3, 0.05) == math.ceil(
-        math.log(6 / 0.05) / (2 * 0.1**2)
-    )
+    assert simultaneous_sample_size(0.1, 3, 0.05) == math.ceil(math.log(6 / 0.05) / (2 * 0.1**2))
 
 
 def test_rate_count_helpers() -> None:

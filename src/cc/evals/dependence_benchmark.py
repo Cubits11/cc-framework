@@ -224,10 +224,7 @@ def build_summary_from_failure_matrix(
     label_names = _validate_labels(labels)
     matrix = _failure_matrix(failure_matrix, expected_width=len(label_names))
     n_rows = int(matrix.shape[0])
-    marginals = {
-        label: float(np.mean(matrix[:, index]))
-        for index, label in enumerate(label_names)
-    }
+    marginals = {label: float(np.mean(matrix[:, index])) for index, label in enumerate(label_names)}
     pairwise_overlaps: dict[str, float] = {}
     for left_index, left in enumerate(label_names):
         for right_index in range(left_index + 1, len(label_names)):
@@ -411,7 +408,9 @@ def _event_summary(
     matrix: np.ndarray[Any, Any],
 ) -> dict[str, Any]:
     result = identified_region(query, assumptions)
-    product_baseline = independent_event_probability(marginals, query, labels=assumptions.guardrails)
+    product_baseline = independent_event_probability(
+        marginals, query, labels=assumptions.guardrails
+    )
     if query.name == "any_guardrail_failure":
         observed = float(np.mean(np.any(matrix == 1, axis=1)))
     elif query.name == "stack_unsafe_pass":
@@ -544,8 +543,7 @@ def _records_from_matrix(
             "row_index": index,
             "row_id": str(index),
             "failure_indicators": {
-                label: int(matrix[index, label_index])
-                for label_index, label in enumerate(labels)
+                label: int(matrix[index, label_index]) for label_index, label in enumerate(labels)
             },
         }
         for index in range(matrix.shape[0])

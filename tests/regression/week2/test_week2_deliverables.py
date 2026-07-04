@@ -37,7 +37,9 @@ def test_smoke_runs(smoke_artifacts: tuple[Path, Path]):
 
 def test_unit_tests_pass():
     """Unit tests are green"""
-    result = subprocess.run([sys.executable, "-m", "pytest", "tests/unit", "-q"], capture_output=True)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/unit", "-q"], capture_output=True
+    )
     assert result.returncode == 0, result.stderr.decode()
 
 

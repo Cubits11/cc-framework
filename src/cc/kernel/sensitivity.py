@@ -377,19 +377,16 @@ class AssumptionSet:
 
         lo, hi = _validate_interval(f"marginal interval for {guardrail!r}", lower, upper)
         coeffs = LinearQuery.marginal(self.guardrails, guardrail).coefficients
-        return (
-            self.with_linear_constraint(
-                f"marginal:{guardrail}:lower",
-                coeffs,
-                ">=",
-                lo,
-            )
-            .with_linear_constraint(
-                f"marginal:{guardrail}:upper",
-                coeffs,
-                "<=",
-                hi,
-            )
+        return self.with_linear_constraint(
+            f"marginal:{guardrail}:lower",
+            coeffs,
+            ">=",
+            lo,
+        ).with_linear_constraint(
+            f"marginal:{guardrail}:upper",
+            coeffs,
+            "<=",
+            hi,
         )
 
     def with_pairwise_joint_interval(
@@ -408,19 +405,16 @@ class AssumptionSet:
         )
         coeffs = LinearQuery.joint(self.guardrails, left, right).coefficients
         pair_name = f"{left}&{right}"
-        return (
-            self.with_linear_constraint(
-                f"pairwise:{pair_name}:lower",
-                coeffs,
-                ">=",
-                lo,
-            )
-            .with_linear_constraint(
-                f"pairwise:{pair_name}:upper",
-                coeffs,
-                "<=",
-                hi,
-            )
+        return self.with_linear_constraint(
+            f"pairwise:{pair_name}:lower",
+            coeffs,
+            ">=",
+            lo,
+        ).with_linear_constraint(
+            f"pairwise:{pair_name}:upper",
+            coeffs,
+            "<=",
+            hi,
         )
 
     def with_monotonicity(self, antecedent: str, consequent: str) -> AssumptionSet:
@@ -854,9 +848,7 @@ def _validate_lp_solution(
         raise IdentificationInfeasibleError(f"{label} has atom mass above 1.")
     total = float(np.sum(solution))
     if abs(total - 1.0) > effective_tol:
-        raise IdentificationInfeasibleError(
-            f"{label} atom probabilities sum to {total}, not 1."
-        )
+        raise IdentificationInfeasibleError(f"{label} atom probabilities sum to {total}, not 1.")
     eq_residual = float(np.max(np.abs(a_eq @ solution - b_eq)))
     if eq_residual > effective_tol:
         raise IdentificationInfeasibleError(

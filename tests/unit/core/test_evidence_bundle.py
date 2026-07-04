@@ -9,7 +9,9 @@ pytest.importorskip("blake3")
 from cc.core.evidence_bundle import EvidenceBundleConfig, run_evidence_bundle
 
 
-def _bundle_config(tmp_path: Path, prompt_text: str = "user email: test@example.com\n") -> EvidenceBundleConfig:
+def _bundle_config(
+    tmp_path: Path, prompt_text: str = "user email: test@example.com\n"
+) -> EvidenceBundleConfig:
     prompt_source = tmp_path / "prompts.txt"
     prompt_source.write_text(prompt_text, encoding="utf-8")
 

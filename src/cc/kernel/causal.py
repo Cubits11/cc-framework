@@ -92,7 +92,9 @@ def _validate_lengths(outcome: np.ndarray, world: np.ndarray, cluster: np.ndarra
         raise ValueError("both worlds must be observed")
 
 
-def difference_in_means(outcome: Sequence[float] | np.ndarray, world: Sequence[int] | np.ndarray) -> float:
+def difference_in_means(
+    outcome: Sequence[float] | np.ndarray, world: Sequence[int] | np.ndarray
+) -> float:
     """Return ``mean(Y | W=1) - mean(Y | W=0)``."""
 
     y = _as_1d_float(outcome, "outcome")
@@ -301,10 +303,7 @@ def generate_synthetic_clustered_two_world(
     cluster = np.repeat(np.arange(n_clusters), cluster_size)
     residual = rng.normal(0.0, residual_sd, size=n_clusters * cluster_size)
     outcome = (
-        float(intercept)
-        + float(treatment_effect) * world
-        + cluster_effects[cluster]
-        + residual
+        float(intercept) + float(treatment_effect) * world + cluster_effects[cluster] + residual
     )
     return ClusteredTwoWorldData(
         outcome=outcome.astype(float),
@@ -423,7 +422,9 @@ def run_coverage_simulation(
                     "naive_coverage": naive_coverage,
                     "coverage_tolerance": tolerance,
                     "within_tolerance": abs(coverage - nominal) <= tolerance,
-                    "mean_se_understatement_ratio": float(np.mean(se_ratios)) if se_ratios else math.inf,
+                    "mean_se_understatement_ratio": float(np.mean(se_ratios))
+                    if se_ratios
+                    else math.inf,
                 }
             )
     return rows

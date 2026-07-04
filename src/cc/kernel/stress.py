@@ -169,11 +169,13 @@ def stress_test(
     budget = _coerce_budget(stress_budget)
     states = atom_matrix(baseline.n_events).astype(float)
     objective = _event_vector(states, budget.event)
-    baseline_risk = _clip01(event_probability(
-        baseline.distribution,
-        event=budget.event,
-        n_events=baseline.n_events,
-    ))
+    baseline_risk = _clip01(
+        event_probability(
+            baseline.distribution,
+            event=budget.event,
+            n_events=baseline.n_events,
+        )
+    )
 
     fh = frechet_bounds(
         baseline.marginals,
@@ -327,10 +329,13 @@ def _resolve_dependence(
     if isinstance(dependence, Mapping):
         return _resolve_from_parts(
             marginals=cast(Sequence[float] | None, dependence.get("marginals")),
-            distribution=cast(Sequence[float] | None, _first_present(
-                dependence,
-                ("distribution", "probabilities", "pmf"),
-            )),
+            distribution=cast(
+                Sequence[float] | None,
+                _first_present(
+                    dependence,
+                    ("distribution", "probabilities", "pmf"),
+                ),
+            ),
             samples=cast(ArrayLike | None, dependence.get("samples")),
             pairwise=cast(
                 Iterable[PairwiseDependence | Mapping[str, object]] | None,

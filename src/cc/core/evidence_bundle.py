@@ -414,7 +414,9 @@ def run_evidence_bundle(config: EvidenceBundleConfig) -> dict[str, Any]:
         "guardrails": config.guardrails,
         "composition": config.composition,
         "seed": config.seed,
-        "rerun_argv": _redact_argv(sys.argv) if sys.argv else ["python", "-m", "cc.core.evidence_bundle"],
+        "rerun_argv": _redact_argv(sys.argv)
+        if sys.argv
+        else ["python", "-m", "cc.core.evidence_bundle"],
         "env_gates": config.env_gates or {},
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "platform": sys.platform,
@@ -642,7 +644,9 @@ def verify_evidence_bundle(
             return False, "metrics hash mismatch"
         if attestation.get("run_id") != manifest.get("run_id"):
             return False, "run_id mismatch"
-        if not manifest.get("run_nonce") or attestation.get("run_nonce") != manifest.get("run_nonce"):
+        if not manifest.get("run_nonce") or attestation.get("run_nonce") != manifest.get(
+            "run_nonce"
+        ):
             return False, "run_nonce mismatch"
 
         transparency = attestation.get("transparency_log")

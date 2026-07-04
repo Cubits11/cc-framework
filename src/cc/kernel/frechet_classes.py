@@ -309,7 +309,9 @@ def dependence_to_joint_probability(
 
     lower, upper = _pairwise_joint_bounds(p_i, p_j)
     if joint < lower - tol or joint > upper + tol:
-        corr_bounds = pairwise_correlation_bounds(p_i, p_j) if _has_pair_variance(p_i, p_j) else None
+        corr_bounds = (
+            pairwise_correlation_bounds(p_i, p_j) if _has_pair_variance(p_i, p_j) else None
+        )
         extra = "" if corr_bounds is None else f" admissible correlation range is {corr_bounds}."
         raise ValueError(
             f"{kind}={value} implies P(A_i and A_j)={joint}, outside "
@@ -343,7 +345,9 @@ def joint_probability_to_dependence(
     return float(np.clip(value, -1.0, 1.0))
 
 
-def pairwise_correlation_bounds(p_i: float, p_j: float, *, tol: float = _TOL) -> tuple[float, float]:
+def pairwise_correlation_bounds(
+    p_i: float, p_j: float, *, tol: float = _TOL
+) -> tuple[float, float]:
     """Return admissible bounds for binary phi/rho/tau-b at fixed margins."""
 
     _validate_probability("p_i", p_i, tol)
@@ -355,7 +359,9 @@ def pairwise_correlation_bounds(p_i: float, p_j: float, *, tol: float = _TOL) ->
     return float(np.clip(lower, -1.0, 1.0)), float(np.clip(upper, -1.0, 1.0))
 
 
-def distribution_moments(distribution: ArrayLike, n_events: int | None = None) -> tuple[FloatArray, FloatArray]:
+def distribution_moments(
+    distribution: ArrayLike, n_events: int | None = None
+) -> tuple[FloatArray, FloatArray]:
     """Return marginals and pairwise joint-probability matrix for an atom pmf."""
 
     pmf, n_int = _as_distribution(distribution, n_events)

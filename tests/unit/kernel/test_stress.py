@@ -40,10 +40,7 @@ def test_wasserstein_stress_is_budget_constrained_not_fh_by_default() -> None:
 
 def test_samples_are_accepted_as_empirical_baseline_dependence() -> None:
     samples = np.asarray(
-        [[0, 0]] * 68
-        + [[1, 0]] * 12
-        + [[0, 1]] * 12
-        + [[1, 1]] * 8,
+        [[0, 0]] * 68 + [[1, 0]] * 12 + [[0, 1]] * 12 + [[1, 1]] * 8,
         dtype=int,
     )
 

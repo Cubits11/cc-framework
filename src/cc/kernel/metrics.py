@@ -101,8 +101,7 @@ def independent_event_probability(
     n_atoms = 1 << len(label_names)
     if query.coefficients.size != n_atoms:
         raise MetricDomainError(
-            f"query dimension must equal 2**len(labels) ({n_atoms}); "
-            f"got {query.coefficients.size}"
+            f"query dimension must equal 2**len(labels) ({n_atoms}); got {query.coefficients.size}"
         )
     _validate_event_coefficients(query.coefficients)
 
@@ -247,8 +246,7 @@ def _rate_values(name: str, rates: RateInput) -> tuple[float, ...]:
     if isinstance(rates, (str, bytes)):
         raise MetricDomainError(f"{name} must not be a string")
     values = tuple(
-        _validate_probability(f"{name}[{index}]", value)
-        for index, value in enumerate(rates)
+        _validate_probability(f"{name}[{index}]", value) for index, value in enumerate(rates)
     )
     if not values:
         raise MetricDomainError(f"{name} must be nonempty")
@@ -269,7 +267,9 @@ def _mapping_rate_values(name: str, rates: Mapping[str, float]) -> tuple[float, 
 def _singleton_shifts(baseline: RateInput, deployed: RateInput) -> tuple[float, ...]:
     if isinstance(baseline, Mapping) or isinstance(deployed, Mapping):
         if not isinstance(baseline, Mapping) or not isinstance(deployed, Mapping):
-            raise MetricDomainError("singleton_baseline and singleton_deployed must use the same shape")
+            raise MetricDomainError(
+                "singleton_baseline and singleton_deployed must use the same shape"
+            )
         return _mapping_singleton_shifts(baseline, deployed)
     if isinstance(baseline, (str, bytes)) or isinstance(deployed, (str, bytes)):
         raise MetricDomainError("singleton rates must not be strings")

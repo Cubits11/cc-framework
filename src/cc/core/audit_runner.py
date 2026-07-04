@@ -283,9 +283,9 @@ def run_audit(config: AuditRunConfig) -> dict[str, Any]:
         )
         attestation["public_key"] = public_key_bytes.hex()
         attestation["signature_status"] = "signed"
-        attestation_message = json.dumps(
-            attestation, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+        attestation_message = json.dumps(attestation, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
         attestation["signature"] = private_key.sign(attestation_message).hex()
 
     attestation_path = output_dir / "attestation.json"

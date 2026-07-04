@@ -107,8 +107,12 @@ def test_benchmark_writes_batched_hash_chains(tmp_path: Path):
     verify_chain(str(out_path))
     verify_chain(str(audit_path))
 
-    output_records = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
-    audit_records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    output_records = [
+        json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()
+    ]
+    audit_records = [
+        json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()
+    ]
     assert [record["record_type"] for record in output_records] == ["item", "item", "summary"]
     assert all(record["record_type"] == "guardrail_adapter_audit" for record in audit_records)
     assert len(audit_records) == len(dataset)

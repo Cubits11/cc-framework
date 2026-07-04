@@ -38,7 +38,9 @@ def _exact_marginal_assumptions(
 ) -> AssumptionSet:
     assumptions = AssumptionSet.empty(guardrails)
     for guardrail, marginal in zip(guardrails, marginals, strict=True):
-        assumptions = assumptions.with_marginal_interval(guardrail, float(marginal), float(marginal))
+        assumptions = assumptions.with_marginal_interval(
+            guardrail, float(marginal), float(marginal)
+        )
     return assumptions
 
 

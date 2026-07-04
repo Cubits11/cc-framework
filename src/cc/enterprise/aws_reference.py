@@ -348,9 +348,7 @@ def verify_bundle(
     object_key = item["object_key"]["S"]
     s3 = boto3_session.client("s3", region_name=resources.region_name)
     bundle = json.loads(
-        s3.get_object(Bucket=resources.bucket_name, Key=object_key)["Body"]
-        .read()
-        .decode("utf-8")
+        s3.get_object(Bucket=resources.bucket_name, Key=object_key)["Body"].read().decode("utf-8")
     )
 
     verification = bundle["verification"]

@@ -24,9 +24,7 @@ def load_checker() -> ModuleType:
 def test_static_checker_rejects_forbidden_tracked_runtime_file() -> None:
     checker = load_checker()
 
-    findings = checker.validate_tracked_paths(
-        ["checkpoints/exp_123/checkpoint_000100.json"]
-    )
+    findings = checker.validate_tracked_paths(["checkpoints/exp_123/checkpoint_000100.json"])
 
     assert findings
     assert "runtime-only generated directory" in findings[0].message

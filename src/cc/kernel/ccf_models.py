@@ -154,17 +154,13 @@ def alpha_factor_basic_event_probabilities(
 
     scheme = _canonical_testing_scheme(testing_scheme)
     if scheme == "staggered":
-        return tuple(
-            float(alphas[k - 1]) * q_t / comb(m - 1, k - 1)
-            for k in range(1, m + 1)
-        )
+        return tuple(float(alphas[k - 1]) * q_t / comb(m - 1, k - 1) for k in range(1, m + 1))
 
     alpha_t = float(sum(k * float(alphas[k - 1]) for k in range(1, m + 1)))
     if alpha_t <= _TOL:
         raise ValueError("alpha_t must be positive for non-staggered alpha-factor modeling.")
     return tuple(
-        k * float(alphas[k - 1]) * q_t / (comb(m - 1, k - 1) * alpha_t)
-        for k in range(1, m + 1)
+        k * float(alphas[k - 1]) * q_t / (comb(m - 1, k - 1) * alpha_t) for k in range(1, m + 1)
     )
 
 
@@ -234,8 +230,7 @@ def partition_failure_probability(basic_event_probabilities: Sequence[float]) ->
     bell[0] = 1.0
     for n in range(1, m + 1):
         bell[n] = sum(
-            comb(n - 1, k - 1) * float(q_values[k - 1]) * bell[n - k]
-            for k in range(1, n + 1)
+            comb(n - 1, k - 1) * float(q_values[k - 1]) * bell[n - k] for k in range(1, n + 1)
         )
     return _clip_probability(float(bell[m]), "partition failure probability")
 
@@ -363,7 +358,9 @@ def _clip_probability(value: float, name: str, *, tol: float = _TOL) -> float:
     return float(np.clip(value, 0.0, 1.0))
 
 
-def _canonical_testing_scheme(testing_scheme: AlphaTestingScheme) -> Literal["staggered", "non_staggered"]:
+def _canonical_testing_scheme(
+    testing_scheme: AlphaTestingScheme,
+) -> Literal["staggered", "non_staggered"]:
     scheme = str(testing_scheme).lower().replace("-", "_")
     if scheme == "staggered":
         return "staggered"

@@ -87,9 +87,7 @@ def test_reliasoft_alpha_factor_worked_example_is_reproduced() -> None:
 def test_partition_failure_probability_generalizes_three_component_formula() -> None:
     q1, q2, q3, q4 = 0.01, 0.002, 0.0003, 0.00004
 
-    assert partition_failure_probability((q1, q2, q3)) == pytest.approx(
-        q1**3 + 3.0 * q1 * q2 + q3
-    )
+    assert partition_failure_probability((q1, q2, q3)) == pytest.approx(q1**3 + 3.0 * q1 * q2 + q3)
     assert partition_failure_probability((q1, q2, q3, q4)) == pytest.approx(
         q1**4 + 6.0 * q1**2 * q2 + 3.0 * q2**2 + 4.0 * q1 * q3 + q4
     )

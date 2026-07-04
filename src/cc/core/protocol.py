@@ -289,9 +289,7 @@ class ICCComputer:
                 "High within-strategy dependence; cluster-bootstrap inference is required."
             )
         elif global_icc >= 0.50:
-            parts.append(
-                "Moderate within-strategy dependence; report cluster-robust intervals."
-            )
+            parts.append("Moderate within-strategy dependence; report cluster-robust intervals.")
         elif global_icc >= 0.20:
             parts.append(
                 "Low within-strategy dependence; cluster-bootstrap intervals remain prespecified."
@@ -423,9 +421,7 @@ class BayesianSequentialTester:
             bf = 1.0
         else:
             like_h1 = float(stats.norm.pdf(effect_mean, loc=0.0, scale=effect_se))
-            like_h0 = float(
-                stats.norm.pdf(effect_mean, loc=0.0, scale=max(effect_se * 0.1, 1e-10))
-            )
+            like_h0 = float(stats.norm.pdf(effect_mean, loc=0.0, scale=max(effect_se * 0.1, 1e-10)))
             bf = like_h1 / max(like_h0, 1e-12)
         post_h1 = bf / (1.0 + bf)
         post_h0 = 1.0 - post_h1

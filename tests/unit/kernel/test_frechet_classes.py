@@ -177,9 +177,7 @@ def test_degenerate_rank_dependence_requires_joint_probability() -> None:
     with pytest.raises(ValueError, match="undefined"):
         dependence_to_joint_probability(1.0, 0.4, 0.0, "kendall_tau")
 
-    assert dependence_to_joint_probability(1.0, 0.4, 0.4, "joint_probability") == pytest.approx(
-        0.4
-    )
+    assert dependence_to_joint_probability(1.0, 0.4, 0.4, "joint_probability") == pytest.approx(0.4)
 
 
 def test_random_feasible_distribution_matches_requested_moments() -> None:

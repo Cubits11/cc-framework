@@ -9,6 +9,7 @@ import pytest
 def _has_pytest_benchmark() -> bool:
     try:
         import pytest_benchmark  # noqa: F401
+
         return True
     except Exception:
         return False
