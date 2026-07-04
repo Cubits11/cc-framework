@@ -155,6 +155,83 @@ def test_unknown_role_requires_review_or_fails_in_strict_mode(tmp_path: Path) ->
     assert any("Unknown evidence role" in reason for reason in loose.reasons)
 
 
+def test_exploratory_redteam_cannot_support_bounded_claim_level(tmp_path: Path) -> None:
+    redteam = tmp_path / "redteam.json"
+    _write_json(
+        redteam,
+        {
+            "redteam_id": "adaptive-redteam-1",
+            "discovery_protocol": "adaptive dependence-cliff search",
+            "findings": [{"case_id": "candidate-cliff"}],
+            "non_claims": [
+                "Exploratory red-team evidence is not confirmatory evidence.",
+            ],
+        },
+    )
+    report_path = _write_package(
+        tmp_path,
+        extra_artifacts=[_artifact(redteam, "exploratory_redteam")],
+    )
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.NEEDS_REVIEW
+    assert any(
+        "exploratory_redteam" in reason and "cannot support claim level" in reason
+        for reason in audit.reasons
+    )
+
+
+def test_human_review_note_cannot_reduce_review_when_hashes_do_not_match(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_package(
+        tmp_path,
+        claim_level="release_claim",
+        review_note_payload={
+            "review_id": "review-partial",
+            "reviewer": "external-reviewer",
+            "reviewed_artifact_hashes": [],
+            "reviewed_claim_level": "release_claim",
+            "decision": "approved_with_conditions",
+            "non_claims": [
+                "Human review does not upgrade underlying statistical evidence.",
+            ],
+        },
+    )
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.NEEDS_REVIEW
+    assert audit.required_human_review is True
+    assert any("does not cover current artifact hash set" in reason for reason in audit.reasons)
+
+
+def test_hash_matched_human_review_note_can_satisfy_scoped_release_review(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_package(
+        tmp_path,
+        claim_level="release_claim",
+        review_note_payload={
+            "review_id": "review-complete",
+            "reviewer": "external-reviewer",
+            "reviewed_artifact_hashes": "__ALL_BOUND_ARTIFACT_HASHES__",
+            "reviewed_claim_level": "release_claim",
+            "decision": "approved_with_conditions",
+            "non_claims": [
+                "Human review does not upgrade underlying statistical evidence.",
+            ],
+        },
+    )
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.PASS
+    assert audit.required_human_review is False
+    assert any("Hash-matched human_review_note" in reason for reason in audit.reasons)
+
+
 def test_naive_verification_time_fails_closed(tmp_path: Path) -> None:
     report_path = _write_package(tmp_path)
 
@@ -199,9 +276,11 @@ def test_cli_writes_audit_json_and_uses_verdict_exit_codes(tmp_path: Path) -> No
 def _write_package(
     tmp_path: Path,
     *,
+    claim_level: str = "bounded_empirical",
     decay_payload: dict[str, Any] | None = None,
     scenario_payloads: list[dict[str, Any]] | None = None,
     extra_artifacts: list[EvidenceArtifact] | None = None,
+    review_note_payload: dict[str, Any] | None = None,
     package_snapshot: dict[str, str] | None = None,
 ) -> Path:
     decay_path = tmp_path / "decay.json"
@@ -218,6 +297,14 @@ def _write_package(
         _artifact(lower_path, "extremal_scenario"),
         *(extra_artifacts or []),
     ]
+    if review_note_payload is not None:
+        review_payload = dict(review_note_payload)
+        if review_payload.get("reviewed_artifact_hashes") == "__ALL_BOUND_ARTIFACT_HASHES__":
+            review_payload["reviewed_artifact_hashes"] = [artifact.sha256 for artifact in artifacts]
+        review_note_path = tmp_path / "human_review_note.json"
+        _write_json(review_note_path, review_payload)
+        artifacts.append(_artifact(review_note_path, "human_review_note"))
+
     report = build_cc_report(
         run=RunSummary(
             run_id="governance-smoke",
@@ -245,7 +332,7 @@ def _write_package(
         ),
         claim=ClaimSummary(
             statement="Bounded empirical CC claim for the governance verifier fixture.",
-            allowed_claim_level="bounded_empirical",
+            allowed_claim_level=claim_level,
             non_claims=[
                 "A receipt verifies artifact integrity, not statistical validity or deployment safety.",
                 "This report does not certify production safety.",

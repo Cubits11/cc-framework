@@ -14,6 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from cc.evidence.claim_envelope import EnvelopeSupportSummary, SupportGraph, compile_claim_envelope
 from cc.evidence.decay import ClaimDecayRecord, DecayState, VersionWatchSet, evaluate_claim_decay
 from cc.evidence.extremal_scenario import ExtremalScenario, ScenarioKind
+from cc.evidence.role_ontology import (
+    get_role_definition,
+    is_known_role,
+    mandatory_non_claims_for,
+    role_support_matrix,
+    roles_requiring_semantic_payload_validation,
+    validate_role_payload,
+)
 from cc.reporting.canonical import sha256_canonical
 from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION, sha256_file
 
@@ -21,21 +29,9 @@ CLAIM_GOVERNANCE_AUDIT_SCHEMA: Literal["cc/claim-governance-audit.v1"] = (
     "cc/claim-governance-audit.v1"
 )
 
-ROLE_SUPPORT_MATRIX: dict[str, dict[str, list[str]]] = {
-    "claim_decay": {
-        "supports": ["time_bounding", "staleness_review"],
-        "does_not_support": ["deployment_safety", "statistical_validity"],
-        "requires_review_if": ["expired", "degraded", "triggered_versions"],
-    },
-    "extremal_scenario": {
-        "supports": ["dependence_endpoint_explanation", "counterfactual_feasibility"],
-        "does_not_support": ["likelihood", "deployment_realization"],
-        "requires_review_if": ["excluded_evidence_fields", "fitted_without_confirmation"],
-    },
-}
+ROLE_SUPPORT_MATRIX: dict[str, dict[str, list[str]]] = role_support_matrix()
 
-_NEUTRAL_EVIDENCE_ROLES = frozenset({"artifact", "audit_log", "figure_manifest"})
-_KNOWN_EVIDENCE_ROLES = frozenset(ROLE_SUPPORT_MATRIX) | _NEUTRAL_EVIDENCE_ROLES
+_SEMANTIC_PAYLOAD_ROLES = roles_requiring_semantic_payload_validation()
 _EXPLORATORY_INTERVAL_FIELDS = frozenset(
     {
         "adaptive_search_ci",
@@ -219,11 +215,11 @@ def verify_claim_governance(
         if artifact_audit.status in {EvidenceRoleStatus.UNREADABLE, EvidenceRoleStatus.INVALID}:
             fail_reasons.append(artifact_audit.reason)
             continue
-        if role not in _KNOWN_EVIDENCE_ROLES:
+        if not is_known_role(role):
             artifact_audit.status = EvidenceRoleStatus.UNKNOWN_ROLE
             artifact_audit.reason = (
-                "Hash verified, but evidence role is not in the governance verifier v0 "
-                "support matrix."
+                "Hash verified, but evidence role is not in the governance verifier "
+                "ontology."
             )
             message = f"Unknown evidence role {role!r} on {artifact_audit.path}."
             if strict_unknown_roles:
@@ -231,7 +227,7 @@ def verify_claim_governance(
             else:
                 review_reasons.append(message)
             continue
-        if role in ROLE_SUPPORT_MATRIX:
+        if role in _SEMANTIC_PAYLOAD_ROLES:
             try:
                 payload = json.loads(_resolve_path(artifact_audit.path, root_dir).read_text())
             except Exception as exc:
@@ -239,15 +235,28 @@ def verify_claim_governance(
                 artifact_audit.reason = f"Artifact could not be parsed as JSON: {exc}"
                 fail_reasons.append(artifact_audit.reason)
                 continue
-            if isinstance(payload, Mapping):
-                semantic_payloads.append((payload, artifact_audit))
-            else:
+            if not isinstance(payload, Mapping):
                 artifact_audit.status = EvidenceRoleStatus.INVALID
                 artifact_audit.reason = "Semantic evidence artifact JSON is not an object."
                 if role == "extremal_scenario" or strict_unknown_roles:
                     fail_reasons.append(artifact_audit.reason)
                 else:
                     review_reasons.append(artifact_audit.reason)
+                continue
+
+            payload_validation = validate_role_payload(role, payload)
+            if not payload_validation.valid:
+                artifact_audit.status = EvidenceRoleStatus.INVALID
+                artifact_audit.reason = (
+                    f"Evidence role ontology rejected {role!r} payload: "
+                    + "; ".join(payload_validation.errors)
+                )
+                if _invalid_role_payload_is_failure(role) or strict_unknown_roles:
+                    fail_reasons.append(artifact_audit.reason)
+                else:
+                    review_reasons.append(artifact_audit.reason)
+                continue
+            semantic_payloads.append((payload, artifact_audit))
 
     receipt = _audit_receipt(report, evidence_audits)
     if receipt.report_hash_verified is False:
@@ -268,6 +277,18 @@ def verify_claim_governance(
         review_reasons.append(message)
         unresolved.append(message)
 
+    for role in sorted(roles_present):
+        if not is_known_role(role):
+            continue
+        definition = get_role_definition(role)
+        if allowed_claim_level not in definition.allowed_claim_levels:
+            message = (
+                f"Evidence role {role!r} cannot support claim level "
+                f"{allowed_claim_level!r} under the role ontology."
+            )
+            review_reasons.append(message)
+            unresolved.append(message)
+
     decay_audit = _audit_decay_artifacts(
         semantic_payloads,
         report=report,
@@ -277,9 +298,9 @@ def verify_claim_governance(
     scenario_audit = _audit_scenario_artifacts(semantic_payloads)
 
     for audit in evidence_audits:
-        if audit.role not in ROLE_SUPPORT_MATRIX or audit.status is not EvidenceRoleStatus.INVALID:
+        if audit.role not in _SEMANTIC_PAYLOAD_ROLES or audit.status is not EvidenceRoleStatus.INVALID:
             continue
-        if audit.role == "extremal_scenario" or strict_unknown_roles:
+        if _invalid_role_payload_is_failure(audit.role) or strict_unknown_roles:
             fail_reasons.append(audit.reason)
         else:
             review_reasons.append(audit.reason)
@@ -308,7 +329,7 @@ def verify_claim_governance(
             + ", ".join(sorted(leakage_paths))
         )
 
-    non_claims = _collect_non_claims(report, decay_audit, scenario_audit)
+    non_claims = _collect_non_claims(report, decay_audit, scenario_audit, semantic_payloads)
     mandatory_missing = _mandatory_non_claims_missing(
         roles_present=roles_present,
         non_claims=non_claims,
@@ -319,10 +340,26 @@ def verify_claim_governance(
         review_reasons.append(message)
         unresolved.append(message)
 
+    review_note_satisfied, review_note_reasons = _human_review_note_satisfies_review(
+        report=report,
+        evidence_audits=evidence_audits,
+        semantic_payloads=semantic_payloads,
+        allowed_claim_level=allowed_claim_level,
+    )
+    for reason in review_note_reasons:
+        review_reasons.append(reason)
+        unresolved.append(reason)
+
     if allowed_claim_level == "release_claim":
-        message = "release_claim packages require accountable external human review."
-        review_reasons.append(message)
-        unresolved.append(message)
+        if review_note_satisfied:
+            reasons.append(
+                "Hash-matched human_review_note satisfies the scoped release-claim review "
+                "requirement without upgrading evidence strength."
+            )
+        else:
+            message = "release_claim packages require accountable external human review."
+            review_reasons.append(message)
+            unresolved.append(message)
 
     artifact_non_claims = decay_audit.non_claims + scenario_audit.non_claims
     boundary = BoundaryAudit(
@@ -778,6 +815,15 @@ def _validate_extremal_scenario_json(payload: Mapping[str, Any]) -> ExtremalScen
     )
 
 
+def _invalid_role_payload_is_failure(role: str) -> bool:
+    return role in {
+        "extremal_scenario",
+        "exploratory_redteam",
+        "confirmatory_failure_matrix",
+        "fitted_empirical_scenario",
+    }
+
+
 def _exploratory_leakage_paths(
     report: Mapping[str, Any],
     semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
@@ -818,8 +864,117 @@ def _collect_non_claims(
     report: Mapping[str, Any],
     decay: DecayAudit,
     scenarios: ScenarioAudit,
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
 ) -> list[str]:
-    return _dedupe([*_claim_non_claims(report), *decay.non_claims, *scenarios.non_claims])
+    return _dedupe(
+        [
+            *_claim_non_claims(report),
+            *decay.non_claims,
+            *scenarios.non_claims,
+            *_semantic_payload_non_claims(semantic_payloads),
+        ]
+    )
+
+
+def _semantic_payload_non_claims(
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+) -> list[str]:
+    values: list[str] = []
+    for payload, _artifact in semantic_payloads:
+        raw = payload.get("non_claims")
+        if isinstance(raw, (list, tuple)):
+            values.extend(str(item) for item in raw if str(item).strip())
+    return values
+
+
+_AUTHORIZING_REVIEW_DECISIONS = frozenset(
+    {
+        "approved",
+        "approved_for_diagnostic_use",
+        "approved_with_conditions",
+    }
+)
+
+
+def _human_review_note_satisfies_review(
+    *,
+    report: Mapping[str, Any],
+    evidence_audits: Sequence[EvidenceArtifactAudit],
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+    allowed_claim_level: str,
+) -> tuple[bool, list[str]]:
+    """Return whether a review note covers the current bound evidence hash set."""
+
+    notes = [
+        (payload, artifact)
+        for payload, artifact in semantic_payloads
+        if artifact.role == "human_review_note" and artifact.status is EvidenceRoleStatus.PRESENT
+    ]
+    if not notes:
+        return False, []
+
+    bound_hashes = {
+        audit.sha256_expected
+        for audit in evidence_audits
+        if audit.role != "human_review_note" and audit.sha256_expected
+    }
+    if not bound_hashes:
+        return False, ["human_review_note cannot reduce review: no reviewed artifact set found."]
+
+    report_hash = _report_receipt_hash(report)
+    mismatch_reasons: list[str] = []
+    for payload, artifact in notes:
+        decision = str(payload.get("decision") or "").strip()
+        if decision not in _AUTHORIZING_REVIEW_DECISIONS:
+            mismatch_reasons.append(
+                f"human_review_note {artifact.path} decision {decision!r} does not "
+                "authorize review reduction."
+            )
+            continue
+
+        reviewed_claim_level = str(payload.get("reviewed_claim_level") or "").strip()
+        if reviewed_claim_level != allowed_claim_level:
+            mismatch_reasons.append(
+                f"human_review_note {artifact.path} reviewed claim level "
+                f"{reviewed_claim_level!r}, not {allowed_claim_level!r}."
+            )
+            continue
+
+        reviewed_report_hash = payload.get("reviewed_report_hash")
+        if (
+            isinstance(reviewed_report_hash, str)
+            and report_hash is not None
+            and reviewed_report_hash != report_hash
+        ):
+            mismatch_reasons.append(
+                f"human_review_note {artifact.path} does not match the report receipt hash."
+            )
+            continue
+
+        reviewed_hashes = _reviewed_artifact_hashes(payload)
+        missing_hashes = sorted(bound_hashes - reviewed_hashes)
+        if missing_hashes:
+            mismatch_reasons.append(
+                f"human_review_note {artifact.path} does not cover current artifact hash set."
+            )
+            continue
+        return True, []
+    return False, _dedupe(mismatch_reasons)
+
+
+def _reviewed_artifact_hashes(payload: Mapping[str, Any]) -> set[str]:
+    raw = payload.get("reviewed_artifact_hashes")
+    if not isinstance(raw, list):
+        return set()
+    return {str(item).strip() for item in raw if str(item).strip()}
+
+
+def _report_receipt_hash(report: Mapping[str, Any]) -> str | None:
+    receipt = report.get("receipt")
+    if not isinstance(receipt, Mapping):
+        return None
+    value = receipt.get("canonical_hash")
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def _claim_non_claims(report: Mapping[str, Any]) -> list[str]:
@@ -838,47 +993,15 @@ def _mandatory_non_claims_missing(
     non_claims: Sequence[str],
     exploratory_boundary_present: bool,
 ) -> list[str]:
-    checks: list[tuple[str, tuple[tuple[str, ...], ...]]] = [
-        (
-            "receipt_integrity_not_statistical_validity_or_deployment_safety",
-            (
-                ("receipt", "hash"),
-                ("statistical validity", "deployment safety", "safe"),
-            ),
-        )
-    ]
-    if "claim_decay" in roles_present:
-        checks.append(
-            (
-                "claim_decay_not_current_safety_proof",
-                (
-                    ("claim decay",),
-                    ("does not prove", "not prove"),
-                    ("safe",),
-                ),
-            )
-        )
-    if "extremal_scenario" in roles_present:
-        checks.append(
-            (
-                "extremal_scenario_not_likely_world_proof",
-                (
-                    ("extremal scenario",),
-                    ("does not prove", "not prove"),
-                    ("likely",),
-                ),
-            )
-        )
+    role_set = set(roles_present)
+    role_set.add("receipt_integrity")
     if exploratory_boundary_present:
-        checks.append(
-            (
-                "exploratory_redteam_not_confirmatory_certificate",
-                (
-                    ("exploratory",),
-                    ("confirmatory",),
-                ),
-            )
-        )
+        role_set.add("exploratory_redteam")
+
+    checks: list[tuple[str, tuple[tuple[str, ...], ...]]] = []
+    for role in sorted(role_set):
+        for non_claim in mandatory_non_claims_for(role):
+            checks.append((non_claim.non_claim_id, non_claim.phrase_groups))
     return [
         check_id
         for check_id, phrase_groups in checks

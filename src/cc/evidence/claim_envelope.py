@@ -15,6 +15,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from cc.evidence.role_ontology import (
+    SupportPermission,
+    classify_role,
+    get_role_definition,
+    support_permissions_for,
+)
 from cc.reporting.canonical import canonical_json_bytes
 from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION
 
@@ -42,22 +48,6 @@ SupportRelation = Literal[
 ]
 SupportStrength = Literal["weak", "diagnostic", "confirmatory", "integrity_only"]
 
-_KNOWN_ROLE_SEMANTICS = frozenset(
-    {
-        "artifact",
-        "audit_log",
-        "calibration_evidence",
-        "claim_decay",
-        "confirmatory_failure_matrix",
-        "extremal_scenario",
-        "exploratory_redteam",
-        "figure_manifest",
-        "human_review",
-        "human_review_note",
-        "measurement_evidence",
-        "receipt_integrity",
-    }
-)
 _STRENGTH_RANK: dict[SupportStrength, int] = {
     "integrity_only": 0,
     "weak": 1,
@@ -87,14 +77,6 @@ _NON_PROOF_REVIEW = (
 _UNKNOWN_ROLE_NON_CLAIM = (
     "Unknown evidence roles are preserved for review but cannot strengthen the claim.",
 )
-_FORBIDDEN_TARGET_MARKERS_BY_ROLE: dict[str, tuple[str, ...]] = {
-    "receipt_integrity": ("statistical_validity", "deployment_safety", "safety"),
-    "claim_decay": ("deployment_safety", "statistical_validity"),
-    "extremal_scenario": ("likelihood", "deployment_realization"),
-    "human_review": ("statistical_validity", "deployment_safety"),
-    "human_review_note": ("statistical_validity", "deployment_safety"),
-}
-
 
 class EnvelopeModel(BaseModel):
     """Strict base model for claim-envelope artifacts."""
@@ -271,7 +253,7 @@ class EnvelopeSupportSummary(EnvelopeModel):
                 strongest = edge.strength
         refs = graph.all_refs()
         unsupported = tuple(
-            ref.artifact_id for ref in refs if ref.role not in _KNOWN_ROLE_SEMANTICS
+            ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown"
         )
         return cls(
             support_edge_count=len(graph.support_edges),
@@ -493,31 +475,47 @@ def claim_envelope_sha256(envelope: ClaimEnvelope) -> str:
 def _validate_role_support_edge(source: ArtifactRef, edge: SupportEdge) -> None:
     role = source.role
     target = edge.target_claim_fragment.lower()
-    forbidden = _FORBIDDEN_TARGET_MARKERS_BY_ROLE.get(role, ())
-    if any(marker in target for marker in forbidden):
-        raise ValueError(f"{role} evidence cannot support {edge.target_claim_fragment!r}")
 
-    if role == "receipt_integrity":
-        if edge.relation != "integrity_binds" or edge.strength != "integrity_only":
-            raise ValueError("receipt evidence may provide integrity_binds/integrity_only support only")
-        return
-    if role == "claim_decay":
-        if edge.relation not in {"qualifies", "requires_review", "invalidates"}:
-            raise ValueError("claim_decay evidence may only qualify, require review, or invalidate")
-        if edge.strength == "confirmatory":
-            raise ValueError("claim_decay evidence cannot provide confirmatory support")
-        return
-    if role == "extremal_scenario":
-        if edge.relation not in {"bounds", "qualifies", "requires_review"}:
-            raise ValueError("extremal_scenario evidence may only bound, qualify, or require review")
-        return
+    permissions = support_permissions_for(role)
+    if classify_role(role) != "unknown":
+        role_definition = get_role_definition(role)
+        for unsupported in role_definition.does_not_support:
+            if any(marker in target for marker in unsupported.target_markers):
+                raise ValueError(f"{role} evidence cannot support {edge.target_claim_fragment!r}")
+
     if role in {"human_review", "human_review_note"}:
         _validate_human_review_edge(source, edge)
-        return
-    if role not in _KNOWN_ROLE_SEMANTICS and (
+    if classify_role(role) == "unknown" and (
         edge.relation not in {"requires_review", "qualifies"} or edge.strength != "weak"
     ):
         raise ValueError("unknown evidence roles cannot strengthen a claim")
+    if classify_role(role) == "unknown":
+        return
+    if not _edge_matches_support_permission(edge, permissions):
+        raise ValueError(f"{role} evidence may only provide ontology-permitted support")
+
+
+def _edge_matches_support_permission(
+    edge: SupportEdge,
+    permissions: tuple[SupportPermission, ...],
+) -> bool:
+    for permission in permissions:
+        if edge.relation != permission.relation or edge.strength != permission.strength:
+            continue
+        if not permission.target_claim_fragments:
+            return True
+        if any(
+            _target_fragment_matches(edge.target_claim_fragment, item)
+            for item in permission.target_claim_fragments
+        ):
+            return True
+    return False
+
+
+def _target_fragment_matches(target: str, allowed: str) -> bool:
+    if allowed.endswith("*"):
+        return target.startswith(allowed[:-1])
+    return target == allowed
 
 
 def _validate_human_review_edge(source: ArtifactRef, edge: SupportEdge) -> None:
@@ -595,7 +593,47 @@ def _compile_support_edges(
                     rationale="Review artifacts can authorize scoped use only.",
                 )
             )
-        elif ref.role not in _KNOWN_ROLE_SEMANTICS:
+        elif ref.role == "exploratory_redteam":
+            edges.append(
+                SupportEdge(
+                    source_artifact_id=ref.artifact_id,
+                    target_claim_fragment="claim.redteam_hypothesis",
+                    relation="exploratory_suggests",
+                    strength="weak",
+                    non_claims=(
+                        "Exploratory red-team evidence is not a confirmatory certificate.",
+                    ),
+                    rationale="Exploratory red-team artifacts generate hypotheses and review pressure.",
+                )
+            )
+        elif ref.role == "confirmatory_failure_matrix":
+            edges.append(
+                SupportEdge(
+                    source_artifact_id=ref.artifact_id,
+                    target_claim_fragment="claim.failure_matrix",
+                    relation="confirmatory_tests",
+                    strength="confirmatory",
+                    non_claims=(
+                        "Confirmatory failure-matrix evidence remains scoped to its protocol "
+                        "and does not certify deployment safety.",
+                    ),
+                    rationale="Confirmatory failure matrices test a predeclared or held-out matrix.",
+                )
+            )
+        elif ref.role == "fitted_empirical_scenario":
+            edges.append(
+                SupportEdge(
+                    source_artifact_id=ref.artifact_id,
+                    target_claim_fragment="claim.fitted_scenario",
+                    relation="bounds",
+                    strength="diagnostic",
+                    non_claims=(
+                        "A fitted empirical scenario does not prove the fitted dependence model is true.",
+                    ),
+                    rationale="Fitted scenario artifacts describe scoped empirical dependence structure.",
+                )
+            )
+        elif classify_role(ref.role) == "unknown":
             edges.append(
                 SupportEdge(
                     source_artifact_id=ref.artifact_id,
@@ -770,6 +808,17 @@ def _claim_fragments(
         )
     if graph.review_refs:
         fragment_ids["claim.review_authorization"] = "Scoped human review authorization."
+    for edge in graph.support_edges:
+        if edge.target_claim_fragment == "claim.redteam_hypothesis":
+            fragment_ids["claim.redteam_hypothesis"] = (
+                "Exploratory red-team hypothesis or triage signal."
+            )
+        elif edge.target_claim_fragment == "claim.failure_matrix":
+            fragment_ids["claim.failure_matrix"] = "Confirmatory failure-matrix evidence."
+        elif edge.target_claim_fragment == "claim.fitted_scenario":
+            fragment_ids["claim.fitted_scenario"] = "Fitted empirical scenario evidence."
+        elif edge.target_claim_fragment == "claim.confirmatory_boundary":
+            fragment_ids["claim.confirmatory_boundary"] = "Exploratory/confirmatory firewall."
     return (
         *(
             ClaimFragment(

@@ -21,7 +21,9 @@ to a report is preserved, but it does not automatically support the whole claim.
 
 ## Public Schemas
 
-The implementation lives in `src/cc/evidence/claim_envelope.py`.
+The implementation lives in `src/cc/evidence/claim_envelope.py`. Role-specific
+support permissions are defined in
+[Evidence Role Ontology](evidence_role_ontology.md).
 
 Public schema strings:
 
@@ -124,5 +126,5 @@ This keeps the migration narrow:
 1. existing report fixtures remain valid,
 2. existing receipt hashes do not change,
 3. support semantics become machine-readable,
-4. future role ontology and human-review artifacts can plug into the same
-   support graph.
+4. the evidence role ontology and future human-review artifacts can plug into
+   the same support graph.

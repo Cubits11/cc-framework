@@ -85,6 +85,7 @@ The experiment flow is illustrated in
 * [Public Research Framing](research/public-framing.md)
 * [Business and Audit Brief](research/business-audit-brief.md)
 * [Claim Governance OS](research/CLAIM_GOVERNANCE_OS.md)
+* [Evidence Role Ontology](design-specs/evidence_role_ontology.md)
 * [Validation Matrix](validation_matrix.md)
 * [Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
