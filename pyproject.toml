@@ -93,6 +93,7 @@ dev = [
   "ruff>=0.6",
   "isort>=5.13",
   "mypy>=1.10",
+  "pre-commit>=4.0",
   "types-PyYAML>=6.0.12",
   "types-jsonschema>=4.22",
 ]
