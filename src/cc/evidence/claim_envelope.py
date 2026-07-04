@@ -447,7 +447,7 @@ def compile_claim_envelope(
         support_graph=graph,
         governance_state=GovernanceState(
             verdict=_audit_str(audit, ("verdict",)) or "not_evaluated",
-            verifier_schema=_audit_str(audit, ("schema",)),
+            verifier_schema=_audit_str(audit, ("schema",)) or _audit_str(audit, ("schema_",)),
             evaluated_at=_audit_str(audit, ("evaluated_at",)) or evaluated_at,
             freshness_status=_audit_str(audit, ("decay", "status")),
             required_human_review=_audit_bool(audit, ("required_human_review",), True),
@@ -1039,7 +1039,7 @@ def _audit_mapping(value: Mapping[str, Any] | BaseModel | None) -> Mapping[str, 
     if value is None:
         return None
     if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
+        return value.model_dump(mode="json", by_alias=True)
     return value
 
 

@@ -18,6 +18,7 @@ import math
 import random
 import shutil
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,7 +42,6 @@ from cc.reporting.report import (
     sha256_file,
     write_cc_report,
 )
-
 
 CAPSULE_ID = "deterministic-claim-governance-capsule"
 MANIFEST_SCHEMA_VERSION = "cc.claim_governance_capsule_manifest.v1"
@@ -196,7 +196,7 @@ def build_capsule(capsule_dir: Path) -> None:
 
     now = parse_utc(str(config["fixed_now"]))
     audit = verify_claim_governance(report_path, now=now, base_dir=outputs_dir)
-    write_json(outputs_dir / AUDIT_FILENAME, audit.model_dump(mode="json"))
+    write_json(outputs_dir / AUDIT_FILENAME, audit.model_dump(mode="json", by_alias=True))
     if audit.verdict is not GovernanceVerdict.PASS:
         raise CapsuleError(f"governance audit verdict was {audit.verdict.value}, expected pass")
 
@@ -374,8 +374,7 @@ def build_confirmatory_protocol_payload(
     protocol_non_claims = [
         "Confirmatory validity depends on the pre-registered protocol and run separation, "
         "not on report polish.",
-        "A confirmatory_protocol artifact does not certify deployment safety or external "
-        "validity.",
+        "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
         "Adaptive discovery evidence may motivate a hypothesis but cannot become "
         "confirmatory evidence by renaming its role.",
     ]
@@ -627,10 +626,8 @@ def clean_outputs(outputs_dir: Path) -> None:
         if path.is_dir():
             shutil.rmtree(path, ignore_errors=True)
         else:
-            try:
+            with suppress(FileNotFoundError):
                 path.unlink()
-            except FileNotFoundError:
-                pass
 
 
 def update_expected(outputs_dir: Path, expected_dir: Path, expected_manifest: Path) -> None:

@@ -216,7 +216,7 @@ def _cmd_verify_claim_governance(args: argparse.Namespace) -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(
             json.dumps(
-                audit.model_dump(mode="json"),
+                audit.model_dump(mode="json", by_alias=True),
                 indent=2,
                 sort_keys=True,
                 ensure_ascii=False,

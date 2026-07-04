@@ -81,7 +81,7 @@ class ClaimFreshnessStatus(str, Enum):
 
 
 class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
 
 class EvidenceArtifactAudit(_StrictModel):
@@ -142,7 +142,10 @@ class ReceiptAudit(_StrictModel):
 
 
 class ClaimGovernanceAudit(_StrictModel):
-    schema: Literal["cc/claim-governance-audit.v1"] = CLAIM_GOVERNANCE_AUDIT_SCHEMA  # type: ignore[assignment]
+    schema_: Literal["cc/claim-governance-audit.v1"] = Field(
+        default=CLAIM_GOVERNANCE_AUDIT_SCHEMA,
+        alias="schema",
+    )
     report_id: str
     evaluated_at: str
     verdict: GovernanceVerdict

@@ -1,3 +1,5 @@
+# tests/integration/test_claim_governance_capsule.py
+
 from __future__ import annotations
 
 import hashlib
@@ -7,17 +9,16 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 CAPSULE = ROOT / "examples" / "claim_governance_capsule"
 OUTPUTS = CAPSULE / "outputs"
 
-GENERATED_ARTIFACTS = [
+MANIFEST_TRACKED_ARTIFACTS = [
     "audit_log.jsonl",
     "bounds.json",
     "calibration.json",
-    "capsule_manifest.json",
     "cc_report.json",
     "claim_envelope.json",
     "claim_governance_audit.json",
@@ -26,6 +27,11 @@ GENERATED_ARTIFACTS = [
     "decay_policy.json",
     "extremal_lower.json",
     "extremal_upper.json",
+]
+
+GENERATED_ARTIFACTS = [
+    *MANIFEST_TRACKED_ARTIFACTS,
+    "capsule_manifest.json",
 ]
 
 
@@ -41,16 +47,68 @@ def test_claim_governance_capsule_reproduces_expected_manifest() -> None:
 
     assert generated == expected
     assert generated["governance_verdict"] == "pass"
+    assert generated["pass_caveat"] == (
+        "PASS means internal consistency under verifier rules; it does not mean the AI "
+        "system is safe in deployment."
+    )
+
+    manifest_files = {item["filename"]: item for item in generated["files"]}
+    assert sorted(manifest_files) == sorted(MANIFEST_TRACKED_ARTIFACTS)
 
     assert audit["schema"] == "cc/claim-governance-audit.v1"
+    assert "schema_" not in audit
     assert audit["verdict"] == "pass"
     assert audit["required_human_review"] is False
     assert audit["reasons"] == []
+    assert audit["boundary"]["mandatory_non_claims_missing"] == []
     assert len(audit["non_claims"]) >= 1
-    assert len(audit["evidence_artifacts"]) >= 1
+    assert any("deployment safety" in item.lower() for item in audit["non_claims"])
+    assert any("not a release claim" in item.lower() for item in audit["non_claims"])
+
+    evidence_by_path = {item["path"]: item for item in audit["evidence_artifacts"]}
+    for required_path in (
+        "bounds.json",
+        "calibration.json",
+        "confirmatory_failure_matrix.json",
+        "confirmatory_protocol.json",
+        "decay_policy.json",
+        "extremal_lower.json",
+        "extremal_upper.json",
+        "audit_log.jsonl",
+    ):
+        assert required_path in evidence_by_path
+        assert evidence_by_path[required_path]["status"] == "present"
+        assert (
+            evidence_by_path[required_path]["sha256_actual"]
+            == evidence_by_path[required_path]["sha256_expected"]
+        )
+
+    assert audit["decay"]["status"] == "fresh"
+    assert audit["scenarios"]["scenario_count"] == 2
+    assert audit["scenarios"]["infeasible_count"] == 0
+    assert sorted(audit["scenarios"]["kinds"]) == ["frechet_endpoint", "frechet_endpoint"]
+
+    assert audit["confirmatory_protocols"]["present"] is True
+    assert audit["confirmatory_protocols"]["artifact_count"] == 1
+    assert audit["confirmatory_protocols"]["failed_count"] == 0
+    assert audit["confirmatory_protocols"]["review_count"] == 0
+    assert audit["confirmatory_protocols"]["audits"][0]["status"] == "pass"
+    assert all(
+        check["status"] == "pass"
+        for check in audit["confirmatory_protocols"]["audits"][0]["checks"]
+    )
+
+    assert audit["envelope_support"]["strongest_non_integrity_strength"] == "confirmatory"
+    assert audit["envelope_support"]["relation_counts"]["confirmatory_tests"] >= 1
+    assert audit["envelope_support"]["unsupported_role_refs"] == []
+    assert audit["envelope_support"]["unknown_role_refs"] == 0
 
     assert envelope["schema"] == "cc.claim_envelope.v1"
     assert envelope["governance_state"]["verdict"] == "pass"
+    assert envelope["governance_state"]["required_human_review"] is False
+    assert envelope["governance_state"]["support_summary"]["strongest_non_integrity_strength"] == (
+        "confirmatory"
+    )
 
 
 def test_claim_governance_capsule_second_run_artifacts_are_identical() -> None:
@@ -127,9 +185,20 @@ def test_claim_governance_capsule_tamper_changes_manifest_and_governance_verdict
     tampered_audit = load_json(tampered_outputs / "tampered_audit.json")
     assert tampered_audit["verdict"] == "fail"
     assert any(
-        "hash" in reason.lower() or "mismatch" in reason.lower()
+        "sha-256" in reason.lower()
+        or "hash" in reason.lower()
+        or "mismatch" in reason.lower()
+        or "does not match" in reason.lower()
         for reason in tampered_audit["reasons"]
     )
+    assert any(
+        artifact["path"] == "bounds.json"
+        and artifact["status"] == "invalid"
+        and "sha-256" in artifact["reason"].lower()
+        and "does not match" in artifact["reason"].lower()
+        for artifact in tampered_audit["evidence_artifacts"]
+    )
+    assert tampered_audit["receipt"]["artifact_hashes_verified"] is False
 
 
 def test_claim_governance_capsule_readme_includes_pass_caveat_and_non_claims() -> None:
@@ -171,14 +240,14 @@ def env(*, extra_pythonpath: str | None = None) -> dict[str, str]:
 
 def artifact_hashes() -> dict[str, str]:
     return {
-        name: sha256(OUTPUTS / name)
-        for name in GENERATED_ARTIFACTS
-        if (OUTPUTS / name).exists()
+        name: sha256(OUTPUTS / name) for name in GENERATED_ARTIFACTS if (OUTPUTS / name).exists()
     }
 
 
-def load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+def load_json(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
 
 
 def sha256(path: Path) -> str:

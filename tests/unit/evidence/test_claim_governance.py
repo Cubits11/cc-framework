@@ -1,3 +1,4 @@
+# tests/unit/evidence/test_claim_governance.py
 from __future__ import annotations
 
 import json
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from cc.evidence import ClaimGovernanceAudit, GovernanceVerdict, verify_claim_governance
-from cc.evidence.claim_governance import ClaimFreshnessStatus
+from cc.evidence.claim_governance import ClaimFreshnessStatus, _empty_envelope_support_summary
 from cc.evidence.decay import ClaimDecayPolicy, ClaimDecayRecord, VersionWatchSet
 from cc.evidence.extremal_scenario import ExtremalScenario
 from cc.kernel.frechet_classes import frechet_bounds
@@ -33,6 +34,67 @@ def test_public_claim_governance_imports_are_intentional() -> None:
     assert ClaimGovernanceAudit.__name__ == "ClaimGovernanceAudit"
     assert GovernanceVerdict.PASS.value == "pass"
     assert callable(verify_claim_governance)
+
+
+def test_claim_governance_audit_schema_alias_preserves_public_json(tmp_path: Path) -> None:
+    report_path = _write_package(tmp_path)
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+    payload = audit.model_dump(mode="json", by_alias=True)
+
+    assert payload["schema"] == "cc/claim-governance-audit.v1"
+    assert "schema_" not in payload
+
+
+def test_claim_governance_audit_accepts_public_schema_key() -> None:
+    audit = ClaimGovernanceAudit(
+        schema="cc/claim-governance-audit.v1",
+        report_id="schema-alias-smoke",
+        evaluated_at="2026-01-02T00:00:00Z",
+        verdict=GovernanceVerdict.PASS,
+        allowed_claim_level="diagnostic",
+        claim_statement="Schema alias smoke test.",
+        receipt={
+            "report_hash_verified": None,
+            "artifact_hashes_verified": False,
+            "canonical_hash": None,
+            "reason": "No receipt checked in alias smoke test.",
+        },
+        evidence_artifacts=[],
+        decay={
+            "present": False,
+            "status": ClaimFreshnessStatus.NOT_EVALUATED,
+            "reason": "No decay checked in alias smoke test.",
+            "evaluated_at": None,
+        },
+        scenarios={
+            "present": False,
+            "scenario_count": 0,
+            "scenario_ids": [],
+            "kinds": [],
+            "infeasible_count": 0,
+            "excluded_evidence_fields": [],
+        },
+        confirmatory_protocols={
+            "present": False,
+            "artifact_count": 0,
+            "protocol_ids": [],
+            "run_ids": [],
+            "failed_count": 0,
+            "review_count": 0,
+        },
+        boundary={
+            "claim_non_claim_count": 0,
+            "artifact_non_claim_count": 0,
+            "mandatory_non_claims_missing": [],
+        },
+        required_human_review=False,
+        reasons=[],
+        non_claims=[],
+        envelope_support=_empty_envelope_support_summary(),
+    )
+
+    assert audit.schema_ == "cc/claim-governance-audit.v1"
 
 
 def test_passing_claim_package_verifies_governance(tmp_path: Path) -> None:
@@ -296,6 +358,7 @@ def test_cli_writes_audit_json_and_uses_verdict_exit_codes(tmp_path: Path) -> No
     assert "Claim governance verdict: PASS" in passed.stdout
     payload = json.loads(audit_path.read_text(encoding="utf-8"))
     assert payload["schema"] == "cc/claim-governance-audit.v1"
+    assert "schema_" not in payload
     assert payload["verdict"] == "pass"
 
     expired = _run_cli(
