@@ -75,9 +75,9 @@ input {
   border-radius: 8px;
   display: grid;
   gap: 4px;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(138px, 1fr));
   padding: 4px;
-  width: min(680px, 100%);
+  width: min(760px, 100%);
 }
 
 .tab {
@@ -357,6 +357,120 @@ input {
   overflow-wrap: anywhere;
 }
 
+.governance-banner {
+  align-items: center;
+  background: #fff8e8;
+  border: 1px solid #e3b36e;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+}
+
+.governance-banner strong {
+  font-size: 1.08rem;
+}
+
+.governance-banner span {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.governance-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.governance-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.governance-card.wide {
+  grid-column: 1 / -1;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detail {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding-bottom: 10px;
+}
+
+.detail span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.detail strong {
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.metric-list.compact {
+  gap: 10px;
+  padding: 0;
+}
+
+.metric-list.compact .metric strong {
+  font-size: 0.96rem;
+  overflow-wrap: anywhere;
+}
+
+.plain-list,
+.non-claim-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.plain-list li {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.plain-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.plain-list span,
+.non-claim-list li {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.plain-list strong {
+  font-size: 0.9rem;
+}
+
+.non-claim-list li {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
 @media (max-width: 860px) {
   .topbar {
     align-items: stretch;
@@ -365,7 +479,9 @@ input {
 
   .tabs,
   .risk-grid,
-  .status-grid {
+  .status-grid,
+  .governance-grid,
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,22 +1,31 @@
 "use client";
 
-import { FileCheck2, Network, ShieldAlert } from "lucide-react";
+import { ClipboardList, FileCheck2, Network, ShieldAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { AssuranceCaseExplorer } from "./views/AssuranceCaseExplorer";
+import { ClaimGovernanceView } from "./views/ClaimGovernanceView";
 import { CompositionRiskView } from "./views/CompositionRiskView";
 import { VerifyView } from "./views/VerifyView";
+import type { ClaimObservatoryModel } from "../lib/claimObservatory";
 import type { EnterpriseBundle } from "../lib/types";
 
-type ViewKey = "composition" | "assurance" | "verify";
+type ViewKey = "composition" | "assurance" | "claim-governance" | "verify";
 
 const views: Array<{ key: ViewKey; label: string; icon: ReactNode }> = [
   { key: "composition", label: "Composition Risk", icon: <ShieldAlert size={17} /> },
   { key: "assurance", label: "Assurance Case", icon: <Network size={17} /> },
+  { key: "claim-governance", label: "Claim Governance", icon: <ClipboardList size={17} /> },
   { key: "verify", label: "Verify", icon: <FileCheck2 size={17} /> },
 ];
 
-export function DashboardShell({ initialBundle }: { initialBundle?: EnterpriseBundle }) {
+export function DashboardShell({
+  initialBundle,
+  initialClaimObservatoryModel,
+}: {
+  initialBundle?: EnterpriseBundle;
+  initialClaimObservatoryModel?: ClaimObservatoryModel;
+}) {
   const [activeView, setActiveView] = useState<ViewKey>("composition");
   const [bundle, setBundle] = useState<EnterpriseBundle | undefined>(initialBundle);
   const subtitle = useMemo(() => {
@@ -53,6 +62,9 @@ export function DashboardShell({ initialBundle }: { initialBundle?: EnterpriseBu
       <section className="content">
         {activeView === "composition" ? <CompositionRiskView bundle={bundle} /> : null}
         {activeView === "assurance" ? <AssuranceCaseExplorer bundle={bundle} /> : null}
+        {activeView === "claim-governance" ? (
+          <ClaimGovernanceView model={initialClaimObservatoryModel} />
+        ) : null}
         {activeView === "verify" ? <VerifyView bundle={bundle} onBundleLoaded={setBundle} /> : null}
       </section>
     </main>
