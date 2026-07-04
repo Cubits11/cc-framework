@@ -79,7 +79,7 @@ Local environment for this record:
 | `make test-reporting` | Reporting receipts | Yes | Pass | CC report/receipt unit tests passed. |
 | `make docs` | Shared docs | Yes | Pass | Strict MkDocs build completed. MkDocs Material printed its upstream MkDocs 2.0 warning; the build still exited successfully. |
 | `PYTHONPATH=src .venv/bin/pytest -q` | Full Python regression | Yes | Pass with skips | Full pytest exited successfully with 7 optional skips and 2 expected warnings from tests that drop non-finite bootstrap samples. |
-| `npm run build` in `apps/dashboard` | Dashboard | No | Pass | Next 15 production build passed. Next warned about multiple lockfiles and inferred the repository root. |
+| `npm run build` in `apps/dashboard` | Dashboard | No | Pass | Next 15 production build passed. A later hygiene pass removed the stale root Node package files that caused the earlier multiple-lockfile warning. |
 | `make enterprise-smoke` | Enterprise Reference v0.1 | No | Pass | Moto-backed enterprise smoke passed, including the dashboard smoke path. |
 | `npm audit --audit-level=high` in `apps/dashboard` | Dashboard dependency hygiene | No | Pass | No critical or high findings remain; 2 moderate transitive `postcss` findings remain through Next. |
 

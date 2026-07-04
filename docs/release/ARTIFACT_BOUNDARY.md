@@ -4,6 +4,11 @@ This repository keeps generated evidence only when it has an explicit role.
 Runtime output roots are ignored by default; promoted files must move into a
 source-controlled fixture, archive, or release-artifact location.
 
+Source-surface migration decisions are tracked separately in
+[Repository Migration Manifest](MIGRATION_MANIFEST.md). This boundary governs
+generated files; the migration manifest governs keep, split, archive, or
+sibling-repo disposition for source surfaces.
+
 ## Directory Policy
 
 | Path | Tracked contents | Classification | Notes |
@@ -21,6 +26,10 @@ source-controlled fixture, archive, or release-artifact location.
 
 The tracked `theory/icse/lesson1/runs/q1/` files are a historical theory
 archive, not root runtime output. New root-level `runs/` payloads remain ignored.
+
+Use `docs/archive/` for tracked historical material. Do not add a competing
+root-level `archive/` convention without updating this document, the migration
+manifest, and the artifact-boundary checker together.
 
 ## Promotion Workflow
 

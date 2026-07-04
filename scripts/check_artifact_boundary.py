@@ -60,6 +60,7 @@ ARCHIVE_MARKERS = {
     "docs/archive/generated-checkpoints/README.md",
     "docs/archive/generated-results/README.md",
     "docs/archive/generated-results/smoke/README.md",
+    "docs/archive/generated-results/two_world_game/README.md",
     "docs/archive/generated-results/week5_scan/README.md",
 }
 

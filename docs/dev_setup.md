@@ -1,8 +1,8 @@
 # Developer Setup
 
 This guide covers local development dependencies for the CC Framework. The core
-project is Python-first; Node.js tooling is only required for optional UI/chart
-work.
+project is Python-first; Node.js tooling is only required for the dashboard and
+infrastructure reference lanes.
 
 ## Python environment (required)
 
@@ -21,19 +21,21 @@ work.
 
 ## Node.js tooling (optional)
 
-Node.js is only needed if you plan to work on Recharts-based UI/chart artifacts
-(for example, iterating on local chart prototypes or UI visualizations). It is
-**not** required for running the core Python experiments.
+Node.js is only needed if you plan to work on `apps/dashboard/` or `infra/`.
+It is **not** required for running the core Python experiments.
 
 1. Install Node.js (LTS) and npm.
-2. Install JavaScript dependencies:
+2. Install dashboard dependencies when working on the dashboard:
 
    ```bash
-   npm install
+   cd apps/dashboard
+   npm ci
    ```
 
-This installs the `recharts` dependency defined in `package.json`, enabling local
-development of chart/UI assets.
+The historical root-level Node package has been removed. `apps/dashboard/` and
+`infra/` are the active JavaScript package roots. Older static artifacts such as
+`tools/week6_artifact.html` load their chart libraries from CDNs and do not
+require a repo-root npm install.
 
 ## Validation lanes
 

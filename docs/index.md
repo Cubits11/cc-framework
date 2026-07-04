@@ -19,6 +19,10 @@ reference architecture, not a deployment safety certification.
 Generated outputs are governed by the
 [Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md), which defines what
 may be tracked as a release artifact, fixture, archive, or runtime-only output.
+Source-surface disposition is tracked in the
+[Repository Migration Manifest](release/MIGRATION_MANIFEST.md), and overlapping
+audit/evidence ownership is summarized in
+[Audit and Evidence Boundaries](architecture/AUDIT_EVIDENCE_BOUNDARIES.md).
 
 ## 1. Architectural Overview
 
@@ -88,6 +92,8 @@ The experiment flow is illustrated in
 * [Evidence Role Ontology](design-specs/evidence_role_ontology.md)
 * [Validation Matrix](validation_matrix.md)
 * [Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md)
+* [Repository Migration Manifest](release/MIGRATION_MANIFEST.md)
+* [Audit and Evidence Boundaries](architecture/AUDIT_EVIDENCE_BOUNDARIES.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
 * [Experiments Guide](experiments-guide.md)
 * [Reproducibility Notes](reproducibility.md)

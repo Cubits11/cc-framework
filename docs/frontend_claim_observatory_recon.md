@@ -81,8 +81,8 @@ require mkdocs nav edits.
 
 Other relevant browser-facing or frontend-adjacent files:
 
-- `package.json` at repo root declares `recharts`; it is not used by
-  `apps/dashboard`.
+- There is no repo-root JavaScript package. Dashboard dependencies live in
+  `apps/dashboard/`; infrastructure dependencies live in `infra/`.
 - `apps/dashboard/.next` and `apps/dashboard/node_modules` are local generated
   outputs/dependencies, not source.
 - `infra/node_modules` and `infra/cdk.out` are generated/dependency outputs.

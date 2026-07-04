@@ -106,9 +106,8 @@ def main() -> int:
         # Friendly guidance for Week-2 demo if heavy deps bite
         print(
             "ERROR: Could not import cc.exp.run_two_world. "
-            "For today's demo, run the lightweight console games:\n"
-            "  python tools/two_world_game_pro.py -n 20 --bot\n"
-            "  python tools/two_world_game_phd.py -n 20 --bot --online\n\n"
+            "For a lightweight console demo, run:\n"
+            "  python tools/two_world_game.py -n 20 --bot --online\n\n"
             f"Import error: {e}",
             file=sys.stderr,
         )
