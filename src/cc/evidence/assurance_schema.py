@@ -57,6 +57,8 @@ class EvidenceRole(str, Enum):
     CLIFF_CERTIFICATE = "cliff_certificate"
     CCF_CONSISTENCY_CHECK = "ccf_consistency_check"
     STATISTICAL_COVERAGE = "statistical_coverage"
+    CLAIM_DECAY = "claim_decay"
+    EXTREMAL_SCENARIO = "extremal_scenario"
     RUN_METADATA = "run_metadata"
 
 
@@ -222,6 +224,18 @@ def assurance_case_from_run(evidence_bundle: Mapping[str, Any] | str | Path) -> 
         id_prefix="ev-coverage",
         description="Coverage, confidence interval, or uncertainty quantification outputs.",
     )
+    decay_evidence = _evidence_from_matches(
+        _collect_matches(payload, _DECAY_PATTERNS),
+        role=EvidenceRole.CLAIM_DECAY,
+        id_prefix="ev-decay",
+        description="Claim-decay policy, hazard covariates, or freshness-trigger artifacts.",
+    )
+    extremal_evidence = _evidence_from_matches(
+        _collect_matches(payload, _EXTREMAL_PATTERNS),
+        role=EvidenceRole.EXTREMAL_SCENARIO,
+        id_prefix="ev-extremal",
+        description="Extremal scenario atom-table or endpoint-distribution evidence.",
+    )
 
     run_contexts = _run_contexts(payload, run_id)
     composition_claim_id = f"claim-{run_slug}-composition-risk-bounded"
@@ -255,7 +269,7 @@ def assurance_case_from_run(evidence_bundle: Mapping[str, Any] | str | Path) -> 
                 ),
             )
         ],
-        evidence=fh_evidence,
+        evidence=[*fh_evidence, *extremal_evidence],
         defeaters=_composition_defeaters(run_slug, found_evidence=bool(fh_evidence)),
     )
 
@@ -325,7 +339,7 @@ def assurance_case_from_run(evidence_bundle: Mapping[str, Any] | str | Path) -> 
                 ),
             )
         ],
-        evidence=coverage_evidence,
+        evidence=[*coverage_evidence, *decay_evidence],
         defeaters=_uncertainty_defeaters(run_slug, found_evidence=bool(coverage_evidence)),
     )
 
@@ -510,6 +524,9 @@ _FH_PATTERNS = (
     "hoeffding",
     "envelope",
     "composition_bound",
+    "lower_distribution",
+    "upper_distribution",
+    "endpoint_distribution",
 )
 _CLIFF_PATTERNS = (
     "cliff",
@@ -547,6 +564,25 @@ _COVERAGE_PATTERNS = (
     "ci_upper",
     "ci_table",
     "standard_error",
+)
+_DECAY_PATTERNS = (
+    "claim_decay",
+    "decay",
+    "hazard",
+    "half_life",
+    "ttl",
+    "freshness",
+    "version_watch",
+    "version_watch_set",
+)
+_EXTREMAL_PATTERNS = (
+    "extremal_scenario",
+    "extremal",
+    "atom_table",
+    "top_outcomes",
+    "feasibility",
+    "source_kernel",
+    "excluded_evidence_fields",
 )
 
 _CONTEXT_KEYS = {
@@ -672,13 +708,18 @@ def _uncertainty_defeaters(run_slug: str, *, found_evidence: bool) -> list[Defea
     return defeaters
 
 
-def _load_bundle_payload(evidence_bundle: Mapping[str, Any] | str | Path) -> tuple[dict[str, Any], list[str]]:
+def _load_bundle_payload(
+    evidence_bundle: Mapping[str, Any] | str | Path,
+) -> tuple[dict[str, Any], list[str]]:
     source_refs: list[str] = []
     if isinstance(evidence_bundle, (str, Path)):
         path = Path(evidence_bundle)
         source_refs.append(str(path))
         if path.is_dir():
-            return {"run_directory": str(path), "loaded_files": _load_json_artifacts(path)}, source_refs
+            return {
+                "run_directory": str(path),
+                "loaded_files": _load_json_artifacts(path),
+            }, source_refs
         return {"bundle_file": str(path), "payload": _read_artifact(path)}, source_refs
 
     payload = _jsonable(evidence_bundle)
@@ -791,6 +832,9 @@ def _mapping_matches(path: str, value: Mapping[str, Any], patterns: Sequence[str
     path_l = path.lower()
     if _contains_any(path_l, patterns):
         return True
+    role = value.get("role")
+    if isinstance(role, str) and _contains_any(role.lower(), patterns):
+        return True
     return any(_contains_any(str(key).lower(), patterns) for key in value)
 
 
@@ -847,10 +891,7 @@ def _truncate_json(value: Any, *, depth: int = 0) -> Any:
         return value
     if isinstance(value, Mapping):
         items = list(value.items())
-        truncated = {
-            str(key): _truncate_json(item, depth=depth + 1)
-            for key, item in items[:8]
-        }
+        truncated = {str(key): _truncate_json(item, depth=depth + 1) for key, item in items[:8]}
         if len(items) > 8:
             truncated["<truncated_keys>"] = len(items) - 8
         return truncated
@@ -918,7 +959,9 @@ def _strategy_jsonld(strategy: Strategy) -> dict[str, Any]:
         "@type": "Strategy",
         "description": strategy.description,
         "rationale": strategy.rationale,
-        "supportsClaim": {"@id": strategy.supports_claim_id} if strategy.supports_claim_id else None,
+        "supportsClaim": {"@id": strategy.supports_claim_id}
+        if strategy.supports_claim_id
+        else None,
         "decomposesInto": [{"@id": claim_id} for claim_id in strategy.decomposes_into_claim_ids],
         "reviewStatus": strategy.review_status.value,
         "humanReviewRequired": strategy.human_review_required,
@@ -972,7 +1015,9 @@ def _defeater_jsonld(defeater: Defeater) -> dict[str, Any]:
         "mitigationPlan": defeater.mitigation_plan,
         "reviewStatus": defeater.review_status.value,
         "humanReviewRequired": defeater.human_review_required,
-        "resolvedByEvidenceIds": [{"@id": evidence_id} for evidence_id in defeater.resolved_by_evidence_ids],
+        "resolvedByEvidenceIds": [
+            {"@id": evidence_id} for evidence_id in defeater.resolved_by_evidence_ids
+        ],
     }
 
 
@@ -997,7 +1042,11 @@ def _claim_markdown(claim: TopClaim | SubClaim, *, heading_level: int) -> list[s
                 claim.strategy.rationale,
             ]
         )
-    lines.extend(_node_list_markdown("Contexts", [f"`{c.id}`: {c.description}" for c in claim.contexts], heading))
+    lines.extend(
+        _node_list_markdown(
+            "Contexts", [f"`{c.id}`: {c.description}" for c in claim.contexts], heading
+        )
+    )
     lines.extend(
         _node_list_markdown(
             "Assumptions",

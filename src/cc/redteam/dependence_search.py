@@ -292,12 +292,8 @@ class DependenceSearchConfig(_ConfigModel):
     run_id: str | None = None
     strategy: Literal["simulated_annealing"] = "simulated_annealing"
     baseline_fraction: float = Field(default=0.25, gt=0.0, lt=1.0)
-    search: SimulatedAnnealingSearchConfig = Field(
-        default_factory=SimulatedAnnealingSearchConfig
-    )
-    perturbation_space: PerturbationSpaceConfig = Field(
-        default_factory=PerturbationSpaceConfig
-    )
+    search: SimulatedAnnealingSearchConfig = Field(default_factory=SimulatedAnnealingSearchConfig)
+    perturbation_space: PerturbationSpaceConfig = Field(default_factory=PerturbationSpaceConfig)
     safety_gate: ContentSafetyGateConfig = Field(default_factory=ContentSafetyGateConfig)
     objective: ObjectiveConfig = Field(default_factory=ObjectiveConfig)
 
@@ -319,11 +315,7 @@ class TransformationRecord:
     public_reference: str | None = None
 
     def artifact_payload(self) -> dict[str, Any]:
-        return {
-            key: value
-            for key, value in asdict(self).items()
-            if value is not None
-        }
+        return {key: value for key, value in asdict(self).items() if value is not None}
 
 
 @dataclass(frozen=True)
@@ -382,6 +374,30 @@ class CandidateSetScore:
 
 
 @dataclass(frozen=True)
+class ConfirmatoryCliffEvidence:
+    """Certificate computed from a non-adaptive confirmatory failure matrix."""
+
+    metrics: DependenceMetrics
+    certificate: CliffCertificate
+    certificate_ci: tuple[float, float]
+    confidence_level: float
+    critical_value: float
+    n_bootstrap: int
+    source: Literal["confirmatory_failure_matrix"] = "confirmatory_failure_matrix"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source": self.source,
+            "metrics": self.metrics.to_dict(),
+            "certificate": asdict(self.certificate),
+            "certificate_ci": self.certificate_ci,
+            "confidence_level": self.confidence_level,
+            "critical_value": self.critical_value,
+            "n_bootstrap": self.n_bootstrap,
+        }
+
+
+@dataclass(frozen=True)
 class DiscoveredCliffReport:
     run_id: str
     created_at: str
@@ -393,6 +409,25 @@ class DiscoveredCliffReport:
     objective_value: float
     certificate: CliffCertificate
     certificate_ci: tuple[float, float]
+    certificate_role: Literal["exploratory_adaptive_selection"] = "exploratory_adaptive_selection"
+    certificate_ci_role: Literal["exploratory_adaptive_selection"] = (
+        "exploratory_adaptive_selection"
+    )
+    confirmatory_evidence: ConfirmatoryCliffEvidence | None = None
+
+    @property
+    def exploratory_certificate_ci(self) -> tuple[float, float]:
+        """Backward-compatible alias that names the adaptive interval correctly."""
+
+        return self.certificate_ci
+
+    @property
+    def confirmatory_certificate_ci(self) -> tuple[float, float] | None:
+        """Return the confirmatory interval when an independent matrix was supplied."""
+
+        if self.confirmatory_evidence is None:
+            return None
+        return self.confirmatory_evidence.certificate_ci
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -406,6 +441,12 @@ class DiscoveredCliffReport:
             "objective_value": self.objective_value,
             "certificate": asdict(self.certificate),
             "certificate_ci": self.certificate_ci,
+            "certificate_role": self.certificate_role,
+            "certificate_ci_role": self.certificate_ci_role,
+            "exploratory_certificate_ci": self.exploratory_certificate_ci,
+            "confirmatory_evidence": (
+                None if self.confirmatory_evidence is None else self.confirmatory_evidence.to_dict()
+            ),
         }
 
 
@@ -469,7 +510,9 @@ class PerturbationEngine:
         transformations: list[TransformationRecord] = []
         max_ops = int(self.config.max_total_transformations)
         if max_ops <= 0:
-            return CandidateInput(text=text, base_prompt_hash=_sha256_text(base), transformations=())
+            return CandidateInput(
+                text=text, base_prompt_hash=_sha256_text(base), transformations=()
+            )
 
         n_ops = int(rng.integers(1, max_ops + 1))
         for _ in range(n_ops):
@@ -676,12 +719,10 @@ class DependenceSearchContext:
 
         metrics = compute_dependence_metrics(failures)
         tau_shift = (
-            metrics.pairwise_kendall_tau_mean
-            - self.baseline_metrics.pairwise_kendall_tau_mean
+            metrics.pairwise_kendall_tau_mean - self.baseline_metrics.pairwise_kendall_tau_mean
         )
         tail_shift = (
-            metrics.joint_tail_cofailure_rate
-            - self.baseline_metrics.joint_tail_cofailure_rate
+            metrics.joint_tail_cofailure_rate - self.baseline_metrics.joint_tail_cofailure_rate
         )
         objective = (
             self.config.objective.tau_weight * tau_shift
@@ -829,6 +870,7 @@ def run_dependence_search(
     config: DependenceSearchConfig | Mapping[str, Any] | None = None,
     *,
     heldout_baseline: Sequence[str] | None = None,
+    confirmatory_failures: Sequence[Sequence[int | bool]] | None = None,
 ) -> DependenceSearchResult:
     """Run active bounded dependence discovery.
 
@@ -874,6 +916,15 @@ def run_dependence_search(
         {"lambda_any": ci, "confidence_level": cfg.objective.confidence_level},
         critical_value=cfg.objective.critical_value,
     )
+    confirmatory_evidence = None
+    if confirmatory_failures is not None:
+        confirmatory_evidence = build_confirmatory_cliff_evidence(
+            confirmatory_failures,
+            n_bootstrap=cfg.objective.bootstrap_samples,
+            confidence_level=cfg.objective.confidence_level,
+            critical_value=cfg.objective.critical_value,
+            random_state=int(cfg.seed) + 1,
+        )
     report = DiscoveredCliffReport(
         run_id=run_id,
         created_at=_utc_now(),
@@ -885,6 +936,7 @@ def run_dependence_search(
         objective_value=best_score.objective_value,
         certificate=certificate,
         certificate_ci=ci,
+        confirmatory_evidence=confirmatory_evidence,
     )
     return DependenceSearchResult(
         run_id=run_id,
@@ -926,6 +978,43 @@ def evaluate_baseline_metrics(
             row.append(0 if blocked else 1)
         failures.append(tuple(row))
     return compute_dependence_metrics(failures)
+
+
+def build_confirmatory_cliff_evidence(
+    failures: Sequence[Sequence[int | bool]],
+    *,
+    n_bootstrap: int,
+    confidence_level: float,
+    critical_value: float,
+    random_state: int | np.random.Generator | None = None,
+) -> ConfirmatoryCliffEvidence:
+    """Build cliff evidence from a non-adaptive confirmatory failure matrix."""
+
+    metrics = compute_dependence_metrics(failures)
+    rng = (
+        random_state
+        if isinstance(random_state, np.random.Generator)
+        else np.random.default_rng(random_state)
+    )
+    ci = _bootstrap_joint_tail_ci(
+        failures,
+        n_bootstrap=n_bootstrap,
+        confidence_level=confidence_level,
+        rng=rng,
+    )
+    certificate = cliff_certificate(
+        {"lambda_any": metrics.joint_tail_cofailure_rate},
+        {"lambda_any": ci, "confidence_level": confidence_level},
+        critical_value=critical_value,
+    )
+    return ConfirmatoryCliffEvidence(
+        metrics=metrics,
+        certificate=certificate,
+        certificate_ci=ci,
+        confidence_level=float(confidence_level),
+        critical_value=float(critical_value),
+        n_bootstrap=int(n_bootstrap),
+    )
 
 
 def compute_dependence_metrics(failures: Sequence[Sequence[int | bool]]) -> DependenceMetrics:
@@ -1042,7 +1131,9 @@ def write_discovered_cliff_report(
         "schema_version": result.config.schema_version,
         "search_corpus_hashes": list(result.search_corpus_hashes),
         "baseline_corpus_hashes": list(result.baseline_corpus_hashes),
-        "discovered_input_hashes": [candidate.input_hash for candidate in result.discovered_candidates],
+        "discovered_input_hashes": [
+            candidate.input_hash for candidate in result.discovered_candidates
+        ],
         "safety_gate_blocks": result.safety_gate_blocks,
         "evaluated_candidate_count": result.evaluated_candidate_count,
         "raw_discovered_text_included": bool(include_raw_discoveries),
@@ -1066,7 +1157,9 @@ def load_prompt_corpus(path: str | Path) -> list[str]:
         raise FileNotFoundError(f"Prompt corpus not found: {source}")
     suffix = source.suffix.lower()
     if suffix == ".txt":
-        return [line.strip() for line in source.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [
+            line.strip() for line in source.read_text(encoding="utf-8").splitlines() if line.strip()
+        ]
     if suffix == ".jsonl":
         prompts: list[str] = []
         with source.open("r", encoding="utf-8") as handle:

@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from cc.evidence.assurance_schema import (
     ClaimCategory,
     Defeater,
+    EvidenceRole,
     ReviewStatus,
     SubClaim,
     assurance_case_from_run,
@@ -69,6 +70,22 @@ def test_assurance_case_from_run_groups_actual_outputs_by_claim_category() -> No
                 }
             ],
         },
+        "evidence": {
+            "artifacts": [
+                {
+                    "path": "decay.json",
+                    "sha256": "a" * 64,
+                    "bytes": 123,
+                    "role": "claim_decay",
+                },
+                {
+                    "path": "extremal.json",
+                    "sha256": "b" * 64,
+                    "bytes": 456,
+                    "role": "extremal_scenario",
+                },
+            ]
+        },
     }
 
     case = assurance_case_from_run(bundle)
@@ -83,6 +100,11 @@ def test_assurance_case_from_run_groups_actual_outputs_by_claim_category() -> No
     assert subclaims[ClaimCategory.COMPOSITION_RISK_BOUNDED].evidence
     assert subclaims[ClaimCategory.DEPENDENCE_STRUCTURE_CHARACTERIZED].evidence
     assert subclaims[ClaimCategory.UNCERTAINTY_HONESTLY_QUANTIFIED].evidence
+    evidence_roles = {
+        evidence.role for claim in case.top_claim.subclaims for evidence in claim.evidence
+    }
+    assert EvidenceRole.CLAIM_DECAY in evidence_roles
+    assert EvidenceRole.EXTREMAL_SCENARIO in evidence_roles
 
     jsonld = export_assurance_case_jsonld(case)
     markdown = export_assurance_case_markdown(case)

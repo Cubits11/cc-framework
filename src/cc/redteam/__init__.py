@@ -3,6 +3,7 @@
 from .dependence_search import (
     BoundedParaphraseConfig,
     CandidateInput,
+    ConfirmatoryCliffEvidence,
     ContentSafetyGate,
     ContentSafetyGateConfig,
     DependenceMetrics,
@@ -19,6 +20,7 @@ from .dependence_search import (
     SimulatedAnnealingSearch,
     SimulatedAnnealingSearchConfig,
     SynonymSubstitutionConfig,
+    build_confirmatory_cliff_evidence,
     compute_dependence_metrics,
     dependence_search_config_schema,
     evaluate_baseline_metrics,
@@ -30,6 +32,7 @@ from .dependence_search import (
 __all__ = [
     "BoundedParaphraseConfig",
     "CandidateInput",
+    "ConfirmatoryCliffEvidence",
     "ContentSafetyGate",
     "ContentSafetyGateConfig",
     "DependenceMetrics",
@@ -46,6 +49,7 @@ __all__ = [
     "SimulatedAnnealingSearch",
     "SimulatedAnnealingSearchConfig",
     "SynonymSubstitutionConfig",
+    "build_confirmatory_cliff_evidence",
     "compute_dependence_metrics",
     "dependence_search_config_schema",
     "evaluate_baseline_metrics",

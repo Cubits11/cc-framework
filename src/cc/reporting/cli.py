@@ -42,6 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--measurement-json", required=True, type=Path)
     build.add_argument("--calibration-json", required=True, type=Path)
     build.add_argument("--evidence", nargs="*", default=[], type=Path)
+    build.add_argument("--decay-policy", type=Path)
+    build.add_argument("--extremal-scenario", action="append", default=[], type=Path)
+    build.add_argument("--evidence-role", action="append", default=[])
     build.add_argument("--audit-log", type=Path)
     build.add_argument("--figure-manifest", type=Path)
     build.add_argument("--claim", required=True)
@@ -85,7 +88,15 @@ def _cmd_build_report(args: argparse.Namespace) -> int:
     measurement_payload = _read_json(args.measurement_json)
     calibration_payload = _read_json(args.calibration_json)
 
-    evidence = [EvidenceArtifact.from_path(path) for path in args.evidence]
+    role_overrides = _parse_evidence_roles(args.evidence_role)
+    evidence = _evidence_artifacts(
+        args.evidence,
+        role_overrides=role_overrides,
+        dedicated_artifacts=[
+            (args.decay_policy, "claim_decay"),
+            *[(path, "extremal_scenario") for path in args.extremal_scenario],
+        ],
+    )
     audit_log = (
         EvidenceArtifact.from_path(args.audit_log, role="audit_log") if args.audit_log else None
     )
@@ -258,6 +269,48 @@ def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _parse_evidence_roles(entries: list[str]) -> dict[str, str]:
+    roles: dict[str, str] = {}
+    for entry in entries:
+        if "=" not in entry:
+            raise ValueError("--evidence-role entries must be formatted as PATH=ROLE")
+        raw_path, raw_role = entry.split("=", 1)
+        path = raw_path.strip()
+        role = raw_role.strip()
+        if not path or not role:
+            raise ValueError("--evidence-role entries must include a non-empty PATH and ROLE")
+        roles[path] = role
+    return roles
+
+
+def _evidence_artifacts(
+    evidence_paths: list[Path],
+    *,
+    role_overrides: dict[str, str],
+    dedicated_artifacts: list[tuple[Path | None, str]],
+) -> list[EvidenceArtifact]:
+    artifacts: list[EvidenceArtifact] = []
+    seen: set[str] = set()
+
+    for path in evidence_paths:
+        key = str(path)
+        artifacts.append(EvidenceArtifact.from_path(path, role=role_overrides.get(key, "artifact")))
+        seen.add(key)
+
+    for path, role in dedicated_artifacts:
+        if path is None:
+            continue
+        key = str(path)
+        artifacts.append(EvidenceArtifact.from_path(path, role=role_overrides.get(key, role)))
+        seen.add(key)
+
+    for raw_path, role in role_overrides.items():
+        if raw_path in seen:
+            continue
+        artifacts.append(EvidenceArtifact.from_path(Path(raw_path), role=role))
+    return artifacts
 
 
 def _command_string(parts: list[str]) -> str:

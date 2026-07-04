@@ -130,6 +130,55 @@ def test_cli_missing_evidence_returns_nonzero(tmp_path: Path) -> None:
     assert "Evidence file not found" in result.stderr
 
 
+def test_new_evidence_roles_are_included_and_change_receipt_hash(tmp_path: Path) -> None:
+    decay = tmp_path / "decay.json"
+    extremal = tmp_path / "extremal.json"
+    decay.write_text('{"schema_version":"cc.claim_decay.v1"}\n', encoding="utf-8")
+    extremal.write_text('{"schema_version":"cc.extremal_scenario.v1"}\n', encoding="utf-8")
+
+    base = _report()
+    report = _report(
+        evidence_artifacts=[
+            EvidenceArtifact.from_path(FIXTURES / "artifact.txt"),
+            EvidenceArtifact.from_path(decay, role="claim_decay"),
+            EvidenceArtifact.from_path(extremal, role="extremal_scenario"),
+        ]
+    )
+
+    Draft202012Validator(_schema()).validate(report)
+    assert [artifact["role"] for artifact in report["evidence"]["artifacts"]] == [
+        "artifact",
+        "claim_decay",
+        "extremal_scenario",
+    ]
+    assert report["receipt"]["canonical_hash"] != base["receipt"]["canonical_hash"]
+
+
+def test_cli_accepts_decay_extremal_and_generic_evidence_roles(tmp_path: Path) -> None:
+    decay = tmp_path / "decay.json"
+    extremal = tmp_path / "extremal.json"
+    out = tmp_path / "report.json"
+    decay.write_text('{"schema_version":"cc.claim_decay.v1"}\n', encoding="utf-8")
+    extremal.write_text('{"schema_version":"cc.extremal_scenario.v1"}\n', encoding="utf-8")
+    args = _cli_args(out)
+    claim_index = args.index("--claim")
+    args[claim_index:claim_index] = [
+        "--decay-policy",
+        str(decay),
+        "--extremal-scenario",
+        str(extremal),
+        "--evidence-role",
+        "tests/fixtures/reporting/artifact.txt=calibration_source",
+    ]
+
+    result = _run_cli(args)
+
+    assert result.returncode == 0, result.stderr
+    report = json.loads(out.read_text(encoding="utf-8"))
+    roles = [artifact["role"] for artifact in report["evidence"]["artifacts"]]
+    assert roles == ["calibration_source", "claim_decay", "extremal_scenario"]
+
+
 def test_checked_in_example_report_is_valid() -> None:
     report = json.loads(
         (ROOT / "examples" / "reporting" / "minimal_cc_report.json").read_text(encoding="utf-8")
@@ -163,6 +212,7 @@ def _report(
     *,
     measurement: MeasurementSummary | None = None,
     claim: ClaimSummary | None = None,
+    evidence_artifacts: list[EvidenceArtifact] | None = None,
 ) -> dict[str, Any]:
     return build_cc_report(
         run=RunSummary(
@@ -202,7 +252,9 @@ def _report(
                 "This report does not generalize outside the named evaluation distribution.",
             ],
         ),
-        evidence_artifacts=[EvidenceArtifact.from_path(FIXTURES / "artifact.txt")],
+        evidence_artifacts=evidence_artifacts
+        if evidence_artifacts is not None
+        else [EvidenceArtifact.from_path(FIXTURES / "artifact.txt")],
         audit_log=EvidenceArtifact.from_path(FIXTURES / "audit.jsonl", role="audit_log"),
         figure_manifest=EvidenceArtifact.from_path(
             FIXTURES / "figure_manifest.json", role="figure_manifest"

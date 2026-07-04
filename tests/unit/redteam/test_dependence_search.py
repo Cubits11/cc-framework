@@ -13,6 +13,7 @@ from cc.redteam.dependence_search import (
     PublicPromptInjectionConfig,
     PublicPromptInjectionPattern,
     SimulatedAnnealingSearchConfig,
+    build_confirmatory_cliff_evidence,
     compute_dependence_metrics,
     run_dependence_search,
     write_discovered_cliff_report,
@@ -166,3 +167,58 @@ def test_bootstrap_free_search_is_reproducible() -> None:
         c.input_hash for c in second.discovered_candidates
     ]
     assert first.report.certificate.lambda_hat == second.report.certificate.lambda_hat
+
+
+def test_adaptive_certificate_ci_is_marked_exploratory() -> None:
+    config = _public_marker_config(run_id="exploratory_ci").model_copy(
+        update={"objective": ObjectiveConfig(bootstrap_samples=0)}
+    )
+    result = run_dependence_search(
+        ["quiet alpha", "quiet beta"],
+        [CountingSharedMissGuardrail(), CountingSharedMissGuardrail()],
+        config,
+        heldout_baseline=["baseline alpha", "baseline beta"],
+    )
+
+    payload = result.report.to_dict()
+
+    assert payload["certificate_ci"] == payload["exploratory_certificate_ci"]
+    assert payload["certificate_ci_role"] == "exploratory_adaptive_selection"
+    assert payload["certificate_role"] == "exploratory_adaptive_selection"
+    assert payload["confirmatory_evidence"] is None
+
+
+def test_confirmatory_failure_matrix_adds_independent_certificate_evidence() -> None:
+    config = _public_marker_config(run_id="confirmatory_ci").model_copy(
+        update={"objective": ObjectiveConfig(bootstrap_samples=0)}
+    )
+    result = run_dependence_search(
+        ["quiet gamma", "quiet delta"],
+        [CountingSharedMissGuardrail(), CountingSharedMissGuardrail()],
+        config,
+        heldout_baseline=["baseline gamma", "baseline delta"],
+        confirmatory_failures=[(1, 1), (1, 0), (0, 1), (0, 0)],
+    )
+
+    payload = result.report.to_dict()
+    confirmatory = payload["confirmatory_evidence"]
+
+    assert result.report.confirmatory_certificate_ci == (0.5, 0.5)
+    assert confirmatory["source"] == "confirmatory_failure_matrix"
+    assert confirmatory["certificate_ci"] == (0.5, 0.5)
+    assert confirmatory["certificate"]["lambda_hat"] == 0.5
+    assert payload["certificate_ci_role"] == "exploratory_adaptive_selection"
+
+
+def test_confirmatory_builder_uses_failure_matrix_not_selected_best_score() -> None:
+    evidence = build_confirmatory_cliff_evidence(
+        [(1, 1), (1, 0), (0, 1), (0, 0)],
+        n_bootstrap=0,
+        confidence_level=0.95,
+        critical_value=0.2,
+        random_state=123,
+    )
+
+    assert evidence.metrics.joint_tail_cofailure_rate == 0.5
+    assert evidence.certificate_ci == (0.5, 0.5)
+    assert evidence.certificate.lambda_hat == 0.5
