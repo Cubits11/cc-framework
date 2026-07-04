@@ -35,6 +35,7 @@ SemanticClass = Literal[
     "integrity",
     "temporal",
     "scenario",
+    "protocol",
     "redteam",
     "review",
     "generic",
@@ -233,9 +234,7 @@ def validate_role_payload(role: str, payload: Mapping[str, Any]) -> RolePayloadV
             known_role=False,
             valid=True,
             review_required=True,
-            warnings=(
-                "Unknown evidence role is preserved for review but has no support power.",
-            ),
+            warnings=("Unknown evidence role is preserved for review but has no support power.",),
         )
 
     missing = tuple(
@@ -248,9 +247,7 @@ def validate_role_payload(role: str, payload: Mapping[str, Any]) -> RolePayloadV
         for rule in definition.forbidden_fields
         for path in _payload_field_matches(payload, rule)
     )
-    errors = [
-        f"missing required field {field!r}" for field in missing
-    ] + [
+    errors = [f"missing required field {field!r}" for field in missing] + [
         f"forbidden field present at {path}" for path in matched_forbidden
     ]
     return RolePayloadValidation(
@@ -332,7 +329,9 @@ def _payload_field_matches(payload: Mapping[str, Any], rule: PayloadFieldRule) -
     field = rule.field.strip()
     matches: list[str] = []
     for path, key in _walk_payload_keys(payload):
-        if (rule.match in {"path", "path_or_leaf"} and _path_matches(path, field)) or (rule.match in {"leaf", "path_or_leaf"} and key == field):
+        if (rule.match in {"path", "path_or_leaf"} and _path_matches(path, field)) or (
+            rule.match in {"leaf", "path_or_leaf"} and key == field
+        ):
             matches.append(path)
     return tuple(matches)
 
@@ -648,9 +647,7 @@ _ROLE_DEFINITIONS: tuple[EvidenceRoleDefinition, ...] = (
                 "Signed decay artifacts must not store live freshness as signed truth.",
             ),
         ),
-        review_rules=(
-            _review("degraded_claim_decay", "Degraded decay state requires review."),
-        ),
+        review_rules=(_review("degraded_claim_decay", "Degraded decay state requires review."),),
         invalidation_triggers=(
             _trigger("expired", "Expired decay state invalidates freshness.", "expires"),
             _trigger("degraded", "Degraded decay state requires review.", "review"),
@@ -731,7 +728,9 @@ _ROLE_DEFINITIONS: tuple[EvidenceRoleDefinition, ...] = (
             ),
         ),
         invalidation_triggers=(
-            _trigger("infeasible", "Infeasible scenarios invalidate scenario support.", "invalidates"),
+            _trigger(
+                "infeasible", "Infeasible scenarios invalidate scenario support.", "invalidates"
+            ),
             _trigger(
                 "excluded_evidence_fields",
                 "Excluded evidence fields require review.",
@@ -809,6 +808,122 @@ _ROLE_DEFINITIONS: tuple[EvidenceRoleDefinition, ...] = (
                 "confirmatory_field_leak",
                 "Confirmatory fields in exploratory payloads fail the firewall.",
                 "invalidates",
+            ),
+        ),
+    ),
+    EvidenceRoleDefinition(
+        role="confirmatory_protocol",
+        semantic_class="protocol",
+        supports=(
+            _sp(
+                "confirmatory_tests",
+                "confirmatory",
+                "claim.confirmatory_boundary",
+                "pre_registered_plan_and_confirmatory_run_separation",
+            ),
+            _sp(
+                "qualifies",
+                "confirmatory",
+                "claim.statistical_interval",
+                "fixed_endpoint_analysis_sample_and_stopping_protocol",
+            ),
+            _sp(
+                "requires_review",
+                "weak",
+                "claim.confirmatory_boundary",
+                "confirmatory_protocol_review_trigger",
+            ),
+            _sp(
+                "invalidates",
+                "diagnostic",
+                "claim.confirmatory_boundary",
+                "confirmatory_protocol_firewall_failure",
+            ),
+        ),
+        does_not_support=(
+            _no_support(
+                "deployment_safety",
+                ("deployment_safety", "deployment safety", "safety"),
+                "Confirmatory protocols still do not certify deployment safety.",
+            ),
+            _no_support(
+                "external_validity",
+                ("external_validity", "generalization", "representativeness"),
+                "Confirmation is scoped to the declared sample, endpoint, and run.",
+            ),
+            _no_support(
+                "adaptive_discovery_reuse",
+                ("adaptive", "exploratory", "post-selection"),
+                "Adaptive discovery can motivate a protocol but cannot become "
+                "confirmatory evidence by relabeling.",
+            ),
+        ),
+        mandatory_non_claims=(
+            _nc(
+                "confirmatory_protocol_validity_depends_on_protocol_not_polish",
+                "Confirmatory validity depends on the protocol and run separation, not "
+                "report polish.",
+                (("confirmatory", "protocol"), ("not", "depends"), ("polish",)),
+            ),
+            _nc(
+                "confirmatory_protocol_not_deployment_safety",
+                "Confirmatory protocol evidence is scoped and does not certify deployment safety.",
+                (("confirmatory", "protocol"), ("does not", "not"), ("deployment", "safe")),
+            ),
+        ),
+        allowed_claim_levels=_CONFIRMATORY_CLAIM_LEVELS,
+        staleness_behavior="artifact_timestamp",
+        exploratory_status="not_exploratory",
+        confirmatory_status="confirmatory",
+        required_fields=(
+            _required(
+                "schema_version",
+                "Confirmatory protocol artifacts must declare their schema.",
+            ),
+            _required("artifact_id", "Confirmatory protocol artifacts must identify themselves."),
+            _required("plan", "Confirmatory protocol artifacts must reference the plan."),
+            _required("run", "Confirmatory protocol artifacts must reference the run."),
+            _required("non_claims", "Confirmatory protocol artifacts must preserve non-claims."),
+        ),
+        forbidden_fields=(
+            _forbidden(
+                "adaptive_search_ci",
+                "Adaptive search intervals cannot be presented as confirmatory protocol output.",
+            ),
+            _forbidden(
+                "exploratory_ci",
+                "Exploratory intervals cannot be presented as confirmatory protocol output.",
+            ),
+            _forbidden(
+                "non_confirmatory_ci",
+                "Non-confirmatory intervals cannot be relabeled by a confirmatory protocol.",
+            ),
+        ),
+        review_rules=(
+            _review(
+                "missing_or_weak_stopping_rule",
+                "Missing stopping rules require review or invalidate stronger claim surfaces.",
+            ),
+            _review(
+                "clustered_without_blocking",
+                "Clustered data without cluster blocking requires review.",
+            ),
+        ),
+        invalidation_triggers=(
+            _trigger(
+                "temporal_order_violation",
+                "The protocol plan must be created before the confirmatory run starts.",
+                "invalidates",
+            ),
+            _trigger(
+                "adaptive_discovery_reuse",
+                "Adaptive discovery artifacts cannot be confirmatory evidence by role rename.",
+                "invalidates",
+            ),
+            _trigger(
+                "clustered_without_blocking",
+                "Clustered data without cluster blocking requires review.",
+                "review",
             ),
         ),
     ),

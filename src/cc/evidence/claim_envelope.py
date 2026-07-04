@@ -25,9 +25,7 @@ from cc.reporting.canonical import canonical_json_bytes
 from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION
 
 CLAIM_ENVELOPE_SCHEMA_VERSION: Literal["cc.claim_envelope.v1"] = "cc.claim_envelope.v1"
-BOUNDARY_ENVELOPE_SCHEMA_VERSION: Literal["cc.boundary_envelope.v1"] = (
-    "cc.boundary_envelope.v1"
-)
+BOUNDARY_ENVELOPE_SCHEMA_VERSION: Literal["cc.boundary_envelope.v1"] = "cc.boundary_envelope.v1"
 SUPPORT_GRAPH_SCHEMA_VERSION: Literal["cc.support_graph.v1"] = "cc.support_graph.v1"
 SUPPORT_SUMMARY_SCHEMA_VERSION: Literal["cc.claim_envelope.support_summary.v1"] = (
     "cc.claim_envelope.support_summary.v1"
@@ -77,6 +75,7 @@ _NON_PROOF_REVIEW = (
 _UNKNOWN_ROLE_NON_CLAIM = (
     "Unknown evidence roles are preserved for review but cannot strengthen the claim.",
 )
+
 
 class EnvelopeModel(BaseModel):
     """Strict base model for claim-envelope artifacts."""
@@ -252,9 +251,7 @@ class EnvelopeSupportSummary(EnvelopeModel):
             ):
                 strongest = edge.strength
         refs = graph.all_refs()
-        unsupported = tuple(
-            ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown"
-        )
+        unsupported = tuple(ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown")
         return cls(
             support_edge_count=len(graph.support_edges),
             relation_counts=dict(sorted(relation_counts.items())),
@@ -404,13 +401,13 @@ def compile_claim_envelope(
         evidence_refs=evidence_refs,
         scenario_refs=scenario_refs,
         decay_refs=decay_refs,
+        receipt_refs=receipt_refs,
+        review_refs=review_refs,
+        support_edges=_compile_support_edges(
+            evidence_refs=all_evidence_refs,
             receipt_refs=receipt_refs,
-            review_refs=review_refs,
-            support_edges=_compile_support_edges(
-                evidence_refs=all_evidence_refs,
-                receipt_refs=receipt_refs,
-                audit=audit,
-            ),
+            audit=audit,
+        ),
     )
     summary = EnvelopeSupportSummary.from_graph(graph)
     boundary = BoundaryEnvelope(
@@ -606,6 +603,8 @@ def _compile_support_edges(
                     rationale="Exploratory red-team artifacts generate hypotheses and review pressure.",
                 )
             )
+        elif ref.role == "confirmatory_protocol":
+            edges.append(_confirmatory_protocol_edge(ref))
         elif ref.role == "confirmatory_failure_matrix":
             edges.append(
                 SupportEdge(
@@ -645,6 +644,44 @@ def _compile_support_edges(
                 )
             )
     return tuple(edges)
+
+
+def _confirmatory_protocol_edge(ref: ArtifactRef) -> SupportEdge:
+    if ref.status == "invalid":
+        return SupportEdge(
+            source_artifact_id=ref.artifact_id,
+            target_claim_fragment="claim.confirmatory_boundary",
+            relation="invalidates",
+            strength="diagnostic",
+            non_claims=(
+                "Failed confirmatory protocol evidence invalidates confirmatory support; "
+                "it does not certify deployment safety.",
+            ),
+            rationale="Confirmatory protocol validation failed under governance checks.",
+        )
+    if ref.reason is not None and "requires review" in ref.reason:
+        return SupportEdge(
+            source_artifact_id=ref.artifact_id,
+            target_claim_fragment="claim.confirmatory_boundary",
+            relation="requires_review",
+            strength="weak",
+            non_claims=(
+                "Confirmatory protocol evidence requiring review is not a confirmatory "
+                "certificate until resolved.",
+            ),
+            rationale="Confirmatory protocol validation raised a review trigger.",
+        )
+    return SupportEdge(
+        source_artifact_id=ref.artifact_id,
+        target_claim_fragment="claim.confirmatory_boundary",
+        relation="confirmatory_tests",
+        strength="confirmatory",
+        non_claims=(
+            "Confirmatory protocol evidence remains scoped to its pre-registered "
+            "plan and run separation; it does not certify deployment safety.",
+        ),
+        rationale="Confirmatory protocol artifacts bind a pre-registered plan to a separate run.",
+    )
 
 
 def _decay_edges(ref: ArtifactRef, audit: Mapping[str, Any] | None) -> tuple[SupportEdge, ...]:
@@ -771,7 +808,9 @@ def _boundary_scope(
     sample_sizes_raw = measurement.get("sample_sizes")
     sample_sizes = {
         str(key): int(value)
-        for key, value in (sample_sizes_raw.items() if isinstance(sample_sizes_raw, Mapping) else [])
+        for key, value in (
+            sample_sizes_raw.items() if isinstance(sample_sizes_raw, Mapping) else []
+        )
     }
     return BoundaryScope(
         subject_ref=subject_ref,
@@ -838,7 +877,9 @@ def _claim_fragments(
 
 def _compile_defeaters(audit: Mapping[str, Any] | None) -> tuple[BoundaryDefeater, ...]:
     defeaters: list[BoundaryDefeater] = []
-    for idx, item in enumerate(_str_tuple(_audit_get(audit, ("boundary", "mandatory_non_claims_missing")))):
+    for idx, item in enumerate(
+        _str_tuple(_audit_get(audit, ("boundary", "mandatory_non_claims_missing")))
+    ):
         defeaters.append(
             BoundaryDefeater(
                 defeater_id=f"defeater:missing-non-claim:{idx}",
@@ -916,7 +957,9 @@ def _compile_review_requirements(
     allowed_claim_level: str,
 ) -> tuple[ReviewRequirement, ...]:
     requirements: list[ReviewRequirement] = []
-    required = _audit_bool(audit, ("required_human_review",), allowed_claim_level == "release_claim")
+    required = _audit_bool(
+        audit, ("required_human_review",), allowed_claim_level == "release_claim"
+    )
     status: Literal["required", "not_required"] = "required" if required else "not_required"
     reason = (
         "Governance verifier requires human review."

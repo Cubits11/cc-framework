@@ -93,6 +93,10 @@ Supported optional roles include:
   rechecked, degraded, or expired. It is not the live claim state.
 * `extremal_scenario`: an endpoint or fitted scenario artifact with atom-table
   and feasibility diagnostics. It is not a deployment approval.
+* `confirmatory_protocol`: a pre-registered plan plus separate run reference
+  used to check confirmatory timing, provenance, endpoints, analysis plans,
+  stopping rules, and cluster-blocking obligations. It is not a deployment
+  approval or external-validity proof.
 
 A signed decay policy is the artifact attached to the receipt. Verification-time
 decay state is computed later by evaluating that policy against a verifier's
@@ -133,6 +137,8 @@ The verifier checks:
   verifier's clock;
 * `extremal_scenario` artifacts parse, expose feasible endpoint/fitted worlds,
   and record excluded evidence fields;
+* `confirmatory_protocol` artifacts bind a pre-registered plan to a separate
+  run and enforce the exploratory/confirmatory firewall;
 * exploratory red-team intervals are not surfaced as confirmatory evidence;
 * mandatory non-claims implied by evidence roles are present.
 
@@ -160,11 +166,13 @@ Interpretation:
   checks are internally consistent under the v0 rules.
 * `NEEDS_REVIEW`: the package is readable but has conservative review triggers,
   such as degraded decay, unknown roles, missing mandatory non-claims, scenario
-  exclusions, or evidence weaker than the claim level.
+  exclusions, clustered confirmatory data without blocking, or evidence weaker
+  than the claim level.
 * `FAIL`: the package cannot be trusted as an internally consistent evidence
   bundle because the report is unreadable, a hash mismatches, decay has expired,
-  scenario evidence is malformed or infeasible, or exploratory evidence leaked
-  into a confirmatory surface.
+  scenario evidence is malformed or infeasible, a confirmatory protocol violates
+  timing/provenance requirements, or exploratory evidence leaked into a
+  confirmatory surface.
 
 ## Fixture Command
 

@@ -12,6 +12,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from cc.evidence.claim_envelope import EnvelopeSupportSummary, SupportGraph, compile_claim_envelope
+from cc.evidence.confirmatory_protocol import (
+    ProtocolAuditStatus,
+    verify_confirmatory_protocol_artifact,
+)
 from cc.evidence.decay import ClaimDecayRecord, DecayState, VersionWatchSet, evaluate_claim_decay
 from cc.evidence.extremal_scenario import ExtremalScenario, ScenarioKind
 from cc.evidence.role_ontology import (
@@ -110,6 +114,19 @@ class ScenarioAudit(_StrictModel):
     non_claims: list[str] = Field(default_factory=list)
 
 
+class ConfirmatoryProtocolGovernanceAudit(_StrictModel):
+    present: bool
+    artifact_count: int
+    protocol_ids: list[str]
+    run_ids: list[str]
+    failed_count: int
+    review_count: int
+    failed_reasons: list[str] = Field(default_factory=list)
+    review_reasons: list[str] = Field(default_factory=list)
+    audits: list[dict[str, Any]] = Field(default_factory=list)
+    non_claims: list[str] = Field(default_factory=list)
+
+
 class BoundaryAudit(_StrictModel):
     claim_non_claim_count: int
     artifact_non_claim_count: int
@@ -135,6 +152,7 @@ class ClaimGovernanceAudit(_StrictModel):
     evidence_artifacts: list[EvidenceArtifactAudit]
     decay: DecayAudit
     scenarios: ScenarioAudit
+    confirmatory_protocols: ConfirmatoryProtocolGovernanceAudit
     boundary: BoundaryAudit
     required_human_review: bool
     reasons: list[str]
@@ -218,8 +236,7 @@ def verify_claim_governance(
         if not is_known_role(role):
             artifact_audit.status = EvidenceRoleStatus.UNKNOWN_ROLE
             artifact_audit.reason = (
-                "Hash verified, but evidence role is not in the governance verifier "
-                "ontology."
+                "Hash verified, but evidence role is not in the governance verifier ontology."
             )
             message = f"Unknown evidence role {role!r} on {artifact_audit.path}."
             if strict_unknown_roles:
@@ -296,9 +313,16 @@ def verify_claim_governance(
         now=evaluation_time,
     )
     scenario_audit = _audit_scenario_artifacts(semantic_payloads)
+    confirmatory_protocol_audit = _audit_confirmatory_protocol_artifacts(
+        semantic_payloads,
+        allowed_claim_level=allowed_claim_level,
+    )
 
     for audit in evidence_audits:
-        if audit.role not in _SEMANTIC_PAYLOAD_ROLES or audit.status is not EvidenceRoleStatus.INVALID:
+        if (
+            audit.role not in _SEMANTIC_PAYLOAD_ROLES
+            or audit.status is not EvidenceRoleStatus.INVALID
+        ):
             continue
         if _invalid_role_payload_is_failure(audit.role) or strict_unknown_roles:
             fail_reasons.append(audit.reason)
@@ -321,6 +345,18 @@ def verify_claim_governance(
         message = "Fitted empirical scenario exists without confirmatory evidence."
         review_reasons.append(message)
         unresolved.append(message)
+    for reason in confirmatory_protocol_audit.failed_reasons:
+        fail_reasons.append(reason)
+    for reason in confirmatory_protocol_audit.review_reasons:
+        review_reasons.append(reason)
+        unresolved.append(reason)
+    if "confirmatory_failure_matrix" in roles_present and not confirmatory_protocol_audit.present:
+        message = (
+            "confirmatory_failure_matrix evidence requires a confirmatory_protocol artifact "
+            "that binds both the plan and the run."
+        )
+        review_reasons.append(message)
+        unresolved.append(message)
 
     leakage_paths = _exploratory_leakage_paths(report, semantic_payloads)
     if leakage_paths:
@@ -329,7 +365,13 @@ def verify_claim_governance(
             + ", ".join(sorted(leakage_paths))
         )
 
-    non_claims = _collect_non_claims(report, decay_audit, scenario_audit, semantic_payloads)
+    non_claims = _collect_non_claims(
+        report,
+        decay_audit,
+        scenario_audit,
+        confirmatory_protocol_audit,
+        semantic_payloads,
+    )
     mandatory_missing = _mandatory_non_claims_missing(
         roles_present=roles_present,
         non_claims=non_claims,
@@ -387,6 +429,7 @@ def verify_claim_governance(
         evidence_artifacts=evidence_audits,
         decay=decay_audit,
         scenarios=scenario_audit,
+        confirmatory_protocols=confirmatory_protocol_audit,
         boundary=boundary,
         required_human_review=verdict is not GovernanceVerdict.PASS,
         reasons=reasons,
@@ -430,6 +473,14 @@ def _failure_audit(
             kinds=[],
             infeasible_count=0,
             excluded_evidence_fields=[],
+        ),
+        confirmatory_protocols=ConfirmatoryProtocolGovernanceAudit(
+            present=False,
+            artifact_count=0,
+            protocol_ids=[],
+            run_ids=[],
+            failed_count=0,
+            review_count=0,
         ),
         boundary=BoundaryAudit(
             claim_non_claim_count=0,
@@ -781,6 +832,59 @@ def _audit_scenario_artifacts(
     )
 
 
+def _audit_confirmatory_protocol_artifacts(
+    semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
+    *,
+    allowed_claim_level: str,
+) -> ConfirmatoryProtocolGovernanceAudit:
+    protocol_ids: list[str] = []
+    run_ids: list[str] = []
+    audits: list[dict[str, Any]] = []
+    failed_reasons: list[str] = []
+    review_reasons: list[str] = []
+    non_claims: list[str] = []
+    count = 0
+
+    for payload, artifact in semantic_payloads:
+        if artifact.role != "confirmatory_protocol":
+            continue
+        count += 1
+        audit = verify_confirmatory_protocol_artifact(
+            payload,
+            claim_level=allowed_claim_level,
+        )
+        audits.append(audit.model_dump(mode="json"))
+        protocol_ids.append(audit.protocol_id)
+        run_ids.append(audit.run_id)
+        non_claims.extend(audit.non_claims)
+        if audit.status is ProtocolAuditStatus.FAIL:
+            reason = f"confirmatory_protocol {artifact.path} failed validation: " + "; ".join(
+                audit.reasons
+            )
+            artifact.status = EvidenceRoleStatus.INVALID
+            artifact.reason = reason
+            failed_reasons.append(reason)
+        elif audit.status is ProtocolAuditStatus.NEEDS_REVIEW:
+            reason = f"confirmatory_protocol {artifact.path} requires review: " + "; ".join(
+                audit.reasons
+            )
+            artifact.reason = reason
+            review_reasons.append(reason)
+
+    return ConfirmatoryProtocolGovernanceAudit(
+        present=count > 0,
+        artifact_count=count,
+        protocol_ids=_dedupe(protocol_ids),
+        run_ids=_dedupe(run_ids),
+        failed_count=len(failed_reasons),
+        review_count=len(review_reasons),
+        failed_reasons=_dedupe(failed_reasons),
+        review_reasons=_dedupe(review_reasons),
+        audits=audits,
+        non_claims=_dedupe(non_claims),
+    )
+
+
 def _has_fitted_without_confirmation(
     semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
 ) -> bool:
@@ -817,6 +921,7 @@ def _validate_extremal_scenario_json(payload: Mapping[str, Any]) -> ExtremalScen
 
 def _invalid_role_payload_is_failure(role: str) -> bool:
     return role in {
+        "confirmatory_protocol",
         "extremal_scenario",
         "exploratory_redteam",
         "confirmatory_failure_matrix",
@@ -864,6 +969,7 @@ def _collect_non_claims(
     report: Mapping[str, Any],
     decay: DecayAudit,
     scenarios: ScenarioAudit,
+    confirmatory_protocols: ConfirmatoryProtocolGovernanceAudit,
     semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
 ) -> list[str]:
     return _dedupe(
@@ -871,6 +977,7 @@ def _collect_non_claims(
             *_claim_non_claims(report),
             *decay.non_claims,
             *scenarios.non_claims,
+            *confirmatory_protocols.non_claims,
             *_semantic_payload_non_claims(semantic_payloads),
         ]
     )

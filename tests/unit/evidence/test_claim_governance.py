@@ -182,6 +182,43 @@ def test_exploratory_redteam_cannot_support_bounded_claim_level(tmp_path: Path) 
     )
 
 
+def test_confirmatory_protocol_artifact_is_audited_by_governance(tmp_path: Path) -> None:
+    protocol_path = tmp_path / "confirmatory_protocol.json"
+    _write_json(protocol_path, _confirmatory_protocol_payload())
+    report_path = _write_package(
+        tmp_path,
+        extra_artifacts=[_artifact(protocol_path, "confirmatory_protocol")],
+    )
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.PASS
+    assert audit.confirmatory_protocols.present is True
+    assert audit.confirmatory_protocols.protocol_ids == ["confirmatory-protocol-1"]
+    assert audit.confirmatory_protocols.failed_count == 0
+    assert audit.envelope_support.relation_counts["confirmatory_tests"] >= 1
+    assert audit.envelope_support.strongest_non_integrity_strength == "confirmatory"
+
+
+def test_confirmatory_protocol_failure_fails_governance(tmp_path: Path) -> None:
+    payload = _confirmatory_protocol_payload()
+    payload["run"]["source_role"] = "exploratory_redteam"
+    protocol_path = tmp_path / "confirmatory_protocol.json"
+    _write_json(protocol_path, payload)
+    report_path = _write_package(
+        tmp_path,
+        extra_artifacts=[_artifact(protocol_path, "confirmatory_protocol")],
+    )
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.FAIL
+    assert audit.confirmatory_protocols.failed_count == 1
+    assert audit.envelope_support.relation_counts["invalidates"] >= 1
+    assert audit.envelope_support.strongest_non_integrity_strength == "diagnostic"
+    assert any("role rename" in reason for reason in audit.reasons)
+
+
 def test_human_review_note_cannot_reduce_review_when_hashes_do_not_match(
     tmp_path: Path,
 ) -> None:
@@ -375,6 +412,89 @@ def _scenario_payload(endpoint: str) -> dict[str, Any]:
     result = frechet_bounds([0.4, 0.6], event="and", return_distributions=True)
     scenario = ExtremalScenario.from_frechet_result(result, endpoint=endpoint)  # type: ignore[arg-type]
     return scenario.model_dump(mode="json")
+
+
+def _confirmatory_protocol_payload() -> dict[str, Any]:
+    non_claims = [
+        "Confirmatory validity depends on the pre-registered protocol and run separation, "
+        "not on report polish.",
+        "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
+        "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory "
+        "evidence by renaming its role.",
+    ]
+    return {
+        "schema_version": "cc.confirmatory_protocol.v1",
+        "artifact_id": "confirmatory-artifact-1",
+        "plan": {
+            "protocol_id": "confirmatory-protocol-1",
+            "hypothesis": "The held-out matrix bounds the AND failure endpoint under the plan.",
+            "discovery_ref": {
+                "artifact_id": "adaptive-redteam-1",
+                "artifact_role": "exploratory_redteam",
+                "artifact_sha256": "a" * 64,
+                "adaptive": True,
+                "description": "Adaptive red-team discovery generated the hypothesis only.",
+                "discovered_at": "2026-01-01T00:00:00Z",
+            },
+            "protocol_mode": "held_out_matrix",
+            "created_at": "2026-01-02T00:00:00Z",
+            "primary_endpoint": "and_failure_rate",
+            "fixed_analysis_plan": {
+                "analysis_id": "analysis-v1",
+                "estimand": "AND composed guardrail failure rate",
+                "interval_method": "fixed-binomial-upper-bound",
+                "alpha": 0.05,
+                "multiplicity_adjustment": "none_predeclared_single_endpoint",
+                "frozen": True,
+            },
+            "sample_plan": {
+                "sampling_frame": "held-out prompt matrix v1",
+                "unit": "prompt",
+                "target_n": 128,
+                "held_out_selection": "pre_failure_pattern",
+                "clustered_data": False,
+            },
+            "stopping_rule": {
+                "rule_id": "fixed-n",
+                "description": "Evaluate exactly the predeclared held-out matrix.",
+                "max_samples": 128,
+                "max_looks": 1,
+                "early_stopping_allowed": False,
+            },
+            "cluster_blocking": None,
+            "exclusion_rules": [
+                {
+                    "rule_id": "deduplicate-prompts",
+                    "field": "prompt_id",
+                    "reason": "Duplicate held-out prompts are excluded before the run starts.",
+                }
+            ],
+            "decision_rule": {
+                "rule_id": "upper-bound-gate",
+                "description": "Pass only if the predeclared upper bound is below threshold.",
+                "threshold": 0.05,
+                "pass_condition": "upper_bound <= 0.05",
+                "fail_condition": "upper_bound > 0.05",
+            },
+            "non_claims": non_claims,
+        },
+        "run": {
+            "run_id": "confirmatory-run-1",
+            "started_at": "2026-01-03T00:00:00Z",
+            "completed_at": "2026-01-03T01:00:00Z",
+            "artifact_id": "confirmatory-matrix-1",
+            "artifact_role": "confirmatory_failure_matrix",
+            "source_role": None,
+            "artifact_sha256": "b" * 64,
+            "primary_endpoint": "and_failure_rate",
+            "analysis_plan_id": "analysis-v1",
+            "used_adaptive_discovery_data": False,
+            "held_out_set_chosen_after_failure_pattern": False,
+            "clustered_data_observed": False,
+            "non_claims": [],
+        },
+        "non_claims": non_claims,
+    }
 
 
 def _artifact(path: Path, role: str) -> EvidenceArtifact:

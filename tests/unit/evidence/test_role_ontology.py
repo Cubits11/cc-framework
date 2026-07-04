@@ -70,3 +70,27 @@ def test_mandatory_non_claims_are_machine_readable() -> None:
     assert non_claims
     assert non_claims[0].non_claim_id == "extremal_scenario_not_likely_world_proof"
     assert any("likely" in phrase for group in non_claims[0].phrase_groups for phrase in group)
+
+
+def test_confirmatory_protocol_role_requires_plan_and_run() -> None:
+    validation = validate_role_payload(
+        "confirmatory_protocol",
+        {
+            "schema_version": "cc.confirmatory_protocol.v1",
+            "artifact_id": "confirmatory-artifact-1",
+            "non_claims": ["Confirmatory validity depends on the protocol, not on report polish."],
+        },
+    )
+
+    assert validation.valid is False
+    assert "plan" in validation.missing_required_fields
+    assert "run" in validation.missing_required_fields
+
+
+def test_confirmatory_protocol_has_scoped_confirmatory_support() -> None:
+    definition = get_role_definition("confirmatory_protocol")
+    permissions = support_permissions_for("confirmatory_protocol")
+
+    assert definition.confirmatory_status == "confirmatory"
+    assert "deployment_safety" in {item.claim_type for item in definition.does_not_support}
+    assert any(permission.strength == "confirmatory" for permission in permissions)

@@ -57,6 +57,7 @@ Models are strict and reject extra fields.
 | `claim_decay` | Time bounding, staleness review, freshness invalidation. | Deployment safety, statistical validity, confirmatory evidence. | Degraded requires review; expired or watched-version changes expire support. | Claim decay does not prove the system is currently safe. |
 | `extremal_scenario` | Endpoint feasibility and counterfactual dependence bounds. | Likelihood, deployment realization, model-truth claims. | Infeasible scenarios invalidate; excluded fields or fitted-without-confirmation require review. | Extremal scenarios do not prove endpoint worlds are likely. |
 | `exploratory_redteam` | Weak exploratory suggestions and confirmatory-firewall review pressure. | Confirmatory evidence, release claims, deployment safety. | Confirmatory fields in exploratory payloads invalidate the firewall; use above `diagnostic` requires review. | Exploratory red-team evidence is not a confirmatory certificate. |
+| `confirmatory_protocol` | Confirmatory boundary support from a pre-registered plan and separate run. | Deployment safety, external validity, adaptive-discovery reuse. | Temporal order violations and adaptive reuse invalidate; missing stopping rules or clustered data without blocking trigger fail/review by surface. | Confirmatory validity depends on protocol/run separation, not report polish; it still does not certify deployment safety. |
 | `confirmatory_failure_matrix` | Confirmatory tests and scoped confirmatory intervals. | Deployment safety, external validity. | Missing `confirmatory_ci` invalidates confirmatory support. | Confirmatory evidence is still scoped and does not certify deployment safety. |
 | `fitted_empirical_scenario` | Diagnostic fitted-scenario bounds. | Model-truth claims, deployment safety. | Model-truth claims invalidate role semantics; unconfirmed fits require review. | A fitted empirical scenario does not prove the fitted model is true. |
 | `human_review_note` | Weak scoped authorization of reviewed artifact hashes. | Statistical upgrades, deployment safety, unreviewed artifacts. | Partial artifact set requires review; hash replacement attempts invalidate review semantics. | Human review does not upgrade underlying statistical evidence. |
@@ -69,6 +70,8 @@ Models are strict and reject extra fields.
 artifact can be used semantically. Examples:
 
 - `exploratory_redteam` forbids `confirmatory_ci`.
+- `confirmatory_protocol` requires both `plan` and `run`, and forbids adaptive
+  interval fields such as `adaptive_search_ci`.
 - `claim_decay` forbids `live_status_as_signed_truth`.
 - `receipt_integrity` forbids `deployment_safety_support`.
 - `fitted_empirical_scenario` forbids `model_truth_claim`.
