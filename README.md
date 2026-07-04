@@ -266,6 +266,7 @@ available.
 
 - [Research Program](docs/research/RESEARCH_PROGRAM.md)
 - [Paper Core](docs/research/PAPER_CORE.md)
+- [Claim Governance OS](docs/research/CLAIM_GOVERNANCE_OS.md)
 - [Non-Claims](docs/research/NON_CLAIMS.md)
 - [Roadmap](docs/research/ROADMAP.md)
 - [Metric Taxonomy](docs/theory/metric_taxonomy.md)

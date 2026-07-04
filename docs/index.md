@@ -45,6 +45,9 @@ The experiment flow is illustrated in
 * **Correlation cliffs**: detect dependence-driven jumps in composed risk.
 * **Claim-bounded receipts**: bind claims to evidence while separating evidence
   integrity from statistical validity.
+* **Evidence-bound claims**: govern safety statements as scoped claims with
+  boundaries, endpoint worlds, decay rules, receipts, non-claims, and review
+  state.
 
 ## 3. Best Practices
 
@@ -81,6 +84,7 @@ The experiment flow is illustrated in
 
 * [Public Research Framing](research/public-framing.md)
 * [Business and Audit Brief](research/business-audit-brief.md)
+* [Claim Governance OS](research/CLAIM_GOVERNANCE_OS.md)
 * [Validation Matrix](validation_matrix.md)
 * [Generated Artifact Boundary](release/ARTIFACT_BOUNDARY.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
