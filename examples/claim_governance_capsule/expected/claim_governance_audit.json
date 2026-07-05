@@ -176,23 +176,23 @@
       "status": "present"
     },
     {
-      "bytes_actual": 4347,
-      "bytes_expected": 4347,
+      "bytes_actual": 4337,
+      "bytes_expected": 4337,
       "path": "extremal_lower.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "extremal_scenario",
-      "sha256_actual": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516",
-      "sha256_expected": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516",
+      "sha256_actual": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83",
+      "sha256_expected": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83",
       "status": "present"
     },
     {
-      "bytes_actual": 4345,
-      "bytes_expected": 4345,
+      "bytes_actual": 4335,
+      "bytes_expected": 4335,
       "path": "extremal_upper.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "extremal_scenario",
-      "sha256_actual": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a",
-      "sha256_expected": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a",
+      "sha256_actual": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29",
+      "sha256_expected": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29",
       "status": "present"
     },
     {
@@ -217,7 +217,7 @@
     "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
     "This scenario does not certify production safety or legal compliance.",
     "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions.",
+    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions.",
     "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
     "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
     "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
@@ -228,7 +228,7 @@
   "reasons": [],
   "receipt": {
     "artifact_hashes_verified": true,
-    "canonical_hash": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "canonical_hash": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
     "reason": "Canonical report hash verified. Evidence artifact hashes verified. Receipt verification checks integrity only; it does not prove statistical validity or deployment safety.",
     "report_hash_verified": true
   },
@@ -245,7 +245,7 @@
       "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
       "This scenario does not certify production safety or legal compliance.",
       "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions."
+      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions."
     ],
     "present": true,
     "scenario_count": 2,

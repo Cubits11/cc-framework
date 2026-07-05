@@ -70,16 +70,16 @@
         "sha256": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35"
       },
       {
-        "bytes": 4347,
+        "bytes": 4337,
         "path": "extremal_lower.json",
         "role": "extremal_scenario",
-        "sha256": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516"
+        "sha256": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83"
       },
       {
-        "bytes": 4345,
+        "bytes": 4335,
         "path": "extremal_upper.json",
         "role": "extremal_scenario",
-        "sha256": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a"
+        "sha256": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29"
       }
     ],
     "audit_log": {
@@ -111,7 +111,7 @@
     }
   },
   "receipt": {
-    "canonical_hash": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "canonical_hash": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
     "canonicalization_method": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded",
     "hash_algorithm": "sha256",
     "previous_hash": null

@@ -19,7 +19,7 @@
       "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
       "This scenario does not certify production safety or legal compliance.",
       "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it proves or records a feasible endpoint/fitted scenario under the stated assumptions.",
+      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions.",
       "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
       "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
       "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
@@ -104,7 +104,7 @@
     "claim_id": "cc-claim-governance-capsule",
     "created_at": "2026-01-01T00:00:00Z",
     "evaluated_at": "2026-01-02T00:00:00Z",
-    "source_report_hash": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+    "source_report_hash": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
     "source_report_id": "cc-claim-governance-capsule",
     "source_report_schema": "cc.report.v0.3.1",
     "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
@@ -298,7 +298,7 @@
         "reason": "Canonical report receipt binds the report bytes and named evidence hashes.",
         "role": "receipt_integrity",
         "schema": "cc.report.receipt.v0.3.1",
-        "sha256": "3f93dd934fd94132372e1362d6120a29660a8edd39644a2c051c7b5b5c877209",
+        "sha256": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
         "status": null,
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }
@@ -307,7 +307,7 @@
     "scenario_refs": [
       {
         "artifact_id": "evidence:extremal_scenario:0005:extremal_lower.json",
-        "bytes": 4347,
+        "bytes": 4337,
         "created_at": null,
         "evaluated_at": null,
         "metadata": {},
@@ -315,13 +315,13 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "extremal_scenario",
         "schema": null,
-        "sha256": "71830fc9ce7e33c0bf9fa70853bb87628c2d269deb894e19285bd90b287a4516",
+        "sha256": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       },
       {
         "artifact_id": "evidence:extremal_scenario:0006:extremal_upper.json",
-        "bytes": 4345,
+        "bytes": 4335,
         "created_at": null,
         "evaluated_at": null,
         "metadata": {},
@@ -329,7 +329,7 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "extremal_scenario",
         "schema": null,
-        "sha256": "42cd27649180ea1033147aded73dfa6f3bba875d480f06afa5e6e376b056c10a",
+        "sha256": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }
