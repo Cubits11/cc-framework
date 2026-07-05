@@ -381,13 +381,28 @@ def test_scenario_metadata_cannot_smuggle_overclaim_fields() -> None:
         ExtremalScenario.model_validate(payload)
 
 
-def test_scenario_requires_mandatory_non_claims() -> None:
+def test_validator_does_not_silently_repair_stripped_extremal_scenario_non_claim() -> None:
     scenario = _simple_frechet_scenario()
     payload = scenario.model_dump(mode="json")
-    payload["non_claims"] = ["too weak"]
+    stripped_non_claims = ["This endpoint scenario has reviewer-facing diagnostics."]
+    payload["non_claims"] = stripped_non_claims
 
     with pytest.raises(ValidationError, match="mandatory non-claims"):
         ExtremalScenario.model_validate(payload)
+
+    assert payload["non_claims"] == stripped_non_claims
+    assert FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM not in payload["non_claims"]
+
+
+def test_extremal_scenario_non_claim_is_not_likelihood_or_safety_proof() -> None:
+    scenario = _simple_frechet_scenario()
+    serialized_non_claims = " ".join(scenario.non_claims).lower()
+
+    assert "extremal scenario" in FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM.lower()
+    assert "does not prove the endpoint world is likely" in serialized_non_claims
+    assert "does not certify deployment safety" in serialized_non_claims
+    assert "proves the endpoint world is likely" not in serialized_non_claims
+    assert "certifies deployment safety" not in serialized_non_claims
 
 
 def test_scenario_kind_epistemic_status_and_boundary_tags_must_match() -> None:

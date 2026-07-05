@@ -100,7 +100,7 @@ SCENARIO_NOT_LIFECYCLE_STATE_NON_CLAIM = (
 )
 
 FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM = (
-    "A feasible extremal endpoint does not prove the endpoint world is likely."
+    "A feasible extremal scenario endpoint does not prove the endpoint world is likely."
 )
 
 SCENARIO_NOT_DEPLOYMENT_NON_CLAIM = (

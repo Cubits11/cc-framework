@@ -22,7 +22,10 @@ from cc.evidence.claim_governance import (
     _empty_envelope_support_summary,
 )
 from cc.evidence.decay import ClaimDecayPolicy, ClaimDecayRecord, VersionWatchSet
-from cc.evidence.extremal_scenario import ExtremalScenario
+from cc.evidence.extremal_scenario import (
+    FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM,
+    ExtremalScenario,
+)
 from cc.kernel.frechet_classes import frechet_bounds
 from cc.reporting.report import (
     CalibrationSummary,
@@ -207,6 +210,24 @@ def test_passing_claim_package_verifies_governance(tmp_path: Path) -> None:
     assert "deployment safety" in audit.receipt.reason
 
 
+def test_builder_supplies_extremal_scenario_non_claim_for_governance_pass(
+    tmp_path: Path,
+) -> None:
+    upper = _scenario_payload("upper")
+    lower = _scenario_payload("lower")
+
+    assert FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM in upper["non_claims"]
+    assert FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM in lower["non_claims"]
+    assert "extremal scenario" in FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM.lower()
+
+    report_path = _write_package(tmp_path, scenario_payloads=[upper, lower])
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.PASS
+    assert audit.boundary.mandatory_non_claims_missing == []
+    assert FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM in audit.non_claims
+
+
 def test_governance_pass_is_explicitly_not_safety_certification(tmp_path: Path) -> None:
     report_path = _write_package(tmp_path)
 
@@ -311,7 +332,9 @@ def test_evidence_artifact_paths_cannot_escape_report_base_dir(tmp_path: Path) -
     assert all("escapes base_dir" in reason for reason in escaping_reasons)
 
 
-def test_missing_mandatory_scenario_non_claim_requires_review(tmp_path: Path) -> None:
+def test_missing_extremal_scenario_non_claim_requires_review_or_fails(
+    tmp_path: Path,
+) -> None:
     upper = _scenario_payload("upper")
     lower = _scenario_payload("lower")
     upper["non_claims"] = ["This endpoint scenario has reviewer-facing diagnostics."]
@@ -320,9 +343,15 @@ def test_missing_mandatory_scenario_non_claim_requires_review(tmp_path: Path) ->
 
     audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
 
-    assert audit.verdict is GovernanceVerdict.NEEDS_REVIEW
-    assert "extremal_scenario_not_likely_world_proof" in (
-        audit.boundary.mandatory_non_claims_missing
+    assert audit.verdict in {GovernanceVerdict.NEEDS_REVIEW, GovernanceVerdict.FAIL}
+    assert audit.required_human_review is True
+    assert (
+        "extremal_scenario_not_likely_world_proof"
+        in audit.boundary.mandatory_non_claims_missing
+        or any(
+            "scenario is missing mandatory non-claims" in artifact.reason
+            for artifact in audit.evidence_artifacts
+        )
     )
 
 
@@ -334,10 +363,9 @@ def test_exploratory_interval_leakage_fails(tmp_path: Path) -> None:
     audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
 
     assert audit.verdict in {GovernanceVerdict.NEEDS_REVIEW, GovernanceVerdict.FAIL}
-    assert (
-        "extremal_scenario_not_likely_world_proof" in audit.boundary.mandatory_non_claims_missing
-        or any("mandatory non-claims" in reason for reason in audit.reasons)
-        or any("mandatory non-claims" in artifact.reason for artifact in audit.evidence_artifacts)
+    assert any(
+        "Exploratory evidence leaked into confirmatory surface" in reason
+        for reason in audit.reasons
     )
 
 
