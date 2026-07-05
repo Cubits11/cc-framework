@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from cc.reporting.canonical import canonical_json_bytes
+
 EMPTY_ROOT_HASH = hashlib.sha256(b"").hexdigest()
 LOG_RECORD_SCHEMA = "cc/merkle-log-record.v1"
 INCLUSION_PROOF_SCHEMA = "cc/merkle-inclusion-proof.v1"
@@ -29,16 +31,6 @@ HASH_ALGORITHM = "sha256-rfc6962"
 
 class MerkleLogError(ValueError):
     """Raised when a Merkle log or proof is structurally invalid."""
-
-
-def _canonical_json_bytes(value: Any) -> bytes:
-    return json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
 
 
 def _sha256(data: bytes) -> bytes:
@@ -67,10 +59,10 @@ def _is_hash_hex(value: Any) -> bool:
     return True
 
 
-def leaf_hash(record: Any) -> str:
-    """Return the RFC 6962 leaf hash for a JSON-serializable audit record."""
+def leaf_hash(record: Mapping[str, Any]) -> str:
+    """Return the RFC 6962 leaf hash for a canonical JSON audit record."""
 
-    return _hash_leaf_bytes(_canonical_json_bytes(record)).hex()
+    return _hash_leaf_bytes(canonical_json_bytes(record)).hex()
 
 
 def _largest_power_of_two_less_than(n: int) -> int:
@@ -95,7 +87,7 @@ def _root_from_leaf_hashes(leaf_hashes: Sequence[str]) -> str:
     return _hash_node_hex(left, right)
 
 
-def root_from_records(records: Iterable[Any]) -> str:
+def root_from_records(records: Iterable[Mapping[str, Any]]) -> str:
     """Return the Merkle root for a sequence of audit records."""
 
     return _root_from_leaf_hashes([leaf_hash(record) for record in records])
@@ -235,7 +227,7 @@ def _expected_inclusion_sides(record_id: int, tree_size: int) -> list[str]:
 
 
 def verify_inclusion(
-    record: Any,
+    record: Mapping[str, Any],
     proof: InclusionProof | Mapping[str, Any],
     *,
     root_hash: str | None = None,
@@ -397,12 +389,12 @@ class MerkleLog:
         self,
         path: str | Path | None = None,
         *,
-        records: Iterable[Any] | None = None,
+        records: Iterable[Mapping[str, Any]] | None = None,
         log_id: str = "cc-transparency-log",
     ) -> None:
         self.path = Path(path) if path is not None else None
         self.log_id = log_id
-        self._records: list[Any] = []
+        self._records: list[Mapping[str, Any]] = []
         self._leaf_hashes: list[str] = []
 
         if self.path is not None and self.path.exists():
@@ -416,7 +408,7 @@ class MerkleLog:
         return len(self._leaf_hashes)
 
     @property
-    def records(self) -> list[Any]:
+    def records(self) -> list[Mapping[str, Any]]:
         return list(self._records)
 
     @property
@@ -446,15 +438,19 @@ class MerkleLog:
                 if "record" not in entry or not isinstance(entry.get("leaf_hash"), str):
                     raise MerkleLogError(f"line {line_number}: missing record or leaf_hash")
                 record = entry["record"]
+                if not isinstance(record, Mapping):
+                    raise MerkleLogError(f"line {line_number}: record must be an object")
                 expected_leaf = leaf_hash(record)
                 if entry["leaf_hash"] != expected_leaf:
                     raise MerkleLogError(f"line {line_number}: leaf hash mismatch")
                 self._records.append(record)
                 self._leaf_hashes.append(expected_leaf)
 
-    def append(self, record: Any) -> int:
+    def append(self, record: Mapping[str, Any]) -> int:
         """Append a record and return its zero-based record id."""
 
+        if not isinstance(record, Mapping):
+            raise MerkleLogError("record must be a JSON object")
         record_id = len(self._records)
         record_leaf_hash = leaf_hash(record)
         self._records.append(record)
@@ -470,7 +466,7 @@ class MerkleLog:
                 "leaf_hash": record_leaf_hash,
             }
             with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(_canonical_json_bytes(entry).decode("utf-8") + "\n")
+                handle.write(canonical_json_bytes(entry).decode("utf-8") + "\n")
 
         return record_id
 

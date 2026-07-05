@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,7 +20,8 @@ from cc.core.evidence_bundle import (
     run_evidence_bundle,
     verify_evidence_bundle,
 )
-from cc.evidence.merkle_log import MerkleLog, verify_consistency, verify_inclusion
+from cc.evidence.merkle_log import MerkleLog, leaf_hash, verify_consistency, verify_inclusion
+from cc.reporting.canonical import CanonicalJSONError, canonical_json_bytes
 
 
 def _write_ed25519_key(path: Path) -> ed25519.Ed25519PrivateKey:
@@ -135,6 +137,36 @@ def test_merkle_proof_forgery_attempt_must_fail_verification() -> None:
     forged_consistency = consistency.to_dict()
     forged_consistency["proof"][0] = "ff" * 32
     assert not verify_consistency(forged_consistency, old_root=old_root, new_root=new_root)
+
+
+def test_merkle_canonicalization_matches_reporting_canonical_json() -> None:
+    record = {"event": "audit", "message": "café", "nested": {"z": 1, "a": True}}
+
+    expected = hashlib.sha256(b"\x00" + canonical_json_bytes(record)).hexdigest()
+
+    assert leaf_hash(record) == expected
+    assert MerkleLog(records=[record]).leaf_hashes == [expected]
+
+
+def test_merkle_log_normalizes_unicode_nfc_like_reporting() -> None:
+    composed = {"é": "café", "event": "audit"}
+    decomposed = {"e\u0301": "cafe\u0301", "event": "audit"}
+
+    assert canonical_json_bytes(composed) == canonical_json_bytes(decomposed)
+    assert leaf_hash(composed) == leaf_hash(decomposed)
+
+
+def test_merkle_log_rejects_non_string_mapping_keys(tmp_path: Path) -> None:
+    path = tmp_path / "transparency.jsonl"
+    log = MerkleLog(path)
+
+    with pytest.raises(CanonicalJSONError, match="non-string key"):
+        leaf_hash({1: "not canonical"})  # type: ignore[arg-type]
+    with pytest.raises(CanonicalJSONError, match="non-string key"):
+        log.append({1: "not canonical"})  # type: ignore[arg-type]
+
+    assert log.tree_size == 0
+    assert not path.exists()
 
 
 def test_replay_old_valid_attestation_under_new_run_context_must_fail(
