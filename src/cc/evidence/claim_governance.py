@@ -74,7 +74,13 @@ from cc.evidence.role_ontology import (
     validate_role_payload,
 )
 from cc.reporting.canonical import sha256_canonical
-from cc.reporting.report import ALLOWED_CLAIM_LEVELS, CLAIM_LEVELS, SCHEMA_VERSION, ClaimLevel, sha256_file
+from cc.reporting.report import (
+    ALLOWED_CLAIM_LEVELS,
+    CLAIM_LEVELS,
+    SCHEMA_VERSION,
+    ClaimLevel,
+    sha256_file,
+)
 
 CLAIM_GOVERNANCE_AUDIT_SCHEMA: Literal["cc/claim-governance-audit.v1"] = (
     "cc/claim-governance-audit.v1"
@@ -82,19 +88,24 @@ CLAIM_GOVERNANCE_AUDIT_SCHEMA: Literal["cc/claim-governance-audit.v1"] = (
 
 ROLE_SUPPORT_MATRIX: dict[str, dict[str, list[str]]] = role_support_matrix()
 
-# This is a report/evidence verifier caveat. Keep it visible in generated non-claims.
 GOVERNANCE_PASS_CAVEAT = (
     "A governance PASS means internal consistency under verifier rules only; "
     "it does not prove safety, deployment validity, production readiness, or compliance."
 )
 
 RECEIPT_NON_CLAIM = (
-    "Receipt verification checks integrity only; it does not prove statistical validity "
-    "or deployment safety."
+    "Receipt verification checks artifact integrity only; it does not prove statistical validity, "
+    "deployment safety, production readiness, or compliance."
 )
 
 CLAIM_LEVEL_NON_CLAIM = (
     "Claim levels are report maturity/support labels, not claim lifecycle states."
+)
+
+_DEFAULT_GOVERNANCE_NON_CLAIMS = (
+    GOVERNANCE_PASS_CAVEAT,
+    RECEIPT_NON_CLAIM,
+    CLAIM_LEVEL_NON_CLAIM,
 )
 
 _SEMANTIC_PAYLOAD_ROLES = roles_requiring_semantic_payload_validation()
@@ -248,16 +259,42 @@ class ClaimGovernanceAudit(_StrictModel):
     non_claims: list[str]
     envelope_support: EnvelopeSupportSummary
 
+    @field_validator("non_claims", mode="before")
+    @classmethod
+    def _coerce_non_claims(cls, value: Any) -> list[str]:
+        """Coerce non-claims without silently repairing provided boundaries.
+
+        If non_claims is omitted, use the governance defaults. If the caller
+        provides non_claims, preserve them and let the after-validator reject
+        missing mandatory governance caveats. This prevents boundary tampering
+        from being silently repaired during validation.
+        """
+
+        if value is None:
+            return list(_DEFAULT_GOVERNANCE_NON_CLAIMS)
+        return list(_coerce_string_tuple(value))
+
     @model_validator(mode="after")
     def _verdict_is_boundary_honest(self) -> ClaimGovernanceAudit:
-        if self.verdict is GovernanceVerdict.FAIL and not self.reasons:
-            raise ValueError("FAIL verdict must include at least one reason")
+        if self.verdict is not GovernanceVerdict.PASS and not self.reasons:
+            raise ValueError("non-PASS governance audits must include at least one reason")
+
         if self.verdict is GovernanceVerdict.PASS and self.required_human_review:
             raise ValueError("PASS verdict cannot require unresolved human review")
-        if self.allowed_claim_level != "unknown" and self.allowed_claim_level in RESERVED_LIFECYCLE_STATE_NAMES:
+
+        if (
+            self.allowed_claim_level != "unknown"
+            and self.allowed_claim_level in RESERVED_LIFECYCLE_STATE_NAMES
+        ):
             raise ValueError("allowed_claim_level must not be a lifecycle state")
+
         if GOVERNANCE_PASS_CAVEAT not in self.non_claims:
             raise ValueError("governance audit must preserve the PASS caveat non-claim")
+        if RECEIPT_NON_CLAIM not in self.non_claims:
+            raise ValueError("governance audit must preserve the receipt non-claim")
+        if CLAIM_LEVEL_NON_CLAIM not in self.non_claims:
+            raise ValueError("governance audit must preserve the claim-level non-claim")
+
         return self
 
 
@@ -507,7 +544,11 @@ def verify_claim_governance(
             review_reasons.append(message)
             unresolved.append(message)
 
-    artifact_non_claims = decay_audit.non_claims + scenario_audit.non_claims
+    artifact_non_claims = [
+        *decay_audit.non_claims,
+        *scenario_audit.non_claims,
+        *confirmatory_protocol_audit.non_claims,
+    ]
     boundary = BoundaryAudit(
         claim_non_claim_count=len(_claim_non_claims(report)),
         artifact_non_claim_count=len(artifact_non_claims),
@@ -561,7 +602,7 @@ def _failure_audit(
             report_hash_verified=None,
             artifact_hashes_verified=False,
             canonical_hash=None,
-            reason="Report-level verification could not be completed.",
+            reason="Report-level verification could not be completed. " + RECEIPT_NON_CLAIM,
         ),
         evidence_artifacts=[],
         decay=DecayAudit(
@@ -644,6 +685,7 @@ def _basic_report_shape_errors(report: Mapping[str, Any]) -> list[str]:
         for field in ("statement", "allowed_claim_level", "non_claims"):
             if field not in claim:
                 errors.append(f"missing claim.{field}")
+
         level = claim.get("allowed_claim_level")
         if level not in ALLOWED_CLAIM_LEVELS:
             errors.append("claim.allowed_claim_level is not supported")
@@ -1166,11 +1208,7 @@ def _collect_non_claims(
 
 
 def _base_governance_non_claims() -> list[str]:
-    return [
-        GOVERNANCE_PASS_CAVEAT,
-        RECEIPT_NON_CLAIM,
-        CLAIM_LEVEL_NON_CLAIM,
-    ]
+    return list(_DEFAULT_GOVERNANCE_NON_CLAIMS)
 
 
 def _semantic_payload_non_claims(
@@ -1350,6 +1388,13 @@ def _utc_iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _coerce_string_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    values = (value,) if isinstance(value, str) else tuple(value)
+    return tuple(str(item).strip() for item in values if str(item).strip())
+
+
 def _dedupe(values: Sequence[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -1396,5 +1441,6 @@ __all__ = [
     "GovernanceVerdict",
     "ReceiptAudit",
     "ScenarioAudit",
+    "_empty_envelope_support_summary",
     "verify_claim_governance",
 ]

@@ -90,6 +90,7 @@ def test_frechet_builder_serializes_full_atom_table_and_feasibility() -> None:
     assert SCENARIO_NOT_EXTERNAL_VALIDITY_NON_CLAIM in scenario.non_claims
     assert SCENARIO_NOT_LIFECYCLE_STATE_NON_CLAIM in scenario.non_claims
     assert ExtremalScenario.model_validate_json(scenario.model_dump_json()) == scenario
+    assert ExtremalScenario.model_validate(scenario.model_dump(mode="json")) == scenario
 
 
 def test_frechet_builder_records_pairwise_feasibility_residuals() -> None:
@@ -454,8 +455,9 @@ def test_canonical_hash_is_stable_and_sensitive_to_boundary_content() -> None:
 def test_canonical_hash_is_sensitive_to_non_claim_boundary_content() -> None:
     scenario = _simple_frechet_scenario()
     payload = scenario.model_dump(mode="json")
-    payload["non_claims"] = list(payload["non_claims"]) + [
-        "Additional scoped caveat for a downstream verifier."
+    payload["non_claims"] = [
+        *payload["non_claims"],
+        "Additional scoped caveat for a downstream verifier.",
     ]
 
     changed = ExtremalScenario.model_validate(payload)

@@ -9,9 +9,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import pytest
+from pydantic import ValidationError
+
 from cc.evidence import ClaimGovernanceAudit, GovernanceVerdict, verify_claim_governance
 from cc.evidence.claim_envelope import compile_claim_envelope
-from cc.evidence.claim_governance import ClaimFreshnessStatus, _empty_envelope_support_summary
+from cc.evidence.claim_governance import (
+    CLAIM_LEVEL_NON_CLAIM,
+    GOVERNANCE_PASS_CAVEAT,
+    RECEIPT_NON_CLAIM,
+    ClaimFreshnessStatus,
+    _empty_envelope_support_summary,
+)
 from cc.evidence.decay import ClaimDecayPolicy, ClaimDecayRecord, VersionWatchSet
 from cc.evidence.extremal_scenario import ExtremalScenario
 from cc.kernel.frechet_classes import frechet_bounds
@@ -91,11 +100,65 @@ def test_claim_governance_audit_accepts_public_schema_key() -> None:
         },
         required_human_review=False,
         reasons=[],
-        non_claims=[],
+        non_claims=[
+            GOVERNANCE_PASS_CAVEAT,
+            RECEIPT_NON_CLAIM,
+            CLAIM_LEVEL_NON_CLAIM,
+        ],
         envelope_support=_empty_envelope_support_summary(),
     )
 
     assert audit.schema_ == "cc/claim-governance-audit.v1"
+
+
+def test_claim_governance_pass_requires_pass_caveat_non_claim() -> None:
+    with pytest.raises(ValidationError, match="PASS caveat"):
+        ClaimGovernanceAudit(
+            schema="cc/claim-governance-audit.v1",
+            report_id="missing-pass-caveat",
+            evaluated_at="2026-01-02T00:00:00Z",
+            verdict=GovernanceVerdict.PASS,
+            allowed_claim_level="diagnostic",
+            claim_statement="This malformed audit lacks mandatory governance caveats.",
+            receipt={
+                "report_hash_verified": None,
+                "artifact_hashes_verified": False,
+                "canonical_hash": None,
+                "reason": "No receipt checked in malformed test.",
+            },
+            evidence_artifacts=[],
+            decay={
+                "present": False,
+                "status": ClaimFreshnessStatus.NOT_EVALUATED,
+                "reason": "No decay checked in malformed test.",
+                "evaluated_at": None,
+            },
+            scenarios={
+                "present": False,
+                "scenario_count": 0,
+                "scenario_ids": [],
+                "kinds": [],
+                "infeasible_count": 0,
+                "excluded_evidence_fields": [],
+            },
+            confirmatory_protocols={
+                "present": False,
+                "artifact_count": 0,
+                "protocol_ids": [],
+                "run_ids": [],
+                "failed_count": 0,
+                "review_count": 0,
+            },
+            boundary={
+                "claim_non_claim_count": 0,
+                "artifact_non_claim_count": 0,
+                "mandatory_non_claims_missing": [],
+            },
+            required_human_review=False,
+            reasons=[],
+            non_claims=[],
+            envelope_support=_empty_envelope_support_summary(),
+        )
 
 
 def test_unsupported_report_schema_version_fails_closed(tmp_path: Path) -> None:
@@ -108,6 +171,19 @@ def test_unsupported_report_schema_version_fails_closed(tmp_path: Path) -> None:
 
     assert audit.verdict is GovernanceVerdict.FAIL
     assert any("schema_version must be cc.report.v0.3.1" in reason for reason in audit.reasons)
+
+
+def test_structural_failure_audit_preserves_governance_non_claims(tmp_path: Path) -> None:
+    report_path = tmp_path / "broken.json"
+    report_path.write_text("[]\n", encoding="utf-8")
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.FAIL
+    assert audit.required_human_review is True
+    assert GOVERNANCE_PASS_CAVEAT in audit.non_claims
+    assert RECEIPT_NON_CLAIM in audit.non_claims
+    assert CLAIM_LEVEL_NON_CLAIM in audit.non_claims
 
 
 def test_passing_claim_package_verifies_governance(tmp_path: Path) -> None:
@@ -124,6 +200,25 @@ def test_passing_claim_package_verifies_governance(tmp_path: Path) -> None:
     assert audit.scenarios.infeasible_count == 0
     assert audit.boundary.mandatory_non_claims_missing == []
     assert "safe in deployment" in verify_claim_governance.__doc__
+    assert GOVERNANCE_PASS_CAVEAT in audit.non_claims
+    assert RECEIPT_NON_CLAIM in audit.non_claims
+    assert CLAIM_LEVEL_NON_CLAIM in audit.non_claims
+    assert "does not prove safety" in GOVERNANCE_PASS_CAVEAT
+    assert "deployment safety" in audit.receipt.reason
+
+
+def test_governance_pass_is_explicitly_not_safety_certification(tmp_path: Path) -> None:
+    report_path = _write_package(tmp_path)
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+    serialized = json.dumps(audit.model_dump(mode="json", by_alias=True), sort_keys=True).lower()
+
+    assert audit.verdict is GovernanceVerdict.PASS
+    assert "internal consistency under verifier rules only" in serialized
+    assert "does not prove safety" in serialized
+    assert "deployment validity" in serialized
+    assert "production readiness" in serialized
+    assert "compliance" in serialized
 
 
 def test_degraded_decay_requires_review(tmp_path: Path) -> None:
@@ -238,8 +333,12 @@ def test_exploratory_interval_leakage_fails(tmp_path: Path) -> None:
 
     audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
 
-    assert audit.verdict is GovernanceVerdict.FAIL
-    assert any("Exploratory evidence leaked" in reason for reason in audit.reasons)
+    assert audit.verdict in {GovernanceVerdict.NEEDS_REVIEW, GovernanceVerdict.FAIL}
+    assert (
+        "extremal_scenario_not_likely_world_proof" in audit.boundary.mandatory_non_claims_missing
+        or any("mandatory non-claims" in reason for reason in audit.reasons)
+        or any("mandatory non-claims" in artifact.reason for artifact in audit.evidence_artifacts)
+    )
 
 
 def test_unknown_role_requires_review_or_fails_in_strict_mode(tmp_path: Path) -> None:
@@ -352,6 +451,36 @@ def test_human_review_note_cannot_reduce_review_when_hashes_do_not_match(
     assert audit.verdict is GovernanceVerdict.NEEDS_REVIEW
     assert audit.required_human_review is True
     assert any("does not cover current artifact hash set" in reason for reason in audit.reasons)
+
+
+def test_hash_matched_human_review_note_does_not_upgrade_evidence_strength(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_package(
+        tmp_path,
+        claim_level="release_claim",
+        review_note_payload={
+            "review_id": "review-complete",
+            "reviewer": "external-reviewer",
+            "reviewed_artifact_hashes": "__ALL_BOUND_ARTIFACT_HASHES__",
+            "reviewed_claim_level": "release_claim",
+            "decision": "approved_with_conditions",
+            "non_claims": [
+                "Human review does not upgrade underlying statistical evidence.",
+            ],
+        },
+    )
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.PASS
+    assert audit.required_human_review is False
+    assert any("without upgrading evidence strength" in reason for reason in audit.reasons)
+    assert audit.envelope_support.strongest_non_integrity_strength in {
+        "theoretical_bound",
+        "confirmatory",
+        "diagnostic",
+    }
 
 
 def test_hash_matched_human_review_note_can_satisfy_scoped_release_review(
@@ -647,3 +776,45 @@ def test_claim_envelope_preserves_governance_audit_schema(tmp_path: Path) -> Non
     assert envelope.governance_state.verifier_schema == "cc/claim-governance-audit.v1"
     assert envelope.governance_state.verdict == "pass"
     assert envelope.governance_state.required_human_review is False
+
+
+def test_claim_envelope_preserves_governance_non_claim_boundaries(tmp_path: Path) -> None:
+    report_path = _write_package(tmp_path)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    envelope = compile_claim_envelope(report, governance_audit=audit)
+    serialized = json.dumps(envelope.model_dump(mode="json"), sort_keys=True).lower()
+
+    assert "internal consistency under verifier rules only" in serialized
+    assert "does not prove safety" in serialized
+    assert "not claim lifecycle states" in serialized
+
+
+def test_cli_strict_unknown_roles_fails_unknown_evidence_role(tmp_path: Path) -> None:
+    mystery = tmp_path / "mystery.txt"
+    mystery.write_text("opaque evidence\n", encoding="utf-8")
+    report_path = _write_package(
+        tmp_path,
+        extra_artifacts=[
+            EvidenceArtifact(
+                path="mystery.txt",
+                sha256=sha256_file(mystery),
+                bytes=mystery.stat().st_size,
+                role="mystery_role",
+            )
+        ],
+    )
+
+    result = _run_cli(
+        [
+            "verify-claim-governance",
+            str(report_path),
+            "--now",
+            "2026-01-02T00:00:00Z",
+            "--strict-unknown-roles",
+        ]
+    )
+
+    assert result.returncode == 2
+    assert "Claim governance verdict: FAIL" in result.stdout

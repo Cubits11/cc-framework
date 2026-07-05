@@ -166,6 +166,11 @@ class GuardrailOutcome(ExtremalModel):
     probability: float = Field(ge=0.0, le=1.0)
     event_occurs: bool
 
+    @field_validator("failures", mode="before")
+    @classmethod
+    def _coerce_failures(cls, value: Any) -> tuple[Any, ...]:
+        return _coerce_tuple(value)
+
     @field_validator("failures")
     @classmethod
     def _binary_failures(cls, value: tuple[int, ...]) -> tuple[int, ...]:
@@ -194,6 +199,11 @@ class ScenarioFeasibility(ExtremalModel):
     objective_residual: float | None = None
     max_abs_residual: float
     is_feasible: bool = True
+
+    @field_validator("marginal_residuals", mode="before")
+    @classmethod
+    def _coerce_marginal_residuals(cls, value: Any) -> tuple[Any, ...]:
+        return _coerce_tuple(value)
 
     @field_validator("pairwise_residuals")
     @classmethod
@@ -284,8 +294,18 @@ class ExtremalScenario(ExtremalModel):
     @model_validator(mode="before")
     @classmethod
     def _reject_live_claim_status_fields_and_ensure_non_claims(cls, data: Any) -> Any:
+        """Reject overclaim fields and preserve mandatory non-claim boundaries.
+
+        Builder-created payloads may omit ``non_claims`` and receive the default
+        boundary language. Already-serialized payloads that provide ``non_claims``
+        are not silently repaired here; missing mandatory non-claims are caught
+        by the after-validator. That distinction prevents boundary tampering from
+        being hidden during validation.
+        """
+
         if not isinstance(data, Mapping):
             return data
+
         payload = dict(data)
         forbidden_live_fields = {
             "claim_state",
@@ -307,13 +327,18 @@ class ExtremalScenario(ExtremalModel):
                 f"live claim/lifecycle/deployment fields: {present}"
             )
 
-        non_claims = _coerce_string_tuple(payload.get("non_claims") or _DEFAULT_NON_CLAIMS)
-        non_claims = _append_missing(non_claims, _DEFAULT_NON_CLAIMS)
+        raw_non_claims = payload.get("non_claims")
+        if raw_non_claims:
+            payload["non_claims"] = _coerce_string_tuple(raw_non_claims)
+            return payload
 
+        non_claims = _DEFAULT_NON_CLAIMS
         kind = payload.get("kind")
         source = payload.get("source")
+
         if kind == ScenarioKind.STRESS_ENDPOINT or kind == ScenarioKind.STRESS_ENDPOINT.value:
             non_claims = _append_missing(non_claims, (STRESS_NOT_FORECAST_NON_CLAIM,))
+
         if (
             kind == ScenarioKind.CONFIRMATORY_FAILURE_MATRIX
             or kind == ScenarioKind.CONFIRMATORY_FAILURE_MATRIX.value
@@ -325,6 +350,7 @@ class ExtremalScenario(ExtremalModel):
                     FITTED_NOT_MODEL_TRUTH_NON_CLAIM,
                 ),
             )
+
         if str(source).startswith("empirical"):
             non_claims = _append_missing(non_claims, (FITTED_NOT_MODEL_TRUTH_NON_CLAIM,))
 
@@ -338,6 +364,20 @@ class ExtremalScenario(ExtremalModel):
         if stripped in RESERVED_LIFECYCLE_STATE_NAMES:
             raise ValueError("scenario identifiers must not reuse claim lifecycle state names")
         return stripped
+
+    @field_validator("atom_table", "top_outcomes", "excluded_evidence_fields", mode="before")
+    @classmethod
+    def _coerce_tuple_fields(cls, value: Any) -> tuple[Any, ...]:
+        return _coerce_tuple(value)
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _coerce_kind(cls, value: Any) -> ScenarioKind:
+        if isinstance(value, ScenarioKind):
+            return value
+        if isinstance(value, str):
+            return ScenarioKind(value)
+        raise TypeError("kind must be a ScenarioKind or scenario-kind string")
 
     @field_validator("guardrail_ids", "non_claims", mode="before")
     @classmethod
@@ -945,13 +985,20 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _coerce_tuple(value: Any) -> tuple[Any, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, tuple):
+        return value
+    if isinstance(value, list):
+        return tuple(value)
+    return tuple(value)
+
+
 def _coerce_string_tuple(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
-    if isinstance(value, str):
-        values = (value,)
-    else:
-        values = tuple(value)
+    values = (value,) if isinstance(value, str) else tuple(value)
     return tuple(str(item).strip() for item in values if str(item).strip())
 
 
