@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import os
@@ -38,14 +39,18 @@ GENERATED_ARTIFACTS = [
 def test_claim_governance_capsule_reproduces_expected_manifest() -> None:
     result = run_capsule()
 
-    assert result.returncode == 0, result.stderr + result.stdout
+    generated_path = OUTPUTS / "capsule_manifest.json"
+    expected_path = CAPSULE / "manifest.expected.json"
+    assert generated_path.exists(), result.stderr + result.stdout
 
-    generated = load_json(OUTPUTS / "capsule_manifest.json")
-    expected = load_json(CAPSULE / "manifest.expected.json")
+    generated = load_json(generated_path)
+    expected = load_json(expected_path)
     audit = load_json(OUTPUTS / "claim_governance_audit.json")
     envelope = load_json(OUTPUTS / "claim_envelope.json")
 
-    assert generated == expected
+    assert_json_equal(generated, expected, label="capsule manifest")
+    assert result.returncode == 0, result.stderr + result.stdout
+
     assert generated["governance_verdict"] == "pass"
     assert generated["pass_caveat"] == (
         "PASS means internal consistency under verifier rules; it does not mean the AI "
@@ -248,6 +253,29 @@ def load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
     return payload
+
+
+def assert_json_equal(
+    actual: dict[str, Any],
+    expected: dict[str, Any],
+    *,
+    label: str,
+) -> None:
+    if actual == expected:
+        return
+
+    actual_text = json.dumps(actual, indent=2, sort_keys=True).splitlines()
+    expected_text = json.dumps(expected, indent=2, sort_keys=True).splitlines()
+    diff = "\n".join(
+        difflib.unified_diff(
+            expected_text,
+            actual_text,
+            fromfile=f"expected {label}",
+            tofile=f"actual {label}",
+            lineterm="",
+        )
+    )
+    raise AssertionError(f"{label} differs from golden artifact:\n{diff}")
 
 
 def sha256(path: Path) -> str:
