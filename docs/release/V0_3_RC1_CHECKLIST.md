@@ -1,6 +1,8 @@
 # v0.3-rc1 Release Candidate Checklist
 
-Date: 2026-06-30
+Original record date: 2026-06-30
+
+Current evidence refresh: 2026-07-05
 
 This document is the sober release narrative for v0.3-rc1. It separates the
 release-candidate paper core from experimental reference architecture work,
@@ -37,8 +39,9 @@ These surfaces are inside the Paper Core v0.3 release-candidate boundary:
   `docs/release/ARTIFACT_BOUNDARY.md` and
   `scripts/check_artifact_boundary.py`.
 - Documentation that defines the paper-core claim boundary:
-  `docs/research/PAPER_CORE.md`, `docs/research/NON_CLAIMS.md`,
-  `docs/validation_matrix.md`, and `docs/theory/theorem_ledger.md`.
+  `docs/api.md`, `docs/research/PAPER_CORE.md`,
+  `docs/research/NON_CLAIMS.md`, `docs/validation_matrix.md`, and
+  `docs/theory/theorem_ledger.md`.
 
 Stable here means suitable for release-candidate review. It does not mean the
 project is production-ready or that every non-kernel module is promoted into
@@ -60,17 +63,47 @@ exclusions, not proof that those optional lanes passed.
 
 ## Required Validation Record
 
-Run commands from the repository root in the listed order. The status column is
-updated only after the command has actually run for this RC.
+Run commands from the repository root in the listed order. A pass claim in this
+section is current only if it appears in the 2026-07-05 table below. Older
+results are retained separately as historical evidence.
 
-Local environment for this record:
+Current local environment for the 2026-07-05 hardening pass:
 
-- Date: 2026-06-30.
-- Python: 3.13.1 from `.venv`.
-- Working tree after validation: intentional release metadata, strict kernel,
-  documentation, artifact, and dashboard dependency edits.
+- `git status --short` before edits: no output.
+- `python3 -V`: Python 3.14.6.
+- `.venv/bin/python -V`: Python 3.13.1.
+- Working tree after validation: intentional README, API-boundary,
+  release-checklist, CLI-help, language-quarantine, and test edits.
 
-| Command | Track | Required for rc1 | Status | Notes |
+| Command | Track | Required for this hardening pass | Current status | Notes |
+| --- | --- | --- | --- | --- |
+| `git status --short` | Baseline hygiene | Yes | Pass | No output before edits. Final status must contain only intentional release-hardening changes. |
+| `python3 -V \|\| true` | Environment | Yes | Pass | Reported Python 3.14.6. |
+| `.venv/bin/python -V \|\| true` | Environment | Yes | Pass | Reported Python 3.13.1. |
+| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py` | Claim governance capsule | Yes | Pass | 4 capsule integration tests passed. |
+| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py -vv` | Claim governance capsule | Yes | Pass | 4 passed in 7.14s. |
+| `diff -u examples/claim_governance_capsule/manifest.expected.json examples/claim_governance_capsule/outputs/capsule_manifest.json \|\| true` | Claim governance capsule | Yes | Pass | No diff. The generated manifest is `outputs/capsule_manifest.json`; the old root `manifest.json` comparison path is stale. |
+| `git diff -- examples/claim_governance_capsule` | Claim governance capsule | Yes | Pass | No tracked capsule diffs. Classification: no semantic drift; expected artifact is current and deterministic. |
+| `rg --hidden -n "tests/property/kernel" -g '!/.git' -g '!/.venv' -g '!/infra/node_modules' -g '!/apps/dashboard/node_modules' . \|\| true` | Test-path references | Yes | Pass | No references found. Current kernel invariant/property-style coverage lives under `tests/unit/kernel`. |
+| `find tests -maxdepth 3 -type d \| sort` | Test-path references | Yes | Pass | Confirmed `tests/unit/kernel` exists and `tests/property/kernel` does not. No release command currently points at the missing path. |
+| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration` | Integration tests | Yes | Pass | Integration suite reached 100% with 21 passing tests. |
+| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/api/test_public_api_contract.py tests/unit/packaging/test_wheel_boundary.py tests/unit/utils/test_methods_cli_smoke.py` | API, wheel, and CLI boundary | Yes | Pass | 8 tests passed. The wheel test builds into a temporary directory and inspects the wheel contents locally. |
+| `PYTHONPATH=src .venv/bin/python -m cc.cartographer.cli --help` | CLI help | Yes | Pass | Top-level help exits 0 and lists subcommands. |
+| `source .venv/bin/activate; python - <<'PY' ...; PYTHONPATH=src python -m pytest -q tests/unit/kernel tests/unit/evidence` | README quickstart | Yes | Pass | Produced the documented `[0.00%, 10.00%]` bounds output and the focused kernel/evidence tests reached 100%. Bare `python` is used only after venv activation. |
+| `.venv/bin/mkdocs build --strict --site-dir /tmp/cc-framework-mkdocs-site` | Shared docs | Yes | Pass | Strict docs build completed; MkDocs Material printed its upstream MkDocs 2.0 warning and exited 0. |
+| `PYTHONPATH=src .venv/bin/python -m pytest -q` | Full Python regression | Yes | Pass with skips | Full pytest reached 100% with 7 optional skips and 3 warnings. |
+
+Unresolved or not-current lanes for this 2026-07-05 refresh:
+
+- Dashboard build, enterprise smoke, security audit, and npm audit were not
+  rerun in this local refresh unless separately recorded below.
+- The exact unbounded `grep -R "tests/property/kernel" -n .` form was stopped
+  because it traversed local dependency directories; the bounded hidden-aware
+  `rg` command above is the current repository evidence.
+
+Historical validation record retained from 2026-06-30:
+
+| Command | Track | Required for rc1 | Historical status | Notes |
 | --- | --- | --- | --- | --- |
 | `make check-artifact-boundary` | Repository hygiene | Yes | Pass | Verified tracked artifact locations, runtime-only roots, fixtures, archive markers, and paper artifact manifest membership. |
 | `make check-repro-clean` | Repository hygiene | Yes | Pass | Ran a short reproduction sequence into a temporary directory and checked for new generated diffs. |
@@ -78,7 +111,7 @@ Local environment for this record:
 | `make test-release` | Paper Core v0.3 | Yes | Pass | Re-ran `make test-kernel`, ran `examples/minimal/run_bounds.py`, and passed 10 paper reproduction / artifact-verifier integration tests. |
 | `make test-reporting` | Reporting receipts | Yes | Pass | CC report/receipt unit tests passed. |
 | `make docs` | Shared docs | Yes | Pass | Strict MkDocs build completed. MkDocs Material printed its upstream MkDocs 2.0 warning; the build still exited successfully. |
-| `PYTHONPATH=src .venv/bin/pytest -q` | Full Python regression | Yes | Pass with skips | Full pytest exited successfully with 7 optional skips and 2 expected warnings from tests that drop non-finite bootstrap samples. |
+| `PYTHONPATH=src .venv/bin/pytest -q` | Full Python regression | Yes | Pass with skips | Historical full pytest exited successfully with 7 optional skips and 2 expected warnings from tests that drop non-finite bootstrap samples. |
 | `npm run build` in `apps/dashboard` | Dashboard | No | Pass | Next 15 production build passed. A later hygiene pass removed the stale root Node package files that caused the earlier multiple-lockfile warning. |
 | `make enterprise-smoke` | Enterprise Reference v0.1 | No | Pass | Moto-backed enterprise smoke passed, including the dashboard smoke path. |
 | `npm audit --audit-level=high` in `apps/dashboard` | Dashboard dependency hygiene | No | Pass | No critical or high findings remain; 2 moderate transitive `postcss` findings remain through Next. |

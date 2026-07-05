@@ -29,9 +29,10 @@ a stacked system is safe.
 ## 60-second quickstart
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
+python -m pip install --upgrade pip wheel setuptools
+python -m pip install -e ".[dev]"
 python - <<'PY'
 from cc.kernel.strict import frechet_bounds
 
@@ -54,7 +55,14 @@ Stacked failure is bounded by [0.00%, 10.00%]
 Independence would estimate 1.00%
 ```
 
+Run focused release-core smoke tests from the activated environment:
+
+```bash
+PYTHONPATH=src python -m pytest -q tests/unit/kernel tests/unit/evidence
+```
+
 For deeper context, start with the
+[public API contract](docs/api.md),
 [validation matrix](docs/validation_matrix.md), the
 [finite-sample identification note](docs/theory/finite_sample_identification.md),
 and the runnable [minimal example](examples/minimal/run_bounds.py).
@@ -280,6 +288,7 @@ available.
 
 - [Research Program](docs/research/RESEARCH_PROGRAM.md)
 - [Paper Core](docs/research/PAPER_CORE.md)
+- [Public API Contract](docs/api.md)
 - [Evidence-Bound Claim Governance Memo](docs/research/CLAIM_GOVERNANCE_OS.md)
 - [Non-Claims](docs/research/NON_CLAIMS.md)
 - [Roadmap](docs/research/ROADMAP.md)

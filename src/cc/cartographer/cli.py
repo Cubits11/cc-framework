@@ -418,16 +418,33 @@ def _cmd_methods(argv: list[str]) -> None:
 # Entrypoint
 # -----------------------------------------------------------------------------
 
+SUBCOMMANDS = ("run", "verify-audit", "verify-stats", "build-reports", "methods")
+
+
+def _print_top_level_help(*, file: Any = sys.stdout) -> None:
+    commands = "|".join(SUBCOMMANDS)
+    print(f"Usage: python -m cc.cartographer.cli {{{commands}}} ...", file=file)
+    print("", file=file)
+    print("Subcommands:", file=file)
+    print("  run             Execute one configured cartographer run", file=file)
+    print("  verify-audit    Verify an append-only JSONL audit chain", file=file)
+    print("  verify-stats    Run bootstrap score-plumbing diagnostics", file=file)
+    print("  build-reports   Aggregate CC/CCC reports", file=file)
+    print("  methods         Compute FH-Bernstein/Wilson CC intervals", file=file)
+    print("", file=file)
+    print("Run a subcommand with --help for command-specific options.", file=file)
+
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print(
-            "Usage: python -m cc.cartographer.cli {run|verify-audit|verify-stats|build-reports|methods} ...",
-            file=sys.stderr,
-        )
+        _print_top_level_help(file=sys.stderr)
         sys.exit(2)
 
     cmd, argv = sys.argv[1], sys.argv[2:]
+    if cmd in {"-h", "--help", "help"}:
+        _print_top_level_help()
+        sys.exit(0)
+
     if cmd == "run":
         _cmd_run(argv)
     elif cmd == "verify-audit":

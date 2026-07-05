@@ -3,6 +3,19 @@ import subprocess
 import sys
 
 
+def test_cartographer_top_level_help():
+    res = subprocess.run(
+        [sys.executable, "-m", "cc.cartographer.cli", "--help"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert res.returncode == 0
+    assert "Subcommands:" in res.stdout
+    assert "methods" in res.stdout
+    assert "unknown subcommand" not in (res.stdout + res.stderr)
+
+
 def test_methods_cli_smoke(tmp_path):
     out = tmp_path / "week3.json"
     cmd = [
