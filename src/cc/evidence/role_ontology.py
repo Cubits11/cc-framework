@@ -37,7 +37,7 @@ Do not allow integrity/provenance/review evidence to upgrade semantic truth.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, TypeAlias, cast
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -80,9 +80,7 @@ _CONFIRMATORY_CLAIM_LEVELS: tuple[ClaimLevel, ...] = (
 )
 
 if set(_ALL_CLAIM_LEVELS) & RESERVED_LIFECYCLE_STATE_NAMES:  # pragma: no cover
-    raise RuntimeError(
-        "report claim levels must remain disjoint from lifecycle state names"
-    )
+    raise RuntimeError("report claim levels must remain disjoint from lifecycle state names")
 
 # ---------------------------------------------------------------------------
 # Type vocabularies
@@ -1440,13 +1438,13 @@ validate_role_ontology_invariants()
 
 
 __all__ = [
+    "RESERVED_LIFECYCLE_STATE_NAMES",
     "ROLE_ONTOLOGY_SCHEMA_VERSION",
     "ClaimMaturityLevel",
     "EvidenceRoleDefinition",
     "InvalidationTrigger",
     "MandatoryNonClaim",
     "PayloadFieldRule",
-    "RESERVED_LIFECYCLE_STATE_NAMES",
     "ReviewRule",
     "RolePayloadValidation",
     "SupportPermission",

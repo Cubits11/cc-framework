@@ -9,12 +9,14 @@ from typing import Any
 
 import pytest
 from jsonschema import Draft202012Validator
+from pydantic import ValidationError
 
 from cc.reporting.canonical import CanonicalJSONError, canonical_json_bytes, sha256_canonical
 from cc.reporting.report import (
     CANONICALIZATION_METHOD,
     CLAIM_LEVELS,
     CalibrationSummary,
+    CCReport,
     ClaimSummary,
     EnvironmentMetadata,
     EvidenceArtifact,
@@ -79,6 +81,46 @@ def test_report_builder_happy_path_validates_against_schema() -> None:
     assert report["receipt"]["hash_algorithm"] == "sha256"
     assert report["receipt"]["canonical_hash"] == sha256_canonical(report)
     assert report["evidence"]["artifacts"][0]["sha256"]
+
+
+def test_report_model_round_trip_preserves_canonical_json_identity() -> None:
+    report = _report()
+
+    model = CCReport.model_validate(report)
+    payload = model.model_dump(mode="json")
+    reparsed = CCReport.model_validate_json(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    )
+
+    assert payload == report
+    assert isinstance(model.assumptions, tuple)
+    assert isinstance(model.claim.non_claims, tuple)
+    assert isinstance(model.evidence.artifacts, tuple)
+    assert canonical_json_bytes(reparsed.model_dump(mode="json")) == canonical_json_bytes(payload)
+    assert reparsed.receipt.canonical_hash == sha256_canonical(payload)
+
+
+def test_report_model_fails_closed_on_incomplete_or_extra_payloads() -> None:
+    missing = _report()
+    del missing["claim"]["non_claims"]
+
+    with pytest.raises(ValidationError, match="non_claims"):
+        CCReport.model_validate(missing)
+
+    extra = _report()
+    extra["claim"]["lifecycle_state"] = "supported"
+
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        CCReport.model_validate(extra)
+
+
+def test_report_model_rejects_reserved_overclaim_vocabulary() -> None:
+    report = _report()
+    report["claim"]["statement"] = "This model is production_ready for deployment."
+    report["receipt"]["canonical_hash"] = sha256_canonical(report)
+
+    with pytest.raises(ValidationError, match="production_ready"):
+        CCReport.model_validate(report)
 
 
 def test_report_builder_rejects_invalid_interval_ordering() -> None:

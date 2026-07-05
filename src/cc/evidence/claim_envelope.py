@@ -93,12 +93,8 @@ _STRENGTH_RANK: dict[SupportStrength, int] = {
     "confirmatory": 3,
 }
 
-_ALLOWED_GOVERNANCE_VERDICTS = frozenset(
-    {"not_evaluated", "pass", "needs_review", "fail"}
-)
-_ALLOWED_FRESHNESS_STATUSES = frozenset(
-    {"not_evaluated", "fresh", "degraded", "expired"}
-)
+_ALLOWED_GOVERNANCE_VERDICTS = frozenset({"not_evaluated", "pass", "needs_review", "fail"})
+_ALLOWED_FRESHNESS_STATUSES = frozenset({"not_evaluated", "fresh", "degraded", "expired"})
 
 _NON_PROOF_RECEIPT = (
     "Receipt evidence binds artifact integrity only; it does not prove statistical validity "
@@ -363,9 +359,7 @@ class EnvelopeSupportSummary(EnvelopeModel):
                 strongest = edge.strength
 
         refs = graph.all_refs()
-        unsupported = tuple(
-            ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown"
-        )
+        unsupported = tuple(ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown")
 
         return cls(
             support_edge_count=len(graph.support_edges),
@@ -451,7 +445,11 @@ class GovernanceState(EnvelopeModel):
     def _governance_consistency(self) -> GovernanceState:
         if self.verdict == "fail" and not self.reasons:
             raise ValueError("failed governance projection must include reasons")
-        if self.required_human_review and self.verdict == "pass" and self.support_summary.review_edges:
+        if (
+            self.required_human_review
+            and self.verdict == "pass"
+            and self.support_summary.review_edges
+        ):
             # This is conservative but not fatal. A pass can still require human review
             # in external release processes, but review edges must remain visible.
             return self
@@ -545,8 +543,7 @@ def compile_claim_envelope(
     evidence_refs = tuple(
         ref
         for ref in all_evidence_refs
-        if ref.role
-        not in {"claim_decay", "extremal_scenario", "human_review", "human_review_note"}
+        if ref.role not in {"claim_decay", "extremal_scenario", "human_review", "human_review_note"}
     )
 
     receipt_refs = (
@@ -1243,11 +1240,7 @@ def _entry_artifact_id(role: str, idx: int, path: str | None) -> str:
 
 
 def _mandatory_edge_non_claims(graph: SupportGraph) -> tuple[str, ...]:
-    return _dedupe(
-        non_claim
-        for edge in graph.support_edges
-        for non_claim in edge.non_claims
-    )
+    return _dedupe(non_claim for edge in graph.support_edges for non_claim in edge.non_claims)
 
 
 def _audit_mapping(value: Mapping[str, Any] | BaseModel | None) -> Mapping[str, Any] | None:

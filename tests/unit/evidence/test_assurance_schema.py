@@ -7,6 +7,8 @@ import pytest
 from pydantic import ValidationError
 
 from cc.evidence.assurance_schema import (
+    ASSURANCE_CASE_NON_CLAIMS,
+    AssuranceCase,
     ClaimCategory,
     Defeater,
     EvidenceRole,
@@ -110,9 +112,22 @@ def test_assurance_case_from_run_groups_actual_outputs_by_claim_category() -> No
     markdown = export_assurance_case_markdown(case)
 
     assert jsonld["@context"]
+    assert jsonld["@graph"][0]["nonClaims"] == list(ASSURANCE_CASE_NON_CLAIMS)
     assert any(node.get("@type") == "Evidence" for node in jsonld["@graph"])
     assert "NEEDS HUMAN REVIEW" in markdown
+    assert "JSON-LD/GSN graph structure does not validate evidence strength" in markdown
     assert "composition_risk_bounded" in markdown
+
+
+def test_assurance_case_requires_non_claim_quarantine() -> None:
+    case = assurance_case_from_run({"run_id": "nonclaim-required"})
+    payload = case.model_dump(mode="json", by_alias=True)
+    payload["non_claims"] = []
+
+    with pytest.raises(ValidationError, match="mandatory non-claim"):
+        AssuranceCase.model_validate(payload)
+
+    assert set(ASSURANCE_CASE_NON_CLAIMS).issubset(set(case.non_claims))
 
 
 def test_write_assurance_case_exports(tmp_path: Path) -> None:

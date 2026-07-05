@@ -14,18 +14,32 @@
       "This report does not certify production safety or deployment fitness.",
       "This report does not generalize outside the checked-in failure matrix, declared event, guardrail set, and fixed verification time.",
       "This bounded empirical claim is not a release claim.",
-      "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
+      "A governance PASS means internal consistency under verifier rules only; it does not prove safety, deployment validity, production readiness, or compliance.",
+      "Receipt verification checks artifact integrity only; it does not prove statistical validity, deployment safety, production readiness, or compliance.",
+      "Claim levels are report maturity/support labels, not claim lifecycle states.",
+      "A claim_decay artifact does not prove the system is currently safe; it defines when the claim's supporting evidence should be rechecked, degraded, or treated as expired.",
       "A claim_decay artifact records signed policy, not live deployment validity.",
+      "A claim_decay artifact does not revoke, falsify, or certify a claim by itself.",
+      "DecayState is a verification-time support projection, not a claim lifecycle state.",
       "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
-      "This scenario does not certify production safety or legal compliance.",
-      "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions.",
+      "This scenario does not certify deployment safety, production readiness, or legal compliance.",
+      "This scenario does not generalize beyond its stated marginals, constraints, sample scope, and assumptions.",
+      "A feasible extremal scenario endpoint does not prove the endpoint world is likely.",
+      "Scenario kind and feasibility status are evidence-artifact properties, not claim lifecycle states.",
       "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
       "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
       "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
+      "A confirmatory protocol PASS means procedural separation under this verifier only; it does not prove deployment safety, external validity, or global truth.",
+      "Protocol audit status is not a claim lifecycle state.",
       "The finite-atom interval is an identification envelope over declared marginals and pairwise co-failures, not a sampling-validity proof.",
       "Confirmatory failure-matrix evidence is scoped and does not certify deployment safety.",
-      "The held-out matrix binds this capsule run only; it does not prove external validity or representativeness."
+      "The held-out matrix binds this capsule run only; it does not prove external validity or representativeness.",
+      "Receipt evidence binds artifact integrity only; it does not prove statistical validity or deployment safety.",
+      "Measurement evidence is scoped to the report population, assumptions, calibration window, and interval method; it does not certify deployment safety.",
+      "Confirmatory evidence remains scoped to its protocol, sample, endpoint, and declared run separation; it does not certify deployment safety.",
+      "Confirmatory protocol evidence remains scoped to its pre-registered plan and run separation; it does not certify deployment safety.",
+      "Claim-decay evidence supports staleness, time bounding, or review pressure only; it does not support deployment safety or statistical validity.",
+      "Extremal scenarios support endpoint feasibility or counterfactual bounds; they do not support likelihood or deployment realization."
     ],
     "review_requirements": [
       {
@@ -104,7 +118,7 @@
     "claim_id": "cc-claim-governance-capsule",
     "created_at": "2026-01-01T00:00:00Z",
     "evaluated_at": "2026-01-02T00:00:00Z",
-    "source_report_hash": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
+    "source_report_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
     "source_report_id": "cc-claim-governance-capsule",
     "source_report_schema": "cc.report.v0.3.1",
     "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
@@ -121,6 +135,11 @@
         "fragment_id": "claim.endpoint_feasibility",
         "fragment_type": "endpoint_feasibility",
         "text": "Endpoint feasibility and counterfactual dependence bounds."
+      },
+      {
+        "fragment_id": "claim.evidence_role_resolution",
+        "fragment_type": "evidence_role_resolution",
+        "text": "Evidence role resolution and unknown-role review."
       },
       {
         "fragment_id": "claim.failure_matrix",
@@ -141,6 +160,11 @@
         "fragment_id": "claim.operating_point",
         "fragment_type": "operating_point",
         "text": "Calibration and operating-point scope."
+      },
+      {
+        "fragment_id": "claim.review_pressure",
+        "fragment_type": "review_pressure",
+        "text": "Review pressure caused by decay or staleness."
       },
       {
         "fragment_id": "claim.staleness",
@@ -170,7 +194,7 @@
     "decay_refs": [
       {
         "artifact_id": "evidence:claim_decay:0004:decay_policy.json",
-        "bytes": 1354,
+        "bytes": 1563,
         "created_at": null,
         "evaluated_at": null,
         "metadata": {},
@@ -178,7 +202,7 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "claim_decay",
         "schema": null,
-        "sha256": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35",
+        "sha256": "7f02283703138c68f8b9b8b0f95424087287b51ee5008eb6ab2a92e730801ba4",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }
@@ -298,7 +322,7 @@
         "reason": "Canonical report receipt binds the report bytes and named evidence hashes.",
         "role": "receipt_integrity",
         "schema": "cc.report.receipt.v0.3.1",
-        "sha256": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
+        "sha256": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
         "status": null,
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }
@@ -307,7 +331,7 @@
     "scenario_refs": [
       {
         "artifact_id": "evidence:extremal_scenario:0005:extremal_lower.json",
-        "bytes": 4337,
+        "bytes": 4559,
         "created_at": null,
         "evaluated_at": null,
         "metadata": {},
@@ -315,13 +339,13 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "extremal_scenario",
         "schema": null,
-        "sha256": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83",
+        "sha256": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       },
       {
         "artifact_id": "evidence:extremal_scenario:0006:extremal_upper.json",
-        "bytes": 4335,
+        "bytes": 4557,
         "created_at": null,
         "evaluated_at": null,
         "metadata": {},
@@ -329,7 +353,7 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "extremal_scenario",
         "schema": null,
-        "sha256": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29",
+        "sha256": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }
@@ -388,7 +412,7 @@
       },
       {
         "non_claims": [
-          "Confirmatory failure-matrix evidence remains scoped to its protocol and does not certify deployment safety."
+          "Confirmatory evidence remains scoped to its protocol, sample, endpoint, and declared run separation; it does not certify deployment safety."
         ],
         "rationale": "Confirmatory failure matrices test a predeclared or held-out matrix.",
         "relation": "confirmatory_tests",

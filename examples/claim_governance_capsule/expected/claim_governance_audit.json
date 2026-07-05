@@ -1,7 +1,7 @@
 {
   "allowed_claim_level": "bounded_empirical",
   "boundary": {
-    "artifact_non_claim_count": 6,
+    "artifact_non_claim_count": 14,
     "claim_non_claim_count": 5,
     "mandatory_non_claims_missing": [],
     "unresolved_defeaters_or_gaps": []
@@ -57,12 +57,19 @@
             "check_id": "protocol_mode_supported",
             "reason": "Protocol mode 'held_out_matrix' is supported by the v0 verifier.",
             "status": "pass"
+          },
+          {
+            "check_id": "non_claim_boundary",
+            "reason": "Mandatory confirmatory protocol non-claim boundaries are present.",
+            "status": "pass"
           }
         ],
         "non_claims": [
           "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
           "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
-          "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role."
+          "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
+          "A confirmatory protocol PASS means procedural separation under this verifier only; it does not prove deployment safety, external validity, or global truth.",
+          "Protocol audit status is not a claim lifecycle state."
         ],
         "protocol_id": "capsule-confirmatory-protocol-v1",
         "reasons": [],
@@ -77,7 +84,9 @@
     "non_claims": [
       "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
       "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
-      "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role."
+      "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
+      "A confirmatory protocol PASS means procedural separation under this verifier only; it does not prove deployment safety, external validity, or global truth.",
+      "Protocol audit status is not a claim lifecycle state."
     ],
     "present": true,
     "protocol_ids": [
@@ -92,8 +101,10 @@
   "decay": {
     "evaluated_at": "2026-01-02T00:00:00Z",
     "non_claims": [
-      "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
-      "A claim_decay artifact records signed policy, not live deployment validity."
+      "A claim_decay artifact does not prove the system is currently safe; it defines when the claim's supporting evidence should be rechecked, degraded, or treated as expired.",
+      "A claim_decay artifact records signed policy, not live deployment validity.",
+      "A claim_decay artifact does not revoke, falsify, or certify a claim by itself.",
+      "DecayState is a verification-time support projection, not a claim lifecycle state."
     ],
     "present": true,
     "reason": "decay_policy.json evaluated as fresh.",
@@ -166,33 +177,33 @@
       "status": "present"
     },
     {
-      "bytes_actual": 1354,
-      "bytes_expected": 1354,
+      "bytes_actual": 1563,
+      "bytes_expected": 1563,
       "path": "decay_policy.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "claim_decay",
-      "sha256_actual": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35",
-      "sha256_expected": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35",
+      "sha256_actual": "7f02283703138c68f8b9b8b0f95424087287b51ee5008eb6ab2a92e730801ba4",
+      "sha256_expected": "7f02283703138c68f8b9b8b0f95424087287b51ee5008eb6ab2a92e730801ba4",
       "status": "present"
     },
     {
-      "bytes_actual": 4337,
-      "bytes_expected": 4337,
+      "bytes_actual": 4559,
+      "bytes_expected": 4559,
       "path": "extremal_lower.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "extremal_scenario",
-      "sha256_actual": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83",
-      "sha256_expected": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83",
+      "sha256_actual": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f",
+      "sha256_expected": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f",
       "status": "present"
     },
     {
-      "bytes_actual": 4335,
-      "bytes_expected": 4335,
+      "bytes_actual": 4557,
+      "bytes_expected": 4557,
       "path": "extremal_upper.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "extremal_scenario",
-      "sha256_actual": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29",
-      "sha256_expected": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29",
+      "sha256_actual": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3",
+      "sha256_expected": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3",
       "status": "present"
     },
     {
@@ -207,20 +218,28 @@
     }
   ],
   "non_claims": [
+    "A governance PASS means internal consistency under verifier rules only; it does not prove safety, deployment validity, production readiness, or compliance.",
+    "Receipt verification checks artifact integrity only; it does not prove statistical validity, deployment safety, production readiness, or compliance.",
+    "Claim levels are report maturity/support labels, not claim lifecycle states.",
     "A receipt and hash check verify artifact integrity, not statistical validity or deployment safety.",
     "The measurement interval is scoped to this capsule fixture and does not certify safe deployment.",
     "This report does not certify production safety or deployment fitness.",
     "This report does not generalize outside the checked-in failure matrix, declared event, guardrail set, and fixed verification time.",
     "This bounded empirical claim is not a release claim.",
-    "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
+    "A claim_decay artifact does not prove the system is currently safe; it defines when the claim's supporting evidence should be rechecked, degraded, or treated as expired.",
     "A claim_decay artifact records signed policy, not live deployment validity.",
+    "A claim_decay artifact does not revoke, falsify, or certify a claim by itself.",
+    "DecayState is a verification-time support projection, not a claim lifecycle state.",
     "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
-    "This scenario does not certify production safety or legal compliance.",
-    "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions.",
+    "This scenario does not certify deployment safety, production readiness, or legal compliance.",
+    "This scenario does not generalize beyond its stated marginals, constraints, sample scope, and assumptions.",
+    "A feasible extremal scenario endpoint does not prove the endpoint world is likely.",
+    "Scenario kind and feasibility status are evidence-artifact properties, not claim lifecycle states.",
     "Confirmatory validity depends on the pre-registered protocol and run separation, not on report polish.",
     "A confirmatory_protocol artifact does not certify deployment safety or external validity.",
     "Adaptive discovery evidence may motivate a hypothesis but cannot become confirmatory evidence by renaming its role.",
+    "A confirmatory protocol PASS means procedural separation under this verifier only; it does not prove deployment safety, external validity, or global truth.",
+    "Protocol audit status is not a claim lifecycle state.",
     "The finite-atom interval is an identification envelope over declared marginals and pairwise co-failures, not a sampling-validity proof.",
     "Confirmatory failure-matrix evidence is scoped and does not certify deployment safety.",
     "The held-out matrix binds this capsule run only; it does not prove external validity or representativeness."
@@ -228,8 +247,8 @@
   "reasons": [],
   "receipt": {
     "artifact_hashes_verified": true,
-    "canonical_hash": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
-    "reason": "Canonical report hash verified. Evidence artifact hashes verified. Receipt verification checks integrity only; it does not prove statistical validity or deployment safety.",
+    "canonical_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
+    "reason": "Canonical report hash verified. Evidence artifact hashes verified. Receipt verification checks artifact integrity only; it does not prove statistical validity, deployment safety, production readiness, or compliance.",
     "report_hash_verified": true
   },
   "report_id": "cc-claim-governance-capsule",
@@ -243,9 +262,10 @@
     ],
     "non_claims": [
       "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
-      "This scenario does not certify production safety or legal compliance.",
-      "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-      "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions."
+      "This scenario does not certify deployment safety, production readiness, or legal compliance.",
+      "This scenario does not generalize beyond its stated marginals, constraints, sample scope, and assumptions.",
+      "A feasible extremal scenario endpoint does not prove the endpoint world is likely.",
+      "Scenario kind and feasibility status are evidence-artifact properties, not claim lifecycle states."
     ],
     "present": true,
     "scenario_count": 2,

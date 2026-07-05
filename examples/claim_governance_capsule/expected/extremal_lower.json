@@ -82,7 +82,12 @@
     }
   ],
   "bound_value": 0.04166666666666666,
+  "boundary_tags": [
+    "feasibility_not_likelihood",
+    "empirical_not_deployment_safety"
+  ],
   "endpoint": "lower",
+  "epistemic_status": "extremal_feasibility_witness",
   "event": "and",
   "event_definition": "AND composed binary guardrail-failure event under supplied marginals and side constraints.",
   "event_probability": 0.04166666666666666,
@@ -128,9 +133,10 @@
   "narrative": "Frechet lower endpoint for the capsule AND failure event under the checked-in marginals and pairwise co-failure constraints.",
   "non_claims": [
     "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
-    "This scenario does not certify production safety or legal compliance.",
-    "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records a feasible endpoint/fitted scenario under the stated assumptions."
+    "This scenario does not certify deployment safety, production readiness, or legal compliance.",
+    "This scenario does not generalize beyond its stated marginals, constraints, sample scope, and assumptions.",
+    "A feasible extremal scenario endpoint does not prove the endpoint world is likely.",
+    "Scenario kind and feasibility status are evidence-artifact properties, not claim lifecycle states."
   ],
   "objective": null,
   "scenario_id": "scenario-frechet-lower-7a00219842c1",

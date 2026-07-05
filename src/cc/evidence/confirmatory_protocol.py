@@ -147,9 +147,7 @@ PROTOCOL_PASS_CAVEAT = (
     "it does not prove deployment safety, external validity, or global truth."
 )
 
-PROTOCOL_NOT_LIFECYCLE_STATE_NON_CLAIM = (
-    "Protocol audit status is not a claim lifecycle state."
-)
+PROTOCOL_NOT_LIFECYCLE_STATE_NON_CLAIM = "Protocol audit status is not a claim lifecycle state."
 
 FUTURE_METHOD_NON_CLAIM = (
     "Reserved future protocol modes are labels only unless their mathematical verifier "
@@ -248,9 +246,9 @@ class SamplePlan(ConfirmatoryProtocolModel):
     cluster_variable: str | None = None
 
     @model_validator(mode="after")
-    def _cluster_variable_required_when_clustered(self) -> SamplePlan:
-        if self.clustered_data and not self.cluster_variable:
-            raise ValueError("cluster_variable is required when clustered_data is true")
+    def _cluster_variable_reviewed_when_clustered(self) -> SamplePlan:
+        # Missing cluster variables are reviewed by _check_cluster_blocking so the
+        # verifier can distinguish schema failure from a review-triggering design gap.
         return self
 
 
@@ -472,8 +470,6 @@ class ConfirmatoryRunReference(ConfirmatoryProtocolModel):
     def _completed_after_started_and_cluster_fields_consistent(self) -> ConfirmatoryRunReference:
         if self.completed_at is not None and self.completed_at < self.started_at:
             raise ValueError("completed_at must be >= started_at")
-        if self.clustered_data_observed and not self.cluster_variable:
-            raise ValueError("cluster_variable is required when clustered_data_observed is true")
         return self
 
 
@@ -904,7 +900,9 @@ def _check_protocol_mode(plan: ConfirmatoryProtocolPlan) -> ProtocolCheck:
 
 
 def _check_non_claim_boundary(artifact: ConfirmatoryProtocolArtifact) -> ProtocolCheck:
-    non_claims = _dedupe((*artifact.non_claims, *artifact.plan.non_claims, *artifact.run.non_claims))
+    non_claims = _dedupe(
+        (*artifact.non_claims, *artifact.plan.non_claims, *artifact.run.non_claims)
+    )
     missing = [item for item in _DEFAULT_PROTOCOL_NON_CLAIMS if item not in non_claims]
 
     if missing:

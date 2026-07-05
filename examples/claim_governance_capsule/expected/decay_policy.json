@@ -24,8 +24,10 @@
   },
   "issued_at": "2026-01-01T00:00:00Z",
   "non_claims": [
-    "A claim_decay artifact does not prove the system is currently safe; it defines when the claim should be rechecked, degraded, or expired.",
-    "A claim_decay artifact records signed policy, not live deployment validity."
+    "A claim_decay artifact does not prove the system is currently safe; it defines when the claim's supporting evidence should be rechecked, degraded, or treated as expired.",
+    "A claim_decay artifact records signed policy, not live deployment validity.",
+    "A claim_decay artifact does not revoke, falsify, or certify a claim by itself.",
+    "DecayState is a verification-time support projection, not a claim lifecycle state."
   ],
   "notes": [
     "Verification computes freshness at fixed_now; the signed artifact does not store a live PASS state."

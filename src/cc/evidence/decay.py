@@ -55,7 +55,7 @@ CONFIGURED_HAZARD_NOTICE = (
 )
 
 DECAY_STATE_NON_LIFECYCLE_NOTICE = (
-    "DecayState is a freshness/support projection, not a claim lifecycle state."
+    "DecayState is a verification-time support projection, not a claim lifecycle state."
 )
 
 _DEFAULT_DECAY_NON_CLAIMS = (
@@ -69,7 +69,8 @@ _DEFAULT_DECAY_NON_CLAIMS = (
 _CONFIGURED_HAZARD_NON_CLAIMS = (
     "This decay policy does not estimate a statistically calibrated claim-failure probability.",
     "This decay policy does not prove the claim remains valid in deployment.",
-    "This decay policy is a verification-time staleness/review-pressure heuristic unless "
+    "This decay policy is a verification-time staleness/risk heuristic and "
+    "review-pressure heuristic unless "
     "externally calibrated.",
     "Configured hazard coefficients are policy parameters, not fitted survival-model parameters.",
 )
@@ -623,10 +624,7 @@ def _coerce_timezone_aware_datetime(value: datetime | str, field_name: str) -> d
 def _coerce_clean_string_tuple(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
-    if isinstance(value, str):
-        values = (value,)
-    else:
-        values = tuple(value)
+    values = (value,) if isinstance(value, str) else tuple(value)
     cleaned = tuple(str(item).strip() for item in values)
     if any(not item for item in cleaned):
         raise ValueError("string collections must contain non-empty strings")

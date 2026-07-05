@@ -346,8 +346,7 @@ def test_missing_extremal_scenario_non_claim_requires_review_or_fails(
     assert audit.verdict in {GovernanceVerdict.NEEDS_REVIEW, GovernanceVerdict.FAIL}
     assert audit.required_human_review is True
     assert (
-        "extremal_scenario_not_likely_world_proof"
-        in audit.boundary.mandatory_non_claims_missing
+        "extremal_scenario_not_likely_world_proof" in audit.boundary.mandatory_non_claims_missing
         or any(
             "scenario is missing mandatory non-claims" in artifact.reason
             for artifact in audit.evidence_artifacts

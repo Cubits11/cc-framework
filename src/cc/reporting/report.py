@@ -28,10 +28,21 @@ import platform as platform_module
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from cc import __version__ as framework_version_default
 from cc.reporting.canonical import sha256_canonical
@@ -104,6 +115,287 @@ CALIBRATION_STATUSES = frozenset({"pass", "fail"})
 
 class ReportValidationError(ValueError):
     """Raised when report inputs would produce an invalid CC report."""
+
+
+OVERCLAIM_VOCABULARY = frozenset(
+    {
+        "deployment_safe",
+        "production_ready",
+        "certified",
+        "model_truth_claim",
+        "likelihood_claim",
+    }
+)
+
+REPORT_RECEIPT_NON_CLAIM = (
+    "Report receipt hashes bind bytes only; they do not prove statistical validity, "
+    "deployment safety, production readiness, or compliance."
+)
+
+
+class _StrictReportModel(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        frozen=True,
+        populate_by_name=True,
+        allow_inf_nan=False,
+    )
+
+
+class GitMetadataModel(_StrictReportModel):
+    commit: str | None
+    dirty: bool
+    branch: str | None
+
+
+class EnvironmentMetadataModel(_StrictReportModel):
+    python_version: str = Field(min_length=1)
+    platform: str = Field(min_length=1)
+    dependency_hash: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+        exclude_if=lambda value: value is None,
+    )
+    package_snapshot: dict[str, str] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+
+    @field_validator("package_snapshot")
+    @classmethod
+    def _package_snapshot_keys_are_nonempty(
+        cls,
+        value: dict[str, str] | None,
+    ) -> dict[str, str] | None:
+        if value is None:
+            return None
+        if any(not key.strip() or not item.strip() for key, item in value.items()):
+            raise ValueError("package_snapshot keys and versions must be non-empty strings")
+        return value
+
+    @model_validator(mode="after")
+    def _optional_fields_are_omitted_not_null(self) -> EnvironmentMetadataModel:
+        if self.dependency_hash is None and "dependency_hash" in self.model_fields_set:
+            raise ValueError("environment.dependency_hash must be omitted or a SHA-256 hex string")
+        if self.package_snapshot is None and "package_snapshot" in self.model_fields_set:
+            raise ValueError("environment.package_snapshot must be omitted or an object")
+        return self
+
+
+class RunSummaryModel(_StrictReportModel):
+    run_id: str = Field(min_length=1)
+    config_path: str | None
+    config_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    seed: int | None
+    command: str | None
+
+
+class CalibrationSummaryModel(_StrictReportModel):
+    target_fpr: float | None
+    alpha_cap: float | None
+    realized_fpr: float | None
+    calibration_window: dict[str, Any]
+    threshold: float | None
+    status: Literal["pass", "fail"]
+
+    @model_validator(mode="after")
+    def _valid_calibration_surface(self) -> CalibrationSummaryModel:
+        if self.target_fpr is None and self.alpha_cap is None:
+            raise ValueError("calibration must include target_fpr or alpha_cap")
+        for field_name in ("target_fpr", "alpha_cap", "realized_fpr"):
+            value = getattr(self, field_name)
+            if value is not None and not 0 <= value <= 1:
+                raise ValueError(f"calibration.{field_name} must be between 0 and 1")
+        if self.threshold is not None and not _is_finite_number(self.threshold):
+            raise ValueError("calibration.threshold must be finite")
+        return self
+
+
+class MeasurementIntervalModel(_StrictReportModel):
+    lower: float
+    upper: float
+
+    @model_validator(mode="after")
+    def _valid_interval(self) -> MeasurementIntervalModel:
+        if not _is_finite_number(self.lower) or not _is_finite_number(self.upper):
+            raise ValueError("measurement interval endpoints must be finite")
+        if self.lower > self.upper:
+            raise ValueError("measurement interval lower cannot exceed upper")
+        return self
+
+
+class MeasurementSummaryModel(_StrictReportModel):
+    metric_family: str = Field(min_length=1)
+    point_estimate: float
+    interval: MeasurementIntervalModel
+    confidence_level: float | None
+    delta: float | None
+    interval_method: str = Field(min_length=1)
+    sample_sizes: dict[str, int] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _valid_measurement_surface(self) -> MeasurementSummaryModel:
+        if self.confidence_level is None and self.delta is None:
+            raise ValueError("measurement must include confidence_level or delta")
+        if self.confidence_level is not None and not 0 < self.confidence_level < 1:
+            raise ValueError("measurement.confidence_level must be between 0 and 1")
+        if self.delta is not None and not 0 <= self.delta < 1:
+            raise ValueError("measurement.delta must be in [0, 1)")
+        if not _is_finite_number(self.point_estimate):
+            raise ValueError("measurement.point_estimate must be finite")
+        for label, sample_size in self.sample_sizes.items():
+            if not label.strip():
+                raise ValueError("sample size labels must be non-empty strings")
+            if sample_size < 0:
+                raise ValueError("sample sizes must be non-negative integers")
+        return self
+
+
+class EvidenceArtifactModel(_StrictReportModel):
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    bytes: int = Field(ge=0)
+    role: str = Field(min_length=1)
+
+    @field_validator("role")
+    @classmethod
+    def _role_is_not_reserved(cls, value: str) -> str:
+        role = value.strip()
+        if role in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("evidence role must not reuse a lifecycle state name")
+        marker = _reserved_overclaim_marker(role)
+        if marker is not None:
+            raise ValueError(f"evidence role contains reserved overclaim vocabulary: {marker}")
+        return role
+
+
+class ReportEvidenceModel(_StrictReportModel):
+    artifacts: tuple[EvidenceArtifactModel, ...]
+    audit_log: EvidenceArtifactModel | None
+    figure_manifest: EvidenceArtifactModel | None
+
+    @field_validator("artifacts", mode="before")
+    @classmethod
+    def _coerce_artifacts(cls, value: Any) -> tuple[Any, ...]:
+        return _coerce_tuple(value, "evidence.artifacts")
+
+
+class ClaimSummaryModel(_StrictReportModel):
+    """Strict public report projection of one scoped claim.
+
+    ``allowed_claim_level`` is a maturity/support label, not a lifecycle state.
+    """
+
+    statement: str = Field(min_length=1)
+    allowed_claim_level: ClaimLevel
+    non_claims: tuple[str, ...]
+
+    @field_validator("non_claims", mode="before")
+    @classmethod
+    def _coerce_non_claims(cls, value: Any) -> tuple[str, ...]:
+        return _coerce_string_tuple(value, "claim.non_claims")
+
+    @field_validator("statement")
+    @classmethod
+    def _statement_is_nonblank_and_not_overclaim(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("claim.statement cannot be empty")
+        marker = _reserved_overclaim_marker(value)
+        if marker is not None:
+            raise ValueError(f"claim.statement contains reserved overclaim vocabulary: {marker}")
+        return value
+
+    @field_validator("allowed_claim_level")
+    @classmethod
+    def _claim_level_is_not_lifecycle(cls, value: ClaimLevel) -> ClaimLevel:
+        if value in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("allowed_claim_level must not be a lifecycle state")
+        return value
+
+    @model_validator(mode="after")
+    def _non_diagnostic_claims_need_boundaries(self) -> ClaimSummaryModel:
+        if self.allowed_claim_level != "diagnostic" and not self.non_claims:
+            raise ValueError("non-diagnostic claims require explicit non_claims")
+        return self
+
+
+class ReportReceiptModel(_StrictReportModel):
+    canonical_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    hash_algorithm: Literal["sha256"]
+    canonicalization_method: Literal[
+        "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); "
+        "receipt.canonical_hash excluded"
+    ]
+    previous_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class CCReport(_StrictReportModel):
+    """Strict public model for ``cc.report.v0.3.1`` reports.
+
+    The model validates the report payload, parses ``created_at`` as an aware
+    timestamp, rejects reserved overclaim vocabulary outside explicit
+    non-claims, and verifies that ``receipt.canonical_hash`` is the SHA-256 of
+    the canonical payload with only that field excluded.
+    """
+
+    schema_version: Literal["cc.report.v0.3.1"]
+    report_id: str = Field(min_length=1)
+    created_at: datetime
+    framework_version: str = Field(min_length=1)
+    git: GitMetadataModel
+    environment: EnvironmentMetadataModel
+    run: RunSummaryModel
+    assumptions: tuple[str, ...]
+    calibration: CalibrationSummaryModel
+    measurement: MeasurementSummaryModel
+    evidence: ReportEvidenceModel
+    claim: ClaimSummaryModel
+    receipt: ReportReceiptModel
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _created_at_is_aware(cls, value: Any) -> datetime:
+        return _parse_aware_datetime(value, "created_at")
+
+    @field_serializer("created_at")
+    def _serialize_created_at(self, value: datetime) -> str:
+        return _format_utc_datetime(value)
+
+    @field_validator("assumptions", mode="before")
+    @classmethod
+    def _coerce_assumptions(cls, value: Any) -> tuple[str, ...]:
+        return _coerce_string_tuple(value, "assumptions")
+
+    @model_validator(mode="after")
+    def _receipt_and_boundary_invariants(self) -> CCReport:
+        if self.claim.allowed_claim_level != "diagnostic":
+            interval = self.measurement.interval
+            if not interval.lower <= self.measurement.point_estimate <= interval.upper:
+                raise ValueError(
+                    "measurement point_estimate must lie within interval for non-diagnostic claims"
+                )
+
+        payload = self.model_dump(mode="json")
+        overclaims = _find_reserved_overclaim_paths(payload)
+        if overclaims:
+            raise ValueError(
+                "report payload contains reserved overclaim vocabulary outside non_claims: "
+                + ", ".join(overclaims)
+            )
+
+        computed_hash = sha256_canonical(payload)
+        if computed_hash != self.receipt.canonical_hash:
+            raise ValueError(
+                "receipt.canonical_hash does not match canonical report payload: "
+                f"expected {self.receipt.canonical_hash}, computed {computed_hash}"
+            )
+        return self
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the JSON-native public report shape."""
+
+        return self.model_dump(mode="json")
 
 
 @dataclass(frozen=True)
@@ -240,7 +532,7 @@ class ClaimSummary:
 
     statement: str
     allowed_claim_level: ClaimLevel
-    non_claims: Sequence[str] = field(default_factory=list)
+    non_claims: Sequence[str] = dataclass_field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -276,7 +568,7 @@ def build_cc_report(
 
     _validate_inputs(calibration=calibration, measurement=measurement, claim=claim)
 
-    created = created_at or _utc_now()
+    created = _format_utc_datetime(_parse_aware_datetime(created_at or _utc_now(), "created_at"))
     report = {
         "schema_version": SCHEMA_VERSION,
         "report_id": report_id or f"cc-report-{run.run_id}",
@@ -302,16 +594,20 @@ def build_cc_report(
         },
     }
     report["receipt"]["canonical_hash"] = sha256_canonical(report)
-    return report
+    try:
+        return CCReport.model_validate(report).to_dict()
+    except ValidationError as exc:
+        raise ReportValidationError(str(exc)) from exc
 
 
 def write_cc_report(path: str | Path, report: Mapping[str, Any]) -> None:
     """Write a report JSON file in a deterministic pretty-printed form."""
 
+    validated = CCReport.model_validate(report).to_dict()
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n",
+        json.dumps(validated, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n",
         encoding="utf-8",
     )
 
@@ -338,6 +634,71 @@ def detect_environment_metadata() -> EnvironmentMetadata:
         python_version=sys.version.split()[0],
         platform=platform_module.platform(),
     )
+
+
+def _parse_aware_datetime(value: Any, field_name: str) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO-8601 timestamp") from exc
+    else:
+        raise TypeError(f"{field_name} must be an ISO-8601 timestamp")
+
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def _format_utc_datetime(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _coerce_tuple(value: Any, field_name: str) -> tuple[Any, ...]:
+    if isinstance(value, tuple):
+        return value
+    if isinstance(value, list):
+        return tuple(value)
+    raise TypeError(f"{field_name} must be a JSON array")
+
+
+def _coerce_string_tuple(value: Any, field_name: str) -> tuple[str, ...]:
+    items = _coerce_tuple(value, field_name)
+    if any(not isinstance(item, str) or not item.strip() for item in items):
+        raise ValueError(f"{field_name} must contain non-empty strings")
+    return tuple(items)
+
+
+def _reserved_overclaim_marker(value: str) -> str | None:
+    normalized = value.lower().replace("-", "_").replace(" ", "_")
+    for marker in sorted(OVERCLAIM_VOCABULARY):
+        if marker in normalized:
+            return marker
+    return None
+
+
+def _find_reserved_overclaim_paths(value: Any, path: str = "$") -> list[str]:
+    found: list[str] = []
+    if isinstance(value, Mapping):
+        for raw_key, child in value.items():
+            key = str(raw_key)
+            child_path = f"{path}.{key}"
+            marker = _reserved_overclaim_marker(key)
+            if marker is not None:
+                found.append(f"{child_path} ({marker})")
+            if key == "non_claims":
+                continue
+            found.extend(_find_reserved_overclaim_paths(child, child_path))
+    elif isinstance(value, list):
+        for idx, child in enumerate(value):
+            found.extend(_find_reserved_overclaim_paths(child, f"{path}[{idx}]"))
+    elif isinstance(value, str):
+        marker = _reserved_overclaim_marker(value)
+        if marker is not None:
+            found.append(f"{path} ({marker})")
+    return found
 
 
 def _validate_inputs(
@@ -373,8 +734,8 @@ def _validate_measurement(measurement: MeasurementSummary) -> None:
         raise ReportValidationError("measurement must include confidence_level or delta")
     if measurement.confidence_level is not None and not 0 < measurement.confidence_level < 1:
         raise ReportValidationError("measurement.confidence_level must be between 0 and 1")
-    if measurement.delta is not None and not 0 < measurement.delta < 1:
-        raise ReportValidationError("measurement.delta must be between 0 and 1")
+    if measurement.delta is not None and not 0 <= measurement.delta < 1:
+        raise ReportValidationError("measurement.delta must be in [0, 1)")
     if measurement.interval_lower > measurement.interval_upper:
         raise ReportValidationError("measurement interval lower cannot exceed upper")
     if not _is_finite_number(measurement.point_estimate):
@@ -420,10 +781,15 @@ def _validate_claim(claim: ClaimSummary, measurement: MeasurementSummary) -> Non
 
 
 def _is_finite_number(value: float) -> bool:
-    return not isinstance(value, bool) and value == value and value not in {
-        float("inf"),
-        float("-inf"),
-    }
+    return (
+        not isinstance(value, bool)
+        and value == value
+        and value
+        not in {
+            float("inf"),
+            float("-inf"),
+        }
+    )
 
 
 def _utc_now() -> str:

@@ -26,6 +26,22 @@ AUTO_POPULATED_NOTE = (
     "Auto-populated from run data; adequacy, interpretation, and acceptance "
     "criteria require human review."
 )
+ASSURANCE_CASE_NOT_GOVERNANCE_NON_CLAIM = (
+    "An assurance case is a structured argument scaffold, not a governance PASS, "
+    "deployment-safety proof, compliance certification, or production-readiness claim."
+)
+ARGUMENT_GRAPH_NOT_VALIDITY_NON_CLAIM = (
+    "JSON-LD/GSN graph structure does not validate evidence strength, statistical validity, "
+    "semantic truth, or future performance."
+)
+HUMAN_REVIEW_NOT_STRENGTH_UPGRADE_NON_CLAIM = (
+    "Human review markers in an assurance case do not upgrade underlying evidence strength."
+)
+ASSURANCE_CASE_NON_CLAIMS = (
+    ASSURANCE_CASE_NOT_GOVERNANCE_NON_CLAIM,
+    ARGUMENT_GRAPH_NOT_VALIDITY_NON_CLAIM,
+    HUMAN_REVIEW_NOT_STRENGTH_UPGRADE_NON_CLAIM,
+)
 
 _MAX_EVIDENCE_ITEMS_PER_ROLE = 12
 _MAX_FILE_BYTES = 5_000_000
@@ -178,7 +194,20 @@ class AssuranceCase(AssuranceModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     source_refs: list[str] = Field(default_factory=list)
     top_claim: TopClaim
+    non_claims: list[str] = Field(...)
     notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _requires_non_claim_quarantine(self) -> AssuranceCase:
+        missing = [item for item in ASSURANCE_CASE_NON_CLAIMS if item not in self.non_claims]
+        if missing:
+            raise ValueError(
+                "assurance cases must preserve mandatory non-claim boundaries: "
+                + ", ".join(missing)
+            )
+        if any(not isinstance(item, str) or not item.strip() for item in self.non_claims):
+            raise ValueError("assurance case non_claims must contain non-empty strings")
+        return self
 
 
 def assurance_case_from_run(evidence_bundle: Mapping[str, Any] | str | Path) -> AssuranceCase:
@@ -427,6 +456,7 @@ def assurance_case_from_run(evidence_bundle: Mapping[str, Any] | str | Path) -> 
         run_id=run_id,
         source_refs=source_refs,
         top_claim=top_claim,
+        non_claims=list(ASSURANCE_CASE_NON_CLAIMS),
         notes=[
             "Evidence nodes were harvested from actual run outputs where matching fields existed.",
             "Claims, assumptions, and defeaters default to NEEDS HUMAN REVIEW.",
@@ -447,6 +477,7 @@ def export_assurance_case_jsonld(case: AssuranceCase) -> dict[str, Any]:
             "createdAt": case.created_at,
             "sourceRefs": case.source_refs,
             "hasTopClaim": {"@id": case.top_claim.id},
+            "nonClaims": case.non_claims,
             "notes": case.notes,
         }
     ]
@@ -472,6 +503,7 @@ def export_assurance_case_jsonld(case: AssuranceCase) -> dict[str, Any]:
             "hasAssumption": {"@id": "gsn:hasAssumption", "@type": "@id"},
             "hasContext": {"@id": "gsn:hasContext", "@type": "@id"},
             "hasDefeater": {"@id": "cc:hasDefeater", "@type": "@id"},
+            "nonClaims": "cc:nonClaims",
         },
         "@id": case.id,
         "@type": "AssuranceCase",
@@ -492,6 +524,10 @@ def export_assurance_case_markdown(case: AssuranceCase) -> str:
         "",
         "> This draft structures run evidence as a GSN-inspired assurance argument. "
         "It does not certify safety, legal compliance, or standards conformance.",
+        "",
+        "## Non-Claims",
+        "",
+        *[f"- {item}" for item in case.non_claims],
         "",
     ]
     if case.source_refs:
@@ -1120,7 +1156,11 @@ def _dedupe_graph_nodes(graph: Sequence[dict[str, Any]]) -> list[dict[str, Any]]
 
 
 __all__ = [
+    "ARGUMENT_GRAPH_NOT_VALIDITY_NON_CLAIM",
+    "ASSURANCE_CASE_NON_CLAIMS",
+    "ASSURANCE_CASE_NOT_GOVERNANCE_NON_CLAIM",
     "ASSURANCE_SCHEMA_VERSION",
+    "HUMAN_REVIEW_NOT_STRENGTH_UPGRADE_NON_CLAIM",
     "Assumption",
     "AssuranceCase",
     "ClaimCategory",

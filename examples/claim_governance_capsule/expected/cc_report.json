@@ -64,22 +64,22 @@
         "sha256": "ec3fe8d311ec20325adc757c5f2c0a146868b5df3717f572004c0a3c965276ed"
       },
       {
-        "bytes": 1354,
+        "bytes": 1563,
         "path": "decay_policy.json",
         "role": "claim_decay",
-        "sha256": "e75cba030f06dbf5e4dedb911b6ddd0fbe53f9464734777f980c0ae53aae3d35"
+        "sha256": "7f02283703138c68f8b9b8b0f95424087287b51ee5008eb6ab2a92e730801ba4"
       },
       {
-        "bytes": 4337,
+        "bytes": 4559,
         "path": "extremal_lower.json",
         "role": "extremal_scenario",
-        "sha256": "fb1880c58fcb66f565b33b31c8a8b3a121a80ca49a8c27723e9cc62976c41d83"
+        "sha256": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f"
       },
       {
-        "bytes": 4335,
+        "bytes": 4557,
         "path": "extremal_upper.json",
         "role": "extremal_scenario",
-        "sha256": "54fb81a6ba275b600576c15df1fceee05c592826c81dab0a0d8eb4c28af43c29"
+        "sha256": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3"
       }
     ],
     "audit_log": {
@@ -111,7 +111,7 @@
     }
   },
   "receipt": {
-    "canonical_hash": "efa004e96d38d061722bb388db2802c00b5455ec49647f6ac62880596ff36ec2",
+    "canonical_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
     "canonicalization_method": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded",
     "hash_algorithm": "sha256",
     "previous_hash": null
