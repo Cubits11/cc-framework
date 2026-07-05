@@ -14,12 +14,12 @@ import argparse
 import json
 import math
 import sys
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
 import bpy
 from mathutils import Vector
-
 
 ROOT = Path(__file__).resolve().parent
 REPO_ROOT = ROOT.parent.parent
@@ -230,8 +230,12 @@ def setup_materials() -> dict[str, bpy.types.Material]:
             emission_strength=1.20,
             roughness=0.42,
         ),
-        "MAT_NonClaims_Stone": make_material("MAT_NonClaims_Stone", (0.018, 0.020, 0.025, 1), roughness=0.78),
-        "MAT_Replay_Ledger": make_material("MAT_Replay_Ledger", (0.010, 0.014, 0.018, 1), roughness=0.68),
+        "MAT_NonClaims_Stone": make_material(
+            "MAT_NonClaims_Stone", (0.018, 0.020, 0.025, 1), roughness=0.78
+        ),
+        "MAT_Replay_Ledger": make_material(
+            "MAT_Replay_Ledger", (0.010, 0.014, 0.018, 1), roughness=0.68
+        ),
         "MAT_Future_LedgerTower": make_material(
             "MAT_Future_LedgerTower",
             (0.055, 0.075, 0.092, 1),
@@ -452,7 +456,7 @@ def add_curve(
     curve.bevel_resolution = 2
     spline = curve.splines.new("POLY")
     spline.points.add(len(points) - 1)
-    for point, co in zip(spline.points, points):
+    for point, co in zip(spline.points, points, strict=False):
         point.co = (co.x, co.y, co.z, 1.0)
     curve.materials.append(material)
     obj = bpy.data.objects.new(name, curve)
@@ -476,11 +480,17 @@ def arc_points(
         c = math.cos(angle) * radius
         s = math.sin(angle) * radius
         if plane == "XY":
-            points.append(Vector((center.x + c, center.y + s, center.z if fixed is None else fixed)))
+            points.append(
+                Vector((center.x + c, center.y + s, center.z if fixed is None else fixed))
+            )
         elif plane == "XZ":
-            points.append(Vector((center.x + c, center.y if fixed is None else fixed, center.z + s)))
+            points.append(
+                Vector((center.x + c, center.y if fixed is None else fixed, center.z + s))
+            )
         elif plane == "YZ":
-            points.append(Vector((center.x if fixed is None else fixed, center.y + c, center.z + s)))
+            points.append(
+                Vector((center.x if fixed is None else fixed, center.y + c, center.z + s))
+            )
         else:
             raise ValueError(f"unknown arc plane: {plane}")
     return points
@@ -557,7 +567,9 @@ def display_filename_from_artifact_id(artifact_id: str) -> str:
     return artifact_id
 
 
-def material_for_strength(materials: dict[str, bpy.types.Material], strength: str, relation: str) -> bpy.types.Material:
+def material_for_strength(
+    materials: dict[str, bpy.types.Material], strength: str, relation: str
+) -> bpy.types.Material:
     if relation == "invalidates":
         return materials["MAT_Invalidation_Red"]
     if relation == "requires_review":
@@ -597,10 +609,8 @@ def setup_render() -> None:
             scene.eevee.gtao_distance = 4
             scene.eevee.gtao_factor = 1.2
 
-    try:
+    with suppress(TypeError):
         scene.view_settings.view_transform = "AgX"
-    except TypeError:
-        pass
     for look in ("AgX - Medium High Contrast", "Medium High Contrast", "High Contrast", "None"):
         try:
             scene.view_settings.look = look
@@ -615,10 +625,19 @@ def setup_render() -> None:
     world.color = (0.002, 0.003, 0.006)
 
 
-def build_world_root(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_world_root(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     root = collections["00_WorldRoot"]
     helpers = collections["15_RenderHelpers"]
-    add_cube(root, "WorldRoot_SharedDarkFloor", (0, -0.25, -0.045), (11.8, 10.6, 0.09), materials["MAT_World_Dark"], bevel=0.02)
+    add_cube(
+        root,
+        "WorldRoot_SharedDarkFloor",
+        (0, -0.25, -0.045),
+        (11.8, 10.6, 0.09),
+        materials["MAT_World_Dark"],
+        bevel=0.02,
+    )
 
     chamber_pads = [
         ("ArrivalHall_Pad", (0, -5.25, 0.01), (4.7, 2.25, 0.035)),
@@ -632,7 +651,11 @@ def build_world_root(collections: dict[str, bpy.types.Collection], materials: di
     ]
     for name, loc, dims in chamber_pads:
         obj = add_cube(helpers, name, loc, dims, materials["MAT_Replay_Ledger"], bevel=0.018)
-        tag(obj, semantic_source="visual_identity/claim_observatory/WORLD_BIBLE_V3.md", chamber=name.removesuffix("_Pad"))
+        tag(
+            obj,
+            semantic_source="visual_identity/claim_observatory/WORLD_BIBLE_V3.md",
+            chamber=name.removesuffix("_Pad"),
+        )
 
     corridor_specs = [
         ("Corridor_Arrival_To_Capsule", (0, -2.7, 0.04), (1.35, 3.0, 0.035)),
@@ -653,9 +676,30 @@ def build_arrival_hall(
     arrival = collections["01_ArrivalHall"]
     text = collections["14_TextLabels"]
     camera_hint = Vector(CAMERA_SPECS["Camera_Arrival"][0])
-    add_cube(arrival, "ArrivalHall_LeftQuietWall", (-2.45, -5.35, 1.1), (0.12, 2.35, 2.2), materials["MAT_NonClaims_Stone"], bevel=0.015)
-    add_cube(arrival, "ArrivalHall_RightQuietWall", (2.45, -5.35, 1.1), (0.12, 2.35, 2.2), materials["MAT_NonClaims_Stone"], bevel=0.015)
-    add_cube(arrival, "ArrivalHall_BackThesisPanel", (0, -6.42, 1.35), (4.55, 0.10, 2.25), materials["MAT_NonClaims_Stone"], bevel=0.02)
+    add_cube(
+        arrival,
+        "ArrivalHall_LeftQuietWall",
+        (-2.45, -5.35, 1.1),
+        (0.12, 2.35, 2.2),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.015,
+    )
+    add_cube(
+        arrival,
+        "ArrivalHall_RightQuietWall",
+        (2.45, -5.35, 1.1),
+        (0.12, 2.35, 2.2),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.015,
+    )
+    add_cube(
+        arrival,
+        "ArrivalHall_BackThesisPanel",
+        (0, -6.42, 1.35),
+        (4.55, 0.10, 2.25),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.02,
+    )
     add_facing_text(
         text,
         "ArrivalHall_ThesisText",
@@ -688,7 +732,11 @@ def build_arrival_hall(
         size=0.056,
         align_x="LEFT",
     )
-    tag(label, semantic_source=SOURCE_ARTIFACTS["claim_envelope"], repo_artifact_path=SOURCE_ARTIFACTS["claim_envelope"])
+    tag(
+        label,
+        semantic_source=SOURCE_ARTIFACTS["claim_envelope"],
+        repo_artifact_path=SOURCE_ARTIFACTS["claim_envelope"],
+    )
 
 
 def build_claim_capsule(
@@ -704,7 +752,15 @@ def build_claim_capsule(
     manifest = data["manifest"]
     camera_hint = Vector(CAMERA_SPECS["Camera_ClaimCapsule"][0])
 
-    body = add_cylinder(chamber, "ClaimCapsule_BoundedArtifactBody", CAPSULE_CENTER, 0.84, 2.35, materials["MAT_Capsule_Glass"], vertices=144)
+    body = add_cylinder(
+        chamber,
+        "ClaimCapsule_BoundedArtifactBody",
+        CAPSULE_CENTER,
+        0.84,
+        2.35,
+        materials["MAT_Capsule_Glass"],
+        vertices=144,
+    )
     tag(
         body,
         semantic_source=SOURCE_ARTIFACTS["claim_envelope"],
@@ -713,31 +769,87 @@ def build_claim_capsule(
         claim_meaning=envelope["proposition"]["statement"],
         does_not_claim="deployment safety",
     )
-    add_sphere(chamber, "ClaimCapsule_TopGlassCap", CAPSULE_CENTER + Vector((0, 0, 1.18)), 0.84, materials["MAT_Capsule_Glass"], scale=(1, 1, 0.36), segments=64, ring_count=16)
-    add_sphere(chamber, "ClaimCapsule_BottomGlassCap", CAPSULE_CENTER + Vector((0, 0, -1.18)), 0.84, materials["MAT_Capsule_Glass"], scale=(1, 1, 0.36), segments=64, ring_count=16)
+    add_sphere(
+        chamber,
+        "ClaimCapsule_TopGlassCap",
+        CAPSULE_CENTER + Vector((0, 0, 1.18)),
+        0.84,
+        materials["MAT_Capsule_Glass"],
+        scale=(1, 1, 0.36),
+        segments=64,
+        ring_count=16,
+    )
+    add_sphere(
+        chamber,
+        "ClaimCapsule_BottomGlassCap",
+        CAPSULE_CENTER + Vector((0, 0, -1.18)),
+        0.84,
+        materials["MAT_Capsule_Glass"],
+        scale=(1, 1, 0.36),
+        segments=64,
+        ring_count=16,
+    )
     for idx, z_offset in enumerate((-1.15, -0.58, 0.0, 0.58, 1.15), 1):
-        add_torus(chamber, f"ClaimCapsule_StrongGlassRim_{idx:02d}", CAPSULE_CENTER + Vector((0, 0, z_offset)), 0.845, 0.0075, materials["MAT_Evidence_BlueWhite"], major_segments=160)
+        add_torus(
+            chamber,
+            f"ClaimCapsule_StrongGlassRim_{idx:02d}",
+            CAPSULE_CENTER + Vector((0, 0, z_offset)),
+            0.845,
+            0.0075,
+            materials["MAT_Evidence_BlueWhite"],
+            major_segments=160,
+        )
 
     plates = [
-        ("cc_report.json", report["schema_version"], SOURCE_ARTIFACTS["cc_report"], -0.48, "cc.report.v0.3.1"),
-        ("claim_governance_audit.json", audit["schema"], SOURCE_ARTIFACTS["claim_governance_audit"], -0.16, "cc/claim-governance-audit.v1"),
-        ("claim_envelope.json", envelope["schema"], SOURCE_ARTIFACTS["claim_envelope"], 0.16, "cc.claim_envelope.v1"),
-        ("manifest.expected.json", manifest["schema_version"], SOURCE_ARTIFACTS["manifest"], 0.48, "cc.claim_governance_capsule_manifest.v1"),
+        (
+            "cc_report.json",
+            report["schema_version"],
+            SOURCE_ARTIFACTS["cc_report"],
+            -0.48,
+            "cc.report.v0.3.1",
+        ),
+        (
+            "claim_governance_audit.json",
+            audit["schema"],
+            SOURCE_ARTIFACTS["claim_governance_audit"],
+            -0.16,
+            "cc/claim-governance-audit.v1",
+        ),
+        (
+            "claim_envelope.json",
+            envelope["schema"],
+            SOURCE_ARTIFACTS["claim_envelope"],
+            0.16,
+            "cc.claim_envelope.v1",
+        ),
+        (
+            "manifest.expected.json",
+            manifest["schema_version"],
+            SOURCE_ARTIFACTS["manifest"],
+            0.48,
+            "cc.claim_governance_capsule_manifest.v1",
+        ),
     ]
     for idx, (filename, schema, source, z_offset, label) in enumerate(plates):
         z = CAPSULE_CENTER.z + z_offset
         plate = add_cube(
             chamber,
-            f"ClaimCapsule_InternalEvidencePlate_{idx+1:02d}_{filename.replace('.', '_')}",
+            f"ClaimCapsule_InternalEvidencePlate_{idx + 1:02d}_{filename.replace('.', '_')}",
             (0.0, -0.055 - idx * 0.012, z),
             (1.24, 0.018, 0.22),
             materials["MAT_Clear_Panel"],
             bevel=0.01,
         )
-        tag(plate, semantic_source=source, repo_artifact_path=source, schema=schema, does_not_claim="deployment safety")
+        tag(
+            plate,
+            semantic_source=source,
+            repo_artifact_path=source,
+            schema=schema,
+            does_not_claim="deployment safety",
+        )
         add_facing_text(
             text,
-            f"ClaimCapsule_InternalEvidencePlateLabel_{idx+1:02d}",
+            f"ClaimCapsule_InternalEvidencePlateLabel_{idx + 1:02d}",
             f"{filename}\n{label}",
             (-0.54, -0.085 - idx * 0.012, z + 0.02),
             materials["MAT_Text_Primary"],
@@ -793,11 +905,50 @@ def build_evidence_vault(
     manifest = data["manifest"]
     camera_hint = Vector(CAMERA_SPECS["Camera_EvidenceVault"][0])
 
-    add_cube(vault, "EvidenceVault_BackWall", (-4.65, 1.38, 1.25), (2.6, 0.12, 2.5), materials["MAT_NonClaims_Stone"], bevel=0.02)
-    add_cube(vault, "EvidenceVault_LeftRack", (-5.50, 0.05, 1.05), (0.10, 2.35, 2.0), materials["MAT_NonClaims_Stone"], bevel=0.012)
-    add_cube(vault, "EvidenceVault_RightRack", (-3.50, 0.05, 1.05), (0.10, 2.35, 2.0), materials["MAT_NonClaims_Stone"], bevel=0.012)
-    add_facing_text(text, "EvidenceVault_Title", "Evidence Vault", (-5.45, -1.33, 2.2), materials["MAT_Text_Primary"], camera_hint, size=0.14, align_x="LEFT")
-    add_facing_text(text, "EvidenceVault_Principle", "Evidence is not generic.\nEvidence has roles.", (-5.45, -1.33, 1.92), materials["MAT_Text_Secondary"], camera_hint, size=0.065, align_x="LEFT")
+    add_cube(
+        vault,
+        "EvidenceVault_BackWall",
+        (-4.65, 1.38, 1.25),
+        (2.6, 0.12, 2.5),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.02,
+    )
+    add_cube(
+        vault,
+        "EvidenceVault_LeftRack",
+        (-5.50, 0.05, 1.05),
+        (0.10, 2.35, 2.0),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.012,
+    )
+    add_cube(
+        vault,
+        "EvidenceVault_RightRack",
+        (-3.50, 0.05, 1.05),
+        (0.10, 2.35, 2.0),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.012,
+    )
+    add_facing_text(
+        text,
+        "EvidenceVault_Title",
+        "Evidence Vault",
+        (-5.45, -1.33, 2.2),
+        materials["MAT_Text_Primary"],
+        camera_hint,
+        size=0.14,
+        align_x="LEFT",
+    )
+    add_facing_text(
+        text,
+        "EvidenceVault_Principle",
+        "Evidence is not generic.\nEvidence has roles.",
+        (-5.45, -1.33, 1.92),
+        materials["MAT_Text_Secondary"],
+        camera_hint,
+        size=0.065,
+        align_x="LEFT",
+    )
 
     files = manifest["files"]
     role_rank = {
@@ -812,7 +963,9 @@ def build_evidence_vault(
         "claim_governance_audit": 8,
         "audit_log": 9,
     }
-    sorted_files = sorted(files, key=lambda item: (role_rank.get(item["role"], 99), item["filename"]))
+    sorted_files = sorted(
+        files, key=lambda item: (role_rank.get(item["role"], 99), item["filename"])
+    )
     positions = []
     for row in range(4):
         for col in range(3):
@@ -821,7 +974,11 @@ def build_evidence_vault(
     for idx, file_info in enumerate(sorted_files[:11]):
         loc = Vector(positions[idx])
         role = file_info["role"]
-        material = materials["MAT_Confirmatory_Cyan"] if "confirmatory" in role else materials["MAT_Diagnostic_Blue"]
+        material = (
+            materials["MAT_Confirmatory_Cyan"]
+            if "confirmatory" in role
+            else materials["MAT_Diagnostic_Blue"]
+        )
         if role in {"audit_log", "claim_envelope", "claim_governance_audit", "cc_report"}:
             material = materials["MAT_Evidence_BlueWhite"]
         if role == "claim_decay":
@@ -830,7 +987,7 @@ def build_evidence_vault(
             material = materials["MAT_Diagnostic_Blue"]
         tablet = add_cube(
             vault,
-            f"EvidenceVault_Tablet_{idx+1:02d}_{file_info['filename'].replace('.', '_')}",
+            f"EvidenceVault_Tablet_{idx + 1:02d}_{file_info['filename'].replace('.', '_')}",
             loc,
             (0.54, 0.035, 0.36),
             material,
@@ -846,7 +1003,7 @@ def build_evidence_vault(
         )
         add_facing_text(
             text,
-            f"EvidenceVault_TabletLabel_{idx+1:02d}",
+            f"EvidenceVault_TabletLabel_{idx + 1:02d}",
             f"{file_info['filename']}\n{role}\nsha256:{short_hash(file_info['sha256'], 8)}  bytes:{file_info['bytes']}",
             loc + Vector((-0.24, -0.07, 0.02)),
             materials["MAT_Text_Primary"],
@@ -856,7 +1013,14 @@ def build_evidence_vault(
             line_spacing=0.78,
         )
 
-    receipt = add_cube(vault, "EvidenceVault_ReceiptIntegrityTablet", (-4.55, -1.08, 0.55), (1.45, 0.040, 0.32), materials["MAT_Integrity_Pale"], bevel=0.012)
+    receipt = add_cube(
+        vault,
+        "EvidenceVault_ReceiptIntegrityTablet",
+        (-4.55, -1.08, 0.55),
+        (1.45, 0.040, 0.32),
+        materials["MAT_Integrity_Pale"],
+        bevel=0.012,
+    )
     tag(
         receipt,
         semantic_source=SOURCE_ARTIFACTS["manifest"],
@@ -889,8 +1053,26 @@ def build_support_graph_orrery(
     ref_by_id = data["support_refs_by_id"]
     camera_hint = Vector(CAMERA_SPECS["Camera_SupportGraphOrrery"][0])
 
-    add_torus(graph, "SupportGraphOrrery_InnerClaimFragmentRing", CAPSULE_CENTER + Vector((0, 0, 1.35)), 1.10, 0.004, materials["MAT_Integrity_Pale"], rotation=(math.radians(83), 0, math.radians(12)), major_segments=160)
-    add_torus(graph, "SupportGraphOrrery_OuterEvidenceArtifactRing", CAPSULE_CENTER + Vector((0, 0, 1.35)), 2.15, 0.004, materials["MAT_Evidence_BlueWhite"], rotation=(math.radians(83), 0, math.radians(12)), major_segments=160)
+    add_torus(
+        graph,
+        "SupportGraphOrrery_InnerClaimFragmentRing",
+        CAPSULE_CENTER + Vector((0, 0, 1.35)),
+        1.10,
+        0.004,
+        materials["MAT_Integrity_Pale"],
+        rotation=(math.radians(83), 0, math.radians(12)),
+        major_segments=160,
+    )
+    add_torus(
+        graph,
+        "SupportGraphOrrery_OuterEvidenceArtifactRing",
+        CAPSULE_CENTER + Vector((0, 0, 1.35)),
+        2.15,
+        0.004,
+        materials["MAT_Evidence_BlueWhite"],
+        rotation=(math.radians(83), 0, math.radians(12)),
+        major_segments=160,
+    )
 
     fragments = sorted({edge["target_claim_fragment"] for edge in edges})
     sources = [edge["source_artifact_id"] for edge in edges]
@@ -900,21 +1082,65 @@ def build_support_graph_orrery(
 
     for idx, fragment in enumerate(fragments):
         angle = math.radians(90 + idx * 360 / len(fragments))
-        loc = center + Vector((math.cos(angle) * 0.98, math.sin(angle) * 0.26, math.sin(angle) * 0.58))
+        loc = center + Vector(
+            (math.cos(angle) * 0.98, math.sin(angle) * 0.26, math.sin(angle) * 0.58)
+        )
         fragment_positions[fragment] = loc
-        node = add_sphere(graph, f"SupportGraphOrrery_ClaimFragment_{idx+1:02d}", loc, 0.055, materials["MAT_Text_Primary"], segments=20, ring_count=10)
-        tag(node, semantic_source=SOURCE_ARTIFACTS["claim_envelope"], target_claim_fragment=fragment)
-        add_facing_text(text, f"SupportGraphOrrery_ClaimFragmentLabel_{idx+1:02d}", fragment.replace("claim.", ""), loc + Vector((0, 0, 0.13)), materials["MAT_Text_Primary"], camera_hint, size=0.036)
+        node = add_sphere(
+            graph,
+            f"SupportGraphOrrery_ClaimFragment_{idx + 1:02d}",
+            loc,
+            0.055,
+            materials["MAT_Text_Primary"],
+            segments=20,
+            ring_count=10,
+        )
+        tag(
+            node, semantic_source=SOURCE_ARTIFACTS["claim_envelope"], target_claim_fragment=fragment
+        )
+        add_facing_text(
+            text,
+            f"SupportGraphOrrery_ClaimFragmentLabel_{idx + 1:02d}",
+            fragment.replace("claim.", ""),
+            loc + Vector((0, 0, 0.13)),
+            materials["MAT_Text_Primary"],
+            camera_hint,
+            size=0.036,
+        )
 
     for idx, source in enumerate(sources):
         angle = math.radians(74 + idx * 360 / len(sources))
-        loc = center + Vector((math.cos(angle) * 2.05, math.sin(angle) * 0.48, math.sin(angle) * 1.03))
+        loc = center + Vector(
+            (math.cos(angle) * 2.05, math.sin(angle) * 0.48, math.sin(angle) * 1.03)
+        )
         source_positions[source] = loc
         ref = ref_by_id.get(source, {})
         material = material_for_strength(materials, edges[idx]["strength"], edges[idx]["relation"])
-        node = add_sphere(graph, f"SupportGraphOrrery_EvidenceArtifact_{idx+1:02d}", loc, 0.070, material, segments=20, ring_count=10)
-        tag(node, semantic_source=SOURCE_ARTIFACTS["claim_envelope"], artifact_id=source, role=ref.get("role", "unknown"), sha256=ref.get("sha256"))
-        add_facing_text(text, f"SupportGraphOrrery_EvidenceArtifactLabel_{idx+1:02d}", display_filename_from_artifact_id(source), loc + Vector((0, 0, 0.14)), material, camera_hint, size=0.034)
+        node = add_sphere(
+            graph,
+            f"SupportGraphOrrery_EvidenceArtifact_{idx + 1:02d}",
+            loc,
+            0.070,
+            material,
+            segments=20,
+            ring_count=10,
+        )
+        tag(
+            node,
+            semantic_source=SOURCE_ARTIFACTS["claim_envelope"],
+            artifact_id=source,
+            role=ref.get("role", "unknown"),
+            sha256=ref.get("sha256"),
+        )
+        add_facing_text(
+            text,
+            f"SupportGraphOrrery_EvidenceArtifactLabel_{idx + 1:02d}",
+            display_filename_from_artifact_id(source),
+            loc + Vector((0, 0, 0.14)),
+            material,
+            camera_hint,
+            size=0.034,
+        )
 
     for idx, edge in enumerate(edges):
         start = source_positions[edge["source_artifact_id"]]
@@ -926,7 +1152,13 @@ def build_support_graph_orrery(
             width = 0.004
         elif edge["strength"] == "confirmatory":
             width = 0.012
-        beam = add_curve(graph, f"SupportGraphOrrery_Edge_{idx+1:02d}_{edge['relation']}", [start, midpoint, end], material, bevel_depth=width)
+        beam = add_curve(
+            graph,
+            f"SupportGraphOrrery_Edge_{idx + 1:02d}_{edge['relation']}",
+            [start, midpoint, end],
+            material,
+            bevel_depth=width,
+        )
         tag(
             beam,
             semantic_source=SOURCE_ARTIFACTS["claim_envelope"],
@@ -936,10 +1168,37 @@ def build_support_graph_orrery(
             target_claim_fragment=edge["target_claim_fragment"],
         )
         if idx % 2 == 0 or edge["strength"] == "integrity_only":
-            add_facing_text(text, f"SupportGraphOrrery_EdgeLabel_{idx+1:02d}", edge["relation"], midpoint + Vector((0, 0, 0.08)), material, camera_hint, size=0.034)
+            add_facing_text(
+                text,
+                f"SupportGraphOrrery_EdgeLabel_{idx + 1:02d}",
+                edge["relation"],
+                midpoint + Vector((0, 0, 0.08)),
+                material,
+                camera_hint,
+                size=0.034,
+            )
 
-    add_facing_text(text, "SupportGraphOrrery_Title", "Support is typed.", (1.30, -1.35, 3.82), materials["MAT_Text_Primary"], camera_hint, size=0.095, align_x="LEFT")
-    add_facing_text(text, "SupportGraphOrrery_Legend", "Role determines what evidence may say.\nconfirmatory / diagnostic / integrity only", (1.30, -1.35, 3.60), materials["MAT_Text_Secondary"], camera_hint, size=0.052, align_x="LEFT", line_spacing=0.82)
+    add_facing_text(
+        text,
+        "SupportGraphOrrery_Title",
+        "Support is typed.",
+        (1.30, -1.35, 3.82),
+        materials["MAT_Text_Primary"],
+        camera_hint,
+        size=0.095,
+        align_x="LEFT",
+    )
+    add_facing_text(
+        text,
+        "SupportGraphOrrery_Legend",
+        "Role determines what evidence may say.\nconfirmatory / diagnostic / integrity only",
+        (1.30, -1.35, 3.60),
+        materials["MAT_Text_Secondary"],
+        camera_hint,
+        size=0.052,
+        align_x="LEFT",
+        line_spacing=0.82,
+    )
 
 
 def build_non_claims_wall(
@@ -949,19 +1208,53 @@ def build_non_claims_wall(
 ) -> None:
     wall = collections["05_NonClaimsWall"]
     text = collections["14_TextLabels"]
-    camera_hint = Vector(CAMERA_SPECS["Camera_NonClaimsWall"][0])
     manifest = data["manifest"]
 
-    monolith = add_cube(wall, "NonClaimsWall_MonumentalSemanticFirewall", (0.0, 3.55, 1.55), (6.2, 0.18, 2.65), materials["MAT_NonClaims_Stone"], bevel=0.028, bevel_segments=5)
-    tag(monolith, semantic_source=SOURCE_ARTIFACTS["claim_governance_audit"], repo_artifact_path=SOURCE_ARTIFACTS["claim_governance_audit"], does_not_claim="deployment safety")
+    monolith = add_cube(
+        wall,
+        "NonClaimsWall_MonumentalSemanticFirewall",
+        (0.0, 3.55, 1.55),
+        (6.2, 0.18, 2.65),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.028,
+        bevel_segments=5,
+    )
+    tag(
+        monolith,
+        semantic_source=SOURCE_ARTIFACTS["claim_governance_audit"],
+        repo_artifact_path=SOURCE_ARTIFACTS["claim_governance_audit"],
+        does_not_claim="deployment safety",
+    )
     for idx, x in enumerate([-2.72, -2.05, -1.36, -0.68, 0.0, 0.68, 1.36, 2.05, 2.72], 1):
-        add_curve(wall, f"NonClaimsWall_VerticalBoundaryRib_{idx:02d}", [Vector((x, 3.43, 0.38)), Vector((x, 3.43, 2.76))], materials["MAT_Integrity_Pale"], bevel_depth=0.003)
-    add_curve(wall, "NonClaimsWall_ProtectiveOverreachArc", arc_points(Vector((0, 3.42, 1.52)), 3.0, 198, 342, plane="XZ", fixed=3.41), materials["MAT_Text_Amber"], bevel_depth=0.012)
+        add_curve(
+            wall,
+            f"NonClaimsWall_VerticalBoundaryRib_{idx:02d}",
+            [Vector((x, 3.43, 0.38)), Vector((x, 3.43, 2.76))],
+            materials["MAT_Integrity_Pale"],
+            bevel_depth=0.003,
+        )
+    add_curve(
+        wall,
+        "NonClaimsWall_ProtectiveOverreachArc",
+        arc_points(Vector((0, 3.42, 1.52)), 3.0, 198, 342, plane="XZ", fixed=3.41),
+        materials["MAT_Text_Amber"],
+        bevel_depth=0.012,
+    )
 
     wall_title_body = "THIS CLAIM DOES NOT SAY"
     wall_rotation = (math.radians(90), 0.0, 0.0)
     wall_text_y = 3.43
-    add_text(text, "NonClaimsWall_Title", wall_title_body.replace(" CLAIM ", " CLAIM\n"), (-2.22, wall_text_y, 2.42), materials["MAT_Text_Amber"], size=0.130, rotation=wall_rotation, align_x="LEFT", line_spacing=0.86)
+    add_text(
+        text,
+        "NonClaimsWall_Title",
+        wall_title_body.replace(" CLAIM ", " CLAIM\n"),
+        (-2.22, wall_text_y, 2.42),
+        materials["MAT_Text_Amber"],
+        size=0.130,
+        rotation=wall_rotation,
+        align_x="LEFT",
+        line_spacing=0.86,
+    )
     non_claim_labels = [
         "deployment safety",
         "external validity",
@@ -969,10 +1262,40 @@ def build_non_claims_wall(
         "future freshness",
         "statistical truth beyond scope",
     ]
-    add_text(text, "NonClaimsWall_MinimumBoundaryList", "\n".join(non_claim_labels), (-2.22, wall_text_y, 1.62), materials["MAT_Text_Primary"], size=0.072, rotation=wall_rotation, align_x="LEFT", line_spacing=0.92)
+    add_text(
+        text,
+        "NonClaimsWall_MinimumBoundaryList",
+        "\n".join(non_claim_labels),
+        (-2.22, wall_text_y, 1.62),
+        materials["MAT_Text_Primary"],
+        size=0.072,
+        rotation=wall_rotation,
+        align_x="LEFT",
+        line_spacing=0.92,
+    )
     caveat = manifest["pass_caveat"].replace("; ", ";\n")
-    add_text(text, "NonClaimsWall_ExactPassCaveat", caveat, (0.05, wall_text_y, 1.30), materials["MAT_Text_Secondary"], size=0.052, rotation=wall_rotation, align_x="LEFT", line_spacing=0.86)
-    add_text(text, "NonClaimsWall_PhysicalPurpose", "Non-claims attached.\nThe wall prevents claim overreach.", (0.05, wall_text_y, 2.30), materials["MAT_Confirmatory_Cyan"], size=0.062, rotation=wall_rotation, align_x="LEFT", line_spacing=0.88)
+    add_text(
+        text,
+        "NonClaimsWall_ExactPassCaveat",
+        caveat,
+        (0.05, wall_text_y, 1.30),
+        materials["MAT_Text_Secondary"],
+        size=0.052,
+        rotation=wall_rotation,
+        align_x="LEFT",
+        line_spacing=0.86,
+    )
+    add_text(
+        text,
+        "NonClaimsWall_PhysicalPurpose",
+        "Non-claims attached.\nThe wall prevents claim overreach.",
+        (0.05, wall_text_y, 2.30),
+        materials["MAT_Confirmatory_Cyan"],
+        size=0.062,
+        rotation=wall_rotation,
+        align_x="LEFT",
+        line_spacing=0.88,
+    )
 
 
 def build_decay_clock_room(
@@ -987,22 +1310,93 @@ def build_decay_clock_room(
     camera_hint = Vector(CAMERA_SPECS["Camera_DecayClockRoom"][0])
     center = Vector((4.36, 0.20, 1.55))
 
-    add_cube(decay_room, "DecayClockRoom_BackPlate", (4.72, 1.34, 1.42), (2.28, 0.12, 2.45), materials["MAT_NonClaims_Stone"], bevel=0.02)
-    add_curve(decay_room, "DecayClockRoom_FreshArc", arc_points(center, 1.02, 42, 158, plane="YZ", fixed=center.x), materials["MAT_Confirmatory_Cyan"], bevel_depth=0.020)
-    add_curve(decay_room, "DecayClockRoom_DegradedArc", arc_points(center, 1.02, 158, 286, plane="YZ", fixed=center.x), materials["MAT_Review_Amber"], bevel_depth=0.018)
-    add_curve(decay_room, "DecayClockRoom_ExpiredArc", arc_points(center, 1.02, 286, 402, plane="YZ", fixed=center.x), materials["MAT_Invalidation_Red"], bevel_depth=0.016)
-    add_curve(decay_room, "DecayClockRoom_OuterQuietRing", arc_points(center, 1.12, 0, 360, plane="YZ", fixed=center.x), materials["MAT_Integrity_Pale"], bevel_depth=0.004)
+    add_cube(
+        decay_room,
+        "DecayClockRoom_BackPlate",
+        (4.72, 1.34, 1.42),
+        (2.28, 0.12, 2.45),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.02,
+    )
+    add_curve(
+        decay_room,
+        "DecayClockRoom_FreshArc",
+        arc_points(center, 1.02, 42, 158, plane="YZ", fixed=center.x),
+        materials["MAT_Confirmatory_Cyan"],
+        bevel_depth=0.020,
+    )
+    add_curve(
+        decay_room,
+        "DecayClockRoom_DegradedArc",
+        arc_points(center, 1.02, 158, 286, plane="YZ", fixed=center.x),
+        materials["MAT_Review_Amber"],
+        bevel_depth=0.018,
+    )
+    add_curve(
+        decay_room,
+        "DecayClockRoom_ExpiredArc",
+        arc_points(center, 1.02, 286, 402, plane="YZ", fixed=center.x),
+        materials["MAT_Invalidation_Red"],
+        bevel_depth=0.016,
+    )
+    add_curve(
+        decay_room,
+        "DecayClockRoom_OuterQuietRing",
+        arc_points(center, 1.12, 0, 360, plane="YZ", fixed=center.x),
+        materials["MAT_Integrity_Pale"],
+        bevel_depth=0.004,
+    )
 
     status_angle_by_name = {"fresh": 82, "degraded": 218, "expired": 330}
     status = audit["decay"]["status"]
     angle = math.radians(status_angle_by_name.get(status, 82))
-    marker = Vector((center.x - 0.03, center.y + math.cos(angle) * 1.02, center.z + math.sin(angle) * 1.02))
-    marker_obj = add_sphere(decay_room, f"DecayClockRoom_CurrentStatusMarker_{status}", marker, 0.075, materials["MAT_Text_Primary"], segments=24, ring_count=12)
-    tag(marker_obj, semantic_source=SOURCE_ARTIFACTS["claim_governance_audit"], repo_artifact_path=SOURCE_ARTIFACTS["decay_policy"], status=status)
-    add_curve(decay_room, "DecayClockRoom_StatusNeedle", [center, marker], materials["MAT_Text_Primary"], bevel_depth=0.005)
+    marker = Vector(
+        (center.x - 0.03, center.y + math.cos(angle) * 1.02, center.z + math.sin(angle) * 1.02)
+    )
+    marker_obj = add_sphere(
+        decay_room,
+        f"DecayClockRoom_CurrentStatusMarker_{status}",
+        marker,
+        0.075,
+        materials["MAT_Text_Primary"],
+        segments=24,
+        ring_count=12,
+    )
+    tag(
+        marker_obj,
+        semantic_source=SOURCE_ARTIFACTS["claim_governance_audit"],
+        repo_artifact_path=SOURCE_ARTIFACTS["decay_policy"],
+        status=status,
+    )
+    add_curve(
+        decay_room,
+        "DecayClockRoom_StatusNeedle",
+        [center, marker],
+        materials["MAT_Text_Primary"],
+        bevel_depth=0.005,
+    )
 
-    add_facing_text(text, "DecayClockRoom_Title", "claims are mortal", (3.52, -0.98, 2.72), materials["MAT_Text_Primary"], camera_hint, size=0.115, align_x="LEFT")
-    add_facing_text(text, "DecayClockRoom_StatusLabels", "Fresh\nDegraded\nExpired", (5.18, -0.78, 2.34), materials["MAT_Text_Secondary"], camera_hint, size=0.065, align_x="LEFT", line_spacing=1.1)
+    add_facing_text(
+        text,
+        "DecayClockRoom_Title",
+        "claims are mortal",
+        (3.52, -0.98, 2.72),
+        materials["MAT_Text_Primary"],
+        camera_hint,
+        size=0.115,
+        align_x="LEFT",
+    )
+    add_facing_text(
+        text,
+        "DecayClockRoom_StatusLabels",
+        "Fresh\nDegraded\nExpired",
+        (5.18, -0.78, 2.34),
+        materials["MAT_Text_Secondary"],
+        camera_hint,
+        size=0.065,
+        align_x="LEFT",
+        line_spacing=1.1,
+    )
     add_facing_text(
         text,
         "DecayClockRoom_RealDecayFields",
@@ -1028,8 +1422,25 @@ def build_challenge_range(
     challenge = collections["07_ChallengeRange"]
     text = collections["14_TextLabels"]
     camera_hint = Vector(CAMERA_SPECS["Camera_ChallengeRange"][0])
-    add_torus(challenge, "ChallengeRange_BoundaryRing_ChallengeSurface", (0, 0, 0.13), 5.10, 0.010, materials["MAT_Review_Amber"], major_segments=192, minor_segments=6)
-    add_facing_text(text, "ChallengeRange_RingLabel", "challenge surface", (2.70, -4.25, 0.52), materials["MAT_Text_Amber"], camera_hint, size=0.060)
+    add_torus(
+        challenge,
+        "ChallengeRange_BoundaryRing_ChallengeSurface",
+        (0, 0, 0.13),
+        5.10,
+        0.010,
+        materials["MAT_Review_Amber"],
+        major_segments=192,
+        minor_segments=6,
+    )
+    add_facing_text(
+        text,
+        "ChallengeRange_RingLabel",
+        "challenge surface",
+        (2.70, -4.25, 0.52),
+        materials["MAT_Text_Amber"],
+        camera_hint,
+        size=0.060,
+    )
 
     probes = [
         ("hash mismatch", "FAIL"),
@@ -1044,11 +1455,43 @@ def build_challenge_range(
     for idx, (probe, expected) in enumerate(probes):
         angle = math.radians(18 + idx * 360 / len(probes))
         loc = Vector((math.cos(angle) * 5.05, math.sin(angle) * 5.05, 0.48 + 0.08 * (idx % 2)))
-        material = materials["MAT_Invalidation_Red"] if expected == "FAIL" else materials["MAT_Review_Amber"]
-        instrument = add_cube(challenge, f"ChallengeRange_Probe_{idx+1:02d}_{probe.replace(' ', '_')}", loc, (0.20, 0.20, 0.44), material, rotation=(0, 0, angle), bevel=0.015)
-        tag(instrument, semantic_source="visual_identity/claim_observatory/WORLD_BIBLE_V3.md", challenge_probe=probe, expected_result=expected)
-        add_curve(challenge, f"ChallengeRange_ProbeBeam_{idx+1:02d}", [loc + Vector((0, 0, 0.26)), CAPSULE_CENTER + Vector((0, 0, 0.05))], material, bevel_depth=0.0028)
-        add_facing_text(text, f"ChallengeRange_ProbeLabel_{idx+1:02d}", f"{probe}\n{expected}", loc + Vector((0, 0, 0.48)), material, camera_hint, size=0.042, line_spacing=0.80)
+        material = (
+            materials["MAT_Invalidation_Red"]
+            if expected == "FAIL"
+            else materials["MAT_Review_Amber"]
+        )
+        instrument = add_cube(
+            challenge,
+            f"ChallengeRange_Probe_{idx + 1:02d}_{probe.replace(' ', '_')}",
+            loc,
+            (0.20, 0.20, 0.44),
+            material,
+            rotation=(0, 0, angle),
+            bevel=0.015,
+        )
+        tag(
+            instrument,
+            semantic_source="visual_identity/claim_observatory/WORLD_BIBLE_V3.md",
+            challenge_probe=probe,
+            expected_result=expected,
+        )
+        add_curve(
+            challenge,
+            f"ChallengeRange_ProbeBeam_{idx + 1:02d}",
+            [loc + Vector((0, 0, 0.26)), CAPSULE_CENTER + Vector((0, 0, 0.05))],
+            material,
+            bevel_depth=0.0028,
+        )
+        add_facing_text(
+            text,
+            f"ChallengeRange_ProbeLabel_{idx + 1:02d}",
+            f"{probe}\n{expected}",
+            loc + Vector((0, 0, 0.48)),
+            material,
+            camera_hint,
+            size=0.042,
+            line_spacing=0.80,
+        )
 
 
 def build_world_hero_labels(
@@ -1100,14 +1543,65 @@ def build_replay_manifest_engine(
     manifest = data["manifest"]
     camera_hint = Vector(CAMERA_SPECS["Camera_ReplayManifestEngine"][0])
 
-    floor = add_cylinder(engine, "ReplayManifestEngine_CircularFloor", (0, 0, 0.035), 2.82, 0.07, materials["MAT_Replay_Ledger"], vertices=192)
-    tag(floor, semantic_source=SOURCE_ARTIFACTS["manifest"], repo_artifact_path=SOURCE_ARTIFACTS["manifest"], schema=manifest["schema_version"], seed=manifest["seed"])
+    floor = add_cylinder(
+        engine,
+        "ReplayManifestEngine_CircularFloor",
+        (0, 0, 0.035),
+        2.82,
+        0.07,
+        materials["MAT_Replay_Ledger"],
+        vertices=192,
+    )
+    tag(
+        floor,
+        semantic_source=SOURCE_ARTIFACTS["manifest"],
+        repo_artifact_path=SOURCE_ARTIFACTS["manifest"],
+        schema=manifest["schema_version"],
+        seed=manifest["seed"],
+    )
     for idx, radius in enumerate((0.92, 1.55, 2.18, 2.72), 1):
-        add_torus(engine, f"ReplayManifestEngine_ConcentricLedgerRing_{idx:02d}", (0, 0, 0.10), radius, 0.004, materials["MAT_Integrity_Pale"] if idx != 2 else materials["MAT_Evidence_BlueWhite"], major_segments=180, minor_segments=6)
+        add_torus(
+            engine,
+            f"ReplayManifestEngine_ConcentricLedgerRing_{idx:02d}",
+            (0, 0, 0.10),
+            radius,
+            0.004,
+            materials["MAT_Integrity_Pale"] if idx != 2 else materials["MAT_Evidence_BlueWhite"],
+            major_segments=180,
+            minor_segments=6,
+        )
 
-    add_text(engine, "ReplayManifestEngine_FloorTitle", "Replay Manifest Engine", (-0.86, -0.28, 0.12), materials["MAT_Text_Primary"], size=0.125, rotation=(0, 0, 0), align_x="LEFT")
-    add_text(engine, "ReplayManifestEngine_MeaningSurvivesReplay", "Meaning survives replay.", (-0.86, -0.55, 0.12), materials["MAT_Confirmatory_Cyan"], size=0.080, rotation=(0, 0, 0), align_x="LEFT")
-    add_text(engine, "ReplayManifestEngine_ReproduceCommands", "reproduce.sh\nreproduce.sh --verify-only", (0.70, -0.52, 0.12), materials["MAT_Integrity_Pale"], size=0.060, rotation=(0, 0, 0), align_x="LEFT", line_spacing=0.86)
+    add_text(
+        engine,
+        "ReplayManifestEngine_FloorTitle",
+        "Replay Manifest Engine",
+        (-0.86, -0.28, 0.12),
+        materials["MAT_Text_Primary"],
+        size=0.125,
+        rotation=(0, 0, 0),
+        align_x="LEFT",
+    )
+    add_text(
+        engine,
+        "ReplayManifestEngine_MeaningSurvivesReplay",
+        "Meaning survives replay.",
+        (-0.86, -0.55, 0.12),
+        materials["MAT_Confirmatory_Cyan"],
+        size=0.080,
+        rotation=(0, 0, 0),
+        align_x="LEFT",
+    )
+    add_text(
+        engine,
+        "ReplayManifestEngine_ReproduceCommands",
+        "reproduce.sh\nreproduce.sh --verify-only",
+        (0.70, -0.52, 0.12),
+        materials["MAT_Integrity_Pale"],
+        size=0.060,
+        rotation=(0, 0, 0),
+        align_x="LEFT",
+        line_spacing=0.86,
+    )
 
     files = manifest["files"]
     for idx, file_info in enumerate(files):
@@ -1116,17 +1610,24 @@ def build_replay_manifest_engine(
         loc = Vector((math.cos(angle) * radius, math.sin(angle) * radius, 0.125))
         tile = add_cube(
             engine,
-            f"ReplayManifestEngine_FileTile_{idx+1:02d}_{file_info['filename'].replace('.', '_')}",
+            f"ReplayManifestEngine_FileTile_{idx + 1:02d}_{file_info['filename'].replace('.', '_')}",
             loc,
             (0.62, 0.035, 0.22),
             materials["MAT_Clear_Panel"],
             rotation=(0, 0, angle + math.pi / 2),
             bevel=0.010,
         )
-        tag(tile, semantic_source=SOURCE_ARTIFACTS["manifest"], filename=file_info["filename"], role=file_info["role"], sha256=file_info["sha256"], bytes=file_info["bytes"])
+        tag(
+            tile,
+            semantic_source=SOURCE_ARTIFACTS["manifest"],
+            filename=file_info["filename"],
+            role=file_info["role"],
+            sha256=file_info["sha256"],
+            bytes=file_info["bytes"],
+        )
         add_text(
             engine,
-            f"ReplayManifestEngine_FileTileLabel_{idx+1:02d}",
+            f"ReplayManifestEngine_FileTileLabel_{idx + 1:02d}",
             f"{file_info['filename']}\n{file_info['role']}\n{short_hash(file_info['sha256'], 8)}  {file_info['bytes']} B",
             loc + Vector((-0.25, -0.025, 0.12)),
             materials["MAT_Text_Secondary"],
@@ -1158,13 +1659,71 @@ def build_human_review_tribunal(
     text = collections["14_TextLabels"]
     audit = data["audit"]
     camera_hint = Vector(CAMERA_SPECS["Camera_HumanReviewTribunal"][0])
-    add_cube(tribunal, "HumanReviewTribunal_ReviewerChairBase", (4.50, 3.35, 0.42), (0.72, 0.62, 0.16), materials["MAT_NonClaims_Stone"], bevel=0.025)
-    add_cube(tribunal, "HumanReviewTribunal_ReviewerChairBack", (4.50, 3.58, 0.96), (0.75, 0.12, 0.90), materials["MAT_NonClaims_Stone"], bevel=0.025)
-    add_cube(tribunal, "HumanReviewTribunal_AccountabilityConsole", (4.10, 2.72, 0.72), (1.18, 0.36, 0.30), materials["MAT_World_Dark"], rotation=(0, 0, math.radians(-8)), bevel=0.020)
-    add_cube(tribunal, "HumanReviewTribunal_AmberScopedReviewLight", (4.05, 2.52, 0.94), (0.82, 0.026, 0.052), materials["MAT_Review_Amber"], rotation=(0, 0, math.radians(-8)), bevel=0.006)
-    add_facing_text(text, "HumanReviewTribunal_Title", "human review", (3.55, 2.20, 1.40), materials["MAT_Text_Amber"], camera_hint, size=0.115, align_x="LEFT")
-    add_facing_text(text, "HumanReviewTribunal_Principle", "review authorizes scoped use;\nit does not upgrade evidence", (3.55, 2.20, 1.12), materials["MAT_Text_Secondary"], camera_hint, size=0.060, align_x="LEFT", line_spacing=0.86)
-    add_facing_text(text, "HumanReviewTribunal_Requirement", f"required_human_review: {str(audit['required_human_review']).lower()} under current verifier rules", (3.55, 2.20, 0.82), materials["MAT_Text_Primary"], camera_hint, size=0.046, align_x="LEFT")
+    add_cube(
+        tribunal,
+        "HumanReviewTribunal_ReviewerChairBase",
+        (4.50, 3.35, 0.42),
+        (0.72, 0.62, 0.16),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.025,
+    )
+    add_cube(
+        tribunal,
+        "HumanReviewTribunal_ReviewerChairBack",
+        (4.50, 3.58, 0.96),
+        (0.75, 0.12, 0.90),
+        materials["MAT_NonClaims_Stone"],
+        bevel=0.025,
+    )
+    add_cube(
+        tribunal,
+        "HumanReviewTribunal_AccountabilityConsole",
+        (4.10, 2.72, 0.72),
+        (1.18, 0.36, 0.30),
+        materials["MAT_World_Dark"],
+        rotation=(0, 0, math.radians(-8)),
+        bevel=0.020,
+    )
+    add_cube(
+        tribunal,
+        "HumanReviewTribunal_AmberScopedReviewLight",
+        (4.05, 2.52, 0.94),
+        (0.82, 0.026, 0.052),
+        materials["MAT_Review_Amber"],
+        rotation=(0, 0, math.radians(-8)),
+        bevel=0.006,
+    )
+    add_facing_text(
+        text,
+        "HumanReviewTribunal_Title",
+        "human review",
+        (3.55, 2.20, 1.40),
+        materials["MAT_Text_Amber"],
+        camera_hint,
+        size=0.115,
+        align_x="LEFT",
+    )
+    add_facing_text(
+        text,
+        "HumanReviewTribunal_Principle",
+        "review authorizes scoped use;\nit does not upgrade evidence",
+        (3.55, 2.20, 1.12),
+        materials["MAT_Text_Secondary"],
+        camera_hint,
+        size=0.060,
+        align_x="LEFT",
+        line_spacing=0.86,
+    )
+    add_facing_text(
+        text,
+        "HumanReviewTribunal_Requirement",
+        f"required_human_review: {str(audit['required_human_review']).lower()} under current verifier rules",
+        (3.55, 2.20, 0.82),
+        materials["MAT_Text_Primary"],
+        camera_hint,
+        size=0.046,
+        align_x="LEFT",
+    )
 
 
 def build_ledger_tower(
@@ -1182,11 +1741,51 @@ def build_ledger_tower(
             material = materials["MAT_Review_Amber"]
         if status in {"expired", "retracted"}:
             material = materials["MAT_Invalidation_Red"]
-        block = add_cube(tower, f"LedgerTower_LifecycleBlock_{idx+1:02d}_{status}", (-4.50, 3.42, z), (0.82, 0.46, 0.22), material, bevel=0.012)
-        tag(block, semantic_source="visual_identity/claim_observatory/WORLD_BIBLE_V3.md", future_layer=True, lifecycle_state=status)
-        add_facing_text(text, f"LedgerTower_LifecycleLabel_{idx+1:02d}", status, (-4.02, 3.20, z), material, camera_hint, size=0.045, align_x="LEFT")
-    add_facing_text(text, "LedgerTower_Title", "claim lifecycle ledger", (-5.20, 2.82, 2.72), materials["MAT_Text_Primary"], camera_hint, size=0.092, align_x="LEFT")
-    add_facing_text(text, "LedgerTower_FutureLayer", "future public claim ledger\nobservatory layer, not current capsule truth", (-5.20, 2.82, 2.45), materials["MAT_Text_Secondary"], camera_hint, size=0.050, align_x="LEFT", line_spacing=0.84)
+        block = add_cube(
+            tower,
+            f"LedgerTower_LifecycleBlock_{idx + 1:02d}_{status}",
+            (-4.50, 3.42, z),
+            (0.82, 0.46, 0.22),
+            material,
+            bevel=0.012,
+        )
+        tag(
+            block,
+            semantic_source="visual_identity/claim_observatory/WORLD_BIBLE_V3.md",
+            future_layer=True,
+            lifecycle_state=status,
+        )
+        add_facing_text(
+            text,
+            f"LedgerTower_LifecycleLabel_{idx + 1:02d}",
+            status,
+            (-4.02, 3.20, z),
+            material,
+            camera_hint,
+            size=0.045,
+            align_x="LEFT",
+        )
+    add_facing_text(
+        text,
+        "LedgerTower_Title",
+        "claim lifecycle ledger",
+        (-5.20, 2.82, 2.72),
+        materials["MAT_Text_Primary"],
+        camera_hint,
+        size=0.092,
+        align_x="LEFT",
+    )
+    add_facing_text(
+        text,
+        "LedgerTower_FutureLayer",
+        "future public claim ledger\nobservatory layer, not current capsule truth",
+        (-5.20, 2.82, 2.45),
+        materials["MAT_Text_Secondary"],
+        camera_hint,
+        size=0.050,
+        align_x="LEFT",
+        line_spacing=0.84,
+    )
 
 
 def build_frechet_atom_garden(
@@ -1201,25 +1800,96 @@ def build_frechet_atom_garden(
     camera_hint = Vector(CAMERA_SPECS["Camera_FrechetAtomGarden"][0])
     base = Vector((-3.55, -2.68, 0.35))
 
-    add_facing_text(text, "FrechetAtomGarden_Title", "Frechet Atom Garden", (-4.62, -3.35, 1.55), materials["MAT_Text_Primary"], camera_hint, size=0.090, align_x="LEFT")
-    add_facing_text(text, "FrechetAtomGarden_Principle", "finite atoms witness endpoint bounds", (-4.62, -3.35, 1.36), materials["MAT_Text_Secondary"], camera_hint, size=0.048, align_x="LEFT")
+    add_facing_text(
+        text,
+        "FrechetAtomGarden_Title",
+        "Frechet Atom Garden",
+        (-4.62, -3.35, 1.55),
+        materials["MAT_Text_Primary"],
+        camera_hint,
+        size=0.090,
+        align_x="LEFT",
+    )
+    add_facing_text(
+        text,
+        "FrechetAtomGarden_Principle",
+        "finite atoms witness endpoint bounds",
+        (-4.62, -3.35, 1.36),
+        materials["MAT_Text_Secondary"],
+        camera_hint,
+        size=0.048,
+        align_x="LEFT",
+    )
 
     for atom in lower["atom_table"]:
         failures = atom["failures"]
         loc = base + Vector((failures[0] * 0.52, failures[1] * 0.52, failures[2] * 0.38))
         radius = 0.035 + 0.12 * atom["probability"]
-        material = materials["MAT_Invalidation_Red"] if atom["event_occurs"] else materials["MAT_Diagnostic_Blue"]
-        point = add_sphere(garden, f"FrechetAtomGarden_Atom_{atom['atom_index']:02d}", loc, radius, material, segments=16, ring_count=8)
-        tag(point, semantic_source=SOURCE_ARTIFACTS["extremal_lower"], atom_index=atom["atom_index"], probability=atom["probability"], event_occurs=atom["event_occurs"])
-        add_facing_text(text, f"FrechetAtomGarden_AtomLabel_{atom['atom_index']:02d}", str(atom["atom_index"]), loc + Vector((0, 0, 0.12)), materials["MAT_Text_Secondary"], camera_hint, size=0.026)
+        material = (
+            materials["MAT_Invalidation_Red"]
+            if atom["event_occurs"]
+            else materials["MAT_Diagnostic_Blue"]
+        )
+        point = add_sphere(
+            garden,
+            f"FrechetAtomGarden_Atom_{atom['atom_index']:02d}",
+            loc,
+            radius,
+            material,
+            segments=16,
+            ring_count=8,
+        )
+        tag(
+            point,
+            semantic_source=SOURCE_ARTIFACTS["extremal_lower"],
+            atom_index=atom["atom_index"],
+            probability=atom["probability"],
+            event_occurs=atom["event_occurs"],
+        )
+        add_facing_text(
+            text,
+            f"FrechetAtomGarden_AtomLabel_{atom['atom_index']:02d}",
+            str(atom["atom_index"]),
+            loc + Vector((0, 0, 0.12)),
+            materials["MAT_Text_Secondary"],
+            camera_hint,
+            size=0.026,
+        )
 
     witnesses = [
-        ("lower witness", lower, SOURCE_ARTIFACTS["extremal_lower"], -4.78, materials["MAT_Diagnostic_Blue"]),
-        ("upper witness", upper, SOURCE_ARTIFACTS["extremal_upper"], -3.64, materials["MAT_Confirmatory_Cyan"]),
+        (
+            "lower witness",
+            lower,
+            SOURCE_ARTIFACTS["extremal_lower"],
+            -4.78,
+            materials["MAT_Diagnostic_Blue"],
+        ),
+        (
+            "upper witness",
+            upper,
+            SOURCE_ARTIFACTS["extremal_upper"],
+            -3.64,
+            materials["MAT_Confirmatory_Cyan"],
+        ),
     ]
     for label, scenario, source, x, material in witnesses:
-        panel = add_cube(garden, f"FrechetAtomGarden_{label.replace(' ', '_').title()}Panel", (x, -2.10, 0.82), (0.92, 0.04, 0.66), materials["MAT_Clear_Panel"], bevel=0.012)
-        tag(panel, semantic_source=source, repo_artifact_path=source, scenario_id=scenario["scenario_id"], kind=scenario["kind"], endpoint=scenario["endpoint"], is_feasible=scenario["feasibility"]["is_feasible"])
+        panel = add_cube(
+            garden,
+            f"FrechetAtomGarden_{label.replace(' ', '_').title()}Panel",
+            (x, -2.10, 0.82),
+            (0.92, 0.04, 0.66),
+            materials["MAT_Clear_Panel"],
+            bevel=0.012,
+        )
+        tag(
+            panel,
+            semantic_source=source,
+            repo_artifact_path=source,
+            scenario_id=scenario["scenario_id"],
+            kind=scenario["kind"],
+            endpoint=scenario["endpoint"],
+            is_feasible=scenario["feasibility"]["is_feasible"],
+        )
         add_facing_text(
             text,
             f"FrechetAtomGarden_{label.replace(' ', '_').title()}Label",
@@ -1238,8 +1908,22 @@ def build_lighting(collections: dict[str, bpy.types.Collection]) -> None:
     light_specs = [
         ("Lighting_KeySoftbox_World", "AREA", (0.0, -4.4, 6.8), 420, (5.8, 3.0), (0.72, 0.86, 1.0)),
         ("Lighting_Capsule_CyanRim", "POINT", (-2.4, -2.0, 3.5), 160, None, (0.45, 0.82, 1.0)),
-        ("Lighting_NonClaims_WallGrazing", "AREA", (0.0, 2.65, 3.4), 170, (5.2, 1.1), (0.85, 0.92, 1.0)),
-        ("Lighting_Decay_AmberPractical", "POINT", (4.75, -0.95, 2.45), 120, None, (1.0, 0.55, 0.22)),
+        (
+            "Lighting_NonClaims_WallGrazing",
+            "AREA",
+            (0.0, 2.65, 3.4),
+            170,
+            (5.2, 1.1),
+            (0.85, 0.92, 1.0),
+        ),
+        (
+            "Lighting_Decay_AmberPractical",
+            "POINT",
+            (4.75, -0.95, 2.45),
+            120,
+            None,
+            (1.0, 0.55, 0.22),
+        ),
         ("Lighting_Challenge_RedEdge", "POINT", (4.9, -3.8, 1.0), 62, None, (1.0, 0.18, 0.14)),
         ("Lighting_Ledger_FutureSpine", "POINT", (-4.8, 2.7, 2.6), 95, None, (0.45, 0.75, 1.0)),
     ]
@@ -1315,13 +1999,28 @@ def write_visual_manifest(data: dict[str, Any]) -> None:
             ]
         ],
         "visual_objects": [
-            {"name": "ClaimCapsule_BoundedArtifactBody", "maps_to": SOURCE_ARTIFACTS["claim_envelope"]},
+            {
+                "name": "ClaimCapsule_BoundedArtifactBody",
+                "maps_to": SOURCE_ARTIFACTS["claim_envelope"],
+            },
             {"name": "EvidenceVault_ReceiptIntegrityTablet", "maps_to": "report_receipt_sha256"},
-            {"name": "SupportGraphOrrery_Edge_*", "maps_to": "claim_envelope.support_graph.support_edges"},
-            {"name": "NonClaimsWall_MonumentalSemanticFirewall", "maps_to": "claim_governance_audit.non_claims"},
-            {"name": "DecayClockRoom_CurrentStatusMarker_fresh", "maps_to": "claim_governance_audit.decay.status"},
+            {
+                "name": "SupportGraphOrrery_Edge_*",
+                "maps_to": "claim_envelope.support_graph.support_edges",
+            },
+            {
+                "name": "NonClaimsWall_MonumentalSemanticFirewall",
+                "maps_to": "claim_governance_audit.non_claims",
+            },
+            {
+                "name": "DecayClockRoom_CurrentStatusMarker_fresh",
+                "maps_to": "claim_governance_audit.decay.status",
+            },
             {"name": "ReplayManifestEngine_FileTile_*", "maps_to": "manifest.expected.json.files"},
-            {"name": "HumanReviewTribunal_AccountabilityConsole", "maps_to": "claim_governance_audit.required_human_review"},
+            {
+                "name": "HumanReviewTribunal_AccountabilityConsole",
+                "maps_to": "claim_governance_audit.required_human_review",
+            },
             {"name": "FrechetAtomGarden_Atom_*", "maps_to": "extremal_lower.atom_table"},
         ],
         "semantic_mappings": {
@@ -1346,10 +2045,15 @@ def write_visual_manifest(data: dict[str, Any]) -> None:
             "A PASS verdict is scoped to verifier rules.",
             "Human review does not upgrade evidence.",
         ],
-        "cameras": [{"name": name, "lens": spec[2], "location": list(spec[0]), "target": list(spec[1])} for name, spec in CAMERA_SPECS.items()],
+        "cameras": [
+            {"name": name, "lens": spec[2], "location": list(spec[0]), "target": list(spec[1])}
+            for name, spec in CAMERA_SPECS.items()
+        ],
         "renders": render_entries,
     }
-    VISUAL_MANIFEST_PATH.write_text(json.dumps(visual_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    VISUAL_MANIFEST_PATH.write_text(
+        json.dumps(visual_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def build_scene() -> dict[str, bpy.types.Object]:
@@ -1404,9 +2108,19 @@ def render_single_still(cameras: dict[str, bpy.types.Object], requested_camera: 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--render-still", action="store_true", help="Render the V3 still set after creating the .blend.")
-    parser.add_argument("--render-stills", action="store_true", help="Render the V3 still set after creating the .blend.")
-    parser.add_argument("--render-camera", help="Render only one configured V3 camera target, for iteration.")
+    parser.add_argument(
+        "--render-still",
+        action="store_true",
+        help="Render the V3 still set after creating the .blend.",
+    )
+    parser.add_argument(
+        "--render-stills",
+        action="store_true",
+        help="Render the V3 still set after creating the .blend.",
+    )
+    parser.add_argument(
+        "--render-camera", help="Render only one configured V3 camera target, for iteration."
+    )
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     return parser.parse_args(argv)
 

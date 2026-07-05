@@ -167,6 +167,29 @@ def test_claim_envelope_models_reject_extra_fields() -> None:
         )
 
 
+def test_report_artifact_metadata_cannot_spoof_reserved_envelope_fields(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_report_with_unknown_role(tmp_path)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    artifact = report["evidence"]["artifacts"][0]
+    artifact["metadata"] = {
+        "role": "claim_decay",
+        "schema": "cc.claim_decay.v1",
+        "sha256": "0" * 64,
+        "status": "present",
+    }
+
+    envelope = compile_claim_envelope(report)
+    ref = next(ref for ref in envelope.support_graph.evidence_refs if ref.role == "mystery_role")
+
+    assert ref.role == "mystery_role"
+    assert ref.schema_ is None
+    assert ref.sha256 == artifact["sha256"] != "0" * 64
+    assert ref.status is None
+    assert ref.metadata == {}
+
+
 def _write_report_with_unknown_role(tmp_path: Path) -> Path:
     mystery = tmp_path / "mystery.txt"
     mystery.write_text("opaque evidence\n", encoding="utf-8")

@@ -14,8 +14,8 @@ where ``p0`` is a pre-registered benchmark such as the worst-case-independent
 baseline miss rate.  For two guardrails with marginal miss rates ``p_A`` and
 ``p_B`` under an independence benchmark, ``p0 = p_A * p_B`` for an OR-style
 stack that misses only when both rails miss.  The code accepts ``p0`` directly
-because production users must define the appropriate benchmark for their
-composition rule and threat model.
+because callers must define the appropriate benchmark for their composition
+rule and threat model before relying on the sequential test.
 
 E-process construction
 ----------------------

@@ -597,8 +597,8 @@ def _audit_artifact(raw_entry: Mapping[str, Any], *, base_dir: Path) -> Evidence
             reason="Evidence artifact entry is missing path, role, sha256, or bytes.",
         )
 
-    resolved = _resolve_path(path, base_dir)
     try:
+        resolved = _resolve_path(path, base_dir)
         actual_hash = sha256_file(resolved)
         actual_bytes = resolved.stat().st_size
     except Exception as exc:
@@ -1136,9 +1136,13 @@ def _normalize_text(value: str) -> str:
 
 def _resolve_path(path: str, base_dir: Path) -> Path:
     candidate = Path(path)
-    if candidate.is_absolute():
-        return candidate
-    return base_dir / candidate
+    root = base_dir.resolve(strict=False)
+    resolved = (candidate if candidate.is_absolute() else root / candidate).resolve(strict=False)
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"Evidence artifact path escapes base_dir: {path}") from exc
+    return resolved
 
 
 def _nested_str(report: Mapping[str, Any], path: tuple[str, ...], default: str) -> str:

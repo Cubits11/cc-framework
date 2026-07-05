@@ -16,44 +16,65 @@ import argparse
 import csv
 from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.tri as mtri
 import numpy as np
 
 from cc.analysis.cc_estimation import cc_confint_newcombe
 from cc.cartographer.audit import _iter_jsonl, tail_sha
 from cc.cartographer.bounds import cc_confint, envelope_over_rocs, fh_intervals
 
+io: Any
 try:
-    from cc.cartographer import io  # optional; for ROC toy loader
+    from cc.cartographer import io as _cartographer_io  # optional; for ROC toy loader
 except Exception:
     io = None  # sentinel
+else:
+    io = _cartographer_io
 
-# -------------------- Matplotlib (paper-safe, colorblind-friendly) ------------
-mpl.rcParams.update(
-    {
-        "pdf.fonttype": 42,
-        "ps.fonttype": 42,
-        "font.family": "serif",
-        "font.size": 11,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "legend.fontsize": 10,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "savefig.bbox": "tight",
-        "savefig.pad_inches": 0.02,
-        # clean white backgrounds (fixes “dark checkerboard”)
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-        "savefig.facecolor": "white",
-        "savefig.edgecolor": "white",
-        "savefig.transparent": False,
-    }
-)
+
+class _MissingMatplotlib:
+    def __getattr__(self, name: str) -> Any:
+        raise ModuleNotFoundError(
+            "cc.analysis.generate_figures requires matplotlib for plotting; install "
+            "cc-framework[viz] or cc-framework[dev]."
+        )
+
+
+if TYPE_CHECKING:
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import matplotlib.tri as mtri
+else:
+    try:
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        import matplotlib.tri as mtri
+    except ModuleNotFoundError:
+        mpl = plt = mtri = _MissingMatplotlib()
+    else:
+        # ---------------- Matplotlib (paper-safe, colorblind-friendly) ----------
+        mpl.rcParams.update(
+            {
+                "pdf.fonttype": 42,
+                "ps.fonttype": 42,
+                "font.family": "serif",
+                "font.size": 11,
+                "axes.titlesize": 12,
+                "axes.labelsize": 11,
+                "legend.fontsize": 10,
+                "xtick.labelsize": 10,
+                "ytick.labelsize": 10,
+                "savefig.bbox": "tight",
+                "savefig.pad_inches": 0.02,
+                # clean white backgrounds (fixes “dark checkerboard”)
+                "figure.facecolor": "white",
+                "axes.facecolor": "white",
+                "savefig.facecolor": "white",
+                "savefig.edgecolor": "white",
+                "savefig.transparent": False,
+            }
+        )
 
 # Accessible palette
 CBLUE = "#1f77b4"
@@ -73,7 +94,7 @@ def _ensure_dir(p: str | Path) -> Path:
     return pth
 
 
-def _save_opaque(fig: plt.Figure, path: Path | str, *, dpi: int = DEFAULT_DPI) -> None:
+def _save_opaque(fig: Any, path: Path | str, *, dpi: int = DEFAULT_DPI) -> None:
     """Always save with an opaque white canvas to avoid transparency artifacts."""
     fig.savefig(
         path,
@@ -275,7 +296,7 @@ def _plot_roc_from_cfg(rec: dict[str, Any], fig_path: Path) -> None:
     try:
         if io is None:
             raise RuntimeError("io.load_scores not available")
-        data = io.load_scores(cfg, n=None)  # type: ignore
+        data = io.load_scores(cfg, n=None)
         rocA = np.asarray(data["rocA"], dtype=float)
         rocB = np.asarray(data["rocB"], dtype=float)
         if rocA.ndim != 2 or rocA.shape[1] != 2 or rocB.ndim != 2 or rocB.shape[1] != 2:
@@ -680,7 +701,7 @@ def main(argv: Iterable[str] | None = None) -> None:
             if io is None:
                 rocA, rocB = _synthetic_roc()
             else:
-                data = io.load_scores(cfg2, n=None)  # type: ignore
+                data = io.load_scores(cfg2, n=None)
                 rocA = np.asarray(data["rocA"], dtype=float)
                 rocB = np.asarray(data["rocB"], dtype=float)
             heatmap_path = fig_dir / "fh_heatmap.png"

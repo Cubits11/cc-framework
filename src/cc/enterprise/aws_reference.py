@@ -1,10 +1,11 @@
 """AWS reference-architecture helpers for local enterprise smoke tests.
 
-The production shape is defined in ``infra/`` as CDK.  This module exercises
-the same AWS API surface against moto/LocalStack-style endpoints: S3 Object
-Lock storage, KMS asymmetric signing and verification, DynamoDB conditional
-writes for monotonic chain-head sequence numbers, and a backend-style bundle
-verification path.
+The reference infrastructure shape is defined in ``infra/`` as CDK.  This
+module exercises the same AWS API surface against moto/LocalStack-style
+endpoints: S3 Object Lock storage, KMS asymmetric signing and verification,
+DynamoDB conditional writes for monotonic chain-head sequence numbers, and a
+backend-style bundle verification path. It is not a live AWS readiness or
+compliance claim.
 """
 
 from __future__ import annotations

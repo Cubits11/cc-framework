@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
-from cc.reporting.canonical import canonical_json_bytes, sha256_canonical
+from cc.reporting.canonical import CanonicalJSONError, canonical_json_bytes, sha256_canonical
 from cc.reporting.report import (
     CANONICALIZATION_METHOD,
     CLAIM_LEVELS,
@@ -37,6 +37,28 @@ def test_canonical_hash_is_key_order_independent_and_value_sensitive() -> None:
     assert canonical_json_bytes(left) == canonical_json_bytes(right)
     assert sha256_canonical(left) == sha256_canonical(right)
     assert sha256_canonical(left) != sha256_canonical(changed)
+
+
+def test_canonical_hash_ignores_json_whitespace_and_rejects_noncanonical_types() -> None:
+    compact = json.loads('{"a":{"x":"value","y":[1,2]},"b":2}')
+    spaced = json.loads(
+        """
+        {
+          "b": 2,
+          "a": {
+            "y": [1, 2],
+            "x": "value"
+          }
+        }
+        """
+    )
+
+    assert canonical_json_bytes(compact) == canonical_json_bytes(spaced)
+    assert sha256_canonical(compact) == sha256_canonical(spaced)
+    with pytest.raises(CanonicalJSONError, match="non-JSON-native"):
+        canonical_json_bytes({"bad": {"set-members-are-unordered"}})
+    with pytest.raises(CanonicalJSONError, match="non-string key"):
+        canonical_json_bytes({1: "numeric keys are not canonical"})
 
 
 def test_receipt_hash_excludes_canonical_hash_field() -> None:

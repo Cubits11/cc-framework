@@ -7,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent
 
 REQUIRED_FILES = [
@@ -110,4 +109,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -47,7 +47,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -60,15 +60,8 @@ from cc.analysis import reporting
 from cc.analysis.cc_estimation import estimate_cc_methods_from_rates
 
 # Core cartographer surfaces
-from cc.cartographer import atlas, audit, bounds, io, stats
+from cc.cartographer import audit, bounds, io, stats
 from cc.cartographer.intervals import cc_ci_bootstrap, cc_ci_wilson
-
-# Optional figure helper (present if you added plot_roc_fh_slice earlier)
-try:
-    from cc.analysis.generate_figures import plot_roc_fh_slice
-except Exception:
-    plot_roc_fh_slice = None  # soft dependency
-
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -137,6 +130,16 @@ def _maybe_counts_to_phat(k: int | None, n: int | None) -> float | None:
 
 
 def _cmd_run(argv: list[str]) -> None:
+    try:
+        from cc.cartographer import atlas
+    except ModuleNotFoundError as exc:
+        if exc.name == "matplotlib":
+            raise SystemExit(
+                "cc-cartographer run requires matplotlib; install cc-framework[viz] "
+                "or cc-framework[dev]."
+            ) from exc
+        raise
+
     p = argparse.ArgumentParser(
         prog="cc.cartographer.cli run",
         description="Execute a single run: load scores, compute J/CI and CC, draw a figure, and append to audit.",
@@ -374,6 +377,16 @@ def _cmd_methods(argv: list[str]) -> None:
 
     # Optional figure
     if args.figure_out:
+        plot_roc_fh_slice: Callable[..., None] | None
+        try:
+            from cc.analysis.generate_figures import (
+                plot_roc_fh_slice as imported_plot_roc_fh_slice,
+            )
+        except Exception:
+            plot_roc_fh_slice = None  # soft dependency
+        else:
+            plot_roc_fh_slice = imported_plot_roc_fh_slice
+
         if plot_roc_fh_slice is None:
             print(
                 "Figure helper not available; add plot_roc_fh_slice() to cc.analysis.generate_figures."

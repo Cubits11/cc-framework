@@ -72,34 +72,51 @@ Current local environment for the 2026-07-05 hardening pass:
 - `git status --short` before edits: no output.
 - `python3 -V`: Python 3.14.6.
 - `.venv/bin/python -V`: Python 3.13.1.
-- Working tree after validation: intentional README, API-boundary,
-  release-checklist, CLI-help, language-quarantine, and test edits.
+- Node.js/npm: `node -v` reported v22.22.3; `npm -v` reported 10.9.8.
+- Working tree after validation: intentional source hardening, public API
+  boundary tests, package-boundary tests, claim-governance tests, lint fixes,
+  metadata, README wording, and this release checklist.
 
-| Command | Track | Required for this hardening pass | Current status | Notes |
+The request called for a v0.1 gate table. In this repository, the package and
+Paper Core release candidate are `0.3.0-rc1`, while Enterprise Reference v0.1
+is a separate experimental lane. The table below records both without merging
+their claims.
+
+## Current Adversarial Gate Table
+
+| Gate | Command | Current status | Evidence date/context | Notes |
 | --- | --- | --- | --- | --- |
-| `git status --short` | Baseline hygiene | Yes | Pass | No output before edits. Final status must contain only intentional release-hardening changes. |
-| `python3 -V \|\| true` | Environment | Yes | Pass | Reported Python 3.14.6. |
-| `.venv/bin/python -V \|\| true` | Environment | Yes | Pass | Reported Python 3.13.1. |
-| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py` | Claim governance capsule | Yes | Pass | 4 capsule integration tests passed. |
-| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py -vv` | Claim governance capsule | Yes | Pass | 4 passed in 7.14s. |
-| `diff -u examples/claim_governance_capsule/manifest.expected.json examples/claim_governance_capsule/outputs/capsule_manifest.json \|\| true` | Claim governance capsule | Yes | Pass | No diff. The generated manifest is `outputs/capsule_manifest.json`; the old root `manifest.json` comparison path is stale. |
-| `git diff -- examples/claim_governance_capsule` | Claim governance capsule | Yes | Pass | No tracked capsule diffs. Classification: no semantic drift; expected artifact is current and deterministic. |
-| `rg --hidden -n "tests/property/kernel" -g '!/.git' -g '!/.venv' -g '!/infra/node_modules' -g '!/apps/dashboard/node_modules' . \|\| true` | Test-path references | Yes | Pass | No references found. Current kernel invariant/property-style coverage lives under `tests/unit/kernel`. |
-| `find tests -maxdepth 3 -type d \| sort` | Test-path references | Yes | Pass | Confirmed `tests/unit/kernel` exists and `tests/property/kernel` does not. No release command currently points at the missing path. |
-| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration` | Integration tests | Yes | Pass | Integration suite reached 100% with 21 passing tests. |
-| `PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/api/test_public_api_contract.py tests/unit/packaging/test_wheel_boundary.py tests/unit/utils/test_methods_cli_smoke.py` | API, wheel, and CLI boundary | Yes | Pass | 8 tests passed. The wheel test builds into a temporary directory and inspects the wheel contents locally. |
-| `PYTHONPATH=src .venv/bin/python -m cc.cartographer.cli --help` | CLI help | Yes | Pass | Top-level help exits 0 and lists subcommands. |
-| `source .venv/bin/activate; python - <<'PY' ...; PYTHONPATH=src python -m pytest -q tests/unit/kernel tests/unit/evidence` | README quickstart | Yes | Pass | Produced the documented `[0.00%, 10.00%]` bounds output and the focused kernel/evidence tests reached 100%. Bare `python` is used only after venv activation. |
-| `.venv/bin/mkdocs build --strict --site-dir /tmp/cc-framework-mkdocs-site` | Shared docs | Yes | Pass | Strict docs build completed; MkDocs Material printed its upstream MkDocs 2.0 warning and exited 0. |
-| `PYTHONPATH=src .venv/bin/python -m pytest -q` | Full Python regression | Yes | Pass with skips | Full pytest reached 100% with 7 optional skips and 3 warnings. |
+| Baseline cleanliness | `git status --short`; `git diff --stat`; targeted `git diff -- README.md docs/api.md docs/release/V0_3_RC1_CHECKLIST.md src/cc/cartographer/cli.py tests/unit/api/test_public_api_contract.py tests/unit/packaging/test_wheel_boundary.py` | Pass before edits | 2026-07-05, repo root | No output before the audit edits. Final status must contain only intentional hardening changes. |
+| Full pytest | `PYTHONPATH=src .venv/bin/python -m pytest -q` | Pass with optional skips | 2026-07-05, Python 3.13.1 venv | Full suite reached 100%; 7 optional skips and 3 warnings. |
+| Integration pytest | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration` | Pass | 2026-07-05, Python 3.13.1 venv | 22 integration tests passed after enterprise dependencies were available. |
+| Capsule determinism and governance | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py` | Pass | 2026-07-05, Python 3.13.1 venv | Current capsule tests include temp-directory deterministic regeneration; expected count is 5 tests. |
+| API and wheel boundary | `PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/api tests/unit/packaging` | Pass | 2026-07-05, Python 3.13.1 venv | Covers strict public API symbols, lazy optional imports, wheel contents, package payload size, and synthetic leaked-wheel rejection. |
+| Docs build | `.venv/bin/mkdocs build --strict --site-dir /tmp/cc-framework-mkdocs-site` | Pass | 2026-07-05, Python 3.13.1 venv | MkDocs Material printed its upstream MkDocs 2.0 warning and exited 0. |
+| Package build | `.venv/bin/python -m build --outdir /tmp/cc-framework-dist` | Pass | 2026-07-05, Python 3.13.1 venv | Built `cc_framework-0.3.0rc1.tar.gz` and `cc_framework-0.3.0rc1-py3-none-any.whl`. |
+| Distribution metadata | `.venv/bin/python -m twine check /tmp/cc-framework-dist/*` | Pass | 2026-07-05, Python 3.13.1 venv | Both sdist and wheel passed. Classifiers now include Python 3.13 to match CI. |
+| Fresh wheel install/import | `python3 -m venv /tmp/cc-framework-wheeltest`; install wheel; import `cc`, `cc.kernel.strict`, optional modules; run `cc-cartographer --help` | Pass | 2026-07-05, Python 3.14.6 clean venv | Found and fixed a blocker where CLI help imported matplotlib from the minimal wheel. |
+| Artifact boundary checker | `.venv/bin/python scripts/check_artifact_boundary.py --static` | Pass | 2026-07-05, Python 3.13.1 venv | Tracked runtime roots remain marker-only; paper artifacts and manuscript figures are allowlisted. |
+| README quickstart smoke | Clean tracked-copy venv, editable install, README Python snippet, and `PYTHONPATH=src python -m pytest -q tests/unit/kernel tests/unit/evidence` | Pass | 2026-07-05, Python 3.14.6 clean copy | Snippet printed `Stacked failure is bounded by [0.00%, 10.00%]`; focused tests reached 100%. |
+| CLI help smoke | `PYTHONPATH=src .venv/bin/python -m cc.cartographer.cli --help`; installed-wheel `cc-cartographer --help` | Pass | 2026-07-05 | Top-level help exits 0 without importing optional matplotlib. |
+| Lint | `.venv/bin/ruff check .` | Pass | 2026-07-05, Python 3.13.1 venv | Required fixes included import sorting and small Blender-helper lint issues in `visual_identity`. |
+| Format | `.venv/bin/ruff format --check .` | Pass | 2026-07-05, Python 3.13.1 venv | All 201 formatted files pass after targeted formatting. |
+| Focused type gate | `make type` | Pass | 2026-07-05, Python 3.13.1 venv | Matches the Makefile/CI focused mypy lane; 8 source files reported no issues. |
+| Full type audit | `.venv/bin/python -m mypy src` | Fail, not claimed gate | 2026-07-05, Python 3.13.1 venv | 269 errors across 43 broader/legacy/optional files. Do not present the whole `src` tree as typed. |
+| Security audit | `make security` | Pass | 2026-07-05, Python 3.13.1 venv | Bandit medium+, detect-secrets, and pip-audit passed; pip-audit found no known vulnerabilities. |
+| Python dependency health | `.venv/bin/python -m pip check` | Pass | 2026-07-05, Python 3.13.1 venv | No broken requirements found. |
+| Secret grep spot-check | bounded `rg` for AWS/private-key/password/token/API-key patterns | Pass with benign hits | 2026-07-05 | Hits were private-key loader `password=None`, dummy guardrail test text, and environment variable adapter plumbing. |
+| Dangerous-pattern grep | bounded `rg` for `eval`, `exec`, `pickle.loads`, `yaml.load`, `shell=True`, destructive paths, and subprocess use | Reviewed | 2026-07-05 | No `eval`, `pickle.loads`, or unsafe YAML hits; remaining subprocess/temp/unlink hits are test, tooling, or scoped utility usage. |
+| Dashboard build | `npm --prefix apps/dashboard run build` | Pass | 2026-07-05, Node v22.22.3/npm 10.9.8 | Next 15.5.19 production build, type check, and static page generation passed. |
+| Dashboard direct smoke | `npm --prefix apps/dashboard run smoke` | Expected fail without bundle | 2026-07-05 | Fails closed unless `ENTERPRISE_BUNDLE_PATH` points at a generated enterprise dashboard bundle. `make enterprise-smoke` is the authoritative lane. |
+| Dashboard npm audit | `npm --prefix apps/dashboard audit --audit-level=moderate` | Pass | 2026-07-05, npm 10.9.8 | Found 0 vulnerabilities. |
+| Infra build | `npm --prefix infra run build` | Pass | 2026-07-05, Node v22.22.3/npm 10.9.8 | `tsc --noEmit` passed. |
+| Infra synth | `npm --prefix infra run synth` | Pass | 2026-07-05, Node v22.22.3/npm 10.9.8 | CDK synthesized the reference template; CDK printed its feature-flag informational message. |
+| Infra npm audit | `npm --prefix infra audit --audit-level=moderate` | Pass | 2026-07-05, npm 10.9.8 | Found 0 vulnerabilities. |
+| Enterprise smoke | `make enterprise-smoke` | Pass | 2026-07-05, Python 3.13.1 venv + Node/npm | Installs `.[enterprise,test]`, runs dashboard `npm ci`, verifies boto3/moto, and passes moto-backed AWS emulation plus dashboard e2e smoke (`2 passed`). |
 
-Unresolved or not-current lanes for this 2026-07-05 refresh:
-
-- Dashboard build, enterprise smoke, security audit, and npm audit were not
-  rerun in this local refresh unless separately recorded below.
-- The exact unbounded `grep -R "tests/property/kernel" -n .` form was stopped
-  because it traversed local dependency directories; the bounded hidden-aware
-  `rg` command above is the current repository evidence.
+The exact unbounded `grep -R "tests/property/kernel" -n .` form was stopped
+because it traversed local dependency and generated directories. The bounded
+hidden-aware `rg` commands are the current repository evidence.
 
 Historical validation record retained from 2026-06-30:
 
@@ -137,19 +154,20 @@ the normalized installed package version `0.3.0rc1`, matching the
 The dashboard remains outside the Paper Core v0.3 claim boundary, but its
 security debt was checked for this pass.
 
-- Initial `npm audit --json` in `apps/dashboard` reported 3 moderate, 2 high,
-  and 1 critical vulnerabilities.
-- `next` was upgraded from `^14.2.5` to `15.5.19`.
-- `vitest` was upgraded from `^2.0.5` to `4.1.9`.
-- `vite` was pinned as a dev dependency at `6.4.3` to avoid the `vite@8` Node
-  engine requirement on local Node `20.12.2`.
-- Follow-up `npm audit --json` reports 0 critical and 0 high vulnerabilities,
-  with 2 moderate findings remaining through Next's transitive `postcss`
-  dependency path.
+- `apps/dashboard/package.json` currently uses Next `15.5.19`, React `18.3.1`,
+  Vitest `3.2.6`, and Vite `6.4.3`.
+- `npm --prefix apps/dashboard audit --audit-level=moderate` found 0
+  vulnerabilities.
+- `npm --prefix apps/dashboard run build` passed.
+- Direct `npm --prefix apps/dashboard run smoke` fails closed when
+  `ENTERPRISE_BUNDLE_PATH` is unset. This is intentional; the authoritative
+  smoke path is `make enterprise-smoke`.
+- `make enterprise-smoke` passed and exercised the generated enterprise bundle
+  through the dashboard e2e smoke.
 
-Migration risk: both Next and Vitest crossed major versions. The local dashboard
-build and `make enterprise-smoke` passed, but this remains dependency hygiene,
-not a dashboard release claim.
+Migration risk: the dashboard remains a separate Enterprise Reference v0.1
+surface. Passing these checks is dependency and e2e hygiene, not a dashboard
+release claim and not Paper Core evidence.
 
 Expected artifact behavior:
 
@@ -178,6 +196,11 @@ The following lanes are not promoted into Paper Core v0.3 by this checklist:
 If any optional lane is run and fails, record it as a separate lane result. Do
 not relabel a failed optional lane as a Paper Core pass.
 
+For this 2026-07-05 audit, `make enterprise-smoke`, `make security`, dashboard
+build/audit, infra build/synth/audit, and the focused Makefile type gate were
+run and recorded in the current adversarial gate table above. They still remain
+outside the Paper Core proof boundary.
+
 Full pytest skipped these optional items in the local validation run:
 
 - `tests/experiments/test_experiment_leak_metrics.py`: requires
@@ -191,9 +214,13 @@ Full pytest skipped these optional items in the local validation run:
 
 Not run for this paper-core rc1 record:
 
-- `make security`.
-- Direct vendor, performance, experiment, notebook, Pandoc/PDF, and LaTeX-only
-  lanes outside the commands listed above.
+- Direct vendor tests requiring provider credentials or provider services.
+- Performance and experiment lanes requiring `CC_RUN_PERF=1` or
+  `CC_RUN_EXPERIMENTS=1`.
+- Notebook, Pandoc/PDF, and LaTeX-only lanes outside the commands listed
+  above.
+- Full-repo `mypy src` is not a passing lane; the current full type audit
+  failed and is recorded as a residual risk.
 
 ## Non-Claims
 
@@ -230,5 +257,5 @@ Block v0.3-rc1 if any of the following are true:
 - [x] Paper Core v0.3 and Enterprise Reference v0.1 remain separate in README,
   changelog, and release docs.
 - [x] Non-claims are visible in release-facing docs.
-- [x] Final `git status --short` contains only intentional release-doc changes
-  and any explicitly accepted artifact updates.
+- [x] Final `git status --short` contains only intentional source, test,
+  metadata, README, and release-doc hardening changes.

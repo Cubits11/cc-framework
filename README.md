@@ -89,7 +89,7 @@ The validation tracks are intentionally separated:
   does not certify deployment safety.
 
 See [docs/validation_matrix.md](docs/validation_matrix.md) for the command
-matrix that states which commands prove which claim.
+matrix that states which evidence supports each scoped claim.
 
 For the v0.3-rc1 release narrative and checklist, see
 [docs/release/V0_3_RC1_CHECKLIST.md](docs/release/V0_3_RC1_CHECKLIST.md).

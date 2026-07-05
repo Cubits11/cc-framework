@@ -22,8 +22,6 @@ import os
 from collections.abc import Mapping
 from typing import Any, Final
 
-import matplotlib.pyplot as plt
-
 __all__ = ["compose_entry", "plot_phase_point"]
 
 # Thresholds for interpreting CC_max (hard invariants for CLI policy)
@@ -43,6 +41,16 @@ def plot_phase_point(cfg: Mapping[str, Any], cc_max: float, outfile: str) -> str
     Returns:
         The outfile path (for logging/audit references).
     """
+    try:
+        import matplotlib.pyplot as plt
+    except ModuleNotFoundError as exc:
+        if exc.name == "matplotlib":
+            raise ModuleNotFoundError(
+                "cc.cartographer.atlas plotting requires matplotlib; install "
+                "cc-framework[viz] or cc-framework[dev]."
+            ) from exc
+        raise
+
     parent = os.path.dirname(outfile) or "."
     os.makedirs(parent, exist_ok=True)
 

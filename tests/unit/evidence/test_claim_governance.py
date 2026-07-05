@@ -98,6 +98,18 @@ def test_claim_governance_audit_accepts_public_schema_key() -> None:
     assert audit.schema_ == "cc/claim-governance-audit.v1"
 
 
+def test_unsupported_report_schema_version_fails_closed(tmp_path: Path) -> None:
+    report_path = _write_package(tmp_path)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["schema_version"] = "cc.report.v999"
+    _write_json(report_path, report)
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.FAIL
+    assert any("schema_version must be cc.report.v0.3.1" in reason for reason in audit.reasons)
+
+
 def test_passing_claim_package_verifies_governance(tmp_path: Path) -> None:
     report_path = _write_package(tmp_path)
 
@@ -167,6 +179,41 @@ def test_artifact_hash_mismatch_fails_even_when_receipt_hash_is_valid(tmp_path: 
     assert audit.receipt.report_hash_verified is True
     assert audit.receipt.artifact_hashes_verified is False
     assert any("SHA-256" in reason for reason in audit.reasons)
+
+
+def test_evidence_artifact_paths_cannot_escape_report_base_dir(tmp_path: Path) -> None:
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text(
+        "outside evidence must not be loadable through report paths\n", encoding="utf-8"
+    )
+    escaping_artifacts = [
+        EvidenceArtifact(
+            path="../outside.txt",
+            sha256=sha256_file(outside),
+            bytes=outside.stat().st_size,
+            role="artifact",
+        ),
+        EvidenceArtifact(
+            path=str(outside),
+            sha256=sha256_file(outside),
+            bytes=outside.stat().st_size,
+            role="artifact",
+        ),
+    ]
+    report_path = _write_package(package_dir, extra_artifacts=escaping_artifacts)
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    escaping_reasons = [
+        artifact.reason
+        for artifact in audit.evidence_artifacts
+        if artifact.path in {"../outside.txt", str(outside)}
+    ]
+    assert audit.verdict is GovernanceVerdict.FAIL
+    assert len(escaping_reasons) == 2
+    assert all("escapes base_dir" in reason for reason in escaping_reasons)
 
 
 def test_missing_mandatory_scenario_non_claim_requires_review(tmp_path: Path) -> None:

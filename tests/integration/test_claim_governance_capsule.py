@@ -128,6 +128,30 @@ def test_claim_governance_capsule_second_run_artifacts_are_identical() -> None:
     assert artifact_hashes() == first_hashes
 
 
+def test_claim_governance_capsule_temp_copy_regeneration_is_byte_identical(
+    tmp_path: Path,
+) -> None:
+    first_root = tmp_path / "capsule-a"
+    second_root = tmp_path / "capsule-b"
+    shutil.copytree(CAPSULE, first_root)
+    shutil.copytree(CAPSULE, second_root)
+
+    first = run_capsule_at(first_root)
+    second = run_capsule_at(second_root)
+
+    assert first.returncode == 0, first.stderr + first.stdout
+    assert second.returncode == 0, second.stderr + second.stdout
+
+    first_hashes = artifact_hashes_at(first_root / "outputs")
+    second_hashes = artifact_hashes_at(second_root / "outputs")
+
+    assert first_hashes == second_hashes
+    for name in GENERATED_ARTIFACTS:
+        assert (first_root / "outputs" / name).read_bytes() == (
+            second_root / "outputs" / name
+        ).read_bytes()
+
+
 def test_claim_governance_capsule_tamper_changes_manifest_and_governance_verdict(
     tmp_path: Path,
 ) -> None:
@@ -231,6 +255,22 @@ def run_capsule() -> subprocess.CompletedProcess[str]:
     )
 
 
+def run_capsule_at(capsule_dir: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(CAPSULE / "build_capsule.py"),
+            "--capsule-dir",
+            str(capsule_dir),
+        ],
+        cwd=ROOT,
+        env=env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def env(*, extra_pythonpath: str | None = None) -> dict[str, str]:
     values = os.environ.copy()
     values["PYTHONHASHSEED"] = "0"
@@ -244,8 +284,14 @@ def env(*, extra_pythonpath: str | None = None) -> dict[str, str]:
 
 
 def artifact_hashes() -> dict[str, str]:
+    return artifact_hashes_at(OUTPUTS)
+
+
+def artifact_hashes_at(outputs_dir: Path) -> dict[str, str]:
     return {
-        name: sha256(OUTPUTS / name) for name in GENERATED_ARTIFACTS if (OUTPUTS / name).exists()
+        name: sha256(outputs_dir / name)
+        for name in GENERATED_ARTIFACTS
+        if (outputs_dir / name).exists()
     }
 
 

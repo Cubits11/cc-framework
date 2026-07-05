@@ -285,7 +285,8 @@ def recommend_model(
             recommendation="FH+CCF-point-estimate",
             justification=(
                 "Pairwise dependence can tighten FH bounds, but it does not identify "
-                "higher-order common-cause structure. Use FH as the guarantee and a "
+                "higher-order common-cause structure. Use FH as the assumption-bound "
+                "reference interval and a "
                 "CCF point estimate only as an explicit sensitivity assumption."
             ),
             required_assumptions=(

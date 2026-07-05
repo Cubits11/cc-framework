@@ -487,6 +487,29 @@ class TestIdentifiedRegionMonotonicity:
         assert result.upper_bound == pytest.approx(1.0, abs=ASSERT_TOL)
         _assert_result_solutions_feasible(result, assumptions)
 
+    def test_repeated_identification_returns_stable_endpoint_witnesses(self) -> None:
+        guardrails = ("A", "B", "C")
+        distribution = np.asarray([0.05, 0.10, 0.15, 0.05, 0.20, 0.10, 0.15, 0.20])
+        marginals, pairwise = distribution_moments(distribution, len(guardrails))
+        assumptions = _exact_pairwise_assumptions(
+            _exact_marginal_assumptions(guardrails, marginals),
+            pairwise,
+            list(combinations(range(3), 2)),
+        )
+        query = LinearQuery.union(guardrails, guardrails)
+
+        first = identified_region(query, assumptions)
+        second = identified_region(query, assumptions)
+
+        assert second.lower_bound == pytest.approx(first.lower_bound, abs=ASSERT_TOL)
+        assert second.upper_bound == pytest.approx(first.upper_bound, abs=ASSERT_TOL)
+        assert second.active_constraints_lower == first.active_constraints_lower
+        assert second.active_constraints_upper == first.active_constraints_upper
+        np.testing.assert_allclose(second.lower_solution, first.lower_solution, atol=ASSERT_TOL)
+        np.testing.assert_allclose(second.upper_solution, first.upper_solution, atol=ASSERT_TOL)
+        _assert_result_solutions_feasible(first, assumptions)
+        _assert_result_solutions_feasible(second, assumptions)
+
     def test_valid_side_constraints_only_narrow_identified_intervals(self) -> None:
         guardrails = ("A", "B", "C")
         distribution = np.asarray([0.05, 0.10, 0.15, 0.05, 0.20, 0.10, 0.15, 0.20])

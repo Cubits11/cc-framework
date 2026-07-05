@@ -14,11 +14,11 @@ import argparse
 import math
 import random
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 import bpy
 from mathutils import Vector
-
 
 ROOT = Path(__file__).resolve().parent
 RENDER_DIR = ROOT / "renders"
@@ -57,7 +57,8 @@ def make_material(
     if alpha is not None:
         set_principled_input(material, "Alpha", alpha)
         material.blend_method = "BLEND"
-        material.use_screen_refraction = True if hasattr(material, "use_screen_refraction") else False
+        if hasattr(material, "use_screen_refraction"):
+            material.use_screen_refraction = True
         material.show_transparent_back = True
     if emission is not None:
         set_principled_input(material, "Emission Color", emission)
@@ -244,7 +245,7 @@ def add_curve(
     curve.bevel_resolution = 2
     spline = curve.splines.new("POLY")
     spline.points.add(len(points) - 1)
-    for point, co in zip(spline.points, points):
+    for point, co in zip(spline.points, points, strict=False):
         point.co = (co.x, co.y, co.z, 1.0)
     curve.materials.append(material)
     obj = bpy.data.objects.new(name, curve)
@@ -295,11 +296,17 @@ def arc_points(
     for step in range(steps + 1):
         t = math.radians(start_deg + (end_deg - start_deg) * step / steps)
         if plane == "XZ":
-            points.append(Vector((center.x + math.cos(t) * radius, y, center.z + math.sin(t) * radius)))
+            points.append(
+                Vector((center.x + math.cos(t) * radius, y, center.z + math.sin(t) * radius))
+            )
         elif plane == "XY":
-            points.append(Vector((center.x + math.cos(t) * radius, center.y + math.sin(t) * radius, center.z)))
+            points.append(
+                Vector((center.x + math.cos(t) * radius, center.y + math.sin(t) * radius, center.z))
+            )
         else:
-            points.append(Vector((center.x, center.y + math.cos(t) * radius, center.z + math.sin(t) * radius)))
+            points.append(
+                Vector((center.x, center.y + math.cos(t) * radius, center.z + math.sin(t) * radius))
+            )
     return points
 
 
@@ -388,11 +395,15 @@ def setup_render() -> None:
             scene.eevee.gtao_distance = 5
             scene.eevee.gtao_factor = 1.2
 
-    try:
+    with suppress(TypeError):
         scene.view_settings.view_transform = "AgX"
-    except TypeError:
-        pass
-    for look in ("AgX - Medium High Contrast", "Medium High Contrast", "AgX - High Contrast", "High Contrast", "None"):
+    for look in (
+        "AgX - Medium High Contrast",
+        "Medium High Contrast",
+        "AgX - High Contrast",
+        "High Contrast",
+        "None",
+    ):
         try:
             scene.view_settings.look = look
             break
@@ -401,10 +412,8 @@ def setup_render() -> None:
     scene.view_settings.exposure = -0.55
     scene.view_settings.gamma = 1.0
 
-    try:
+    with suppress(Exception):
         scene.use_nodes = True
-    except Exception:
-        pass
     tree = getattr(scene, "node_tree", None)
     if tree is not None:
         for node in list(tree.nodes):
@@ -428,9 +437,15 @@ def setup_render() -> None:
 
 def setup_materials() -> dict[str, bpy.types.Material]:
     return {
-        "matte_black": make_material("MAT_matte_black_observatory", (0.006, 0.008, 0.012, 1), roughness=0.82),
-        "dark_wall": make_material("MAT_dark_semantic_firewall", (0.012, 0.014, 0.018, 1), roughness=0.78),
-        "floor": make_material("MAT_dark_hash_ledger_floor", (0.008, 0.010, 0.013, 1), roughness=0.67),
+        "matte_black": make_material(
+            "MAT_matte_black_observatory", (0.006, 0.008, 0.012, 1), roughness=0.82
+        ),
+        "dark_wall": make_material(
+            "MAT_dark_semantic_firewall", (0.012, 0.014, 0.018, 1), roughness=0.78
+        ),
+        "floor": make_material(
+            "MAT_dark_hash_ledger_floor", (0.008, 0.010, 0.013, 1), roughness=0.67
+        ),
         "glass": make_material(
             "MAT_transparent_claim_capsule_glass",
             (0.48, 0.82, 1.0, 0.22),
@@ -501,11 +516,15 @@ def setup_materials() -> dict[str, bpy.types.Material]:
     }
 
 
-def build_claim_capsule(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_claim_capsule(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     capsule = collections["ClaimCapsule"]
     evidence = collections["EvidenceArtifacts"]
 
-    add_cylinder(capsule, "ClaimCapsule_GlassCylinder", CENTER, 1.10, 2.28, materials["glass"], vertices=160)
+    add_cylinder(
+        capsule, "ClaimCapsule_GlassCylinder", CENTER, 1.10, 2.28, materials["glass"], vertices=160
+    )
     add_sphere(
         capsule,
         "ClaimCapsule_GlassTopCap",
@@ -527,8 +546,17 @@ def build_claim_capsule(collections: dict[str, bpy.types.Collection], materials:
         ring_count=24,
     )
 
-    for idx, z in enumerate((CENTER.z - 1.12, CENTER.z - 0.52, CENTER.z, CENTER.z + 0.52, CENTER.z + 1.12), 1):
-        add_torus(capsule, f"ClaimCapsule_CyanSealRing_{idx:02d}", (0, 0, z), 1.105, 0.006, materials["cyan_soft"])
+    for idx, z in enumerate(
+        (CENTER.z - 1.12, CENTER.z - 0.52, CENTER.z, CENTER.z + 0.52, CENTER.z + 1.12), 1
+    ):
+        add_torus(
+            capsule,
+            f"ClaimCapsule_CyanSealRing_{idx:02d}",
+            (0, 0, z),
+            1.105,
+            0.006,
+            materials["cyan_soft"],
+        )
 
     for idx, angle in enumerate((0, 60, 120, 180, 240, 300), 1):
         theta = math.radians(angle)
@@ -669,21 +697,33 @@ def build_claim_capsule(collections: dict[str, bpy.types.Collection], materials:
     )
 
 
-def build_support_graph(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_support_graph(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     graph = collections["SupportGraph"]
     camera_hint = Vector((5.8, -8.0, 4.4))
     nodes = {
-        "claim_fragment": (Vector((-0.55, -0.25, CENTER.z + 0.45)), materials["white"], "claim fragment"),
+        "claim_fragment": (
+            Vector((-0.55, -0.25, CENTER.z + 0.45)),
+            materials["white"],
+            "claim fragment",
+        ),
         "bounds": (Vector((-2.05, -0.72, CENTER.z + 0.74)), materials["cyan"], "bounds.json"),
         "upper": (Vector((1.92, -0.56, CENTER.z + 0.93)), materials["cyan"], "extremal_upper"),
         "lower": (Vector((-1.62, 0.86, CENTER.z - 0.20)), materials["cyan_soft"], "extremal_lower"),
         "manifest": (Vector((1.70, 0.86, CENTER.z - 0.25)), materials["weak"], "manifest receipt"),
-        "confirmatory": (Vector((0.28, -2.12, CENTER.z + 0.10)), materials["cyan"], "confirmatory tests"),
+        "confirmatory": (
+            Vector((0.28, -2.12, CENTER.z + 0.10)),
+            materials["cyan"],
+            "confirmatory tests",
+        ),
         "review": (Vector((2.35, -0.05, CENTER.z - 0.85)), materials["amber"], "human review"),
     }
     for key, (loc, material, label) in nodes.items():
         radius = 0.078 if key != "claim_fragment" else 0.095
-        add_sphere(graph, f"SupportGraph_Node_{key}", loc, radius, material, segments=24, ring_count=12)
+        add_sphere(
+            graph, f"SupportGraph_Node_{key}", loc, radius, material, segments=24, ring_count=12
+        )
         add_facing_text(
             graph,
             f"SupportGraph_NodeLabel_{key}",
@@ -708,9 +748,17 @@ def build_support_graph(collections: dict[str, bpy.types.Collection], materials:
         midpoint = start.lerp(end, 0.5)
         lift = Vector((0.0, 0.0, 0.16 + 0.05 * math.sin(len(label))))
         if dashed:
-            add_dashed_curve(graph, f"SupportGraph_Edge_{label}", start, end, material, bevel_depth=width)
+            add_dashed_curve(
+                graph, f"SupportGraph_Edge_{label}", start, end, material, bevel_depth=width
+            )
         else:
-            add_curve(graph, f"SupportGraph_Edge_{label}", [start, midpoint + lift, end], material, bevel_depth=width)
+            add_curve(
+                graph,
+                f"SupportGraph_Edge_{label}",
+                [start, midpoint + lift, end],
+                material,
+                bevel_depth=width,
+            )
         add_facing_text(
             graph,
             f"SupportGraph_EdgeLabel_{label}",
@@ -733,7 +781,9 @@ def build_support_graph(collections: dict[str, bpy.types.Collection], materials:
     )
 
 
-def build_non_claims_wall(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_non_claims_wall(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     wall = collections["NonClaimsWall"]
     add_cube(
         wall,
@@ -767,10 +817,7 @@ def build_non_claims_wall(collections: dict[str, bpy.types.Collection], material
     add_text(
         wall,
         "NonClaimsWall_EngravedFirewallText",
-        "This claim does NOT say:\n"
-        "deployment safety\n"
-        "external validity\n"
-        "release approval",
+        "This claim does NOT say:\ndeployment safety\nexternal validity\nrelease approval",
         (-2.62, 2.330, 3.25),
         materials["white"],
         size=0.135,
@@ -804,17 +851,57 @@ def build_non_claims_wall(collections: dict[str, bpy.types.Collection], material
     )
 
 
-def build_decay_clock(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_decay_clock(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     decay = collections["DecayClock"]
     y = -0.18
-    add_curve(decay, "DecayClock_FreshSegment", arc_points(CENTER, 2.02, 36, 162, plane="XZ", y=y), materials["cyan"], bevel_depth=0.018)
-    add_curve(decay, "DecayClock_DegradedSegment", arc_points(CENTER, 2.02, 162, 292, plane="XZ", y=y), materials["amber"], bevel_depth=0.015)
-    add_curve(decay, "DecayClock_ExpiredSegment", arc_points(CENTER, 2.02, 292, 396, plane="XZ", y=y), materials["red"], bevel_depth=0.012)
-    add_curve(decay, "DecayClock_OuterQuietRing", arc_points(CENTER, 2.12, 0, 360, plane="XZ", y=y + 0.025, steps=180), materials["weak"], bevel_depth=0.004)
+    add_curve(
+        decay,
+        "DecayClock_FreshSegment",
+        arc_points(CENTER, 2.02, 36, 162, plane="XZ", y=y),
+        materials["cyan"],
+        bevel_depth=0.018,
+    )
+    add_curve(
+        decay,
+        "DecayClock_DegradedSegment",
+        arc_points(CENTER, 2.02, 162, 292, plane="XZ", y=y),
+        materials["amber"],
+        bevel_depth=0.015,
+    )
+    add_curve(
+        decay,
+        "DecayClock_ExpiredSegment",
+        arc_points(CENTER, 2.02, 292, 396, plane="XZ", y=y),
+        materials["red"],
+        bevel_depth=0.012,
+    )
+    add_curve(
+        decay,
+        "DecayClock_OuterQuietRing",
+        arc_points(CENTER, 2.12, 0, 360, plane="XZ", y=y + 0.025, steps=180),
+        materials["weak"],
+        bevel_depth=0.004,
+    )
 
     marker_angle = math.radians(72)
-    marker = Vector((CENTER.x + math.cos(marker_angle) * 2.02, y - 0.02, CENTER.z + math.sin(marker_angle) * 2.02))
-    add_sphere(decay, "DecayClock_CurrentFreshMarker", marker, 0.075, materials["white"], segments=24, ring_count=12)
+    marker = Vector(
+        (
+            CENTER.x + math.cos(marker_angle) * 2.02,
+            y - 0.02,
+            CENTER.z + math.sin(marker_angle) * 2.02,
+        )
+    )
+    add_sphere(
+        decay,
+        "DecayClock_CurrentFreshMarker",
+        marker,
+        0.075,
+        materials["white"],
+        segments=24,
+        ring_count=12,
+    )
     add_curve(
         decay,
         "DecayClock_CurrentFreshMarkerNeedle",
@@ -823,9 +910,33 @@ def build_decay_clock(collections: dict[str, bpy.types.Collection], materials: d
         bevel_depth=0.004,
     )
     camera_hint = Vector((5.8, -8.0, 4.4))
-    add_facing_text(decay, "DecayClock_Label_Fresh", "Fresh", (1.35, -0.58, 4.50), materials["cyan"], camera_hint, size=0.09)
-    add_facing_text(decay, "DecayClock_Label_Degraded", "Degraded", (-2.18, -0.55, 2.82), materials["amber"], camera_hint, size=0.083)
-    add_facing_text(decay, "DecayClock_Label_Expired", "Expired", (1.28, -0.55, 1.18), materials["red"], camera_hint, size=0.078)
+    add_facing_text(
+        decay,
+        "DecayClock_Label_Fresh",
+        "Fresh",
+        (1.35, -0.58, 4.50),
+        materials["cyan"],
+        camera_hint,
+        size=0.09,
+    )
+    add_facing_text(
+        decay,
+        "DecayClock_Label_Degraded",
+        "Degraded",
+        (-2.18, -0.55, 2.82),
+        materials["amber"],
+        camera_hint,
+        size=0.083,
+    )
+    add_facing_text(
+        decay,
+        "DecayClock_Label_Expired",
+        "Expired",
+        (1.28, -0.55, 1.18),
+        materials["red"],
+        camera_hint,
+        size=0.078,
+    )
     add_facing_text(
         decay,
         "DecayClock_Label_FreshDegradedExpired",
@@ -837,9 +948,19 @@ def build_decay_clock(collections: dict[str, bpy.types.Collection], materials: d
     )
 
 
-def build_replay_manifest(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_replay_manifest(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     floor = collections["ReplayManifest"]
-    add_cylinder(floor, "ReplayManifest_CircularHashLedgerFloor", (0.0, 0.0, -0.035), 5.85, 0.07, materials["floor"], vertices=192)
+    add_cylinder(
+        floor,
+        "ReplayManifest_CircularHashLedgerFloor",
+        (0.0, 0.0, -0.035),
+        5.85,
+        0.07,
+        materials["floor"],
+        vertices=192,
+    )
     for idx, radius in enumerate((1.38, 2.52, 3.70, 5.05), 1):
         add_torus(
             floor,
@@ -868,7 +989,7 @@ def build_replay_manifest(collections: dict[str, bpy.types.Collection], material
         body = f"{filename}  {byte_count}\n{digest}"
         add_text(
             floor,
-            f"ReplayManifest_FloorEngraving_{idx+1:02d}_{filename.replace('.', '_')}",
+            f"ReplayManifest_FloorEngraving_{idx + 1:02d}_{filename.replace('.', '_')}",
             body,
             (x, y, 0.045),
             materials["weak"] if idx % 2 else materials["white"],
@@ -904,12 +1025,44 @@ def build_replay_manifest(collections: dict[str, bpy.types.Collection], material
     )
 
 
-def build_human_review(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_human_review(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     human = collections["HumanReview"]
-    add_cube(human, "HumanReview_DistantReviewerSeat_Base", (3.95, 2.85, 0.42), (0.78, 0.70, 0.14), materials["dark_wall"], bevel=0.025)
-    add_cube(human, "HumanReview_DistantReviewerSeat_Back", (3.95, 3.12, 0.96), (0.80, 0.12, 0.92), materials["dark_wall"], bevel=0.025)
-    add_cube(human, "HumanReview_AccountabilityConsole", (3.10, 2.30, 0.74), (1.18, 0.42, 0.36), materials["matte_black"], rotation=(0.0, 0.0, math.radians(-10)), bevel=0.02)
-    add_cube(human, "HumanReview_ConsoleAmberReviewLight", (3.05, 2.08, 0.96), (0.72, 0.020, 0.035), materials["amber"], rotation=(0.0, 0.0, math.radians(-10)), bevel=0.006)
+    add_cube(
+        human,
+        "HumanReview_DistantReviewerSeat_Base",
+        (3.95, 2.85, 0.42),
+        (0.78, 0.70, 0.14),
+        materials["dark_wall"],
+        bevel=0.025,
+    )
+    add_cube(
+        human,
+        "HumanReview_DistantReviewerSeat_Back",
+        (3.95, 3.12, 0.96),
+        (0.80, 0.12, 0.92),
+        materials["dark_wall"],
+        bevel=0.025,
+    )
+    add_cube(
+        human,
+        "HumanReview_AccountabilityConsole",
+        (3.10, 2.30, 0.74),
+        (1.18, 0.42, 0.36),
+        materials["matte_black"],
+        rotation=(0.0, 0.0, math.radians(-10)),
+        bevel=0.02,
+    )
+    add_cube(
+        human,
+        "HumanReview_ConsoleAmberReviewLight",
+        (3.05, 2.08, 0.96),
+        (0.72, 0.020, 0.035),
+        materials["amber"],
+        rotation=(0.0, 0.0, math.radians(-10)),
+        bevel=0.006,
+    )
     add_facing_text(
         human,
         "HumanReview_Label",
@@ -930,7 +1083,9 @@ def build_human_review(collections: dict[str, bpy.types.Collection], materials: 
     )
 
 
-def build_orbiting_panels(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_orbiting_panels(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     target_collections = {
         "Claim Envelope": collections["ClaimCapsule"],
         "Governance Audit": collections["ClaimCapsule"],
@@ -967,7 +1122,9 @@ def build_orbiting_panels(collections: dict[str, bpy.types.Collection], material
             f"OrbitPanel_{compact}_Label",
             label,
             text_loc,
-            materials["white"] if label not in {"Human Review", "Decay Clock"} else materials["amber"],
+            materials["white"]
+            if label not in {"Human Review", "Decay Clock"}
+            else materials["amber"],
             Vector((5.8, -8.0, 4.4)),
             size=0.105 if len(label) < 14 else 0.082,
             align_x="CENTER",
@@ -982,7 +1139,9 @@ def build_orbiting_panels(collections: dict[str, bpy.types.Collection], material
         )
 
 
-def build_hero_text(collection: bpy.types.Collection, materials: dict[str, bpy.types.Material]) -> None:
+def build_hero_text(
+    collection: bpy.types.Collection, materials: dict[str, bpy.types.Material]
+) -> None:
     camera_hint = Vector((5.8, -8.0, 4.4))
     add_facing_text(
         collection,
@@ -1015,9 +1174,17 @@ def build_hero_text(collection: bpy.types.Collection, materials: dict[str, bpy.t
     )
 
 
-def build_lighting(collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]) -> None:
+def build_lighting(
+    collections: dict[str, bpy.types.Collection], materials: dict[str, bpy.types.Material]
+) -> None:
     lighting = collections["Lighting"]
-    add_cube(lighting, "Lighting_SubtleVolumetricHazeBox", (0.0, 0.0, 2.6), (12.0, 12.0, 7.0), materials["volume"])
+    add_cube(
+        lighting,
+        "Lighting_SubtleVolumetricHazeBox",
+        (0.0, 0.0, 2.6),
+        (12.0, 12.0, 7.0),
+        materials["volume"],
+    )
 
     light_specs = [
         ("Lighting_KeySoftbox_CapsuleTop", "AREA", (0.0, -3.2, 6.9), 260, (3.4, 2.2)),
@@ -1064,12 +1231,48 @@ def build_camera_rig(collections: dict[str, bpy.types.Collection]) -> None:
     bpy.context.scene.camera = camera
 
     shots = [
-        (1, "Shot 1 - Wide reveal of dark observatory", Vector((7.4, -9.3, 5.25)), CENTER + Vector((0, 0, 0.05)), 34),
-        (72, "Shot 2 - Push toward glowing Claim Capsule", Vector((5.35, -6.75, 4.45)), CENTER + Vector((0, 0, 0.12)), 46),
-        (144, "Shot 3 - Orbit support graph edges", Vector((-4.65, -6.15, 3.60)), CENTER + Vector((0.20, -0.20, 0.05)), 58),
-        (216, "Shot 4 - Pan to Non-Claims Wall", Vector((3.10, -6.35, 3.34)), Vector((-0.65, 2.28, 3.05)), 54),
-        (288, "Shot 5 - Close-up on Decay Clock", Vector((2.50, -4.90, 4.55)), Vector((0.92, -0.18, 4.38)), 70),
-        (360, "Shot 6 - Final hero frame", Vector((5.85, -7.75, 4.35)), CENTER + Vector((0, 0, 0.12)), 50),
+        (
+            1,
+            "Shot 1 - Wide reveal of dark observatory",
+            Vector((7.4, -9.3, 5.25)),
+            CENTER + Vector((0, 0, 0.05)),
+            34,
+        ),
+        (
+            72,
+            "Shot 2 - Push toward glowing Claim Capsule",
+            Vector((5.35, -6.75, 4.45)),
+            CENTER + Vector((0, 0, 0.12)),
+            46,
+        ),
+        (
+            144,
+            "Shot 3 - Orbit support graph edges",
+            Vector((-4.65, -6.15, 3.60)),
+            CENTER + Vector((0.20, -0.20, 0.05)),
+            58,
+        ),
+        (
+            216,
+            "Shot 4 - Pan to Non-Claims Wall",
+            Vector((3.10, -6.35, 3.34)),
+            Vector((-0.65, 2.28, 3.05)),
+            54,
+        ),
+        (
+            288,
+            "Shot 5 - Close-up on Decay Clock",
+            Vector((2.50, -4.90, 4.55)),
+            Vector((0.92, -0.18, 4.38)),
+            70,
+        ),
+        (
+            360,
+            "Shot 6 - Final hero frame",
+            Vector((5.85, -7.75, 4.35)),
+            CENTER + Vector((0, 0, 0.12)),
+            50,
+        ),
     ]
     scene = bpy.context.scene
     for frame, marker_name, loc, target_loc, lens in shots:
@@ -1121,7 +1324,11 @@ def build_scene() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--render-still", action="store_true", help="Render the final hero frame after creating the .blend.")
+    parser.add_argument(
+        "--render-still",
+        action="store_true",
+        help="Render the final hero frame after creating the .blend.",
+    )
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     return parser.parse_args(argv)
 

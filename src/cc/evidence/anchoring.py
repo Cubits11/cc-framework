@@ -1,9 +1,10 @@
 """External anchoring for Merkle transparency roots.
 
 This module implements a pluggable witness interface and a concrete Ed25519
-witness. In production, the witness private key should be controlled by an
-independent party or service. The local Ed25519 implementation exists so tests
-and deployments can exercise the protocol without depending on a specific TSA.
+witness. In any deployed use, the witness private key should be controlled by
+an independent party or service. The local Ed25519 implementation exists so
+tests and reference deployments can exercise the protocol without depending on
+a specific TSA.
 """
 
 from __future__ import annotations
