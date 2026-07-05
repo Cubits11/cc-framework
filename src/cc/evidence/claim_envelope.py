@@ -1,28 +1,57 @@
-"""Typed claim and boundary envelopes for evidence-bound CC claims.
+"""Typed claim and boundary envelopes for evidence-bound CC reports.
 
 The envelope is an intermediate representation around ``cc.report.v0.3.1``.
-It does not change the stable report schema and it does not promote evidence
-roles into broader claims than they are allowed to support.
+
+Important semantic boundary
+---------------------------
+This module compiles a report plus optional governance audit into a typed,
+hashable envelope. It does not change the stable report schema, it does not
+promote evidence roles into broader claims than they are allowed to support,
+and it does not own claim lifecycle semantics.
+
+This file owns:
+
+- report-to-envelope projection;
+- claim fragments targeted by evidence support edges;
+- boundary scope, assumptions, non-claims, defeaters, invalidation conditions;
+- support graph construction from conservative evidence-role ontology;
+- governance audit projection into envelope fields.
+
+This file does not own:
+
+- claim lifecycle state machine;
+- claim transitions;
+- claim compiler;
+- assumption registry;
+- challenge calculus;
+- dashboard display state;
+- deployment/compliance certification.
+
+Future lifecycle states such as draft/supported/bounded/challenged/weakened/
+expired/revoked/superseded/non_claim belong in ``cc.claims.ClaimState``.
+
+The ``GovernanceState`` in this module is only an audit projection attached to
+an envelope. It is not the same thing as a future claim lifecycle state.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias, cast
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from cc.evidence.role_ontology import (
+    RESERVED_LIFECYCLE_STATE_NAMES,
     SupportPermission,
     classify_role,
     get_role_definition,
     support_permissions_for,
 )
 from cc.reporting.canonical import canonical_json_bytes
-from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION
+from cc.reporting.report import ALLOWED_CLAIM_LEVELS, CLAIM_LEVELS, SCHEMA_VERSION, ClaimLevel
 
 CLAIM_ENVELOPE_SCHEMA_VERSION: Literal["cc.claim_envelope.v1"] = "cc.claim_envelope.v1"
 BOUNDARY_ENVELOPE_SCHEMA_VERSION: Literal["cc.boundary_envelope.v1"] = "cc.boundary_envelope.v1"
@@ -46,12 +75,31 @@ SupportRelation = Literal[
 ]
 SupportStrength = Literal["weak", "diagnostic", "confirmatory", "integrity_only"]
 
+# Audit projection verdicts, not claim lifecycle states.
+GovernanceVerdict: TypeAlias = Literal["not_evaluated", "pass", "needs_review", "fail"]
+
+# Audit projection freshness, not lifecycle state. Future cc.claims may translate
+# this into lifecycle transitions, but this envelope only records the verifier view.
+ClaimFreshnessStatus: TypeAlias = Literal["not_evaluated", "fresh", "degraded", "expired"]
+
+DefeaterStatus: TypeAlias = Literal["active", "unresolved", "resolved", "unknown"]
+InvalidationSeverity: TypeAlias = Literal["review", "invalidates", "expires", "unknown"]
+ReviewStatus: TypeAlias = Literal["required", "not_required", "satisfied", "unknown"]
+
 _STRENGTH_RANK: dict[SupportStrength, int] = {
     "integrity_only": 0,
     "weak": 1,
     "diagnostic": 2,
     "confirmatory": 3,
 }
+
+_ALLOWED_GOVERNANCE_VERDICTS = frozenset(
+    {"not_evaluated", "pass", "needs_review", "fail"}
+)
+_ALLOWED_FRESHNESS_STATUSES = frozenset(
+    {"not_evaluated", "fresh", "degraded", "expired"}
+)
+
 _NON_PROOF_RECEIPT = (
     "Receipt evidence binds artifact integrity only; it does not prove statistical validity "
     "or deployment safety.",
@@ -72,13 +120,17 @@ _NON_PROOF_REVIEW = (
     "Human review can authorize scoped use of an evidence package; it does not upgrade "
     "underlying statistical evidence.",
 )
+_NON_PROOF_CONFIRMATORY = (
+    "Confirmatory evidence remains scoped to its protocol, sample, endpoint, and declared "
+    "run separation; it does not certify deployment safety.",
+)
 _UNKNOWN_ROLE_NON_CLAIM = (
     "Unknown evidence roles are preserved for review but cannot strengthen the claim.",
 )
 
 
 class EnvelopeModel(BaseModel):
-    """Strict base model for claim-envelope artifacts."""
+    """Strict frozen base model for claim-envelope artifacts."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -111,16 +163,22 @@ class ClaimIdentity(EnvelopeModel):
 
 
 class ClaimProposition(EnvelopeModel):
-    """The positive claim text and the fragments evidence is allowed to touch."""
+    """Positive claim text and report maturity level.
+
+    ``allowed_claim_level`` is a report maturity/support label from
+    ``cc.reporting.report``. It is not a lifecycle state.
+    """
 
     statement: str = Field(min_length=1)
-    allowed_claim_level: str = Field(min_length=1)
+    allowed_claim_level: ClaimLevel
     fragments: tuple[ClaimFragment, ...] = Field(default_factory=tuple)
 
     @model_validator(mode="after")
     def _validate_claim_level(self) -> ClaimProposition:
         if self.allowed_claim_level not in ALLOWED_CLAIM_LEVELS:
             raise ValueError("allowed_claim_level is not supported by cc.report.v0.3.1")
+        if self.allowed_claim_level in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("allowed_claim_level must not reuse a lifecycle state name")
         return self
 
 
@@ -132,6 +190,14 @@ class MeasurementInterval(EnvelopeModel):
     point_estimate: float | None = None
     confidence_level: float | None = None
     delta: float | None = None
+
+    @model_validator(mode="after")
+    def _interval_is_ordered(self) -> MeasurementInterval:
+        if self.lower > self.upper:
+            raise ValueError("measurement interval lower cannot exceed upper")
+        if self.point_estimate is not None and not self.lower <= self.point_estimate <= self.upper:
+            raise ValueError("point_estimate must lie inside measurement interval")
+        return self
 
 
 class BoundaryScope(EnvelopeModel):
@@ -149,24 +215,44 @@ class BoundaryScope(EnvelopeModel):
     config_path: str | None = None
     evidence_artifact_ids: tuple[str, ...] = Field(default_factory=tuple)
 
+    @field_validator("sample_sizes")
+    @classmethod
+    def _sample_sizes_are_non_negative(cls, value: dict[str, int]) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for label, sample_size in value.items():
+            if not label:
+                raise ValueError("sample size labels must be non-empty")
+            if isinstance(sample_size, bool) or sample_size < 0:
+                raise ValueError("sample sizes must be non-negative integers")
+            out[str(label)] = int(sample_size)
+        return dict(sorted(out.items()))
+
 
 class BoundaryDefeater(EnvelopeModel):
-    """Condition or gap that can weaken, invalidate, or block reliance."""
+    """Condition or gap that can weaken, invalidate, or block reliance.
+
+    This is a proto-challenge boundary artifact. It is not a full future
+    ``cc.claims.Challenge`` object and it does not own lifecycle transitions.
+    """
 
     defeater_id: str = Field(min_length=1)
     description: str = Field(min_length=1)
     source_ref: str | None = None
-    status: Literal["active", "unresolved", "resolved", "unknown"] = "unresolved"
+    status: DefeaterStatus = "unresolved"
 
 
 class InvalidationCondition(EnvelopeModel):
-    """Machine-readable condition under which support no longer holds."""
+    """Machine-readable condition under which support no longer holds.
+
+    This is an envelope support-boundary condition. It is not the same thing as
+    revoking a future ``cc.claims.Claim``.
+    """
 
     condition_id: str = Field(min_length=1)
     description: str = Field(min_length=1)
     trigger: str = Field(min_length=1)
     source_ref: str | None = None
-    severity: Literal["review", "invalidates", "expires", "unknown"] = "review"
+    severity: InvalidationSeverity = "review"
 
 
 class ReviewRequirement(EnvelopeModel):
@@ -176,7 +262,13 @@ class ReviewRequirement(EnvelopeModel):
     reason: str = Field(min_length=1)
     source_ref: str | None = None
     required: bool = True
-    status: Literal["required", "not_required", "satisfied", "unknown"] = "required"
+    status: ReviewStatus = "required"
+
+    @model_validator(mode="after")
+    def _status_matches_required_flag(self) -> ReviewRequirement:
+        if self.required and self.status == "not_required":
+            raise ValueError("required review requirement cannot have status not_required")
+        return self
 
 
 class BoundaryEnvelope(EnvelopeModel):
@@ -192,6 +284,11 @@ class BoundaryEnvelope(EnvelopeModel):
     defeaters: tuple[BoundaryDefeater, ...] = Field(default_factory=tuple)
     invalidation_conditions: tuple[InvalidationCondition, ...] = Field(default_factory=tuple)
     review_requirements: tuple[ReviewRequirement, ...] = Field(default_factory=tuple)
+
+    @field_validator("assumptions", "non_claims")
+    @classmethod
+    def _clean_boundary_strings(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return _dedupe(value)
 
 
 class ArtifactRef(EnvelopeModel):
@@ -210,6 +307,14 @@ class ArtifactRef(EnvelopeModel):
     evaluated_at: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("role")
+    @classmethod
+    def _role_is_not_lifecycle_state(cls, value: str) -> str:
+        role = value.strip()
+        if role in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("artifact role must not reuse a lifecycle state name")
+        return role
+
 
 class SupportEdge(EnvelopeModel):
     """Typed edge from one artifact to one claim fragment."""
@@ -220,6 +325,11 @@ class SupportEdge(EnvelopeModel):
     strength: SupportStrength
     non_claims: tuple[str, ...] = Field(default_factory=tuple)
     rationale: str | None = None
+
+    @field_validator("non_claims")
+    @classmethod
+    def _non_claims_are_clean(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return _dedupe(value)
 
 
 class EnvelopeSupportSummary(EnvelopeModel):
@@ -243,6 +353,7 @@ class EnvelopeSupportSummary(EnvelopeModel):
         relation_counts: dict[str, int] = {}
         strength_counts: dict[str, int] = {}
         strongest: SupportStrength | None = None
+
         for edge in graph.support_edges:
             relation_counts[edge.relation] = relation_counts.get(edge.relation, 0) + 1
             strength_counts[edge.strength] = strength_counts.get(edge.strength, 0) + 1
@@ -250,8 +361,12 @@ class EnvelopeSupportSummary(EnvelopeModel):
                 strongest is None or _STRENGTH_RANK[edge.strength] > _STRENGTH_RANK[strongest]
             ):
                 strongest = edge.strength
+
         refs = graph.all_refs()
-        unsupported = tuple(ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown")
+        unsupported = tuple(
+            ref.artifact_id for ref in refs if classify_role(ref.role) == "unknown"
+        )
+
         return cls(
             support_edge_count=len(graph.support_edges),
             relation_counts=dict(sorted(relation_counts.items())),
@@ -293,28 +408,54 @@ class SupportGraph(EnvelopeModel):
         ref_by_id = {ref.artifact_id: ref for ref in refs}
         if len(ref_by_id) != len(refs):
             raise ValueError("artifact_id values must be unique across a support graph")
+
         for edge in self.support_edges:
             source = ref_by_id.get(edge.source_artifact_id)
             if source is None:
                 raise ValueError(f"support edge source {edge.source_artifact_id!r} is unknown")
             _validate_role_support_edge(source, edge)
+
         return self
 
 
 class GovernanceState(EnvelopeModel):
-    """Computed or attached governance state for the envelope."""
+    """Computed or attached governance audit projection for the envelope.
+
+    This is not a claim lifecycle state.
+
+    ``verdict`` records the verifier's envelope/report consistency outcome.
+    ``freshness_status`` records the verifier's freshness projection.
+
+    Future ``cc.claims`` may translate these values into lifecycle transitions,
+    but this module only stores the audit projection.
+    """
 
     schema_: Literal["cc.claim_envelope.governance_state.v1"] = Field(
         default=GOVERNANCE_STATE_SCHEMA_VERSION,
         alias="schema",
     )
-    verdict: str = "not_evaluated"
+    verdict: GovernanceVerdict = "not_evaluated"
     verifier_schema: str | None = None
     evaluated_at: str | None = None
-    freshness_status: str | None = None
+    freshness_status: ClaimFreshnessStatus = "not_evaluated"
     required_human_review: bool = True
     reasons: tuple[str, ...] = Field(default_factory=tuple)
     support_summary: EnvelopeSupportSummary
+
+    @field_validator("reasons")
+    @classmethod
+    def _reasons_are_clean(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return _dedupe(value)
+
+    @model_validator(mode="after")
+    def _governance_consistency(self) -> GovernanceState:
+        if self.verdict == "fail" and not self.reasons:
+            raise ValueError("failed governance projection must include reasons")
+        if self.required_human_review and self.verdict == "pass" and self.support_summary.review_edges:
+            # This is conservative but not fatal. A pass can still require human review
+            # in external release processes, but review edges must remain visible.
+            return self
+        return self
 
 
 class ClaimEnvelope(EnvelopeModel):
@@ -330,10 +471,24 @@ class ClaimEnvelope(EnvelopeModel):
     support_graph: SupportGraph
     governance_state: GovernanceState
 
+    @model_validator(mode="after")
+    def _envelope_is_boundary_honest(self) -> ClaimEnvelope:
+        if self.proposition.allowed_claim_level != "diagnostic" and not self.boundary.non_claims:
+            raise ValueError("non-diagnostic envelopes require explicit non-claims")
+
+        fragment_ids = {fragment.fragment_id for fragment in self.proposition.fragments}
+        for edge in self.support_graph.support_edges:
+            if edge.target_claim_fragment not in fragment_ids:
+                raise ValueError(
+                    f"support edge targets missing claim fragment {edge.target_claim_fragment!r}"
+                )
+
+        return self
+
     def to_canonical_dict(self) -> dict[str, Any]:
         """Return deterministic JSON-native payload for serialization or hashing."""
 
-        return self.model_dump(mode="json")
+        return self.model_dump(mode="json", by_alias=True)
 
     def to_canonical_json(self) -> str:
         """Serialize the envelope with stable sorted-key compact JSON."""
@@ -358,6 +513,9 @@ def compile_claim_envelope(
     The compiler is intentionally conservative. Report-bound artifacts are
     preserved as references, but only evidence roles with explicit semantics
     receive support edges, and those edges target narrow claim fragments.
+
+    This function does not create a future ``cc.claims.Claim`` and does not
+    assign lifecycle state.
     """
 
     audit = _audit_mapping(governance_audit)
@@ -365,16 +523,20 @@ def compile_claim_envelope(
     source_schema = _required_str(report, "schema_version")
     if source_schema != SCHEMA_VERSION:
         raise ValueError(f"report schema_version must be {SCHEMA_VERSION}")
+
     claim = _required_mapping(report, "claim")
     claim_statement = _required_str(claim, "statement")
-    allowed_claim_level = _required_str(claim, "allowed_claim_level")
+    allowed_claim_level = _claim_level(_required_str(claim, "allowed_claim_level"))
+
     subject = subject_ref or f"{source_schema}:{report_id}"
     report_hash = _receipt_hash(report)
 
     report_evidence_refs = _compile_evidence_refs(report, audit=audit, subject_ref=subject)
     measurement_ref = _measurement_ref(report, subject_ref=subject)
     calibration_ref = _calibration_ref(report, subject_ref=subject)
+
     all_evidence_refs = (measurement_ref, calibration_ref, *report_evidence_refs)
+
     scenario_refs = tuple(ref for ref in all_evidence_refs if ref.role == "extremal_scenario")
     decay_refs = tuple(ref for ref in all_evidence_refs if ref.role == "claim_decay")
     review_refs = tuple(
@@ -383,8 +545,10 @@ def compile_claim_envelope(
     evidence_refs = tuple(
         ref
         for ref in all_evidence_refs
-        if ref.role not in {"claim_decay", "extremal_scenario", "human_review", "human_review_note"}
+        if ref.role
+        not in {"claim_decay", "extremal_scenario", "human_review", "human_review_note"}
     )
+
     receipt_refs = (
         ArtifactRef(
             artifact_id="receipt:report",
@@ -397,6 +561,7 @@ def compile_claim_envelope(
             reason="Canonical report receipt binds the report bytes and named evidence hashes.",
         ),
     )
+
     graph = SupportGraph(
         evidence_refs=evidence_refs,
         scenario_refs=scenario_refs,
@@ -410,6 +575,7 @@ def compile_claim_envelope(
         ),
     )
     summary = EnvelopeSupportSummary.from_graph(graph)
+
     boundary = BoundaryEnvelope(
         scope=_boundary_scope(
             report,
@@ -421,12 +587,14 @@ def compile_claim_envelope(
             [
                 *_str_tuple(claim.get("non_claims")),
                 *_str_tuple(_audit_get(audit, ("non_claims",))),
+                *_mandatory_edge_non_claims(graph),
             ]
         ),
         defeaters=_compile_defeaters(audit),
         invalidation_conditions=_compile_invalidation_conditions(audit),
         review_requirements=_compile_review_requirements(audit, allowed_claim_level),
     )
+
     return ClaimEnvelope(
         identity=ClaimIdentity(
             artifact_id=f"claim-envelope:{_slug(report_id)}",
@@ -446,10 +614,10 @@ def compile_claim_envelope(
         boundary=boundary,
         support_graph=graph,
         governance_state=GovernanceState(
-            verdict=_audit_str(audit, ("verdict",)) or "not_evaluated",
+            verdict=_governance_verdict(_audit_str(audit, ("verdict",))),
             verifier_schema=_audit_str(audit, ("schema",)) or _audit_str(audit, ("schema_",)),
             evaluated_at=_audit_str(audit, ("evaluated_at",)) or evaluated_at,
-            freshness_status=_audit_str(audit, ("decay", "status")),
+            freshness_status=_freshness_status(_audit_str(audit, ("decay", "status"))),
             required_human_review=_audit_bool(audit, ("required_human_review",), True),
             reasons=_str_tuple(_audit_get(audit, ("reasons",))),
             support_summary=summary,
@@ -482,12 +650,15 @@ def _validate_role_support_edge(source: ArtifactRef, edge: SupportEdge) -> None:
 
     if role in {"human_review", "human_review_note"}:
         _validate_human_review_edge(source, edge)
+
     if classify_role(role) == "unknown" and (
         edge.relation not in {"requires_review", "qualifies"} or edge.strength != "weak"
     ):
         raise ValueError("unknown evidence roles cannot strengthen a claim")
+
     if classify_role(role) == "unknown":
         return
+
     if not _edge_matches_support_permission(edge, permissions):
         raise ValueError(f"{role} evidence may only provide ontology-permitted support")
 
@@ -518,6 +689,7 @@ def _target_fragment_matches(target: str, allowed: str) -> bool:
 def _validate_human_review_edge(source: ArtifactRef, edge: SupportEdge) -> None:
     if edge.strength == "confirmatory":
         raise ValueError("human review cannot provide confirmatory statistical support")
+
     target = edge.target_claim_fragment
     if target.startswith("evidence."):
         reviewed = {str(item) for item in source.metadata.get("reviewed_artifact_ids", [])}
@@ -543,6 +715,7 @@ def _compile_support_edges(
             rationale="Receipt hashing binds report and artifact bytes, but only as integrity.",
         )
     ]
+
     for ref in evidence_refs:
         if ref.role == "measurement_evidence":
             edges.append(
@@ -612,10 +785,7 @@ def _compile_support_edges(
                     target_claim_fragment="claim.failure_matrix",
                     relation="confirmatory_tests",
                     strength="confirmatory",
-                    non_claims=(
-                        "Confirmatory failure-matrix evidence remains scoped to its protocol "
-                        "and does not certify deployment safety.",
-                    ),
+                    non_claims=_NON_PROOF_CONFIRMATORY,
                     rationale="Confirmatory failure matrices test a predeclared or held-out matrix.",
                 )
             )
@@ -643,6 +813,7 @@ def _compile_support_edges(
                     rationale="Unknown role is preserved without strengthening the claim.",
                 )
             )
+
     return tuple(edges)
 
 
@@ -659,6 +830,7 @@ def _confirmatory_protocol_edge(ref: ArtifactRef) -> SupportEdge:
             ),
             rationale="Confirmatory protocol validation failed under governance checks.",
         )
+
     if ref.reason is not None and "requires review" in ref.reason:
         return SupportEdge(
             source_artifact_id=ref.artifact_id,
@@ -671,6 +843,7 @@ def _confirmatory_protocol_edge(ref: ArtifactRef) -> SupportEdge:
             ),
             rationale="Confirmatory protocol validation raised a review trigger.",
         )
+
     return SupportEdge(
         source_artifact_id=ref.artifact_id,
         target_claim_fragment="claim.confirmatory_boundary",
@@ -685,7 +858,7 @@ def _confirmatory_protocol_edge(ref: ArtifactRef) -> SupportEdge:
 
 
 def _decay_edges(ref: ArtifactRef, audit: Mapping[str, Any] | None) -> tuple[SupportEdge, ...]:
-    status = _audit_str(audit, ("decay", "status"))
+    status = _freshness_status(_audit_str(audit, ("decay", "status")))
     edges = [
         SupportEdge(
             source_artifact_id=ref.artifact_id,
@@ -696,6 +869,7 @@ def _decay_edges(ref: ArtifactRef, audit: Mapping[str, Any] | None) -> tuple[Sup
             rationale="Decay policy qualifies freshness and review timing.",
         )
     ]
+
     if status == "expired":
         edges.append(
             SupportEdge(
@@ -718,6 +892,7 @@ def _decay_edges(ref: ArtifactRef, audit: Mapping[str, Any] | None) -> tuple[Sup
                 rationale="Degraded decay state requires conservative review.",
             )
         )
+
     return tuple(edges)
 
 
@@ -730,11 +905,13 @@ def _compile_evidence_refs(
     entries = _report_evidence_entries(report)
     audits = _artifact_audits_by_path_role(audit)
     refs: list[ArtifactRef] = []
+
     for idx, entry in enumerate(entries):
         role = _optional_str(entry.get("role")) or "artifact"
         path = _optional_str(entry.get("path"))
         artifact_id = _entry_artifact_id(role, idx, path)
         audit_item = audits.get((path or "", role), {})
+
         refs.append(
             ArtifactRef(
                 artifact_id=artifact_id,
@@ -747,14 +924,13 @@ def _compile_evidence_refs(
                 reason=_audit_str(audit_item, ("reason",)) or None,
             )
         )
+
     return tuple(refs)
 
 
 def _measurement_ref(report: Mapping[str, Any], *, subject_ref: str) -> ArtifactRef:
     measurement = _required_mapping(report, "measurement")
-    digest = hashlib.sha256(
-        json.dumps(measurement, sort_keys=True, separators=(",", ":"), default=str).encode()
-    ).hexdigest()
+    digest = hashlib.sha256(canonical_json_bytes(measurement)).hexdigest()
     return ArtifactRef(
         artifact_id="report:measurement",
         subject_ref=subject_ref,
@@ -768,9 +944,7 @@ def _measurement_ref(report: Mapping[str, Any], *, subject_ref: str) -> Artifact
 
 def _calibration_ref(report: Mapping[str, Any], *, subject_ref: str) -> ArtifactRef:
     calibration = _required_mapping(report, "calibration")
-    digest = hashlib.sha256(
-        json.dumps(calibration, sort_keys=True, separators=(",", ":"), default=str).encode()
-    ).hexdigest()
+    digest = hashlib.sha256(canonical_json_bytes(calibration)).hexdigest()
     return ArtifactRef(
         artifact_id="report:calibration",
         subject_ref=subject_ref,
@@ -791,6 +965,7 @@ def _boundary_scope(
     measurement = _required_mapping(report, "measurement")
     interval = measurement.get("interval")
     measurement_interval = None
+
     if isinstance(interval, Mapping):
         lower = interval.get("lower")
         upper = interval.get("upper")
@@ -803,6 +978,7 @@ def _boundary_scope(
             confidence_level=_optional_float(measurement.get("confidence_level")),
             delta=_optional_float(measurement.get("delta")),
         )
+
     run = _mapping_or_empty(report.get("run"))
     calibration = _mapping_or_empty(report.get("calibration"))
     sample_sizes_raw = measurement.get("sample_sizes")
@@ -812,6 +988,7 @@ def _boundary_scope(
             sample_sizes_raw.items() if isinstance(sample_sizes_raw, Mapping) else []
         )
     }
+
     return BoundaryScope(
         subject_ref=subject_ref,
         report_id=_required_str(report, "report_id"),
@@ -837,16 +1014,22 @@ def _claim_fragments(
         "claim.statistical_interval": "Measured interval and point estimate under report scope.",
         "claim.operating_point": "Calibration and operating-point scope.",
         "claim.integrity.receipt": "Report and evidence-byte integrity.",
+        "claim.evidence_role_resolution": "Evidence role resolution and unknown-role review.",
     }
+
     if graph.decay_refs:
         fragment_ids["claim.staleness"] = "Claim freshness, staleness, and review pressure."
         fragment_ids["claim.freshness"] = "Verification-time freshness state."
+        fragment_ids["claim.review_pressure"] = "Review pressure caused by decay or staleness."
+
     if graph.scenario_refs:
         fragment_ids["claim.endpoint_feasibility"] = (
             "Endpoint feasibility and counterfactual dependence bounds."
         )
+
     if graph.review_refs:
         fragment_ids["claim.review_authorization"] = "Scoped human review authorization."
+
     for edge in graph.support_edges:
         if edge.target_claim_fragment == "claim.redteam_hypothesis":
             fragment_ids["claim.redteam_hypothesis"] = (
@@ -858,6 +1041,7 @@ def _claim_fragments(
             fragment_ids["claim.fitted_scenario"] = "Fitted empirical scenario evidence."
         elif edge.target_claim_fragment == "claim.confirmatory_boundary":
             fragment_ids["claim.confirmatory_boundary"] = "Exploratory/confirmatory firewall."
+
     return (
         *(
             ClaimFragment(
@@ -877,6 +1061,7 @@ def _claim_fragments(
 
 def _compile_defeaters(audit: Mapping[str, Any] | None) -> tuple[BoundaryDefeater, ...]:
     defeaters: list[BoundaryDefeater] = []
+
     for idx, item in enumerate(
         _str_tuple(_audit_get(audit, ("boundary", "mandatory_non_claims_missing")))
     ):
@@ -888,6 +1073,7 @@ def _compile_defeaters(audit: Mapping[str, Any] | None) -> tuple[BoundaryDefeate
                 status="active",
             )
         )
+
     for idx, reason in enumerate(_str_tuple(_audit_get(audit, ("reasons",)))):
         if "Unknown evidence role" in reason:
             defeaters.append(
@@ -898,6 +1084,7 @@ def _compile_defeaters(audit: Mapping[str, Any] | None) -> tuple[BoundaryDefeate
                     status="unresolved",
                 )
             )
+
     return tuple(defeaters)
 
 
@@ -907,6 +1094,7 @@ def _compile_invalidation_conditions(
     conditions: list[InvalidationCondition] = []
     if not audit:
         return tuple(conditions)
+
     receipt_verified = _audit_get(audit, ("receipt", "report_hash_verified"))
     if receipt_verified is False:
         conditions.append(
@@ -918,7 +1106,8 @@ def _compile_invalidation_conditions(
                 severity="invalidates",
             )
         )
-    if _audit_str(audit, ("decay", "status")) == "expired":
+
+    if _freshness_status(_audit_str(audit, ("decay", "status"))) == "expired":
         conditions.append(
             InvalidationCondition(
                 condition_id="expires:claim-decay",
@@ -928,6 +1117,7 @@ def _compile_invalidation_conditions(
                 severity="expires",
             )
         )
+
     if int(_audit_get(audit, ("scenarios", "infeasible_count")) or 0) > 0:
         conditions.append(
             InvalidationCondition(
@@ -938,8 +1128,14 @@ def _compile_invalidation_conditions(
                 severity="invalidates",
             )
         )
+
     for idx, reason in enumerate(_str_tuple(_audit_get(audit, ("reasons",)))):
-        if "SHA-256" in reason or "unreadable" in reason or "Exploratory evidence leaked" in reason:
+        lowered = reason.lower()
+        if (
+            "sha-256" in reason
+            or "unreadable" in lowered
+            or "exploratory evidence leaked" in reason
+        ):
             conditions.append(
                 InvalidationCondition(
                     condition_id=f"invalidates:governance-reason:{idx}",
@@ -949,12 +1145,13 @@ def _compile_invalidation_conditions(
                     severity="invalidates",
                 )
             )
+
     return tuple(conditions)
 
 
 def _compile_review_requirements(
     audit: Mapping[str, Any] | None,
-    allowed_claim_level: str,
+    allowed_claim_level: ClaimLevel,
 ) -> tuple[ReviewRequirement, ...]:
     requirements: list[ReviewRequirement] = []
     required = _audit_bool(
@@ -966,6 +1163,7 @@ def _compile_review_requirements(
         if required
         else "Governance verifier did not require human review under its narrow rules."
     )
+
     requirements.append(
         ReviewRequirement(
             requirement_id="review:governance-verdict",
@@ -975,6 +1173,7 @@ def _compile_review_requirements(
             status=status,
         )
     )
+
     if allowed_claim_level == "release_claim":
         requirements.append(
             ReviewRequirement(
@@ -985,6 +1184,7 @@ def _compile_review_requirements(
                 status="required",
             )
         )
+
     for idx, reason_item in enumerate(_str_tuple(_audit_get(audit, ("reasons",)))):
         if "review" in reason_item.lower() or "Unknown evidence role" in reason_item:
             requirements.append(
@@ -996,6 +1196,7 @@ def _compile_review_requirements(
                     status="required",
                 )
             )
+
     return tuple(requirements)
 
 
@@ -1003,14 +1204,17 @@ def _report_evidence_entries(report: Mapping[str, Any]) -> list[Mapping[str, Any
     evidence = _required_mapping(report, "evidence")
     entries: list[Mapping[str, Any]] = []
     raw_artifacts = evidence.get("artifacts", [])
+
     if isinstance(raw_artifacts, Sequence) and not isinstance(raw_artifacts, (str, bytes)):
         entries.extend(item for item in raw_artifacts if isinstance(item, Mapping))
+
     for key, role in (("audit_log", "audit_log"), ("figure_manifest", "figure_manifest")):
         item = evidence.get(key)
         if isinstance(item, Mapping):
             entry = dict(item)
             entry["role"] = str(entry.get("role") or role)
             entries.append(entry)
+
     return entries
 
 
@@ -1019,20 +1223,31 @@ def _artifact_audits_by_path_role(
 ) -> dict[tuple[str, str], Mapping[str, Any]]:
     out: dict[tuple[str, str], Mapping[str, Any]] = {}
     items = _audit_get(audit, ("evidence_artifacts",))
+
     if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
         return out
+
     for item in items:
         if not isinstance(item, Mapping):
             continue
         path = _optional_str(item.get("path")) or ""
         role = _optional_str(item.get("role")) or ""
         out[(path, role)] = item
+
     return out
 
 
 def _entry_artifact_id(role: str, idx: int, path: str | None) -> str:
     stem = _slug(path or role)
     return f"evidence:{_slug(role)}:{idx:04d}:{stem}"
+
+
+def _mandatory_edge_non_claims(graph: SupportGraph) -> tuple[str, ...]:
+    return _dedupe(
+        non_claim
+        for edge in graph.support_edges
+        for non_claim in edge.non_claims
+    )
 
 
 def _audit_mapping(value: Mapping[str, Any] | BaseModel | None) -> Mapping[str, Any] | None:
@@ -1066,14 +1281,14 @@ def _required_str(mapping: Mapping[str, Any], key: str) -> str:
     value = mapping.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} must be a non-empty string")
-    return value
+    return value.strip()
 
 
 def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
-    text = str(value)
-    return text if text.strip() else None
+    text = str(value).strip()
+    return text if text else None
 
 
 def _optional_int(value: Any) -> int | None:
@@ -1110,9 +1325,9 @@ def _str_tuple(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
     if isinstance(value, str):
-        return (value,) if value.strip() else ()
+        return (value.strip(),) if value.strip() else ()
     if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray, str)):
-        return tuple(str(item) for item in value if str(item).strip())
+        return tuple(str(item).strip() for item in value if str(item).strip())
     return ()
 
 
@@ -1133,6 +1348,31 @@ def _slug(value: str) -> str:
     return slug or "unknown"
 
 
+def _claim_level(value: str) -> ClaimLevel:
+    if value not in CLAIM_LEVELS:
+        allowed = ", ".join(CLAIM_LEVELS)
+        raise ValueError(f"allowed_claim_level must be one of: {allowed}")
+    if value in RESERVED_LIFECYCLE_STATE_NAMES:
+        raise ValueError("allowed_claim_level must not reuse a lifecycle state name")
+    return cast(ClaimLevel, value)
+
+
+def _governance_verdict(value: str | None) -> GovernanceVerdict:
+    if value is None:
+        return "not_evaluated"
+    if value not in _ALLOWED_GOVERNANCE_VERDICTS:
+        raise ValueError(f"governance verdict {value!r} is not recognized")
+    return cast(GovernanceVerdict, value)
+
+
+def _freshness_status(value: str | None) -> ClaimFreshnessStatus:
+    if value is None:
+        return "not_evaluated"
+    if value not in _ALLOWED_FRESHNESS_STATUSES:
+        raise ValueError(f"claim freshness status {value!r} is not recognized")
+    return cast(ClaimFreshnessStatus, value)
+
+
 __all__ = [
     "BOUNDARY_ENVELOPE_SCHEMA_VERSION",
     "CLAIM_ENVELOPE_SCHEMA_VERSION",
@@ -1145,13 +1385,18 @@ __all__ = [
     "BoundaryScope",
     "ClaimEnvelope",
     "ClaimFragment",
+    "ClaimFreshnessStatus",
     "ClaimIdentity",
     "ClaimProposition",
+    "DefeaterStatus",
     "EnvelopeSupportSummary",
     "GovernanceState",
+    "GovernanceVerdict",
     "InvalidationCondition",
+    "InvalidationSeverity",
     "MeasurementInterval",
     "ReviewRequirement",
+    "ReviewStatus",
     "SupportEdge",
     "SupportGraph",
     "SupportRelation",

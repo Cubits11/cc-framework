@@ -1,9 +1,37 @@
 """Deterministic claim-decay policies for evidence freshness checks.
 
-The models in this module are intended for signed artifacts: they record the
-policy, covariates, and version watch set, but they do not store a live
-freshness verdict.  Call :func:`evaluate_claim_decay` at verification time to
-derive the current state against the verifier's clock and observed versions.
+This module defines signed claim-decay artifacts and verification-time freshness
+evaluation.
+
+Important semantic boundary
+---------------------------
+`DecayState` is a freshness/support-state projection. It is not a claim
+lifecycle state.
+
+`DecayState.EXPIRED` means the claim-decay policy no longer permits the attached
+evidence to be treated as fresh under this verifier's clock and observed version
+context. It does not mean the historical claim was false, revoked, unsafe, or
+fraudulent.
+
+Future `cc.claims.ClaimState` may consume decay evaluations as inputs to a
+lifecycle transition, but this module does not own lifecycle transitions.
+
+This module owns:
+
+- signed freshness policy records;
+- TTL-based freshness evaluation;
+- version-watch invalidation;
+- configured heuristic hazard scoring;
+- mandatory decay non-claims.
+
+This module does not own:
+
+- claim lifecycle state;
+- claim revocation;
+- claim challenge semantics;
+- deployment safety;
+- calibrated survival modeling;
+- production/compliance certification.
 
 Configured hazard support in this module is a configured heuristic risk score,
 not a fitted or calibrated survival model.
@@ -19,19 +47,44 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-CLAIM_DECAY_SCHEMA_VERSION = "cc.claim_decay.v1"
+CLAIM_DECAY_SCHEMA_VERSION: Literal["cc.claim_decay.v1"] = "cc.claim_decay.v1"
+
 CONFIGURED_HAZARD_NOTICE = (
-    "This is a configured heuristic risk score, not a fitted or calibrated survival model."
+    "This is a configured heuristic review-pressure score, not a fitted or calibrated "
+    "survival model and not a probability that the claim is false."
 )
+
+DECAY_STATE_NON_LIFECYCLE_NOTICE = (
+    "DecayState is a freshness/support projection, not a claim lifecycle state."
+)
+
 _DEFAULT_DECAY_NON_CLAIMS = (
-    "A claim_decay artifact does not prove the system is currently safe; it defines when the "
-    "claim should be rechecked, degraded, or expired.",
+    "A claim_decay artifact does not prove the system is currently safe; it defines when "
+    "the claim's supporting evidence should be rechecked, degraded, or treated as expired.",
     "A claim_decay artifact records signed policy, not live deployment validity.",
+    "A claim_decay artifact does not revoke, falsify, or certify a claim by itself.",
+    DECAY_STATE_NON_LIFECYCLE_NOTICE,
 )
+
 _CONFIGURED_HAZARD_NON_CLAIMS = (
     "This decay policy does not estimate a statistically calibrated claim-failure probability.",
     "This decay policy does not prove the claim remains valid in deployment.",
-    "This decay policy is a verification-time staleness/risk heuristic unless externally calibrated.",
+    "This decay policy is a verification-time staleness/review-pressure heuristic unless "
+    "externally calibrated.",
+    "Configured hazard coefficients are policy parameters, not fitted survival-model parameters.",
+)
+
+RESERVED_LIFECYCLE_STATE_NAMES = frozenset(
+    {
+        "draft",
+        "supported",
+        "bounded",
+        "challenged",
+        "weakened",
+        "revoked",
+        "superseded",
+        "non_claim",
+    }
 )
 
 
@@ -42,7 +95,14 @@ class DecayModel(BaseModel):
 
 
 class DecayState(str, Enum):
-    """Verification-time freshness state for a claim or evidence item."""
+    """Verification-time freshness state for a claim or evidence item.
+
+    This is not a claim lifecycle state.
+
+    - FRESH: the policy does not currently impose degradation or expiry.
+    - DEGRADED: the policy requires review or reduced reliance.
+    - EXPIRED: the policy no longer permits fresh reliance on the support.
+    """
 
     FRESH = "fresh"
     DEGRADED = "degraded"
@@ -50,6 +110,38 @@ class DecayState(str, Enum):
 
 
 DecayStatus = DecayState
+
+
+class DecayEvaluation(DecayModel):
+    """Audit-friendly result of evaluating a claim-decay record.
+
+    This object is intentionally separate from the signed `ClaimDecayRecord`.
+    The signed record stores policy. The evaluation stores live verifier output.
+    """
+
+    claim_id: str = Field(min_length=1)
+    state: DecayState
+    evaluated_at: datetime
+    age_days: float = Field(ge=0.0)
+    triggered_rules: tuple[str, ...] = Field(default_factory=tuple)
+    version_changes: tuple[str, ...] = Field(default_factory=tuple)
+    non_claims: tuple[str, ...] = Field(default_factory=lambda: _DEFAULT_DECAY_NON_CLAIMS)
+
+    @field_validator("evaluated_at", mode="before")
+    @classmethod
+    def _require_timezone(cls, value: datetime | str) -> datetime:
+        return _coerce_timezone_aware_datetime(value, "evaluated_at")
+
+    @field_validator("triggered_rules", "version_changes", "non_claims", mode="before")
+    @classmethod
+    def _coerce_string_tuple(cls, value: Any) -> tuple[str, ...]:
+        return _coerce_clean_string_tuple(value)
+
+    @model_validator(mode="after")
+    def _expired_has_trigger(self) -> DecayEvaluation:
+        if self.state is DecayState.EXPIRED and not (self.triggered_rules or self.version_changes):
+            raise ValueError("expired decay evaluations must include a trigger")
+        return self
 
 
 class ConfiguredHazardCovariates(DecayModel):
@@ -61,6 +153,14 @@ class ConfiguredHazardCovariates(DecayModel):
     data_drift_score: float = Field(default=0.0, ge=0.0)
     threat_activity_level: float = Field(default=0.0, ge=0.0)
     custom: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("data_drift_score", "threat_activity_level")
+    @classmethod
+    def _finite_nonnegative_float(cls, value: float) -> float:
+        item = float(value)
+        if not math.isfinite(item) or item < 0.0:
+            raise ValueError("hazard covariates must be finite non-negative values")
+        return item
 
     @field_validator("custom")
     @classmethod
@@ -74,7 +174,7 @@ class ConfiguredHazardCovariates(DecayModel):
             if not math.isfinite(item):
                 raise ValueError(f"custom covariate {key!r} must be finite")
             cleaned[key] = item
-        return cleaned
+        return dict(sorted(cleaned.items()))
 
     def feature_map(self) -> dict[str, float]:
         """Return the configured heuristic covariate vector used for beta dot x scoring."""
@@ -87,15 +187,20 @@ class ConfiguredHazardCovariates(DecayModel):
             "threat_activity_level": float(self.threat_activity_level),
         }
         features.update(self.custom)
-        return features
+        return dict(sorted(features.items()))
 
 
 class ConfiguredHazardPolicy(DecayModel):
-    """Configured proportional-hazard heuristic risk policy.
+    """Configured proportional-hazard heuristic review-pressure policy.
 
     This is a configured heuristic risk score, not a fitted or calibrated
-    survival model.  Callers supply the baseline hazard and coefficients, and
-    evaluation uses ``lambda = baseline_hazard_per_day * exp(beta dot x)``.
+    survival model. Callers supply the baseline hazard and coefficients, and
+    evaluation uses:
+
+        lambda = baseline_hazard_per_day * exp(beta dot x)
+
+    The resulting half-life is a policy-derived review-pressure clock, not an
+    empirically established half-life of truth, safety, or deployment validity.
     """
 
     rationale: str = Field(
@@ -135,6 +240,14 @@ class ConfiguredHazardPolicy(DecayModel):
             raise ValueError("configured hazard rationale must be non-empty")
         return stripped
 
+    @field_validator("baseline_hazard_per_day")
+    @classmethod
+    def _validate_baseline_hazard(cls, value: float) -> float:
+        item = float(value)
+        if not math.isfinite(item) or item <= 0.0:
+            raise ValueError("baseline_hazard_per_day must be positive and finite")
+        return item
+
     @field_validator("coefficients")
     @classmethod
     def _validate_coefficients(cls, value: dict[str, float]) -> dict[str, float]:
@@ -147,7 +260,7 @@ class ConfiguredHazardPolicy(DecayModel):
             if not math.isfinite(item):
                 raise ValueError(f"hazard coefficient {key!r} must be finite")
             cleaned[key] = item
-        return cleaned
+        return dict(sorted(cleaned.items()))
 
     @model_validator(mode="after")
     def _validate_threshold_order(self) -> ConfiguredHazardPolicy:
@@ -172,7 +285,7 @@ class ConfiguredHazardPolicy(DecayModel):
         return hazard
 
     def configured_half_life_days(self, covariates: ConfiguredHazardCovariates) -> float:
-        """Return heuristic half-life ``ln(2) / lambda``; this is not empirically calibrated."""
+        """Return heuristic half-life ``ln(2) / lambda``; this is not calibrated."""
 
         return math.log(2.0) / self.configured_risk_rate_per_day(covariates)
 
@@ -202,10 +315,14 @@ class VersionWatchSet(DecayModel):
             if not item:
                 raise ValueError(f"version for {key!r} must be non-empty")
             cleaned[key] = item
-        return cleaned
+        return dict(sorted(cleaned.items()))
 
     def changes_from(self, current: VersionWatchSet | dict[str, Any]) -> tuple[str, ...]:
-        """Return watched version paths whose observed values differ."""
+        """Return watched version paths whose observed values differ.
+
+        Missing observed keys do not trigger expiry because absence is ambiguous.
+        They should instead be handled as a governance review gap by callers.
+        """
 
         observed = (
             current
@@ -225,6 +342,28 @@ class VersionWatchSet(DecayModel):
                 if key in observed_versions and observed_versions[key] != expected:
                     changed.append(f"{field_name}.{key}")
         return tuple(changed)
+
+    def missing_from(self, current: VersionWatchSet | dict[str, Any]) -> tuple[str, ...]:
+        """Return watched version paths that are absent from observed versions."""
+
+        observed = (
+            current
+            if isinstance(current, VersionWatchSet)
+            else VersionWatchSet.model_validate(current)
+        )
+        missing: list[str] = []
+        for field_name in (
+            "model_versions",
+            "guardrail_versions",
+            "data_versions",
+            "dependency_versions",
+        ):
+            expected_versions = getattr(self, field_name)
+            observed_versions = getattr(observed, field_name)
+            for key in sorted(expected_versions):
+                if key not in observed_versions:
+                    missing.append(f"{field_name}.{key}")
+        return tuple(missing)
 
     @property
     def is_empty(self) -> bool:
@@ -251,6 +390,14 @@ class ClaimDecayPolicy(DecayModel):
         description=CONFIGURED_HAZARD_NOTICE,
     )
 
+    @field_validator("policy_id")
+    @classmethod
+    def _policy_id_is_not_lifecycle_state(cls, value: str) -> str:
+        stripped = value.strip()
+        if stripped in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("policy_id must not reuse a claim lifecycle state name")
+        return stripped
+
     @model_validator(mode="after")
     def _validate_policy(self) -> ClaimDecayPolicy:
         if (
@@ -269,7 +416,14 @@ class ClaimDecayPolicy(DecayModel):
 
 
 class ClaimDecayRecord(DecayModel):
-    """Signed claim-decay artifact without a live freshness verdict."""
+    """Signed claim-decay artifact without a live freshness verdict.
+
+    This object intentionally stores policy, not live evaluation result.
+
+    Do not add a `state`, `status`, `fresh`, `expired`, or `verdict` field here.
+    Use `evaluate_claim_decay` or `evaluate_claim_decay_with_details` at
+    verification time.
+    """
 
     schema_version: Literal["cc.claim_decay.v1"] = CLAIM_DECAY_SCHEMA_VERSION
     claim_id: str = Field(min_length=1)
@@ -289,40 +443,56 @@ class ClaimDecayRecord(DecayModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _ensure_non_claims(cls, data: Any) -> Any:
+    def _reject_live_state_and_ensure_non_claims(cls, data: Any) -> Any:
         if not isinstance(data, Mapping):
             return data
         payload = dict(data)
-        non_claims = tuple(payload.get("non_claims") or _DEFAULT_DECAY_NON_CLAIMS)
+        forbidden_live_fields = {
+            "state",
+            "status",
+            "freshness_status",
+            "verdict",
+            "is_fresh",
+            "is_expired",
+            "evaluated_at",
+        }
+        present = sorted(forbidden_live_fields & set(payload))
+        if present:
+            raise ValueError(
+                "ClaimDecayRecord stores signed policy only and must not contain live "
+                f"freshness fields: {present}"
+            )
+        non_claims = _coerce_clean_string_tuple(
+            payload.get("non_claims") or _DEFAULT_DECAY_NON_CLAIMS
+        )
+        non_claims = _append_missing(non_claims, _DEFAULT_DECAY_NON_CLAIMS)
         if _policy_has_configured_hazard(payload.get("policy")):
             non_claims = _append_missing(non_claims, _CONFIGURED_HAZARD_NON_CLAIMS)
         payload["non_claims"] = non_claims
         return payload
 
+    @field_validator("claim_id")
+    @classmethod
+    def _claim_id_is_not_lifecycle_state(cls, value: str) -> str:
+        stripped = value.strip()
+        if stripped in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("claim_id must not reuse a claim lifecycle state name")
+        return stripped
+
     @field_validator("issued_at", mode="before")
     @classmethod
-    def _require_timezone(cls, value: datetime) -> datetime:
-        if isinstance(value, str):
-            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("issued_at must be timezone-aware")
-        return value
+    def _require_timezone(cls, value: datetime | str) -> datetime:
+        return _coerce_timezone_aware_datetime(value, "issued_at")
 
     @field_validator("evidence_refs", "notes", "non_claims", mode="before")
     @classmethod
     def _coerce_string_collections(cls, value: Any) -> tuple[str, ...]:
-        if value is None:
-            return ()
-        if isinstance(value, str):
-            return (value,)
-        return tuple(value)
+        return _coerce_clean_string_tuple(value)
 
     @field_validator("evidence_refs", "notes", "non_claims")
     @classmethod
     def _non_empty_strings(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        if any(not item.strip() for item in value):
-            raise ValueError("string collections must contain non-empty strings")
-        return value
+        return _coerce_clean_string_tuple(value)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize signed policy data only, never live fresh/degraded/expired state."""
@@ -331,54 +501,99 @@ class ClaimDecayRecord(DecayModel):
 
 
 def evaluate_claim_decay(
-    record: ClaimDecayRecord,
+    record: ClaimDecayRecord | Mapping[str, Any],
     *,
     now: datetime | None = None,
     as_of: datetime | None = None,
     current_versions: VersionWatchSet | dict[str, Any] | None = None,
 ) -> DecayState:
-    """Evaluate a claim's freshness state at verification time."""
+    """Evaluate a claim's freshness state at verification time.
+
+    Returns only `DecayState` for backward compatibility. Use
+    `evaluate_claim_decay_with_details` when audit details are needed.
+    """
+
+    return evaluate_claim_decay_with_details(
+        record,
+        now=now,
+        as_of=as_of,
+        current_versions=current_versions,
+    ).state
+
+
+def evaluate_claim_decay_with_details(
+    record: ClaimDecayRecord | Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+    as_of: datetime | None = None,
+    current_versions: VersionWatchSet | dict[str, Any] | None = None,
+) -> DecayEvaluation:
+    """Evaluate freshness and return an audit-friendly deterministic result."""
 
     if not isinstance(record, ClaimDecayRecord):
         record = ClaimDecayRecord.model_validate(record)
+
     if now is not None and as_of is not None:
         raise ValueError("provide only one of now or as_of")
+
     verification_time = now or as_of or datetime.now(timezone.utc)
-    if verification_time.tzinfo is None or verification_time.utcoffset() is None:
-        raise ValueError("now/as_of must be timezone-aware")
+    verification_time = _coerce_timezone_aware_datetime(verification_time, "now/as_of")
+
     if verification_time < record.issued_at:
         raise ValueError("now/as_of cannot be earlier than record.issued_at")
 
-    if current_versions is not None and record.version_watch_set.changes_from(current_versions):
-        return DecayState.EXPIRED
-
     age_days = (verification_time - record.issued_at).total_seconds() / 86400.0
+    triggered_rules: list[str] = []
+    version_changes: tuple[str, ...] = ()
+
+    if current_versions is not None:
+        version_changes = record.version_watch_set.changes_from(current_versions)
+        if version_changes:
+            triggered_rules.append("version_watch_set_changed")
+
     state = DecayState.FRESH
 
-    if (
-        record.policy.expires_after_days is not None
-        and age_days >= record.policy.expires_after_days
-    ):
+    if version_changes:
         state = DecayState.EXPIRED
-    elif (
-        record.policy.degraded_after_days is not None
-        and age_days >= record.policy.degraded_after_days
-    ):
-        state = DecayState.DEGRADED
-
-    if record.policy.configured_hazard is not None:
-        half_life = record.policy.configured_hazard.configured_half_life_days(
-            record.hazard_covariates
-        )
-        if age_days >= record.policy.configured_hazard.expired_after_half_lives * half_life:
-            return DecayState.EXPIRED
+    else:
         if (
-            state is DecayState.FRESH
-            and age_days >= record.policy.configured_hazard.degraded_after_half_lives * half_life
+            record.policy.expires_after_days is not None
+            and age_days >= record.policy.expires_after_days
+        ):
+            state = DecayState.EXPIRED
+            triggered_rules.append("expires_after_days")
+        elif (
+            record.policy.degraded_after_days is not None
+            and age_days >= record.policy.degraded_after_days
         ):
             state = DecayState.DEGRADED
+            triggered_rules.append("degraded_after_days")
 
-    return state
+        if record.policy.configured_hazard is not None:
+            half_life = record.policy.configured_hazard.configured_half_life_days(
+                record.hazard_covariates
+            )
+            expired_threshold = record.policy.configured_hazard.expired_after_half_lives * half_life
+            degraded_threshold = (
+                record.policy.configured_hazard.degraded_after_half_lives * half_life
+            )
+
+            if age_days >= expired_threshold:
+                state = DecayState.EXPIRED
+                triggered_rules.append("configured_hazard_expired_threshold")
+            elif state is DecayState.FRESH and age_days >= degraded_threshold:
+                state = DecayState.DEGRADED
+                triggered_rules.append("configured_hazard_degraded_threshold")
+
+    return DecayEvaluation(
+        claim_id=record.claim_id,
+        state=state,
+        evaluated_at=verification_time,
+        age_days=age_days,
+        triggered_rules=_dedupe(triggered_rules),
+        version_changes=version_changes,
+        non_claims=record.non_claims,
+    )
 
 
 def _policy_has_configured_hazard(policy: Any) -> bool:
@@ -397,14 +612,51 @@ def _append_missing(existing: tuple[str, ...], required: tuple[str, ...]) -> tup
     return tuple(values)
 
 
+def _coerce_timezone_aware_datetime(value: datetime | str, field_name: str) -> datetime:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field_name} must be timezone-aware")
+    return value.astimezone(timezone.utc)
+
+
+def _coerce_clean_string_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        values = (value,)
+    else:
+        values = tuple(value)
+    cleaned = tuple(str(item).strip() for item in values)
+    if any(not item for item in cleaned):
+        raise ValueError("string collections must contain non-empty strings")
+    return _dedupe(cleaned)
+
+
+def _dedupe(values: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        item = str(value).strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return tuple(out)
+
+
 __all__ = [
     "CLAIM_DECAY_SCHEMA_VERSION",
+    "CONFIGURED_HAZARD_NOTICE",
+    "DECAY_STATE_NON_LIFECYCLE_NOTICE",
     "ClaimDecayPolicy",
     "ClaimDecayRecord",
     "ConfiguredHazardCovariates",
     "ConfiguredHazardPolicy",
+    "DecayEvaluation",
     "DecayState",
     "DecayStatus",
     "VersionWatchSet",
     "evaluate_claim_decay",
+    "evaluate_claim_decay_with_details",
 ]

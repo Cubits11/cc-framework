@@ -1,4 +1,24 @@
-"""Build machine-checkable CC reports with canonical SHA-256 receipts."""
+"""Build machine-checkable CC reports with canonical SHA-256 receipts.
+
+This module is intentionally report-facing.
+
+Important semantic boundary
+---------------------------
+`ClaimSummary.allowed_claim_level` is a report maturity/support label. It is not
+a claim lifecycle state.
+
+Examples of report maturity/support labels:
+- diagnostic
+- bounded_empirical
+- reproducible_run
+- release_claim
+
+Future lifecycle states such as draft/supported/challenged/expired/revoked
+belong in `cc.claims`, not here.
+
+This distinction is deliberately enforced so the repository does not grow two
+unreconciled claim ontologies.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +31,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from cc import __version__ as framework_version_default
 from cc.reporting.canonical import sha256_canonical
@@ -22,9 +42,48 @@ CANONICALIZATION_METHOD = (
     "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); "
     "receipt.canonical_hash excluded"
 )
-CLAIM_LEVELS = ("diagnostic", "bounded_empirical", "reproducible_run", "release_claim")
+
+# Report maturity/support labels.
+#
+# These are NOT lifecycle states. Do not add lifecycle words such as:
+# draft, supported, challenged, weakened, expired, revoked, superseded, non_claim.
+#
+# Lifecycle belongs in future `cc.claims.ClaimState`.
+ClaimLevel = Literal[
+    "diagnostic",
+    "bounded_empirical",
+    "reproducible_run",
+    "release_claim",
+]
+
+CLAIM_LEVELS: tuple[ClaimLevel, ...] = (
+    "diagnostic",
+    "bounded_empirical",
+    "reproducible_run",
+    "release_claim",
+)
+
+# Preferred clearer alias. Keep CLAIM_LEVELS for compatibility with existing imports/tests.
+CLAIM_MATURITY_LEVELS = CLAIM_LEVELS
+
 ALLOWED_CLAIM_LEVELS = frozenset(CLAIM_LEVELS)
-CLAIM_LEVEL_DESCRIPTIONS = {
+
+# Explicit guardrail against semantic drift when `cc.claims.ClaimState` is added.
+RESERVED_LIFECYCLE_STATE_NAMES = frozenset(
+    {
+        "draft",
+        "supported",
+        "bounded",
+        "challenged",
+        "weakened",
+        "expired",
+        "revoked",
+        "superseded",
+        "non_claim",
+    }
+)
+
+CLAIM_LEVEL_DESCRIPTIONS: dict[ClaimLevel, str] = {
     "diagnostic": "Exploratory or debugging evidence only; not a release or safety claim.",
     "bounded_empirical": (
         "A measured bound or interval scoped to the named run, evaluation distribution, "
@@ -36,9 +95,10 @@ CLAIM_LEVEL_DESCRIPTIONS = {
     ),
     "release_claim": (
         "A release-gate claim only within an external review process; not standalone "
-        "certification of production safety or compliance."
+        "certification of production safety, deployment safety, or compliance."
     ),
 }
+
 CALIBRATION_STATUSES = frozenset({"pass", "fail"})
 
 
@@ -61,7 +121,7 @@ class EnvironmentMetadata:
     python_version: str
     platform: str
     dependency_hash: str | None = None
-    package_snapshot: dict[str, str] | None = None
+    package_snapshot: Mapping[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -171,8 +231,15 @@ class EvidenceArtifact:
 
 @dataclass(frozen=True)
 class ClaimSummary:
+    """Report projection of a claim.
+
+    `allowed_claim_level` is a report maturity/support level. It is not a lifecycle
+    state and must not be used to represent whether a claim is draft, supported,
+    challenged, expired, revoked, or superseded.
+    """
+
     statement: str
-    allowed_claim_level: str
+    allowed_claim_level: ClaimLevel
     non_claims: Sequence[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -201,7 +268,11 @@ def build_cc_report(
     previous_hash: str | None = None,
     cwd: Path | None = None,
 ) -> dict[str, Any]:
-    """Build and validate a CC report dictionary with a canonical receipt."""
+    """Build and validate a CC report dictionary with a canonical receipt.
+
+    The receipt supports artifact integrity/reproducibility inspection. It does
+    not prove safety, deployment readiness, compliance, or real-world validity.
+    """
 
     _validate_inputs(calibration=calibration, measurement=measurement, claim=claim)
 
@@ -275,29 +346,68 @@ def _validate_inputs(
     measurement: MeasurementSummary,
     claim: ClaimSummary,
 ) -> None:
+    _validate_calibration(calibration)
+    _validate_measurement(measurement)
+    _validate_claim(claim, measurement)
+
+
+def _validate_calibration(calibration: CalibrationSummary) -> None:
     if calibration.status not in CALIBRATION_STATUSES:
         raise ReportValidationError("calibration.status must be one of: pass, fail")
     if calibration.target_fpr is None and calibration.alpha_cap is None:
         raise ReportValidationError("calibration must include target_fpr or alpha_cap")
+    if calibration.target_fpr is not None and not 0 <= calibration.target_fpr <= 1:
+        raise ReportValidationError("calibration.target_fpr must be between 0 and 1")
+    if calibration.alpha_cap is not None and not 0 <= calibration.alpha_cap <= 1:
+        raise ReportValidationError("calibration.alpha_cap must be between 0 and 1")
+    if calibration.realized_fpr is not None and not 0 <= calibration.realized_fpr <= 1:
+        raise ReportValidationError("calibration.realized_fpr must be between 0 and 1")
 
+
+def _validate_measurement(measurement: MeasurementSummary) -> None:
     if not measurement.metric_family.strip():
         raise ReportValidationError("measurement.metric_family cannot be empty")
     if not measurement.interval_method.strip():
         raise ReportValidationError("measurement.interval_method cannot be empty")
     if measurement.confidence_level is None and measurement.delta is None:
         raise ReportValidationError("measurement must include confidence_level or delta")
+    if measurement.confidence_level is not None and not 0 < measurement.confidence_level < 1:
+        raise ReportValidationError("measurement.confidence_level must be between 0 and 1")
+    if measurement.delta is not None and not 0 < measurement.delta < 1:
+        raise ReportValidationError("measurement.delta must be between 0 and 1")
     if measurement.interval_lower > measurement.interval_upper:
         raise ReportValidationError("measurement interval lower cannot exceed upper")
+    if not _is_finite_number(measurement.point_estimate):
+        raise ReportValidationError("measurement.point_estimate must be finite")
+    if not _is_finite_number(measurement.interval_lower):
+        raise ReportValidationError("measurement.interval_lower must be finite")
+    if not _is_finite_number(measurement.interval_upper):
+        raise ReportValidationError("measurement.interval_upper must be finite")
 
+    for label, sample_size in measurement.sample_sizes.items():
+        if not isinstance(label, str) or not label:
+            raise ReportValidationError("sample size labels must be non-empty strings")
+        if isinstance(sample_size, bool) or not isinstance(sample_size, int) or sample_size < 0:
+            raise ReportValidationError("sample sizes must be non-negative integers")
+
+
+def _validate_claim(claim: ClaimSummary, measurement: MeasurementSummary) -> None:
     if not claim.statement.strip():
         raise ReportValidationError("claim.statement cannot be empty")
-    non_claims = list(claim.non_claims)
-    if any(not isinstance(item, str) or not item.strip() for item in non_claims):
-        raise ReportValidationError("claim.non_claims must contain non-empty strings")
 
     if claim.allowed_claim_level not in ALLOWED_CLAIM_LEVELS:
         allowed = ", ".join(sorted(ALLOWED_CLAIM_LEVELS))
         raise ReportValidationError(f"claim.allowed_claim_level must be one of: {allowed}")
+
+    if claim.allowed_claim_level in RESERVED_LIFECYCLE_STATE_NAMES:
+        raise ReportValidationError(
+            "claim.allowed_claim_level must be a report maturity level, not a lifecycle state"
+        )
+
+    non_claims = list(claim.non_claims)
+    if any(not isinstance(item, str) or not item.strip() for item in non_claims):
+        raise ReportValidationError("claim.non_claims must contain non-empty strings")
+
     if claim.allowed_claim_level != "diagnostic":
         if not (
             measurement.interval_lower <= measurement.point_estimate <= measurement.interval_upper
@@ -308,11 +418,12 @@ def _validate_inputs(
         if not non_claims:
             raise ReportValidationError("non-diagnostic claims require explicit non_claims")
 
-    for label, sample_size in measurement.sample_sizes.items():
-        if not isinstance(label, str) or not label:
-            raise ReportValidationError("sample size labels must be non-empty strings")
-        if isinstance(sample_size, bool) or not isinstance(sample_size, int) or sample_size < 0:
-            raise ReportValidationError("sample sizes must be non-negative integers")
+
+def _is_finite_number(value: float) -> bool:
+    return not isinstance(value, bool) and value == value and value not in {
+        float("inf"),
+        float("-inf"),
+    }
 
 
 def _utc_now() -> str:

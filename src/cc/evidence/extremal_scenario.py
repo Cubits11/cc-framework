@@ -1,19 +1,55 @@
-"""Serializable extremal scenarios from Frechet and stress kernels."""
+"""Serializable extremal scenarios from Frechet and stress kernels.
+
+This module serializes finite-atom endpoint, stress, and confirmatory failure
+matrix scenarios as evidence artifacts.
+
+Important semantic boundary
+---------------------------
+An extremal scenario is a feasible or fitted scenario artifact. It is not a
+deployment prediction, not a likelihood claim, not a production approval, and
+not a safety certificate.
+
+This module owns:
+
+- finite atom-table scenario serialization;
+- Frechet endpoint scenario construction;
+- stress endpoint scenario construction;
+- confirmatory failure-matrix scenario construction;
+- feasibility diagnostics;
+- adaptive/exploratory field exclusion;
+- mandatory non-claims for scenario artifacts.
+
+This module does not own:
+
+- claim lifecycle state;
+- claim compiler logic;
+- challenge calculus;
+- deployment safety;
+- production readiness;
+- compliance certification;
+- causal truth;
+- external validity;
+- probability that an endpoint world will occur in deployment.
+
+Future `cc.claims` may consume these scenarios as evidence, but an
+`ExtremalScenario` must never be treated as a lifecycle state or a proof that a
+world is likely.
+"""
 
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, is_dataclass
 from enum import Enum
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeAlias, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from cc.evidence.role_ontology import RESERVED_LIFECYCLE_STATE_NAMES
 from cc.kernel.frechet_classes import (
     FrechetBoundResult,
     atom_matrix,
@@ -21,16 +57,81 @@ from cc.kernel.frechet_classes import (
     event_probability,
 )
 from cc.kernel.stress import StressTestResult
+from cc.reporting.canonical import canonical_json_bytes
 
-EXTREMAL_SCENARIO_SCHEMA_VERSION = "cc.extremal_scenario.v1"
+EXTREMAL_SCENARIO_SCHEMA_VERSION: Literal["cc.extremal_scenario.v1"] = "cc.extremal_scenario.v1"
+
 _DISTRIBUTION_TOL = 1.0e-8
 _NEGATIVE_PROBABILITY_TOL = 1.0e-10
+
+ScenarioSource: TypeAlias = Literal[
+    "frechet",
+    "stress",
+    "empirical_confirmatory",
+]
+
+ScenarioEpistemicStatus: TypeAlias = Literal[
+    "extremal_feasibility_witness",
+    "stress_feasibility_witness",
+    "confirmatory_empirical_summary",
+]
+
+ScenarioBoundary: TypeAlias = Literal[
+    "feasibility_not_likelihood",
+    "stress_not_forecast",
+    "empirical_not_deployment_safety",
+    "fitted_not_model_truth",
+    "confirmatory_not_external_validity",
+]
+
+PROHIBITED_ADAPTIVE_FIELDS = frozenset(
+    {
+        "certificate_ci",
+        "exploratory_ci",
+        "adaptive_search_ci",
+        "non_confirmatory_ci",
+        "exploratory_certificate_ci",
+    }
+)
+
+SCENARIO_NOT_LIFECYCLE_STATE_NON_CLAIM = (
+    "Scenario kind and feasibility status are evidence-artifact properties, not claim "
+    "lifecycle states."
+)
+
+FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM = (
+    "A feasible extremal endpoint does not prove the endpoint world is likely."
+)
+
+SCENARIO_NOT_DEPLOYMENT_NON_CLAIM = (
+    "This scenario does not certify deployment safety, production readiness, or legal compliance."
+)
+
+SCENARIO_NOT_EXTERNAL_VALIDITY_NON_CLAIM = (
+    "This scenario does not generalize beyond its stated marginals, constraints, sample scope, "
+    "and assumptions."
+)
+
+FITTED_NOT_MODEL_TRUTH_NON_CLAIM = (
+    "A fitted or empirical scenario does not prove the fitted dependence model is true."
+)
+
+STRESS_NOT_FORECAST_NON_CLAIM = (
+    "A stress scenario is a counterfactual or constrained stress artifact, not a forecast "
+    "of deployment behavior."
+)
+
+CONFIRMATORY_MATRIX_NOT_DEPLOYMENT_NON_CLAIM = (
+    "A confirmatory failure matrix is scoped to its declared protocol/sample and does not "
+    "certify deployment safety."
+)
+
 _DEFAULT_NON_CLAIMS = (
     "This scenario is an extremal or fitted evidence artifact, not a deployment approval.",
-    "This scenario does not certify production safety or legal compliance.",
-    "This scenario does not generalize beyond its stated marginals, constraints, and sample scope.",
-    "An extremal_scenario artifact does not prove the endpoint scenario is likely; it records "
-    "a feasible endpoint/fitted scenario under the stated assumptions.",
+    SCENARIO_NOT_DEPLOYMENT_NON_CLAIM,
+    SCENARIO_NOT_EXTERNAL_VALIDITY_NON_CLAIM,
+    FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM,
+    SCENARIO_NOT_LIFECYCLE_STATE_NON_CLAIM,
 )
 
 
@@ -47,7 +148,10 @@ class ExtremalModel(BaseModel):
 
 
 class ScenarioKind(str, Enum):
-    """Kind of endpoint or fitted scenario represented by the evidence object."""
+    """Kind of endpoint or fitted scenario represented by the evidence object.
+
+    This is not a claim lifecycle state.
+    """
 
     FRECHET_ENDPOINT = "frechet_endpoint"
     STRESS_ENDPOINT = "stress_endpoint"
@@ -71,7 +175,11 @@ class GuardrailOutcome(ExtremalModel):
 
 
 class ScenarioFeasibility(ExtremalModel):
-    """Residual diagnostics against the scenario's defining constraints."""
+    """Residual diagnostics against the scenario's defining constraints.
+
+    Feasible means numerically compatible with the declared constraints. It does
+    not mean likely, true, deployed, representative, or safe.
+    """
 
     probability_sum: float
     min_probability: float
@@ -86,6 +194,20 @@ class ScenarioFeasibility(ExtremalModel):
     objective_residual: float | None = None
     max_abs_residual: float
     is_feasible: bool = True
+
+    @field_validator("pairwise_residuals")
+    @classmethod
+    def _pairwise_residuals_are_sorted(cls, value: dict[str, float]) -> dict[str, float]:
+        cleaned: dict[str, float] = {}
+        for raw_key, raw_item in value.items():
+            key = str(raw_key).strip()
+            item = float(raw_item)
+            if not key:
+                raise ValueError("pairwise residual keys must be non-empty")
+            if not math.isfinite(item):
+                raise ValueError(f"pairwise residual {key!r} must be finite")
+            cleaned[key] = item
+        return dict(sorted(cleaned.items()))
 
     @model_validator(mode="after")
     def _require_finite_residuals(self) -> ScenarioFeasibility:
@@ -107,11 +229,19 @@ class ScenarioFeasibility(ExtremalModel):
         values.append(self.max_abs_residual)
         if any(not math.isfinite(float(value)) for value in values):
             raise ValueError("feasibility residuals must be finite")
+        if self.negative_probability_count > 0 and self.is_feasible:
+            raise ValueError("scenario with negative probabilities cannot be feasible")
+        if self.max_abs_residual > _DISTRIBUTION_TOL and self.is_feasible:
+            raise ValueError("scenario with excessive residuals cannot be feasible")
         return self
 
 
 class ExcludedEvidenceField(ExtremalModel):
-    """Field intentionally excluded from scenario evidence."""
+    """Field intentionally excluded from scenario evidence.
+
+    This is how the artifact records that exploratory/adaptive quantities were
+    seen but were not allowed to become confirmatory evidence.
+    """
 
     field_name: str = Field(min_length=1)
     reason: str = Field(min_length=1)
@@ -130,7 +260,8 @@ class ExtremalScenario(ExtremalModel):
     schema_version: Literal["cc.extremal_scenario.v1"] = EXTREMAL_SCENARIO_SCHEMA_VERSION
     scenario_id: str = Field(min_length=1)
     kind: ScenarioKind
-    source: str = Field(min_length=1)
+    epistemic_status: ScenarioEpistemicStatus
+    source: ScenarioSource
     source_kernel: str = Field(min_length=1)
     source_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     guardrail_ids: tuple[str, ...] = Field(min_length=1)
@@ -145,12 +276,112 @@ class ExtremalScenario(ExtremalModel):
     top_outcomes: tuple[GuardrailOutcome, ...]
     feasibility: ScenarioFeasibility
     narrative: str = Field(min_length=1)
+    boundary_tags: tuple[ScenarioBoundary, ...] = Field(default_factory=tuple)
     non_claims: tuple[str, ...] = Field(default_factory=lambda: _DEFAULT_NON_CLAIMS)
     excluded_evidence_fields: tuple[ExcludedEvidenceField, ...] = Field(default_factory=tuple)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_live_claim_status_fields_and_ensure_non_claims(cls, data: Any) -> Any:
+        if not isinstance(data, Mapping):
+            return data
+        payload = dict(data)
+        forbidden_live_fields = {
+            "claim_state",
+            "lifecycle_state",
+            "verdict",
+            "status",
+            "supported",
+            "certified",
+            "production_ready",
+            "deployment_safe",
+            "likelihood_claim",
+            "deployment_realization_claim",
+            "model_truth_claim",
+        }
+        present = sorted(forbidden_live_fields & set(payload))
+        if present:
+            raise ValueError(
+                "ExtremalScenario stores scenario evidence only and must not contain "
+                f"live claim/lifecycle/deployment fields: {present}"
+            )
+
+        non_claims = _coerce_string_tuple(payload.get("non_claims") or _DEFAULT_NON_CLAIMS)
+        non_claims = _append_missing(non_claims, _DEFAULT_NON_CLAIMS)
+
+        kind = payload.get("kind")
+        source = payload.get("source")
+        if kind == ScenarioKind.STRESS_ENDPOINT or kind == ScenarioKind.STRESS_ENDPOINT.value:
+            non_claims = _append_missing(non_claims, (STRESS_NOT_FORECAST_NON_CLAIM,))
+        if (
+            kind == ScenarioKind.CONFIRMATORY_FAILURE_MATRIX
+            or kind == ScenarioKind.CONFIRMATORY_FAILURE_MATRIX.value
+        ):
+            non_claims = _append_missing(
+                non_claims,
+                (
+                    CONFIRMATORY_MATRIX_NOT_DEPLOYMENT_NON_CLAIM,
+                    FITTED_NOT_MODEL_TRUTH_NON_CLAIM,
+                ),
+            )
+        if str(source).startswith("empirical"):
+            non_claims = _append_missing(non_claims, (FITTED_NOT_MODEL_TRUTH_NON_CLAIM,))
+
+        payload["non_claims"] = non_claims
+        return payload
+
+    @field_validator("scenario_id", "source_kernel", "endpoint")
+    @classmethod
+    def _ids_are_not_lifecycle_states(cls, value: str) -> str:
+        stripped = value.strip()
+        if stripped in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("scenario identifiers must not reuse claim lifecycle state names")
+        return stripped
+
+    @field_validator("guardrail_ids", "non_claims", mode="before")
+    @classmethod
+    def _coerce_string_sequences(cls, value: Any) -> tuple[str, ...]:
+        return _coerce_string_tuple(value)
+
+    @field_validator("guardrail_ids", "non_claims")
+    @classmethod
+    def _string_sequences_are_non_empty(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return _non_empty_string_tuple(value)
+
+    @field_validator("boundary_tags", mode="before")
+    @classmethod
+    def _coerce_boundary_tags(cls, value: Any) -> tuple[Any, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, str):
+            return (value,)
+        return tuple(value)
+
+    @field_validator("metadata")
+    @classmethod
+    def _metadata_is_jsonable_and_boundary_safe(cls, value: dict[str, Any]) -> dict[str, Any]:
+        jsonable = _jsonable(value)
+        if not isinstance(jsonable, Mapping):
+            raise ValueError("metadata must be JSON-object-like")
+        for forbidden in (
+            "deployment_safety_support",
+            "production_ready",
+            "certified",
+            "model_truth_claim",
+            "likelihood_claim",
+            "deployment_realization_claim",
+        ):
+            if forbidden in jsonable:
+                raise ValueError(
+                    f"metadata must not contain forbidden overclaim field {forbidden!r}"
+                )
+        return dict(sorted(cast(Mapping[str, Any], jsonable).items()))
+
     @model_validator(mode="after")
-    def _validate_atom_table(self) -> ExtremalScenario:
+    def _validate_atom_table_and_boundaries(self) -> ExtremalScenario:
+        if self.kind.value in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("scenario kind must not reuse a lifecycle state name")
         if len(self.guardrail_ids) != self.n_guardrails:
             raise ValueError("guardrail_ids length must match n_guardrails")
         expected = 1 << self.n_guardrails
@@ -162,18 +393,67 @@ class ExtremalScenario(ExtremalModel):
             raise ValueError("all atom outcomes must match n_guardrails")
         if [outcome.atom_index for outcome in self.atom_table] != list(range(expected)):
             raise ValueError("atom_table must be ordered by atom_index")
+
         total = sum(outcome.probability for outcome in self.atom_table)
         if not math.isclose(total, 1.0, abs_tol=_DISTRIBUTION_TOL):
             raise ValueError(f"atom_table probabilities must sum to 1, got {total}")
+
         if not self.top_outcomes:
             raise ValueError("top_outcomes must contain at least one outcome")
         if any(outcome not in self.atom_table for outcome in self.top_outcomes):
             raise ValueError("top_outcomes must be drawn from atom_table")
+
         expected_top = _top_outcomes(self.atom_table, top_k=len(self.top_outcomes))
         if self.top_outcomes != expected_top:
             raise ValueError("top_outcomes must be sorted deterministically from atom_table")
+
         if self.event_definition is None and self.objective is None:
             raise ValueError("scenario must include event_definition or objective")
+
+        calculated_event_probability = sum(
+            outcome.probability for outcome in self.atom_table if outcome.event_occurs
+        )
+        if not math.isclose(
+            calculated_event_probability,
+            self.event_probability,
+            abs_tol=_DISTRIBUTION_TOL,
+        ):
+            raise ValueError("event_probability must match atom_table event mass")
+
+        required_non_claims = set(_DEFAULT_NON_CLAIMS)
+        if self.kind is ScenarioKind.STRESS_ENDPOINT:
+            required_non_claims.add(STRESS_NOT_FORECAST_NON_CLAIM)
+        if self.kind is ScenarioKind.CONFIRMATORY_FAILURE_MATRIX:
+            required_non_claims.add(CONFIRMATORY_MATRIX_NOT_DEPLOYMENT_NON_CLAIM)
+
+        missing = sorted(required_non_claims - set(self.non_claims))
+        if missing:
+            raise ValueError(f"scenario is missing mandatory non-claims: {missing}")
+
+        if self.kind is ScenarioKind.FRECHET_ENDPOINT:
+            if self.epistemic_status != "extremal_feasibility_witness":
+                raise ValueError("frechet_endpoint must use extremal_feasibility_witness status")
+            if "feasibility_not_likelihood" not in self.boundary_tags:
+                raise ValueError(
+                    "frechet_endpoint requires feasibility_not_likelihood boundary tag"
+                )
+
+        if self.kind is ScenarioKind.STRESS_ENDPOINT:
+            if self.epistemic_status != "stress_feasibility_witness":
+                raise ValueError("stress_endpoint must use stress_feasibility_witness status")
+            if "stress_not_forecast" not in self.boundary_tags:
+                raise ValueError("stress_endpoint requires stress_not_forecast boundary tag")
+
+        if self.kind is ScenarioKind.CONFIRMATORY_FAILURE_MATRIX:
+            if self.epistemic_status != "confirmatory_empirical_summary":
+                raise ValueError(
+                    "confirmatory_failure_matrix must use confirmatory_empirical_summary status"
+                )
+            if "confirmatory_not_external_validity" not in self.boundary_tags:
+                raise ValueError(
+                    "confirmatory_failure_matrix requires confirmatory_not_external_validity tag"
+                )
+
         return self
 
     @classmethod
@@ -194,6 +474,7 @@ class ExtremalScenario(ExtremalModel):
         )
         if distribution is None:
             raise ValueError("Frechet result does not include endpoint distributions")
+
         target = result.upper if endpoint == "upper" else result.lower
         n_guardrails = int(result.marginals.size)
         feasibility = _feasibility(
@@ -208,6 +489,7 @@ class ExtremalScenario(ExtremalModel):
         )
         event_prob = event_probability(distribution, event=result.event, n_events=n_guardrails)
         atom_table = _atom_table(distribution, event=result.event, n_events=n_guardrails)
+
         return cls(
             scenario_id=scenario_id
             or _scenario_id(
@@ -221,6 +503,7 @@ class ExtremalScenario(ExtremalModel):
                 },
             ),
             kind=ScenarioKind.FRECHET_ENDPOINT,
+            epistemic_status="extremal_feasibility_witness",
             source="frechet",
             source_kernel="frechet",
             source_hash=source_hash,
@@ -240,7 +523,12 @@ class ExtremalScenario(ExtremalModel):
             narrative=narrative
             or (
                 f"Frechet {endpoint} endpoint for the {result.event.upper()} composed "
-                "failure event under the supplied marginals and side constraints."
+                "failure event under the supplied marginals and side constraints. "
+                "This is a feasible endpoint witness, not a likelihood claim."
+            ),
+            boundary_tags=(
+                "feasibility_not_likelihood",
+                "empirical_not_deployment_safety",
             ),
             metadata={
                 "frechet_lower": float(result.lower),
@@ -269,6 +557,7 @@ class ExtremalScenario(ExtremalModel):
         else:
             distribution = result.frechet_limit_distribution
             target = result.frechet_upper
+
         n_guardrails = int(result.marginals.size)
         feasibility = _feasibility(
             distribution,
@@ -277,6 +566,7 @@ class ExtremalScenario(ExtremalModel):
             expected_event_probability=float(target),
         )
         atom_table = _atom_table(distribution, event=result.event, n_events=n_guardrails)
+
         return cls(
             scenario_id=scenario_id
             or _scenario_id(
@@ -290,6 +580,7 @@ class ExtremalScenario(ExtremalModel):
                 },
             ),
             kind=ScenarioKind.STRESS_ENDPOINT,
+            epistemic_status="stress_feasibility_witness",
             source="stress",
             source_kernel="stress",
             source_hash=source_hash,
@@ -309,8 +600,14 @@ class ExtremalScenario(ExtremalModel):
             narrative=narrative
             or (
                 f"Stress {endpoint} scenario for the {result.event.upper()} composed "
-                "failure event under the fixed-marginal stress budget."
+                "failure event under the fixed-marginal stress budget. This is a stress "
+                "witness, not a forecast."
             ),
+            boundary_tags=(
+                "stress_not_forecast",
+                "empirical_not_deployment_safety",
+            ),
+            non_claims=_append_missing(_DEFAULT_NON_CLAIMS, (STRESS_NOT_FORECAST_NON_CLAIM,)),
             metadata={
                 "baseline_risk": float(result.baseline_risk),
                 "stressed_risk": float(result.stressed_risk),
@@ -340,10 +637,12 @@ class ExtremalScenario(ExtremalModel):
     ) -> ExtremalScenario:
         """Build empirical scenario evidence from a non-adaptive failure matrix."""
 
+        _validate_confirmatory_ci(confirmatory_ci)
         distribution, n_guardrails = _distribution_from_failure_matrix(failures)
         event_prob = event_probability(distribution, event=event, n_events=n_guardrails)
         atom_table = _atom_table(distribution, event=event, n_events=n_guardrails)
         exclusions = excluded_evidence_fields_from_payload(source_payload or {})
+
         return cls(
             scenario_id=scenario_id
             or _scenario_id(
@@ -356,6 +655,7 @@ class ExtremalScenario(ExtremalModel):
                 },
             ),
             kind=ScenarioKind.CONFIRMATORY_FAILURE_MATRIX,
+            epistemic_status="confirmatory_empirical_summary",
             source="empirical_confirmatory",
             source_kernel="empirical_confirmatory",
             source_hash=source_hash,
@@ -373,7 +673,22 @@ class ExtremalScenario(ExtremalModel):
             top_outcomes=_top_outcomes(atom_table, top_k=top_k),
             feasibility=_feasibility(distribution, event=event),
             narrative=narrative
-            or "Confirmatory empirical failure-matrix scenario from a non-adaptive sample.",
+            or (
+                "Confirmatory empirical failure-matrix scenario from a non-adaptive sample. "
+                "This summarizes the declared sample and does not certify deployment safety."
+            ),
+            boundary_tags=(
+                "confirmatory_not_external_validity",
+                "empirical_not_deployment_safety",
+                "fitted_not_model_truth",
+            ),
+            non_claims=_append_missing(
+                _DEFAULT_NON_CLAIMS,
+                (
+                    CONFIRMATORY_MATRIX_NOT_DEPLOYMENT_NON_CLAIM,
+                    FITTED_NOT_MODEL_TRUTH_NON_CLAIM,
+                ),
+            ),
             excluded_evidence_fields=exclusions,
             metadata={
                 "confirmatory_ci": [float(confirmatory_ci[0]), float(confirmatory_ci[1])],
@@ -381,6 +696,16 @@ class ExtremalScenario(ExtremalModel):
                 "atom_order": "little_endian",
             },
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the scenario as deterministic JSON-compatible data."""
+
+        return self.model_dump(mode="json", by_alias=True)
+
+    def canonical_hash(self) -> str:
+        """Return SHA-256 over canonical scenario JSON."""
+
+        return hashlib.sha256(canonical_json_bytes(self.to_dict())).hexdigest()
 
 
 def excluded_evidence_fields_from_payload(
@@ -391,13 +716,7 @@ def excluded_evidence_fields_from_payload(
     excluded: list[ExcludedEvidenceField] = []
     for path, _value in _walk(payload):
         leaf = path.rsplit(".", 1)[-1]
-        if leaf in {
-            "certificate_ci",
-            "exploratory_ci",
-            "adaptive_search_ci",
-            "non_confirmatory_ci",
-            "exploratory_certificate_ci",
-        }:
+        if leaf in PROHIBITED_ADAPTIVE_FIELDS:
             excluded.append(
                 ExcludedEvidenceField(
                     field_name=leaf,
@@ -421,6 +740,7 @@ def _atom_table(
     pmf = _as_distribution(distribution, n_events)
     states = atom_matrix(n_events)
     rows: list[GuardrailOutcome] = []
+
     for idx, (state, probability) in enumerate(zip(states, pmf, strict=True)):
         failures = tuple(int(item) for item in state.tolist())
         event_occurs = all(failures) if event == "and" else any(failures)
@@ -432,6 +752,7 @@ def _atom_table(
                 event_occurs=bool(event_occurs),
             )
         )
+
     return tuple(rows)
 
 
@@ -457,13 +778,15 @@ def _feasibility(
     raw_pmf = _raw_distribution(distribution, None)
     pmf = _as_distribution(distribution, None)
     n_events = int(math.log2(pmf.size))
+
     probability_sum = float(np.sum(raw_pmf))
     total_residual = float(probability_sum - 1.0)
     min_probability = float(np.min(raw_pmf))
     max_probability = float(np.max(raw_pmf))
     negative_probability_count = int(np.sum(raw_pmf < 0.0))
+
     marginals, pairwise = distribution_moments(pmf, n_events)
-    marginal_residuals: tuple[float, ...]
+
     if expected_marginals is None:
         marginal_residuals = tuple(0.0 for _ in range(n_events))
     else:
@@ -471,6 +794,7 @@ def _feasibility(
         if expected.shape != marginals.shape:
             raise ValueError("expected_marginals length must match distribution dimension")
         marginal_residuals = tuple(float(item) for item in (marginals - expected))
+
     marginal_residual_linf = (
         max(abs(float(item)) for item in marginal_residuals) if marginal_residuals else 0.0
     )
@@ -487,10 +811,13 @@ def _feasibility(
         event_residual = float(
             event_probability(pmf, event=event, n_events=n_events) - expected_event_probability
         )
+
     residuals = [total_residual, *marginal_residuals, *pairwise_residuals.values()]
     if event_residual is not None:
         residuals.append(event_residual)
+
     max_abs_residual = max(abs(float(item)) for item in residuals) if residuals else 0.0
+
     return ScenarioFeasibility(
         probability_sum=probability_sum,
         min_probability=min_probability,
@@ -499,7 +826,7 @@ def _feasibility(
         total_probability_residual=total_residual,
         marginal_residuals=marginal_residuals,
         marginal_residual_linf=marginal_residual_linf,
-        pairwise_residuals=pairwise_residuals,
+        pairwise_residuals=dict(sorted(pairwise_residuals.items())),
         event_probability_residual=event_residual,
         bound_residual=event_residual,
         objective_residual=event_residual,
@@ -512,14 +839,17 @@ def _distribution_from_failure_matrix(
     failures: Sequence[Sequence[int | bool]],
 ) -> tuple[NDArray[np.float64], int]:
     arr = np.asarray(failures, dtype=int)
+
     if arr.ndim != 2 or arr.shape[0] < 1 or arr.shape[1] < 2:
         raise ValueError("failures must be a non-empty 2D matrix with at least two guardrails")
     if not np.all((arr == 0) | (arr == 1)):
         raise ValueError("failures must be binary")
+
     n_events = int(arr.shape[1])
     weights = 1 << np.arange(n_events, dtype=int)
     atom_ids = arr @ weights
     counts = np.bincount(atom_ids, minlength=1 << n_events).astype(float)
+
     return counts / float(np.sum(counts)), n_events
 
 
@@ -529,7 +859,11 @@ def _as_distribution(
 ) -> NDArray[np.float64]:
     pmf = _raw_distribution(distribution, n_events)
     total = float(np.sum(pmf))
-    return cast(NDArray[np.float64], np.clip(pmf, 0.0, 1.0) / total)
+    if total <= 0.0:
+        raise ValueError("distribution total probability must be positive")
+    clipped = np.clip(pmf, 0.0, 1.0)
+    normalized = clipped / float(np.sum(clipped))
+    return cast(NDArray[np.float64], normalized)
 
 
 def _raw_distribution(
@@ -537,22 +871,38 @@ def _raw_distribution(
     n_events: int | None,
 ) -> NDArray[np.float64]:
     pmf = np.asarray(distribution, dtype=float)
+
     if pmf.ndim != 1:
         raise ValueError("distribution must be one-dimensional")
     if not np.all(np.isfinite(pmf)):
         raise ValueError("distribution must be finite")
     if np.any(pmf < -_NEGATIVE_PROBABILITY_TOL):
         raise ValueError("distribution entries must be nonnegative")
+
     if n_events is None:
         if pmf.size == 0 or pmf.size & (pmf.size - 1):
             raise ValueError("distribution length must be a positive power of two")
         n_events = int(math.log2(pmf.size))
+
     if pmf.size != 1 << int(n_events):
         raise ValueError("distribution length must equal 2**n_events")
+
     total = float(np.sum(pmf))
     if not math.isclose(total, 1.0, abs_tol=_DISTRIBUTION_TOL):
         raise ValueError(f"distribution must sum to 1, got {total}")
-    return cast(NDArray[np.float64], pmf)
+
+    cleaned = np.where(np.abs(pmf) <= _NEGATIVE_PROBABILITY_TOL, 0.0, pmf)
+    return cast(NDArray[np.float64], cleaned)
+
+
+def _validate_confirmatory_ci(confirmatory_ci: tuple[float, float]) -> None:
+    lower, upper = float(confirmatory_ci[0]), float(confirmatory_ci[1])
+    if not (math.isfinite(lower) and math.isfinite(upper)):
+        raise ValueError("confirmatory_ci bounds must be finite")
+    if lower < 0.0 or upper > 1.0:
+        raise ValueError("confirmatory_ci must lie in [0, 1]")
+    if lower > upper:
+        raise ValueError("confirmatory_ci lower cannot exceed upper")
 
 
 def _default_guardrail_ids(n_guardrails: int) -> tuple[str, ...]:
@@ -560,9 +910,7 @@ def _default_guardrail_ids(n_guardrails: int) -> tuple[str, ...]:
 
 
 def _scenario_id(source_kernel: str, endpoint: str, payload: Mapping[str, Any]) -> str:
-    digest = hashlib.sha256(
-        json.dumps(_jsonable(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    digest = hashlib.sha256(canonical_json_bytes(_jsonable(payload))).hexdigest()
     return f"scenario-{source_kernel}-{endpoint}-{digest[:12]}"
 
 
@@ -579,13 +927,13 @@ def _walk(value: Any, path: str = "$") -> list[tuple[str, Any]]:
 
 def _jsonable(value: Any) -> Any:
     if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
+        return value.model_dump(mode="json", by_alias=True)
     if is_dataclass(value) and not isinstance(value, type):
         return _jsonable(asdict(value))
     if isinstance(value, np.ndarray):
         return [_jsonable(item) for item in value.tolist()]
     if isinstance(value, Mapping):
-        return {str(key): _jsonable(item) for key, item in value.items()}
+        return {str(key): _jsonable(item) for key, item in sorted(value.items())}
     if isinstance(value, tuple):
         return [_jsonable(item) for item in value]
     if isinstance(value, list):
@@ -597,12 +945,60 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _coerce_string_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        values = (value,)
+    else:
+        values = tuple(value)
+    return tuple(str(item).strip() for item in values if str(item).strip())
+
+
+def _non_empty_string_tuple(value: tuple[str, ...]) -> tuple[str, ...]:
+    cleaned = tuple(str(item).strip() for item in value)
+    if any(not item for item in cleaned):
+        raise ValueError("string collections must contain non-empty strings")
+    return _dedupe(cleaned)
+
+
+def _append_missing(existing: tuple[str, ...], required: tuple[str, ...]) -> tuple[str, ...]:
+    values = list(existing)
+    for item in required:
+        if item not in values:
+            values.append(item)
+    return tuple(values)
+
+
+def _dedupe(values: Sequence[str]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        item = str(value).strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return tuple(out)
+
+
 __all__ = [
+    "CONFIRMATORY_MATRIX_NOT_DEPLOYMENT_NON_CLAIM",
     "EXTREMAL_SCENARIO_SCHEMA_VERSION",
+    "FEASIBILITY_NOT_LIKELIHOOD_NON_CLAIM",
+    "FITTED_NOT_MODEL_TRUTH_NON_CLAIM",
+    "PROHIBITED_ADAPTIVE_FIELDS",
+    "SCENARIO_NOT_DEPLOYMENT_NON_CLAIM",
+    "SCENARIO_NOT_EXTERNAL_VALIDITY_NON_CLAIM",
+    "SCENARIO_NOT_LIFECYCLE_STATE_NON_CLAIM",
+    "STRESS_NOT_FORECAST_NON_CLAIM",
     "ExcludedEvidenceField",
     "ExtremalScenario",
     "GuardrailOutcome",
+    "ScenarioBoundary",
+    "ScenarioEpistemicStatus",
     "ScenarioFeasibility",
     "ScenarioKind",
+    "ScenarioSource",
     "excluded_evidence_fields_from_payload",
 ]

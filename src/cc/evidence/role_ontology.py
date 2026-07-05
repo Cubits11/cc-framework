@@ -1,23 +1,93 @@
 """Conservative evidence-role ontology for evidence-bound claims.
 
-An evidence role is a typed permission set, not a label.  The definitions in
-this module say what a role may support, what it must not support, which
-non-claims must remain visible, and which payload fields are required or
-forbidden when a semantic artifact is attached to a report.
+An evidence role is a typed permission set, not a decorative label.
+
+This module answers one narrow question:
+
+    Given an evidence artifact role, what may that role support, what must it
+    never support, which non-claims must remain visible, and which semantic
+    payload fields are required or forbidden?
+
+Important semantic boundary
+---------------------------
+This module owns evidence-role support semantics.
+
+It does not own claim lifecycle state.
+
+Lifecycle states such as draft/supported/bounded/challenged/weakened/expired/
+revoked/superseded/non_claim belong in future `cc.claims.ClaimState`, not here.
+
+Report maturity/support levels such as diagnostic/bounded_empirical/
+reproducible_run/release_claim are imported from `cc.reporting.report` so this
+module does not silently grow a second claim-level taxonomy.
+
+The intended ontology split is:
+
+- `cc.reporting.report`: report-facing claim maturity/support labels.
+- `cc.evidence.role_ontology`: evidence-role support permissions.
+- `cc.evidence.claim_governance`: verification of evidence/report consistency.
+- future `cc.claims`: lifecycle state, transitions, assumptions, challenges,
+  expiry, and first-class claim objects.
+
+Do not add new claim lifecycle states to this file.
+Do not use an evidence role as proof of safety.
+Do not allow integrity/provenance/review evidence to upgrade semantic truth.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from cc.reporting.report import CLAIM_LEVELS, ClaimLevel
 
 ROLE_ONTOLOGY_SCHEMA_VERSION: Literal["cc.evidence_role_ontology.v1"] = (
     "cc.evidence_role_ontology.v1"
 )
 
-ClaimLevel = Literal["diagnostic", "bounded_empirical", "reproducible_run", "release_claim"]
+# ---------------------------------------------------------------------------
+# Ontology boundary constants
+# ---------------------------------------------------------------------------
+
+# These names are reserved for future `cc.claims.ClaimState`.
+# They must never become report claim levels or evidence roles.
+RESERVED_LIFECYCLE_STATE_NAMES = frozenset(
+    {
+        "draft",
+        "supported",
+        "bounded",
+        "challenged",
+        "weakened",
+        "expired",
+        "revoked",
+        "superseded",
+        "non_claim",
+    }
+)
+
+# Report-facing maturity/support levels imported from cc.reporting.report.
+# Keep this alias local so the role ontology can describe its own intent without
+# redefining the taxonomy.
+ClaimMaturityLevel: TypeAlias = ClaimLevel
+
+_ALL_CLAIM_LEVELS: tuple[ClaimLevel, ...] = CLAIM_LEVELS
+_CONFIRMATORY_CLAIM_LEVELS: tuple[ClaimLevel, ...] = (
+    "bounded_empirical",
+    "reproducible_run",
+    "release_claim",
+)
+
+if set(_ALL_CLAIM_LEVELS) & RESERVED_LIFECYCLE_STATE_NAMES:  # pragma: no cover
+    raise RuntimeError(
+        "report claim levels must remain disjoint from lifecycle state names"
+    )
+
+# ---------------------------------------------------------------------------
+# Type vocabularies
+# ---------------------------------------------------------------------------
+
 SupportRelation = Literal[
     "supports",
     "bounds",
@@ -28,7 +98,14 @@ SupportRelation = Literal[
     "exploratory_suggests",
     "confirmatory_tests",
 ]
-SupportStrength = Literal["weak", "diagnostic", "confirmatory", "integrity_only"]
+
+SupportStrength = Literal[
+    "weak",
+    "diagnostic",
+    "confirmatory",
+    "integrity_only",
+]
+
 SemanticClass = Literal[
     "measurement",
     "calibration",
@@ -41,6 +118,7 @@ SemanticClass = Literal[
     "generic",
     "unknown",
 ]
+
 StalenessBehavior = Literal[
     "none",
     "verification_time",
@@ -48,27 +126,32 @@ StalenessBehavior = Literal[
     "review_expiry",
     "unknown",
 ]
-ExploratoryStatus = Literal["not_exploratory", "exploratory", "mixed", "unknown"]
+
+ExploratoryStatus = Literal[
+    "not_exploratory",
+    "exploratory",
+    "mixed",
+    "unknown",
+]
+
 ConfirmatoryStatus = Literal[
     "not_confirmatory",
     "confirmatory",
     "requires_confirmation",
     "unknown",
 ]
-FieldMatchMode = Literal["path", "leaf", "path_or_leaf"]
-InvalidationSeverity = Literal["review", "invalidates", "expires"]
 
-_ALL_CLAIM_LEVELS: tuple[ClaimLevel, ...] = (
-    "diagnostic",
-    "bounded_empirical",
-    "reproducible_run",
-    "release_claim",
-)
-_CONFIRMATORY_CLAIM_LEVELS: tuple[ClaimLevel, ...] = (
-    "bounded_empirical",
-    "reproducible_run",
-    "release_claim",
-)
+FieldMatchMode = Literal[
+    "path",
+    "leaf",
+    "path_or_leaf",
+]
+
+InvalidationSeverity = Literal[
+    "review",
+    "invalidates",
+    "expires",
+]
 
 
 class RoleOntologyModel(BaseModel):
@@ -78,7 +161,21 @@ class RoleOntologyModel(BaseModel):
 
 
 class SupportPermission(RoleOntologyModel):
-    """A narrow support edge a role is allowed to provide."""
+    """A narrow support edge an evidence role is allowed to provide.
+
+    This is not a claim lifecycle state.
+
+    A support permission describes a permitted evidence-to-claim-fragment edge:
+
+    - relation: how support is allowed to behave;
+    - strength: conservative support strength;
+    - target_claim_fragments: machine-readable target fragments;
+    - support_scope: human-readable scope boundary.
+
+    Example:
+        receipt_integrity may integrity-bind report bytes.
+        It may not support deployment safety or statistical validity.
+    """
 
     relation: SupportRelation
     strength: SupportStrength
@@ -92,7 +189,12 @@ class SupportPermission(RoleOntologyModel):
 
 
 class UnsupportedClaim(RoleOntologyModel):
-    """A claim family this role must not be used to support."""
+    """A claim family this evidence role must not be used to support.
+
+    This is a negative support rule. It is not yet the same thing as a future
+    `cc.claims.NonClaim`, but it is one source from which mandatory non-claims
+    can be generated.
+    """
 
     claim_type: str = Field(min_length=1)
     target_markers: tuple[str, ...] = Field(min_length=1)
@@ -105,7 +207,13 @@ class UnsupportedClaim(RoleOntologyModel):
 
 
 class MandatoryNonClaim(RoleOntologyModel):
-    """Machine-readable non-claim boundary required by a role."""
+    """Machine-readable non-claim boundary required by an evidence role.
+
+    This is the evidence layer's seed for first-class non-claims. Future
+    `cc.claims.NonClaim` may consume or project this object, but this role
+    ontology remains responsible for saying which non-claims are mandatory for
+    each evidence role.
+    """
 
     non_claim_id: str = Field(min_length=1)
     description: str = Field(min_length=1)
@@ -124,7 +232,7 @@ class MandatoryNonClaim(RoleOntologyModel):
 
 
 class PayloadFieldRule(RoleOntologyModel):
-    """Required or forbidden payload field rule."""
+    """Required or forbidden semantic-payload field rule."""
 
     field: str = Field(min_length=1)
     reason: str = Field(min_length=1)
@@ -132,7 +240,7 @@ class PayloadFieldRule(RoleOntologyModel):
 
 
 class ReviewRule(RoleOntologyModel):
-    """A conservative review rule implied by a role."""
+    """A conservative review rule implied by an evidence role."""
 
     rule_id: str = Field(min_length=1)
     description: str = Field(min_length=1)
@@ -140,7 +248,11 @@ class ReviewRule(RoleOntologyModel):
 
 
 class InvalidationTrigger(RoleOntologyModel):
-    """A machine-readable event that weakens or invalidates support."""
+    """A machine-readable event that weakens, expires, or invalidates support.
+
+    This is not a full challenge calculus. Future `cc.claims.challenge` may
+    translate these triggers into claim lifecycle transitions.
+    """
 
     trigger_id: str = Field(min_length=1)
     description: str = Field(min_length=1)
@@ -170,12 +282,20 @@ class EvidenceRoleDefinition(RoleOntologyModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("role must be non-empty")
+        if stripped in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("evidence role must not reuse a lifecycle state name")
         return stripped
 
     @model_validator(mode="after")
-    def _claim_levels_are_unique(self) -> EvidenceRoleDefinition:
+    def _claim_levels_are_unique_and_not_lifecycle_states(self) -> EvidenceRoleDefinition:
         if len(set(self.allowed_claim_levels)) != len(self.allowed_claim_levels):
             raise ValueError("allowed_claim_levels must not contain duplicates")
+        overlap = set(self.allowed_claim_levels) & RESERVED_LIFECYCLE_STATE_NAMES
+        if overlap:
+            raise ValueError(
+                "allowed_claim_levels must be report maturity levels, not lifecycle states: "
+                f"{sorted(overlap)}"
+            )
         return self
 
 
@@ -314,6 +434,64 @@ def role_support_matrix() -> dict[str, dict[str, list[str]]]:
     return matrix
 
 
+def role_claim_level_matrix() -> dict[str, list[str]]:
+    """Return role-to-report-claim-level permissions.
+
+    This is intentionally report maturity support, not lifecycle state.
+    """
+
+    return {
+        role: list(definition.allowed_claim_levels)
+        for role, definition in sorted(_ROLE_REGISTRY.items())
+    }
+
+
+def role_non_claim_matrix() -> dict[str, list[str]]:
+    """Return role-to-mandatory-non-claim identifiers."""
+
+    return {
+        role: [non_claim.non_claim_id for non_claim in definition.mandatory_non_claims]
+        for role, definition in sorted(_ROLE_REGISTRY.items())
+        if definition.mandatory_non_claims
+    }
+
+
+def validate_role_ontology_invariants() -> None:
+    """Validate import-time ontology invariants.
+
+    This is intentionally callable from tests so future taxonomy drift is caught
+    without relying only on import-time exceptions.
+    """
+
+    if len(_ROLE_REGISTRY) != len(_ROLE_DEFINITIONS):
+        raise RuntimeError("duplicate evidence role definitions")
+
+    if set(_ALL_CLAIM_LEVELS) & RESERVED_LIFECYCLE_STATE_NAMES:
+        raise RuntimeError("claim maturity levels overlap lifecycle state names")
+
+    for role, definition in _ROLE_REGISTRY.items():
+        if role in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise RuntimeError(f"role {role!r} reuses a lifecycle state name")
+
+        unknown_levels = set(definition.allowed_claim_levels) - set(_ALL_CLAIM_LEVELS)
+        if unknown_levels:
+            raise RuntimeError(
+                f"role {role!r} uses unknown report claim levels: {sorted(unknown_levels)}"
+            )
+
+        if not definition.supports and definition.allowed_claim_levels:
+            # This is allowed for generic/context roles such as artifact/audit_log,
+            # but it is intentionally visible to reviewers through the matrix.
+            continue
+
+        if definition.semantic_class == "integrity":
+            for permission in definition.supports:
+                if permission.strength != "integrity_only":
+                    raise RuntimeError(
+                        f"integrity role {role!r} must not emit non-integrity support strength"
+                    )
+
+
 def _normalize_role(role: str) -> str:
     return str(role or "").strip()
 
@@ -339,8 +517,6 @@ def _payload_field_matches(payload: Mapping[str, Any], rule: PayloadFieldRule) -
 def _path_matches(path: str, field: str) -> bool:
     normalized_field = field[2:] if field.startswith("$.") else field
     normalized_path = path[2:] if path.startswith("$.") else path
-    if "." not in normalized_field:
-        return normalized_path == normalized_field
     return normalized_path == normalized_field
 
 
@@ -729,7 +905,9 @@ _ROLE_DEFINITIONS: tuple[EvidenceRoleDefinition, ...] = (
         ),
         invalidation_triggers=(
             _trigger(
-                "infeasible", "Infeasible scenarios invalidate scenario support.", "invalidates"
+                "infeasible",
+                "Infeasible scenarios invalidate scenario support.",
+                "invalidates",
             ),
             _trigger(
                 "excluded_evidence_fields",
@@ -1258,16 +1436,17 @@ _ROLE_REGISTRY: dict[str, EvidenceRoleDefinition] = {
     definition.role: definition for definition in _ROLE_DEFINITIONS
 }
 
-if len(_ROLE_REGISTRY) != len(_ROLE_DEFINITIONS):  # pragma: no cover - import-time invariant
-    raise RuntimeError("duplicate evidence role definitions")
+validate_role_ontology_invariants()
 
 
 __all__ = [
     "ROLE_ONTOLOGY_SCHEMA_VERSION",
+    "ClaimMaturityLevel",
     "EvidenceRoleDefinition",
     "InvalidationTrigger",
     "MandatoryNonClaim",
     "PayloadFieldRule",
+    "RESERVED_LIFECYCLE_STATE_NAMES",
     "ReviewRule",
     "RolePayloadValidation",
     "SupportPermission",
@@ -1277,8 +1456,11 @@ __all__ = [
     "is_known_role",
     "known_evidence_roles",
     "mandatory_non_claims_for",
+    "role_claim_level_matrix",
+    "role_non_claim_matrix",
     "role_support_matrix",
     "roles_requiring_semantic_payload_validation",
     "support_permissions_for",
+    "validate_role_ontology_invariants",
     "validate_role_payload",
 ]

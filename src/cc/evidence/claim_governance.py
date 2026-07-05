@@ -1,4 +1,50 @@
-"""Read-only governance verifier for evidence-bound CC claims."""
+"""Read-only governance verifier for evidence-bound CC claims.
+
+This module verifies the internal consistency of a CC report/evidence package.
+
+Important semantic boundary
+---------------------------
+`GovernanceVerdict` is a verifier outcome, not a claim lifecycle state.
+
+A PASS verdict means:
+
+    The evidence-bound claim package is internally consistent under this
+    verifier's declared rules at verification time.
+
+A PASS verdict does not mean:
+
+- the AI system is safe;
+- the claim is globally true;
+- the claim is deployment-valid;
+- the package is production-certified;
+- the package is compliance-certified;
+- the claim should transition to a future `cc.claims.ClaimState.SUPPORTED`
+  without explicit lifecycle rules.
+
+This module owns:
+
+- report/evidence package verification;
+- artifact hash and byte-count checks;
+- evidence-role ontology checks;
+- semantic payload validation;
+- claim-decay freshness projection;
+- extremal-scenario validation;
+- confirmatory-protocol validation;
+- mandatory non-claim checks;
+- conservative pass/needs_review/fail verdicts.
+
+This module does not own:
+
+- claim lifecycle transitions;
+- claim compiler logic;
+- assumption registry;
+- challenge calculus;
+- dashboard display state;
+- deployment/compliance certification.
+
+Future `cc.claims` may consume this audit as evidence, but must not treat this
+audit as a lifecycle state machine.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +53,9 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from cc.evidence.claim_envelope import EnvelopeSupportSummary, SupportGraph, compile_claim_envelope
 from cc.evidence.confirmatory_protocol import (
@@ -19,6 +65,7 @@ from cc.evidence.confirmatory_protocol import (
 from cc.evidence.decay import ClaimDecayRecord, DecayState, VersionWatchSet, evaluate_claim_decay
 from cc.evidence.extremal_scenario import ExtremalScenario, ScenarioKind
 from cc.evidence.role_ontology import (
+    RESERVED_LIFECYCLE_STATE_NAMES,
     get_role_definition,
     is_known_role,
     mandatory_non_claims_for,
@@ -27,7 +74,7 @@ from cc.evidence.role_ontology import (
     validate_role_payload,
 )
 from cc.reporting.canonical import sha256_canonical
-from cc.reporting.report import ALLOWED_CLAIM_LEVELS, SCHEMA_VERSION, sha256_file
+from cc.reporting.report import ALLOWED_CLAIM_LEVELS, CLAIM_LEVELS, SCHEMA_VERSION, ClaimLevel, sha256_file
 
 CLAIM_GOVERNANCE_AUDIT_SCHEMA: Literal["cc/claim-governance-audit.v1"] = (
     "cc/claim-governance-audit.v1"
@@ -35,7 +82,23 @@ CLAIM_GOVERNANCE_AUDIT_SCHEMA: Literal["cc/claim-governance-audit.v1"] = (
 
 ROLE_SUPPORT_MATRIX: dict[str, dict[str, list[str]]] = role_support_matrix()
 
+# This is a report/evidence verifier caveat. Keep it visible in generated non-claims.
+GOVERNANCE_PASS_CAVEAT = (
+    "A governance PASS means internal consistency under verifier rules only; "
+    "it does not prove safety, deployment validity, production readiness, or compliance."
+)
+
+RECEIPT_NON_CLAIM = (
+    "Receipt verification checks integrity only; it does not prove statistical validity "
+    "or deployment safety."
+)
+
+CLAIM_LEVEL_NON_CLAIM = (
+    "Claim levels are report maturity/support labels, not claim lifecycle states."
+)
+
 _SEMANTIC_PAYLOAD_ROLES = roles_requiring_semantic_payload_validation()
+
 _EXPLORATORY_INTERVAL_FIELDS = frozenset(
     {
         "adaptive_search_ci",
@@ -45,16 +108,23 @@ _EXPLORATORY_INTERVAL_FIELDS = frozenset(
         "non_confirmatory_ci",
     }
 )
-_REQUIRED_ROLES_BY_CLAIM_LEVEL: dict[str, tuple[str, ...]] = {
+
+_REQUIRED_ROLES_BY_CLAIM_LEVEL: dict[ClaimLevel, tuple[str, ...]] = {
     "diagnostic": (),
     "bounded_empirical": ("claim_decay", "extremal_scenario"),
     "reproducible_run": ("claim_decay",),
     "release_claim": ("claim_decay", "extremal_scenario"),
 }
 
+if set(CLAIM_LEVELS) & RESERVED_LIFECYCLE_STATE_NAMES:  # pragma: no cover
+    raise RuntimeError("claim maturity labels must remain disjoint from lifecycle state names")
+
 
 class GovernanceVerdict(str, Enum):
-    """Conservative verdict for an evidence-bound claim package."""
+    """Conservative verifier verdict for an evidence-bound claim package.
+
+    This is not a lifecycle state.
+    """
 
     PASS = "pass"
     NEEDS_REVIEW = "needs_review"
@@ -72,7 +142,10 @@ class EvidenceRoleStatus(str, Enum):
 
 
 class ClaimFreshnessStatus(str, Enum):
-    """Verification-time claim freshness state."""
+    """Verification-time claim freshness projection.
+
+    This is not the same thing as a future `cc.claims.ClaimState`.
+    """
 
     NOT_EVALUATED = "not_evaluated"
     FRESH = "fresh"
@@ -81,7 +154,12 @@ class ClaimFreshnessStatus(str, Enum):
 
 
 class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        populate_by_name=True,
+        validate_assignment=True,
+    )
 
 
 class EvidenceArtifactAudit(_StrictModel):
@@ -93,6 +171,14 @@ class EvidenceArtifactAudit(_StrictModel):
     bytes_actual: int | None
     status: EvidenceRoleStatus
     reason: str
+
+    @field_validator("role")
+    @classmethod
+    def _role_is_not_lifecycle_state(cls, value: str) -> str:
+        role = value.strip()
+        if role in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("evidence artifact role must not reuse a lifecycle state name")
+        return role
 
 
 class DecayAudit(_StrictModel):
@@ -149,7 +235,7 @@ class ClaimGovernanceAudit(_StrictModel):
     report_id: str
     evaluated_at: str
     verdict: GovernanceVerdict
-    allowed_claim_level: str
+    allowed_claim_level: ClaimLevel | Literal["unknown"]
     claim_statement: str
     receipt: ReceiptAudit
     evidence_artifacts: list[EvidenceArtifactAudit]
@@ -162,6 +248,18 @@ class ClaimGovernanceAudit(_StrictModel):
     non_claims: list[str]
     envelope_support: EnvelopeSupportSummary
 
+    @model_validator(mode="after")
+    def _verdict_is_boundary_honest(self) -> ClaimGovernanceAudit:
+        if self.verdict is GovernanceVerdict.FAIL and not self.reasons:
+            raise ValueError("FAIL verdict must include at least one reason")
+        if self.verdict is GovernanceVerdict.PASS and self.required_human_review:
+            raise ValueError("PASS verdict cannot require unresolved human review")
+        if self.allowed_claim_level != "unknown" and self.allowed_claim_level in RESERVED_LIFECYCLE_STATE_NAMES:
+            raise ValueError("allowed_claim_level must not be a lifecycle state")
+        if GOVERNANCE_PASS_CAVEAT not in self.non_claims:
+            raise ValueError("governance audit must preserve the PASS caveat non-claim")
+        return self
+
 
 def verify_claim_governance(
     report_path: Path,
@@ -173,8 +271,9 @@ def verify_claim_governance(
     """Verify a CC report's evidence-bound claim package without mutating artifacts.
 
     A PASS verdict means the evidence-bound claim package is internally
-    consistent under this verifier's rules. It does not mean the AI system is
-    safe in deployment.
+    consistent under this verifier's rules at verification time.
+
+    It does not mean the AI system is safe in deployment.
     """
 
     report_file = Path(report_path)
@@ -187,6 +286,7 @@ def verify_claim_governance(
         )
 
     evaluated_at = _utc_iso(evaluation_time)
+
     try:
         report = json.loads(report_file.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -209,14 +309,16 @@ def verify_claim_governance(
             report_id=str(report.get("report_id") or report_file.stem or "<unusable>"),
             evaluated_at=evaluated_at,
             reason="Report is structurally unusable: " + "; ".join(shape_errors),
-            allowed_claim_level=_nested_str(report, ("claim", "allowed_claim_level"), "unknown"),
+            allowed_claim_level=_unknown_or_claim_level(
+                _nested_str(report, ("claim", "allowed_claim_level"), "unknown")
+            ),
             claim_statement=_nested_str(report, ("claim", "statement"), ""),
         )
 
     report_id = str(report["report_id"])
-    claim = report["claim"]
+    claim = cast(Mapping[str, Any], report["claim"])
     claim_statement = str(claim["statement"])
-    allowed_claim_level = str(claim["allowed_claim_level"])
+    allowed_claim_level = _claim_level(str(claim["allowed_claim_level"]))
     root_dir = Path(base_dir) if base_dir is not None else report_file.parent
 
     reasons: list[str] = []
@@ -231,11 +333,13 @@ def verify_claim_governance(
     for raw_entry in raw_entries:
         artifact_audit = _audit_artifact(raw_entry, base_dir=root_dir)
         evidence_audits.append(artifact_audit)
+
         role = artifact_audit.role
 
         if artifact_audit.status in {EvidenceRoleStatus.UNREADABLE, EvidenceRoleStatus.INVALID}:
             fail_reasons.append(artifact_audit.reason)
             continue
+
         if not is_known_role(role):
             artifact_audit.status = EvidenceRoleStatus.UNKNOWN_ROLE
             artifact_audit.reason = (
@@ -246,22 +350,26 @@ def verify_claim_governance(
                 fail_reasons.append(message)
             else:
                 review_reasons.append(message)
+                unresolved.append(message)
             continue
+
+        role_definition = get_role_definition(role)
+        if allowed_claim_level not in role_definition.allowed_claim_levels:
+            message = (
+                f"Evidence role {role!r} cannot support claim level "
+                f"{allowed_claim_level!r} under the role ontology."
+            )
+            review_reasons.append(message)
+            unresolved.append(message)
+
         if role in _SEMANTIC_PAYLOAD_ROLES:
-            try:
-                payload = json.loads(_resolve_path(artifact_audit.path, root_dir).read_text())
-            except Exception as exc:
-                artifact_audit.status = EvidenceRoleStatus.UNREADABLE
-                artifact_audit.reason = f"Artifact could not be parsed as JSON: {exc}"
-                fail_reasons.append(artifact_audit.reason)
-                continue
-            if not isinstance(payload, Mapping):
-                artifact_audit.status = EvidenceRoleStatus.INVALID
-                artifact_audit.reason = "Semantic evidence artifact JSON is not an object."
-                if role == "extremal_scenario" or strict_unknown_roles:
+            payload = _read_semantic_payload(artifact_audit, root_dir)
+            if payload is None:
+                if _invalid_role_payload_is_failure(role) or strict_unknown_roles:
                     fail_reasons.append(artifact_audit.reason)
                 else:
                     review_reasons.append(artifact_audit.reason)
+                    unresolved.append(artifact_audit.reason)
                 continue
 
             payload_validation = validate_role_payload(role, payload)
@@ -275,7 +383,14 @@ def verify_claim_governance(
                     fail_reasons.append(artifact_audit.reason)
                 else:
                     review_reasons.append(artifact_audit.reason)
+                    unresolved.append(artifact_audit.reason)
                 continue
+
+            if payload_validation.review_required:
+                for warning in payload_validation.warnings:
+                    review_reasons.append(warning)
+                    unresolved.append(warning)
+
             semantic_payloads.append((payload, artifact_audit))
 
     receipt = _audit_receipt(report, evidence_audits)
@@ -285,6 +400,7 @@ def verify_claim_governance(
     roles_present = {
         audit.role for audit in evidence_audits if audit.status is not EvidenceRoleStatus.MISSING
     }
+
     missing_roles = [
         role
         for role in _REQUIRED_ROLES_BY_CLAIM_LEVEL.get(allowed_claim_level, ())
@@ -296,18 +412,6 @@ def verify_claim_governance(
         )
         review_reasons.append(message)
         unresolved.append(message)
-
-    for role in sorted(roles_present):
-        if not is_known_role(role):
-            continue
-        definition = get_role_definition(role)
-        if allowed_claim_level not in definition.allowed_claim_levels:
-            message = (
-                f"Evidence role {role!r} cannot support claim level "
-                f"{allowed_claim_level!r} under the role ontology."
-            )
-            review_reasons.append(message)
-            unresolved.append(message)
 
     decay_audit = _audit_decay_artifacts(
         semantic_payloads,
@@ -321,38 +425,34 @@ def verify_claim_governance(
         allowed_claim_level=allowed_claim_level,
     )
 
-    for audit in evidence_audits:
-        if (
-            audit.role not in _SEMANTIC_PAYLOAD_ROLES
-            or audit.status is not EvidenceRoleStatus.INVALID
-        ):
-            continue
-        if _invalid_role_payload_is_failure(audit.role) or strict_unknown_roles:
-            fail_reasons.append(audit.reason)
-        else:
-            review_reasons.append(audit.reason)
-
     if decay_audit.present:
         if decay_audit.status is ClaimFreshnessStatus.EXPIRED:
             fail_reasons.append(f"Claim decay status is expired: {decay_audit.reason}")
         elif decay_audit.status is ClaimFreshnessStatus.DEGRADED:
-            review_reasons.append(f"Claim decay status is degraded: {decay_audit.reason}")
+            message = f"Claim decay status is degraded: {decay_audit.reason}"
+            review_reasons.append(message)
+            unresolved.append(message)
 
     if scenario_audit.infeasible_count:
         fail_reasons.append("One or more extremal_scenario artifacts are infeasible.")
+
     if scenario_audit.excluded_evidence_fields:
         message = "Endpoint or fitted scenarios contain excluded evidence fields requiring review."
         review_reasons.append(message)
         unresolved.append(message)
+
     if _has_fitted_without_confirmation(semantic_payloads):
         message = "Fitted empirical scenario exists without confirmatory evidence."
         review_reasons.append(message)
         unresolved.append(message)
+
     for reason in confirmatory_protocol_audit.failed_reasons:
         fail_reasons.append(reason)
+
     for reason in confirmatory_protocol_audit.review_reasons:
         review_reasons.append(reason)
         unresolved.append(reason)
+
     if "confirmatory_failure_matrix" in roles_present and not confirmatory_protocol_audit.present:
         message = (
             "confirmatory_failure_matrix evidence requires a confirmatory_protocol artifact "
@@ -375,6 +475,7 @@ def verify_claim_governance(
         confirmatory_protocol_audit,
         semantic_payloads,
     )
+
     mandatory_missing = _mandatory_non_claims_missing(
         roles_present=roles_present,
         non_claims=non_claims,
@@ -447,7 +548,7 @@ def _failure_audit(
     report_id: str,
     evaluated_at: str,
     reason: str,
-    allowed_claim_level: str = "unknown",
+    allowed_claim_level: ClaimLevel | Literal["unknown"] = "unknown",
     claim_statement: str = "",
 ) -> ClaimGovernanceAudit:
     return ClaimGovernanceAudit(
@@ -492,7 +593,7 @@ def _failure_audit(
         ),
         required_human_review=True,
         reasons=[reason],
-        non_claims=[],
+        non_claims=_base_governance_non_claims(),
         envelope_support=_empty_envelope_support_summary(),
     )
 
@@ -528,11 +629,14 @@ def _verification_time(now: datetime | None) -> datetime | None:
 
 def _basic_report_shape_errors(report: Mapping[str, Any]) -> list[str]:
     errors: list[str] = []
+
     for field in ("schema_version", "report_id", "claim", "evidence", "receipt"):
         if field not in report:
             errors.append(f"missing {field}")
+
     if report.get("schema_version") != SCHEMA_VERSION:
         errors.append(f"schema_version must be {SCHEMA_VERSION}")
+
     claim = report.get("claim")
     if not isinstance(claim, Mapping):
         errors.append("claim must be an object")
@@ -540,10 +644,16 @@ def _basic_report_shape_errors(report: Mapping[str, Any]) -> list[str]:
         for field in ("statement", "allowed_claim_level", "non_claims"):
             if field not in claim:
                 errors.append(f"missing claim.{field}")
-        if claim.get("allowed_claim_level") not in ALLOWED_CLAIM_LEVELS:
+        level = claim.get("allowed_claim_level")
+        if level not in ALLOWED_CLAIM_LEVELS:
             errors.append("claim.allowed_claim_level is not supported")
+        if level in RESERVED_LIFECYCLE_STATE_NAMES:
+            errors.append("claim.allowed_claim_level must not be a lifecycle state")
         if not isinstance(claim.get("non_claims"), list):
             errors.append("claim.non_claims must be a list")
+        elif level != "diagnostic" and not claim.get("non_claims"):
+            errors.append("non-diagnostic claim levels require explicit non_claims")
+
     evidence = report.get("evidence")
     if not isinstance(evidence, Mapping):
         errors.append("evidence must be an object")
@@ -557,25 +667,30 @@ def _basic_report_shape_errors(report: Mapping[str, Any]) -> list[str]:
             item = evidence.get(field)
             if item is not None and not isinstance(item, Mapping):
                 errors.append(f"evidence.{field} must be an object or null")
+
     receipt = report.get("receipt")
     if not isinstance(receipt, Mapping):
         errors.append("receipt must be an object")
+
     return errors
 
 
 def _report_evidence_entries(report: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     evidence = report["evidence"]
     assert isinstance(evidence, Mapping)
+
     entries: list[Mapping[str, Any]] = []
     for item in evidence.get("artifacts", []):
         if isinstance(item, Mapping):
             entries.append(item)
+
     for key, role in (("audit_log", "audit_log"), ("figure_manifest", "figure_manifest")):
         item = evidence.get(key)
         if isinstance(item, Mapping):
             entry = dict(item)
             entry["role"] = str(entry.get("role") or role)
             entries.append(entry)
+
     return entries
 
 
@@ -585,6 +700,19 @@ def _audit_artifact(raw_entry: Mapping[str, Any], *, base_dir: Path) -> Evidence
     expected_hash = str(raw_entry.get("sha256") or "")
     expected_bytes = raw_entry.get("bytes")
     bytes_expected = int(expected_bytes) if isinstance(expected_bytes, int) else None
+
+    if role in RESERVED_LIFECYCLE_STATE_NAMES:
+        return EvidenceArtifactAudit(
+            path=path,
+            role=role,
+            sha256_expected=expected_hash,
+            sha256_actual=None,
+            bytes_expected=bytes_expected,
+            bytes_actual=None,
+            status=EvidenceRoleStatus.INVALID,
+            reason="Evidence artifact role reuses a reserved claim lifecycle state name.",
+        )
+
     if not path or not role or not expected_hash or bytes_expected is None:
         return EvidenceArtifactAudit(
             path=path,
@@ -624,6 +752,7 @@ def _audit_artifact(raw_entry: Mapping[str, Any], *, base_dir: Path) -> Evidence
             status=EvidenceRoleStatus.INVALID,
             reason="Evidence artifact SHA-256 does not match the report.",
         )
+
     if actual_bytes != bytes_expected:
         return EvidenceArtifactAudit(
             path=path,
@@ -635,6 +764,7 @@ def _audit_artifact(raw_entry: Mapping[str, Any], *, base_dir: Path) -> Evidence
             status=EvidenceRoleStatus.INVALID,
             reason="Evidence artifact byte count does not match the report.",
         )
+
     return EvidenceArtifactAudit(
         path=path,
         role=role,
@@ -647,14 +777,35 @@ def _audit_artifact(raw_entry: Mapping[str, Any], *, base_dir: Path) -> Evidence
     )
 
 
+def _read_semantic_payload(
+    artifact_audit: EvidenceArtifactAudit,
+    root_dir: Path,
+) -> Mapping[str, Any] | None:
+    try:
+        payload = json.loads(_resolve_path(artifact_audit.path, root_dir).read_text())
+    except Exception as exc:
+        artifact_audit.status = EvidenceRoleStatus.UNREADABLE
+        artifact_audit.reason = f"Artifact could not be parsed as JSON: {exc}"
+        return None
+
+    if not isinstance(payload, Mapping):
+        artifact_audit.status = EvidenceRoleStatus.INVALID
+        artifact_audit.reason = "Semantic evidence artifact JSON is not an object."
+        return None
+
+    return payload
+
+
 def _audit_receipt(
     report: Mapping[str, Any],
     evidence_audits: Sequence[EvidenceArtifactAudit],
 ) -> ReceiptAudit:
     receipt = report.get("receipt")
     canonical_hash = receipt.get("canonical_hash") if isinstance(receipt, Mapping) else None
+
     hash_verified: bool | None
     reason_parts: list[str] = []
+
     if isinstance(canonical_hash, str):
         try:
             computed_hash = sha256_canonical(report)
@@ -677,14 +828,14 @@ def _audit_receipt(
         audit.sha256_actual == audit.sha256_expected and audit.bytes_actual == audit.bytes_expected
         for audit in evidence_audits
     )
+
     if artifact_hashes_verified:
         reason_parts.append("Evidence artifact hashes verified.")
     else:
         reason_parts.append("One or more evidence artifact hashes or byte counts did not verify.")
-    reason_parts.append(
-        "Receipt verification checks integrity only; it does not prove statistical validity "
-        "or deployment safety."
-    )
+
+    reason_parts.append(RECEIPT_NON_CLAIM)
+
     return ReceiptAudit(
         report_hash_verified=hash_verified,
         artifact_hashes_verified=artifact_hashes_verified,
@@ -706,9 +857,11 @@ def _audit_decay_artifacts(
     non_claims: list[str] = []
     observed_versions = _observed_versions_from_report(report)
     count = 0
+
     for payload, artifact in semantic_payloads:
         if artifact.role != "claim_decay":
             continue
+
         count += 1
         try:
             record = ClaimDecayRecord.model_validate(payload)
@@ -723,6 +876,7 @@ def _audit_decay_artifacts(
             artifact.reason = f"claim_decay artifact is semantically invalid: {exc}"
             reasons.append(artifact.reason)
             continue
+
         states.append(state)
         non_claims.extend(record.non_claims)
         trigger_summary.extend(_decay_trigger_summary(record, now=now, state=state))
@@ -735,7 +889,9 @@ def _audit_decay_artifacts(
             status=ClaimFreshnessStatus.NOT_EVALUATED,
             reason="No claim_decay artifact was present.",
             evaluated_at=None,
+            non_claims=[],
         )
+
     if not states:
         return DecayAudit(
             present=True,
@@ -744,12 +900,14 @@ def _audit_decay_artifacts(
             evaluated_at=evaluated_at,
             non_claims=_dedupe(non_claims),
         )
+
     if DecayState.EXPIRED in states:
         status = ClaimFreshnessStatus.EXPIRED
     elif DecayState.DEGRADED in states:
         status = ClaimFreshnessStatus.DEGRADED
     else:
         status = ClaimFreshnessStatus.FRESH
+
     return DecayAudit(
         present=True,
         status=status,
@@ -764,9 +922,11 @@ def _observed_versions_from_report(report: Mapping[str, Any]) -> VersionWatchSet
     environment = report.get("environment")
     if not isinstance(environment, Mapping):
         return None
+
     package_snapshot = environment.get("package_snapshot")
     if not isinstance(package_snapshot, Mapping):
         return None
+
     dependency_versions = {
         str(key): str(value)
         for key, value in package_snapshot.items()
@@ -774,6 +934,7 @@ def _observed_versions_from_report(report: Mapping[str, Any]) -> VersionWatchSet
     }
     if not dependency_versions:
         return None
+
     return VersionWatchSet(dependency_versions=dependency_versions)
 
 
@@ -785,12 +946,14 @@ def _decay_trigger_summary(
 ) -> list[str]:
     age_days = (now - record.issued_at).total_seconds() / 86400.0
     summary = [f"age_days={age_days:.6g}", f"policy_id={record.policy.policy_id}"]
+
     if state is DecayState.DEGRADED:
         summary.append("age crossed a degraded threshold")
     if state is DecayState.EXPIRED:
         summary.append("age crossed an expiry threshold or a watched version changed")
     if not record.version_watch_set.is_empty:
         summary.append("version_watch_set present; live observed versions were not supplied")
+
     return summary
 
 
@@ -807,6 +970,7 @@ def _audit_scenario_artifacts(
     for payload, artifact in semantic_payloads:
         if artifact.role != "extremal_scenario":
             continue
+
         count += 1
         try:
             scenario = _validate_extremal_scenario_json(payload)
@@ -815,11 +979,14 @@ def _audit_scenario_artifacts(
             artifact.reason = f"extremal_scenario artifact is semantically invalid: {exc}"
             infeasible_count += 1
             continue
+
         scenario_ids.append(scenario.scenario_id)
         kinds.append(scenario.kind.value)
         non_claims.extend(scenario.non_claims)
+
         if not scenario.feasibility.is_feasible:
             infeasible_count += 1
+
         for item in scenario.excluded_evidence_fields:
             excluded_fields.append(item.model_dump(mode="json"))
             non_claims.append(item.reason)
@@ -827,7 +994,7 @@ def _audit_scenario_artifacts(
     return ScenarioAudit(
         present=count > 0,
         scenario_count=count,
-        scenario_ids=scenario_ids,
+        scenario_ids=_dedupe(scenario_ids),
         kinds=kinds,
         infeasible_count=infeasible_count,
         excluded_evidence_fields=excluded_fields,
@@ -838,7 +1005,7 @@ def _audit_scenario_artifacts(
 def _audit_confirmatory_protocol_artifacts(
     semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
     *,
-    allowed_claim_level: str,
+    allowed_claim_level: ClaimLevel,
 ) -> ConfirmatoryProtocolGovernanceAudit:
     protocol_ids: list[str] = []
     run_ids: list[str] = []
@@ -851,6 +1018,7 @@ def _audit_confirmatory_protocol_artifacts(
     for payload, artifact in semantic_payloads:
         if artifact.role != "confirmatory_protocol":
             continue
+
         count += 1
         audit = verify_confirmatory_protocol_artifact(
             payload,
@@ -860,6 +1028,7 @@ def _audit_confirmatory_protocol_artifacts(
         protocol_ids.append(audit.protocol_id)
         run_ids.append(audit.run_id)
         non_claims.extend(audit.non_claims)
+
         if audit.status is ProtocolAuditStatus.FAIL:
             reason = f"confirmatory_protocol {artifact.path} failed validation: " + "; ".join(
                 audit.reasons
@@ -894,10 +1063,12 @@ def _has_fitted_without_confirmation(
     for payload, artifact in semantic_payloads:
         if artifact.role != "extremal_scenario":
             continue
+
         try:
             scenario = _validate_extremal_scenario_json(payload)
         except Exception:
             continue
+
         searchable = " ".join(
             str(item)
             for item in (
@@ -907,12 +1078,14 @@ def _has_fitted_without_confirmation(
                 scenario.endpoint,
             )
         ).lower()
+
         if "empirical" in searchable or "fitted" in searchable:
             if scenario.kind is ScenarioKind.CONFIRMATORY_FAILURE_MATRIX:
                 if "confirmatory_ci" not in scenario.metadata:
                     return True
             elif "confirmatory_ci" not in scenario.metadata:
                 return True
+
     return False
 
 
@@ -937,19 +1110,23 @@ def _exploratory_leakage_paths(
     semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
 ) -> set[str]:
     paths = set(_find_exploratory_keys(report))
+
     for payload, artifact in semantic_payloads:
         if artifact.role == "extremal_scenario":
             paths.update(f"{artifact.path}:{path}" for path in _find_exploratory_keys(payload))
+
     for entry in _report_evidence_entries(report):
         role = str(entry.get("role") or "")
         if role in _EXPLORATORY_INTERVAL_FIELDS:
             paths.add(f"evidence role {role!r}")
+
     return paths
 
 
 def _find_exploratory_keys(value: Any, path: str = "$") -> set[str]:
     if _path_is_excluded_evidence_field(path):
         return set()
+
     found: set[str] = set()
     if isinstance(value, Mapping):
         for key, item in value.items():
@@ -961,6 +1138,7 @@ def _find_exploratory_keys(value: Any, path: str = "$") -> set[str]:
     elif isinstance(value, list):
         for idx, item in enumerate(value):
             found.update(_find_exploratory_keys(item, f"{path}[{idx}]"))
+
     return found
 
 
@@ -977,6 +1155,7 @@ def _collect_non_claims(
 ) -> list[str]:
     return _dedupe(
         [
+            *_base_governance_non_claims(),
             *_claim_non_claims(report),
             *decay.non_claims,
             *scenarios.non_claims,
@@ -984,6 +1163,14 @@ def _collect_non_claims(
             *_semantic_payload_non_claims(semantic_payloads),
         ]
     )
+
+
+def _base_governance_non_claims() -> list[str]:
+    return [
+        GOVERNANCE_PASS_CAVEAT,
+        RECEIPT_NON_CLAIM,
+        CLAIM_LEVEL_NON_CLAIM,
+    ]
 
 
 def _semantic_payload_non_claims(
@@ -1011,7 +1198,7 @@ def _human_review_note_satisfies_review(
     report: Mapping[str, Any],
     evidence_audits: Sequence[EvidenceArtifactAudit],
     semantic_payloads: Sequence[tuple[Mapping[str, Any], EvidenceArtifactAudit]],
-    allowed_claim_level: str,
+    allowed_claim_level: ClaimLevel,
 ) -> tuple[bool, list[str]]:
     """Return whether a review note covers the current bound evidence hash set."""
 
@@ -1033,6 +1220,7 @@ def _human_review_note_satisfies_review(
 
     report_hash = _report_receipt_hash(report)
     mismatch_reasons: list[str] = []
+
     for payload, artifact in notes:
         decision = str(payload.get("decision") or "").strip()
         if decision not in _AUTHORIZING_REVIEW_DECISIONS:
@@ -1068,7 +1256,9 @@ def _human_review_note_satisfies_review(
                 f"human_review_note {artifact.path} does not cover current artifact hash set."
             )
             continue
+
         return True, []
+
     return False, _dedupe(mismatch_reasons)
 
 
@@ -1105,6 +1295,7 @@ def _mandatory_non_claims_missing(
 ) -> list[str]:
     role_set = set(roles_present)
     role_set.add("receipt_integrity")
+
     if exploratory_boundary_present:
         role_set.add("exploratory_redteam")
 
@@ -1112,6 +1303,7 @@ def _mandatory_non_claims_missing(
     for role in sorted(role_set):
         for non_claim in mandatory_non_claims_for(role):
             checks.append((non_claim.non_claim_id, non_claim.phrase_groups))
+
     return [
         check_id
         for check_id, phrase_groups in checks
@@ -1170,12 +1362,33 @@ def _dedupe(values: Sequence[str]) -> list[str]:
     return out
 
 
+def _claim_level(value: str) -> ClaimLevel:
+    if value not in CLAIM_LEVELS:
+        allowed = ", ".join(CLAIM_LEVELS)
+        raise ValueError(f"allowed_claim_level must be one of: {allowed}")
+    if value in RESERVED_LIFECYCLE_STATE_NAMES:
+        raise ValueError("allowed_claim_level must not be a lifecycle state")
+    return cast(ClaimLevel, value)
+
+
+def _unknown_or_claim_level(value: str) -> ClaimLevel | Literal["unknown"]:
+    if value == "unknown":
+        return "unknown"
+    if value in CLAIM_LEVELS:
+        return cast(ClaimLevel, value)
+    return "unknown"
+
+
 __all__ = [
     "CLAIM_GOVERNANCE_AUDIT_SCHEMA",
+    "CLAIM_LEVEL_NON_CLAIM",
+    "GOVERNANCE_PASS_CAVEAT",
+    "RECEIPT_NON_CLAIM",
     "ROLE_SUPPORT_MATRIX",
     "BoundaryAudit",
     "ClaimFreshnessStatus",
     "ClaimGovernanceAudit",
+    "ConfirmatoryProtocolGovernanceAudit",
     "DecayAudit",
     "EnvelopeSupportSummary",
     "EvidenceArtifactAudit",
