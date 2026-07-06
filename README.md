@@ -47,6 +47,14 @@ compliance, validate dataset representativeness, or turn receipt integrity into
 empirical truth. Its narrower purpose is to make AI assurance claims more
 evidence-bound, reproducible, and harder to overstate accidentally.
 
+## Open Core Strategy
+
+CC-Framework is currently a public research prototype. Its core mathematical,
+reporting, and evidence-boundary primitives are intended to remain inspectable
+for credibility and reproducibility. Potential hosted, enterprise, or
+customer-specific workflows should remain separate from the research claim
+boundary. See `docs/product/OPEN_CORE_STRATEGY.md`.
+
 ## 60-second quickstart
 
 ```bash
