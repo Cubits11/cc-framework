@@ -1,0 +1,1007 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-framework.local/schemas/evidence/evidence-item.schema.json",
+  "title": "Universal Evidence Item",
+  "description": "Atomic evidence-governance record for one preservable object or bounded evidentiary observation. The schema binds provenance, integrity, non-claims, confidence components, and chain-of-custody hashes without certifying deployment safety, empirical truth, or causal validity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "namespace",
+    "custody_status",
+    "evidence_class",
+    "non_claims",
+    "provenance",
+    "acquisition",
+    "extraction",
+    "content",
+    "integrity",
+    "epistemic",
+    "domain_tags",
+    "chain_of_custody",
+    "audit"
+  ],
+  "properties": {
+    "@context": {
+      "description": "Optional JSON-LD context for graph publication.",
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "object",
+                    "array",
+                    "boolean",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "cc.evidence_item.v1"
+    },
+    "id": {
+      "description": "Canonical cryptographic identifier for the normalized evidence item.",
+      "$ref": "#/$defs/sha256Urn"
+    },
+    "namespace": {
+      "description": "Repository namespace in the form ev:<domain>:<subdomain>:<entity-type>:<slug>.",
+      "$ref": "#/$defs/evNamespace"
+    },
+    "canonical_uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "custody_status": {
+      "description": "Evidence-handling status only. This is not a claim lifecycle state.",
+      "type": "string",
+      "enum": [
+        "received",
+        "quarantined",
+        "under_evidence_review",
+        "admitted",
+        "preserved",
+        "withdrawn_for_integrity_failure",
+        "archived_for_retention"
+      ]
+    },
+    "evidence_class": {
+      "type": "string",
+      "enum": [
+        "document",
+        "dataset",
+        "webpage",
+        "image",
+        "audio",
+        "video",
+        "transcript",
+        "code",
+        "log",
+        "model_eval_artifact",
+        "human_review_note",
+        "confirmatory_protocol",
+        "redteam_discovery",
+        "other"
+      ]
+    },
+    "non_claims": {
+      "description": "Mandatory negative scope statements. These are part of the machine-checkable evidence contract.",
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 12,
+        "maxLength": 2048
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prov_entity_id",
+        "source_uri",
+        "source_type",
+        "captured_at",
+        "author",
+        "collector",
+        "license_assertion"
+      ],
+      "properties": {
+        "prov_entity_id": {
+          "$ref": "#/$defs/evNamespace"
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "publisher-site",
+            "repository",
+            "database",
+            "api",
+            "email",
+            "human-interview",
+            "sensor",
+            "scan",
+            "manual-upload",
+            "social-media",
+            "other"
+          ]
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "captured_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "author": {
+          "$ref": "#/$defs/actor"
+        },
+        "contributors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/actorRef"
+          }
+        },
+        "collector": {
+          "$ref": "#/$defs/actorRef"
+        },
+        "was_attributed_to": {
+          "$ref": "#/$defs/actorRef"
+        },
+        "was_generated_by": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "was_derived_from": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256Urn"
+          }
+        },
+        "license_assertion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "retrieval_method": {
+          "type": "string",
+          "enum": [
+            "manual-download",
+            "api-fetch",
+            "crawler",
+            "email-import",
+            "scanner",
+            "sensor-stream",
+            "direct-submission",
+            "other"
+          ]
+        },
+        "citation_hint": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "submitted_at",
+        "submitted_by",
+        "submission_channel",
+        "package_format",
+        "submission_manifest_hash"
+      ],
+      "properties": {
+        "submitted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "submitted_by": {
+          "$ref": "#/$defs/actorRef"
+        },
+        "submission_channel": {
+          "type": "string",
+          "enum": [
+            "web-form",
+            "api",
+            "email",
+            "cli",
+            "batch-import",
+            "agent",
+            "human-reviewer"
+          ]
+        },
+        "package_format": {
+          "type": "string",
+          "enum": [
+            "bagit",
+            "single-object",
+            "json-record",
+            "multipart",
+            "stream",
+            "other"
+          ]
+        },
+        "submission_manifest_hash": {
+          "$ref": "#/$defs/digest"
+        },
+        "time_stamp_token_ref": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "method",
+        "performed_at",
+        "extractor_id",
+        "pipeline_version",
+        "quality_score"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "human",
+            "automated",
+            "hybrid"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "manual-transcription",
+            "ocr",
+            "speech-to-text",
+            "structured-parser",
+            "html-parser",
+            "api-normalizer",
+            "llm-assisted-extraction",
+            "other"
+          ]
+        },
+        "performed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "extractor_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "pipeline_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "toolchain": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "quality_score": {
+          "$ref": "#/$defs/probability"
+        },
+        "human_verified": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "media_type",
+        "language",
+        "title",
+        "byte_size"
+      ],
+      "properties": {
+        "media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+        },
+        "title": {
+          "$ref": "#/$defs/nonOverclaimText"
+        },
+        "abstract": {
+          "$ref": "#/$defs/nonOverclaimTextLong"
+        },
+        "text": {
+          "$ref": "#/$defs/nonOverclaimTextLong"
+        },
+        "claim_fragments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fragment_id",
+              "char_start",
+              "char_end",
+              "text"
+            ],
+            "properties": {
+              "fragment_id": {
+                "type": "string",
+                "pattern": "^frag-[A-Za-z0-9._:-]{1,128}$"
+              },
+              "char_start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "char_end": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "text": {
+                "$ref": "#/$defs/nonOverclaimTextLong"
+              }
+            }
+          }
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "storage_refs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "raw_object_ref": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "normalized_text_ref": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "derivative_ref": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "embedding_ref": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "ocfl_object_id": {
+              "type": "string",
+              "maxLength": 512
+            }
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_hash",
+        "canonical_json_hash",
+        "nfc_normalized_content_hash",
+        "canonicalization_profile",
+        "signature_status",
+        "dedupe_status"
+      ],
+      "properties": {
+        "primary_hash": {
+          "$ref": "#/$defs/digest"
+        },
+        "canonical_json_hash": {
+          "$ref": "#/$defs/digest"
+        },
+        "nfc_normalized_content_hash": {
+          "$ref": "#/$defs/digest"
+        },
+        "canonicalization_profile": {
+          "description": "Canonical JSON profile used before hashing.",
+          "type": "string",
+          "const": "NFC + canonical JSON with sorted keys, compact separators, UTF-8, and allow_nan=false"
+        },
+        "signature_status": {
+          "type": "string",
+          "enum": [
+            "not-applicable",
+            "unsigned",
+            "signature-present-unverified",
+            "verified",
+            "verified-with-warnings",
+            "revoked",
+            "failed"
+          ]
+        },
+        "signature_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/signatureRef"
+          }
+        },
+        "dedupe_status": {
+          "type": "string",
+          "enum": [
+            "unique",
+            "exact-duplicate",
+            "near-duplicate",
+            "supersedes-existing",
+            "superseded-by-existing"
+          ]
+        },
+        "exact_duplicate_of": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "near_duplicate_cluster": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "epistemic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_score",
+        "confidence_formula",
+        "component_scores",
+        "evidence_tier",
+        "source_reliability",
+        "corroboration_count",
+        "conflict_state",
+        "receipt_integrity_caveat"
+      ],
+      "properties": {
+        "confidence_score": {
+          "description": "Must equal round(0.24P + 0.24I + 0.18R + 0.16C + 0.10T + 0.08E, 3). JSON Schema records the contract; policy/Pydantic validators enforce arithmetic.",
+          "$ref": "#/$defs/probability"
+        },
+        "confidence_formula": {
+          "type": "string",
+          "const": "round(0.24P + 0.24I + 0.18R + 0.16C + 0.10T + 0.08E, 3)"
+        },
+        "component_scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provenance_score",
+            "integrity_score",
+            "source_reliability_score",
+            "corroboration_score",
+            "temporal_validity_score",
+            "extraction_quality_score"
+          ],
+          "properties": {
+            "provenance_score": {
+              "$ref": "#/$defs/probability"
+            },
+            "integrity_score": {
+              "$ref": "#/$defs/probability"
+            },
+            "source_reliability_score": {
+              "$ref": "#/$defs/probability"
+            },
+            "corroboration_score": {
+              "$ref": "#/$defs/probability"
+            },
+            "temporal_validity_score": {
+              "$ref": "#/$defs/probability"
+            },
+            "extraction_quality_score": {
+              "$ref": "#/$defs/probability"
+            }
+          }
+        },
+        "evidence_tier": {
+          "type": "string",
+          "enum": [
+            "tier-1",
+            "tier-2",
+            "tier-3",
+            "tier-4"
+          ]
+        },
+        "source_reliability": {
+          "$ref": "#/$defs/probability"
+        },
+        "corroboration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conflict_state": {
+          "type": "string",
+          "enum": [
+            "none",
+            "contested",
+            "superseded",
+            "revoked"
+          ]
+        },
+        "conflicts_with": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256Urn"
+          }
+        },
+        "confidence_rationale": {
+          "$ref": "#/$defs/nonOverclaimTextLong"
+        },
+        "receipt_integrity_caveat": {
+          "type": "string",
+          "pattern": "[Ii]ntegrity.*not.*(statistical validity|truth|deployment safety)"
+        }
+      }
+    },
+    "domain_tags": {
+      "description": "Dynamic domain tags or ontology identifiers.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evNamespace"
+      }
+    },
+    "ontology_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evNamespace"
+      }
+    },
+    "confirmatory_binding": {
+      "description": "Required before exploratory red-team output can influence confirmatory receipts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "protocol_hash",
+        "model_version_hash",
+        "pre_registered_at"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "protocol_hash": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "model_version_hash": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "pre_registered_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "human_review_note": {
+      "description": "Procedural requirement-satisfaction artifact. It does not change confidence_score or component_scores.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_note_id",
+        "reviewer",
+        "reviewed_at",
+        "decision",
+        "reviewed_artifact_hashes",
+        "does_not_modify_confidence"
+      ],
+      "properties": {
+        "review_note_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "reviewer": {
+          "$ref": "#/$defs/actorRef"
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "reviewed_no_exception",
+            "reviewed_exception_requested",
+            "reviewed_exception_denied",
+            "reviewed_quarantine_required"
+          ]
+        },
+        "reviewed_artifact_hashes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256Urn"
+          }
+        },
+        "does_not_modify_confidence": {
+          "type": "boolean",
+          "const": true
+        },
+        "note": {
+          "$ref": "#/$defs/nonOverclaimTextLong"
+        }
+      }
+    },
+    "chain_of_custody": {
+      "type": "array",
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/custodyEvent"
+            },
+            {
+              "properties": {
+                "event_index": {
+                  "const": 0
+                },
+                "previous_event_hash": {
+                  "type": "null"
+                },
+                "event_type": {
+                  "const": "acquired"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/custodyEvent"
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_validated_at",
+        "validator_id",
+        "policy_bundle_hash",
+        "receipt_caveats_appended"
+      ],
+      "properties": {
+        "schema_validated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "policy_bundle_hash": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "receipt_caveats_appended": {
+          "type": "boolean",
+          "const": true
+        },
+        "pipeline_run_id": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "non_claims": {
+          "contains": {
+            "pattern": "([Nn]ot|[Dd]oes not).*deployment approval"
+          },
+          "minContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "non_claims": {
+          "contains": {
+            "pattern": "([Nn]ot|[Dd]oes not).*(proof|prove).*deployment safety"
+          },
+          "minContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "non_claims": {
+          "contains": {
+            "pattern": "[Rr]eceipt integrity.*not.*(statistical validity|truth)"
+          },
+          "minContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "non_claims": {
+          "contains": {
+            "pattern": "[Hh]uman review.*not.*(upgrade|increase|modify).*confidence"
+          },
+          "minContains": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "sha256Hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sha256Urn": {
+      "type": "string",
+      "pattern": "^urn:sha256:[a-f0-9]{64}$"
+    },
+    "evNamespace": {
+      "type": "string",
+      "pattern": "^ev:[a-z0-9][a-z0-9-]{0,63}:[a-z0-9][a-z0-9-]{0,63}:[a-z0-9][a-z0-9-]{0,63}:[a-z0-9][a-z0-9-]{0,127}$",
+      "maxLength": 320
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "nonOverclaimText": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        {
+          "not": {
+            "pattern": "\\b([Gg]uaranteed|[Uu]nconditionally safe|[Aa]bsolute safety|[Pp]roven safe|[Ss]afe for deployment|[Dd]eployment approval|[Mm]odel truth|[Cc]ausal inference without assumptions|[Cc]ertif(y|ies|ied) safety)\\b"
+          }
+        }
+      ]
+    },
+    "nonOverclaimTextLong": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536,
+      "not": {
+        "pattern": "\\b([Gg]uaranteed|[Uu]nconditionally safe|[Aa]bsolute safety|[Pp]roven safe|[Ss]afe for deployment|[Dd]eployment approval|[Mm]odel truth|[Cc]ausal inference without assumptions|[Cc]ertif(y|ies|ied) safety)\\b"
+      }
+    },
+    "actorRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_id",
+        "actor_type",
+        "display_name"
+      ],
+      "properties": {
+        "actor_id": {
+          "$ref": "#/$defs/evNamespace"
+        },
+        "actor_type": {
+          "type": "string",
+          "enum": [
+            "person",
+            "organization",
+            "system",
+            "service-account",
+            "unknown"
+          ]
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "contact_uri": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "display_name",
+        "actor_type"
+      ],
+      "properties": {
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "actor_type": {
+          "type": "string",
+          "enum": [
+            "person",
+            "organization",
+            "system",
+            "unknown"
+          ]
+        },
+        "identifier": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "contact_uri": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "SHA-256"
+        },
+        "value": {
+          "$ref": "#/$defs/sha256Hex"
+        },
+        "urn": {
+          "$ref": "#/$defs/sha256Urn"
+        }
+      }
+    },
+    "signatureRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signature_id",
+        "signature_type",
+        "verification_material_ref"
+      ],
+      "properties": {
+        "signature_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "signature_type": {
+          "type": "string",
+          "enum": [
+            "sigstore",
+            "x509",
+            "pgp",
+            "jws",
+            "timestamp-token",
+            "other"
+          ]
+        },
+        "verification_material_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "custodyEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_index",
+        "event_type",
+        "performed_at",
+        "actor",
+        "object_hash",
+        "previous_event_hash",
+        "event_hash",
+        "hash_rule"
+      ],
+      "properties": {
+        "event_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "acquired",
+            "verified",
+            "normalized",
+            "transformed",
+            "reviewed",
+            "promoted_to_storage",
+            "restored",
+            "withdrawn_for_integrity_failure",
+            "accessed"
+          ]
+        },
+        "performed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actor": {
+          "$ref": "#/$defs/actorRef"
+        },
+        "object_hash": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "previous_event_hash": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256Urn"
+            }
+          ]
+        },
+        "event_payload_canonical_hash": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "event_hash": {
+          "$ref": "#/$defs/sha256Urn"
+        },
+        "hash_rule": {
+          "type": "string",
+          "const": "event_hash = SHA256(canonical_event_n || previous_event_hash) over NFC-normalized canonical JSON"
+        },
+        "reason": {
+          "$ref": "#/$defs/nonOverclaimText"
+        }
+      }
+    }
+  }
+}
