@@ -642,7 +642,7 @@ _ROLE_DEFINITIONS: tuple[EvidenceRoleDefinition, ...] = (
             ),
             _no_support(
                 "deployment_safety",
-                ("deployment_safety", "deployment safety", "safety"),
+                ("deployment_safety", "deployment safety", "safe for deployment", "safety"),
                 "Byte integrity is not deployment evidence.",
             ),
         ),
