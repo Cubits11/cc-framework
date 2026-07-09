@@ -1,0 +1,266 @@
+{
+  "schema_version": "cc.claim_boundary_manifest.v0.1",
+  "generated_for": "cc-framework",
+  "purpose": "Map public CC-Framework claims to evidence, validation lanes, supporting files, tests or commands, and explicit non-claims so that public communication remains evidence-bound.",
+  "claim_levels": {
+    "C0": "Repository Metadata Claim: basic facts about files, docs, package metadata, or repository organization.",
+    "C1": "Structural Validation Claim: a schema, report, or artifact conforms to declared validation rules.",
+    "C2": "Provenance / Integrity Claim: receipt-covered artifacts can be checked for byte integrity or tamper evidence under canonicalization and digest/signature verification.",
+    "C3": "Mathematical Kernel Claim: a mathematical statement about finite binary atom spaces, Fréchet-Hoeffding bounds, identified intervals, endpoint witnesses, finite-sample outer intervals, or infeasibility detection under stated assumptions.",
+    "C4": "Evidence-Governance Claim: a claim about how evidence roles, non-claims, freshness, confirmatory/exploratory boundaries, or governance checks are represented and validated.",
+    "C5": "Deployment / Compliance Claim: out of scope for this repository unless a future release explicitly creates a separate authority layer. Current status: deferred / not claimed."
+  },
+  "claims": [
+    {
+      "id": "kernel.frechet_bounds",
+      "level": "C3",
+      "lane": "Paper Core v0.3",
+      "status": "active_rc_boundary",
+      "claim_text": "The strict kernel computes classical Fréchet-Hoeffding bounds for finite binary guardrail failure composition under exact singleton marginals and no additional side constraints.",
+      "supporting_files": [
+        "README.md",
+        "docs/theory/theorem_ledger.md",
+        "src/cc/kernel/frechet_classes.py",
+        "src/cc/kernel/sensitivity.py"
+      ],
+      "supporting_tests_or_commands": [
+        "tests/unit/kernel/test_classical_frechet_special_cases.py",
+        "make test-kernel"
+      ],
+      "non_claims": [
+        "Does not assume independence.",
+        "Does not prove deployment safety.",
+        "Does not prove marginals are representative."
+      ],
+      "risk_if_overstated": "Could be misrepresented as a safety certification or as evidence that exact singleton marginals identify the true deployment risk."
+    },
+    {
+      "id": "kernel.identified_interval",
+      "level": "C3",
+      "lane": "Paper Core v0.3",
+      "status": "active_rc_boundary",
+      "claim_text": "The finite atom LP computes sharp lower and upper values for declared linear composition queries over feasible finite binary atom distributions.",
+      "supporting_files": [
+        "docs/theory/theorem_ledger.md",
+        "src/cc/kernel/sensitivity.py",
+        "docs/api.md"
+      ],
+      "supporting_tests_or_commands": [
+        "tests/unit/kernel/test_sensitivity.py",
+        "tests/unit/kernel/test_monotonic_tightening.py",
+        "make test-kernel"
+      ],
+      "non_claims": [
+        "Does not validate upstream data collection.",
+        "Does not validate semantic safety.",
+        "Does not establish representativeness."
+      ],
+      "risk_if_overstated": "Could turn a conditional mathematical identification result into an unsupported empirical or deployment claim."
+    },
+    {
+      "id": "kernel.finite_sample_outer_interval",
+      "level": "C3",
+      "lane": "Paper Core v0.3",
+      "status": "active_rc_boundary",
+      "claim_text": "Under stated iid Bernoulli sampling assumptions and simultaneous moment coverage, count-derived LP intervals form an outer confidence interval for the target query.",
+      "supporting_files": [
+        "docs/theory/finite_sample_identification.md",
+        "docs/theory/theorem_ledger.md",
+        "src/cc/kernel/sample_complexity.py",
+        "src/cc/kernel/sensitivity.py"
+      ],
+      "supporting_tests_or_commands": [
+        "tests/unit/kernel/test_finite_sample_constraints.py",
+        "tests/unit/kernel/test_sample_complexity.py",
+        "make test-kernel"
+      ],
+      "non_claims": [
+        "Not valid after uncorrected adaptive target selection.",
+        "Not a deployment certificate."
+      ],
+      "risk_if_overstated": "Could imply finite-sample uncertainty handling proves future behavior or deployment safety outside the named assumptions."
+    },
+    {
+      "id": "reporting.receipt_integrity",
+      "level": "C2",
+      "lane": "Evidence Governance",
+      "status": "active_governance_boundary",
+      "claim_text": "Receipt/hash verification can provide tamper evidence for recorded bytes under canonical serialization and verification rules.",
+      "supporting_files": [
+        "docs/theory/theorem_ledger.md",
+        "docs/validation_matrix.md",
+        "src/cc/reporting/canonical.py",
+        "src/cc/reporting/report.py",
+        "src/cc/evidence/merkle_log.py",
+        "src/cc/evidence/anchoring.py"
+      ],
+      "supporting_tests_or_commands": [
+        "tests/unit/reporting/test_reporting.py",
+        "tests/unit/evidence/test_transparency_log_adversarial.py",
+        "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence tests/unit/reporting"
+      ],
+      "non_claims": [
+        "Does not prove statistical validity.",
+        "Does not prove source data truth.",
+        "Does not prove representativeness.",
+        "Does not prove compliance.",
+        "Does not prove safety."
+      ],
+      "risk_if_overstated": "Could convert byte integrity or provenance into an unsupported empirical validity, compliance, or safety claim."
+    },
+    {
+      "id": "evidence.non_claim_boundaries",
+      "level": "C4",
+      "lane": "Evidence Governance / Shared Docs",
+      "status": "active_docs_boundary",
+      "claim_text": "Documentation and reporting surfaces explicitly separate what each validation result supports from what it does not support.",
+      "supporting_files": [
+        "README.md",
+        "docs/validation_matrix.md",
+        "docs/theory/theorem_ledger.md",
+        "docs/briefs/rick_mergenthaler_ai_safety_disclosure_controls.md",
+        "docs/briefs/three_minute_demo.md",
+        "docs/research/NON_CLAIMS.md"
+      ],
+      "supporting_tests_or_commands": [
+        ".venv/bin/mkdocs build --strict",
+        "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence",
+        "PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py"
+      ],
+      "non_claims": [
+        "Does not prevent bad-faith actors from making misleading claims outside the framework."
+      ],
+      "risk_if_overstated": "Could imply documentation controls alone prevent institutional overclaiming or misuse outside the repository."
+    },
+    {
+      "id": "release.paper_core_v0_3_rc1",
+      "level": "C0/C3",
+      "lane": "Paper Core v0.3",
+      "status": "active_rc_boundary",
+      "claim_text": "Paper Core v0.3 is release-candidate quality for the finite atom kernel, canonical metrics, endpoint witnesses, deterministic paper artifacts, and documentation spine.",
+      "supporting_files": [
+        "docs/release/V0_3_RC1_CHECKLIST.md",
+        "docs/validation_matrix.md",
+        "docs/api.md",
+        "docs/research/PAPER_CORE.md",
+        "docs/research/NON_CLAIMS.md"
+      ],
+      "supporting_tests_or_commands": [
+        "make test-kernel",
+        "make test-release",
+        "make docs",
+        "make paper-smoke",
+        "make verify-paper-artifacts"
+      ],
+      "non_claims": [
+        "Does not promote enterprise, dashboard, vendor, cloud, or experimental lanes into paper core."
+      ],
+      "risk_if_overstated": "Could present a release-candidate paper-core boundary as whole-repository production quality."
+    },
+    {
+      "id": "enterprise.reference_v0_1",
+      "level": "C0/C2",
+      "lane": "Enterprise Reference v0.1",
+      "status": "experimental_reference",
+      "claim_text": "Enterprise Reference v0.1 is an experimental evidence-integrity reference architecture with moto-backed smoke tests.",
+      "supporting_files": [
+        "docs/validation_matrix.md",
+        "docs/release/V0_3_RC1_CHECKLIST.md",
+        "src/cc/enterprise/aws_reference.py",
+        "infra/lambda/verify_handler.py",
+        "apps/dashboard/scripts/require-enterprise-bundle.mjs"
+      ],
+      "supporting_tests_or_commands": [
+        "make enterprise-smoke",
+        "PYTHONPATH=src .venv/bin/pytest tests/integration/test_enterprise_aws_emulation.py tests/e2e/test_enterprise_smoke.py -q"
+      ],
+      "non_claims": [
+        "Not enterprise-ready.",
+        "Not live-AWS proof.",
+        "Not compliance certification.",
+        "Not deployment safety."
+      ],
+      "risk_if_overstated": "Could imply a moto-backed reference path is production infrastructure, live-cloud validation, compliance certification, or deployment safety."
+    },
+    {
+      "id": "open_core.strategy",
+      "level": "C0",
+      "lane": "Product Strategy / Docs",
+      "status": "active_strategy_boundary",
+      "claim_text": "The public research core is intended to remain inspectable for credibility and reproducibility, while possible private/commercial layers may operationalize the primitives.",
+      "supporting_files": [
+        "docs/product/OPEN_CORE_STRATEGY.md",
+        "README.md"
+      ],
+      "supporting_tests_or_commands": [
+        ".venv/bin/mkdocs build --strict"
+      ],
+      "non_claims": [
+        "Does not make the project a product today.",
+        "Does not claim enterprise readiness."
+      ],
+      "risk_if_overstated": "Could turn a strategic boundary document into an unsupported claim that a commercial product already exists."
+    }
+  ],
+  "forbidden_upgrades": [
+    {
+      "from": "Governance PASS",
+      "to": "deployment safety",
+      "reason": "Internal validation does not establish real-world safety."
+    },
+    {
+      "from": "Receipt/hash integrity",
+      "to": "statistical validity",
+      "reason": "Byte integrity and provenance do not establish sampling validity, measurement correctness, or inference quality."
+    },
+    {
+      "from": "JSON schema validity",
+      "to": "semantic truth",
+      "reason": "Schema conformance checks structure, not whether the represented claim is true."
+    },
+    {
+      "from": "Human review",
+      "to": "stronger empirical evidence",
+      "reason": "Review may satisfy a process requirement without adding new empirical support."
+    },
+    {
+      "from": "Exploratory red-team discovery",
+      "to": "confirmatory proof",
+      "reason": "Exploratory findings require separate confirmatory design before being treated as proof."
+    },
+    {
+      "from": "Product coupling baseline",
+      "to": "true independence model",
+      "reason": "A product baseline is a comparison calculation unless independence is separately assumed and supported."
+    },
+    {
+      "from": "Dashboard view",
+      "to": "certified assurance result",
+      "reason": "A visual surface does not create certification authority."
+    },
+    {
+      "from": "Enterprise smoke test",
+      "to": "production readiness",
+      "reason": "Moto-backed or local smoke tests do not establish operational readiness."
+    },
+    {
+      "from": "Paper Core release candidate",
+      "to": "whole-repo production quality",
+      "reason": "Release-candidate status is scoped to the named paper-core lane."
+    },
+    {
+      "from": "Open-core strategy",
+      "to": "existing commercial product",
+      "reason": "A strategy document does not create product status."
+    }
+  ],
+  "global_non_claims": [
+    "CC-Framework does not certify deployed AI systems.",
+    "CC-Framework does not prove regulatory compliance.",
+    "CC-Framework does not prove dataset representativeness.",
+    "CC-Framework does not prove deployment safety.",
+    "CC-Framework does not turn receipt integrity into statistical validity.",
+    "CC-Framework does not make schema validity equivalent to semantic truth.",
+    "CC-Framework does not claim enterprise readiness."
+  ]
+}

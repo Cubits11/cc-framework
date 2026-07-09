@@ -47,6 +47,15 @@ compliance, validate dataset representativeness, or turn receipt integrity into
 empirical truth. Its narrower purpose is to make AI assurance claims more
 evidence-bound, reproducible, and harder to overstate accidentally.
 
+## Claim Boundary Manifest
+
+CC-Framework now maintains a claim-boundary manifest that maps public claims to
+validation lanes, supporting files, tests or commands, and explicit non-claims.
+The manifest is intended to prevent documentation, demos, receipts, dashboards,
+or enterprise references from being interpreted as broader assurance claims
+than the repository supports. See
+[docs/claims/CLAIM_BOUNDARY_MANIFEST.md](docs/claims/CLAIM_BOUNDARY_MANIFEST.md).
+
 ## Open Core Strategy
 
 CC-Framework is currently a public research prototype. Its core mathematical,
