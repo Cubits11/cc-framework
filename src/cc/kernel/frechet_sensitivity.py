@@ -331,7 +331,7 @@ def _as_float_vector(
         _validate_vector_length(arr, expected_length, label=label)
     out = arr.astype(np.float64, copy=True)
     out.setflags(write=False)
-    return cast(FloatArray, out)
+    return out
 
 
 def _validate_vector_length(values: ArrayLike, expected_length: int, *, label: str) -> None:
@@ -350,7 +350,7 @@ def _as_probability_distribution(values: ArrayLike, label: str, tol: float) -> F
     cleaned = np.clip(arr, 0.0, 1.0)
     cleaned = cleaned / float(np.sum(cleaned))
     cleaned.setflags(write=False)
-    return cast(FloatArray, cleaned)
+    return cleaned
 
 
 def _validate_probability(name: str, value: float, tol: float) -> None:

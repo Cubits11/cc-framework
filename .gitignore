@@ -55,3 +55,6 @@ cdk.out/
 
 # runtime logs
 protocol_*.jsonl
+
+# Generated bundles and built docs (never track)
+*.zip
