@@ -23,7 +23,19 @@ from scipy.stats import t as student_t_dist
 FloatArray: TypeAlias = NDArray[np.float64]
 CopulaFamily: TypeAlias = Literal["gaussian", "clayton", "gumbel", "student_t"]
 Criterion: TypeAlias = Literal["aic", "bic"]
-Regime: TypeAlias = Literal["sub-critical", "critical", "super-critical"]
+Regime: TypeAlias = Literal["sub-critical", "critical", "super-critical", "discovery-only"]
+
+# How the interval fed to `cliff_certificate` was obtained. This is load-bearing,
+# not metadata: an interval computed on the SAME data that was searched to
+# maximise the statistic has no nominal coverage (winner's curse / selective
+# inference), so it cannot support a confidence statement about a regime.
+#
+#   "confirmatory" -- the interval comes from data held out from, and untouched
+#                     by, the search. Confidence statements are meaningful.
+#   "post-selection" -- the interval was computed on the search's own winning
+#                     sample. It is a DESCRIPTIVE summary of that sample, never a
+#                     coverage-valid interval for the underlying parameter.
+Provenance: TypeAlias = Literal["confirmatory", "post-selection"]
 
 _EPS = 1.0e-12
 _DEFAULT_CANDIDATES: tuple[CopulaFamily, ...] = (
@@ -38,6 +50,7 @@ __all__ = [
     "CopulaCandidateFit",
     "CopulaFamily",
     "CopulaFitResult",
+    "Provenance",
     "Regime",
     "TailDependenceCI",
     "TailDependenceEstimate",
@@ -136,6 +149,10 @@ class CliffCertificate:
     confidence_level: float
     statement: str
     falsifier: str
+    #: How the interval was obtained. "post-selection" forces regime
+    #: "discovery-only": the certificate then names a HYPOTHESIS to replicate,
+    #: never a supported regime.
+    provenance: Provenance = "confirmatory"
 
 
 def estimate_tail_dependence(
@@ -282,6 +299,7 @@ def cliff_certificate(
     ci: TailDependenceCI | tuple[float, float] | Mapping[str, Any],
     *,
     critical_value: float = 0.20,
+    provenance: Provenance = "confirmatory",
 ) -> CliffCertificate:
     """Return a falsifiable co-failure regime statement from an estimate and CI.
 
@@ -297,6 +315,36 @@ def cliff_certificate(
     ci_low, ci_high, confidence = _extract_ci(ci)
     if ci_low > ci_high:
         raise ValueError(f"CI lower endpoint exceeds upper endpoint: {(ci_low, ci_high)!r}")
+    if provenance not in ("confirmatory", "post-selection"):
+        raise ValueError(f"unknown provenance {provenance!r}")
+
+    if provenance == "post-selection":
+        # FAIL CLOSED ON SELECTIVE INFERENCE. The estimate is the maximum over a
+        # search, so it is biased upward and the bootstrap interval around it does
+        # not attain its nominal level for the true parameter. Emitting
+        # "at 95% confidence ... the data support super-critical co-failure" here
+        # would be precisely the false confidence this framework exists to prevent.
+        # A discovery is a hypothesis; only held-out data can certify it.
+        return CliffCertificate(
+            regime="discovery-only",
+            lambda_hat=_clip01(lam_hat),
+            ci=(_clip01(ci_low), _clip01(ci_high)),
+            critical_value=threshold,
+            confidence_level=confidence,
+            statement=(
+                f"DISCOVERY ONLY (no confidence claim): lambda_hat={_clip01(lam_hat):.3f} was obtained by "
+                "searching for the maximum, so it is biased upward and the interval "
+                f"[{_clip01(ci_low):.3f}, {_clip01(ci_high):.3f}] has no nominal coverage for the true "
+                "parameter (selective inference). This certificate names a hypothesis to replicate; it "
+                f"does NOT support any regime claim about the {threshold:.3f} threshold."
+            ),
+            falsifier=(
+                "Replicate on data held out from the search and re-certify with "
+                "provenance='confirmatory'. If that independent CI does not clear "
+                f"{threshold:.3f}, the discovery was a selection artifact."
+            ),
+            provenance="post-selection",
+        )
 
     if ci_high < threshold:
         regime: Regime = "sub-critical"
@@ -338,6 +386,7 @@ def cliff_certificate(
         confidence_level=confidence,
         statement=statement,
         falsifier=falsifier,
+        provenance=provenance,
     )
 
 

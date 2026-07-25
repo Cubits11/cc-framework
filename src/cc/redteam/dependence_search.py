@@ -904,10 +904,18 @@ def run_dependence_search(
         confidence_level=cfg.objective.confidence_level,
         rng=rng,
     )
+    # `best_score` is the ARGMAX of a simulated-annealing search, and `ci` is
+    # bootstrapped from that winner's own failures. That is textbook selective
+    # inference: the point estimate is biased upward and the interval has no
+    # nominal coverage for the true parameter. Declaring the provenance forces
+    # the certificate to "discovery-only" instead of emitting a confidence
+    # claim the design cannot support. Certification requires held-out data,
+    # supplied via `confirmatory_failures` below.
     certificate = cliff_certificate(
         {"lambda_any": best_score.metrics.joint_tail_cofailure_rate},
         {"lambda_any": ci, "confidence_level": cfg.objective.confidence_level},
         critical_value=cfg.objective.critical_value,
+        provenance="post-selection",
     )
     confirmatory_evidence = None
     if confirmatory_failures is not None:
@@ -995,10 +1003,13 @@ def build_confirmatory_cliff_evidence(
         confidence_level=confidence_level,
         rng=rng,
     )
+    # These failures are held out from the search, so a coverage claim is
+    # meaningful here. Stated explicitly because the default is load-bearing.
     certificate = cliff_certificate(
         {"lambda_any": metrics.joint_tail_cofailure_rate},
         {"lambda_any": ci, "confidence_level": confidence_level},
         critical_value=critical_value,
+        provenance="confirmatory",
     )
     return ConfirmatoryCliffEvidence(
         metrics=metrics,
