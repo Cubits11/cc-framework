@@ -42,25 +42,57 @@ wrote 214 lines of JavaScript instead.
 
 So the scorecard reads:
 
-| | |
-|---|---:|
-| Mathematical correctness | **8.9** |
-| Claim discipline — prose | **8.8** |
-| Consumability as a library | **2.6** |
-| Claim discipline — enforcement | **2.1** |
-| Cross-implementation agreement | **0.0** |
+| | At excavation | Now |
+|---|---:|---:|
+| Mathematical correctness | 8.9 | 8.9 |
+| Claim discipline — prose | 8.8 | 8.8 |
+| Consumability as a library | 2.6 | **6.8** |
+| Claim discipline — enforcement | 2.1 † | **4.0** † |
+| Cross-implementation agreement | 0.0 | **6.5** |
+
+† Corrected, not improved — see [F-12](FINDINGS_REGISTER.md#f-12).
 
 Three failures, stated once:
 
 1. **Reachability.** Correct and unreachable — wrong ontology, Python-only, no
-   conformance corpus. Everybody rewrites it.
-2. **Enforcement.** Prose 8.8, enforcement 2.1. Strict typing declared over 90
-   files, enforced on 7. The claim-boundary manifest is validated by nothing.
-   Everything holding this repository honest is a person remembering to be honest.
+   conformance corpus. Everybody rewrites it. **Largely closed by
+   [W5](EPISTEMIC_UPGRADE_PLAN.md#w5-delivery-record).**
+2. **Enforcement.** Prose 8.8, enforcement 4.0. Strict typing declared over 90
+   files, enforced on 7. No forbidden-phrase scanner anywhere. The claim ledger
+   itself *is* enforced — an earlier draft said otherwise and was wrong.
 3. **Unexamined foundations.** The canonicalization kernel every signed artifact
    routes through silently merges Unicode-distinct keys, diverges from RFC 8785
    on five of six number forms, and had never been attacked. One hour of probing
-   found four defects.
+   found four defects. **Open — this is W3, the highest-severity work remaining.**
+
+---
+
+## What has been built
+
+[W5](EPISTEMIC_UPGRADE_PLAN.md#w5-delivery-record) is delivered. Reproduce it:
+
+```bash
+make test-compose     # the ROC-free surface, 34 tests
+make conformance      # corpus current + an independent Node implementation agrees
+make differential     # 4,000 randomized cases through both implementations
+make acceptance       # an external consumer's PUBLISHED numbers, from this library
+```
+
+The acceptance gate is the one that matters. It is not "the API exists" — it is
+a real consumer's published four-control result reproduced from `cc.compose`:
+interval `[0, 0.01]`, independence baseline `1.2e-5`, understatement factor
+`833×`, all three of their scenarios, and their sensitivity finding. Their 214
+lines of JavaScript could be deleted.
+
+The differential fuzzer found a real bug on its first run — `countermonotone`
+with one event, where the Python raised `IndexError` and the Node silently
+returned `NaN`. Both wrong, differently; the curated corpus had not thought to
+ask.
+
+**The honest limit:** both implementations were authored in the same project, so
+this is a differential-testing instrument, not an independent replication. The
+one genuinely non-same-author check is a single external oracle on a single
+scenario family.
 
 ---
 
@@ -98,3 +130,8 @@ Absence of a finding is not evidence of absence.
   examined**. It is the most likely home of a subtle statistical defect.
 - No external reviewer was involved. Every finding here was produced by the same
   kind of process that produced the code.
+- One finding was **wrong on first publication**. F-12 claimed the
+  claim-boundary manifest was "validated by nothing"; the original grep covered
+  `.github/` and `Makefile` but not `tests/`, where the validator is in fact
+  called. It is corrected in place, with the correction visible rather than
+  quietly edited away, and the enforcement score was revised from 2.1 to 4.0.

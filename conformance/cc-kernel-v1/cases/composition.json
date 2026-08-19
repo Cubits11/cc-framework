@@ -1,0 +1,512 @@
+{
+  "case_count": 24,
+  "cases": [
+    {
+      "description": "Classical two-event conjunction. Lower is max(0, sum-1)=0; upper is min(p)=0.1.",
+      "expect": {
+        "binding_event": "A",
+        "independence_point": 0.020000000000000004,
+        "lower": 0.0,
+        "understatement_factor": 4.999999999999999,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "and-two-classical",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 0.1,
+          "B": 0.2
+        }
+      }
+    },
+    {
+      "description": "Marginals summing above 1 force a positive lower bound: 0.9+0.8-1 = 0.7.",
+      "expect": {
+        "binding_event": "B",
+        "independence_point": 0.7200000000000001,
+        "lower": 0.7000000000000002,
+        "understatement_factor": 1.111111111111111,
+        "upper": 0.8,
+        "width": 0.09999999999999987
+      },
+      "id": "and-two-overlap-forced",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 0.9,
+          "B": 0.8
+        }
+      }
+    },
+    {
+      "description": "Tied minima: no single event binds, so binding_event is null.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.0625,
+        "lower": 0.0,
+        "understatement_factor": 4.0,
+        "upper": 0.25,
+        "width": 0.25
+      },
+      "id": "and-two-equal-tie",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 0.25,
+          "B": 0.25
+        }
+      }
+    },
+    {
+      "description": "A narrow interval from extreme marginals. Narrowness is not evidence of validity.",
+      "expect": {
+        "binding_event": "A",
+        "independence_point": 0.0099,
+        "lower": 0.0,
+        "understatement_factor": 1.01010101010101,
+        "upper": 0.01,
+        "width": 0.01
+      },
+      "id": "and-two-extreme-asymmetry",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 0.01,
+          "B": 0.99
+        }
+      }
+    },
+    {
+      "description": "Classical two-event union. Lower is max(p)=0.2; upper is min(1, sum)=0.3.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.2799999999999999,
+        "lower": 0.2,
+        "understatement_factor": 1.0714285714285718,
+        "upper": 0.30000000000000004,
+        "width": 0.10000000000000003
+      },
+      "id": "or-two-classical",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "any",
+        "marginals": {
+          "A": 0.1,
+          "B": 0.2
+        }
+      }
+    },
+    {
+      "description": "Union upper bound clipped at 1 because the marginals sum above it.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.94,
+        "lower": 0.8,
+        "understatement_factor": 1.0638297872340425,
+        "upper": 1.0,
+        "width": 0.19999999999999996
+      },
+      "id": "or-two-clipped",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "any",
+        "marginals": {
+          "A": 0.7,
+          "B": 0.8
+        }
+      }
+    },
+    {
+      "description": "Four deterministic controls, assumed evasion rates. Reproduces a published external result: lower 0, upper 0.01, independence 1.2e-5, factor 833.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 1.2e-05,
+        "lower": 0.0,
+        "understatement_factor": 833.3333333333334,
+        "upper": 0.01,
+        "width": 0.01
+      },
+      "id": "and-four-vinctura-small-chapter",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "IMMUTABLE": 0.01,
+          "SELF_REPORTED": 0.3,
+          "SEPARATION": 0.4,
+          "STALE": 0.01
+        }
+      }
+    },
+    {
+      "description": "Same four controls, optimistic assumed rates. Tied minima at 0.01.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 5.000000000000001e-07,
+        "lower": 0.0,
+        "understatement_factor": 19999.999999999996,
+        "upper": 0.01,
+        "width": 0.01
+      },
+      "id": "and-four-vinctura-optimistic",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "IMMUTABLE": 0.01,
+          "SELF_REPORTED": 0.05,
+          "SEPARATION": 0.1,
+          "STALE": 0.01
+        }
+      }
+    },
+    {
+      "description": "Same four controls, pessimistic assumed rates. IMMUTABLE binds at 0.05.",
+      "expect": {
+        "binding_event": "IMMUTABLE",
+        "independence_point": 0.0015000000000000002,
+        "lower": 0.0,
+        "understatement_factor": 33.33333333333333,
+        "upper": 0.05,
+        "width": 0.05
+      },
+      "id": "and-four-vinctura-pessimistic",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "IMMUTABLE": 0.05,
+          "SELF_REPORTED": 0.5,
+          "SEPARATION": 0.6,
+          "STALE": 0.1
+        }
+      }
+    },
+    {
+      "description": "Degenerate single-event conjunction. The interval collapses to the marginal.",
+      "expect": {
+        "binding_event": "A",
+        "independence_point": 0.42,
+        "lower": 0.42,
+        "understatement_factor": 1.0,
+        "upper": 0.42,
+        "width": 0.0
+      },
+      "id": "and-single-event",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 0.42
+        }
+      }
+    },
+    {
+      "description": "Degenerate single-event union. The interval collapses to the marginal.",
+      "expect": {
+        "binding_event": "A",
+        "independence_point": 0.41999999999999993,
+        "lower": 0.42,
+        "understatement_factor": 1.0000000000000002,
+        "upper": 0.42,
+        "width": 0.0
+      },
+      "id": "or-single-event",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "any",
+        "marginals": {
+          "A": 0.42
+        }
+      }
+    },
+    {
+      "description": "A zero marginal pins the conjunction to zero regardless of the other event.",
+      "expect": {
+        "binding_event": "A",
+        "independence_point": 0.0,
+        "lower": 0.0,
+        "understatement_factor": null,
+        "upper": 0.0,
+        "width": 0.0
+      },
+      "id": "and-zero-marginal",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 0.0,
+          "B": 0.5
+        }
+      }
+    },
+    {
+      "description": "Certain events. The conjunction is certain.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 1.0,
+        "lower": 1.0,
+        "understatement_factor": 1.0,
+        "upper": 1.0,
+        "width": 0.0
+      },
+      "id": "and-unit-marginals",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 1.0,
+          "B": 1.0
+        }
+      }
+    },
+    {
+      "description": "Independence returns a degenerate interval at the product. A baseline, not an answer.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.12,
+        "lower": 0.12,
+        "understatement_factor": 1.0,
+        "upper": 0.12,
+        "width": 0.0
+      },
+      "id": "and-two-independent",
+      "input": {
+        "dependence": "independent",
+        "event": "all",
+        "marginals": {
+          "A": 0.3,
+          "B": 0.4
+        }
+      }
+    },
+    {
+      "description": "Independent union: 1 - (1-0.3)(1-0.4) = 0.58.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.5800000000000001,
+        "lower": 0.5800000000000001,
+        "understatement_factor": 1.0,
+        "upper": 0.5800000000000001,
+        "width": 0.0
+      },
+      "id": "or-two-independent",
+      "input": {
+        "dependence": "independent",
+        "event": "any",
+        "marginals": {
+          "A": 0.3,
+          "B": 0.4
+        }
+      }
+    },
+    {
+      "description": "The upper Frechet corner as a degenerate interval.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.12,
+        "lower": 0.3,
+        "understatement_factor": 2.5,
+        "upper": 0.3,
+        "width": 0.0
+      },
+      "id": "and-two-comonotone",
+      "input": {
+        "dependence": "comonotone",
+        "event": "all",
+        "marginals": {
+          "A": 0.3,
+          "B": 0.4
+        }
+      }
+    },
+    {
+      "description": "Defined only for exactly two events: max(0, 0.3+0.4-1) = 0.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.12,
+        "lower": 0.0,
+        "understatement_factor": 0.0,
+        "upper": 0.0,
+        "width": 0.0
+      },
+      "id": "and-two-countermonotone",
+      "input": {
+        "dependence": "countermonotone",
+        "event": "all",
+        "marginals": {
+          "A": 0.3,
+          "B": 0.4
+        }
+      }
+    },
+    {
+      "description": "Two-event countermonotone with a positive floor: 0.7+0.8-1 = 0.5.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.5599999999999999,
+        "lower": 0.5,
+        "understatement_factor": 0.8928571428571429,
+        "upper": 0.5,
+        "width": 0.0
+      },
+      "id": "and-two-countermonotone-positive",
+      "input": {
+        "dependence": "countermonotone",
+        "event": "all",
+        "marginals": {
+          "A": 0.7,
+          "B": 0.8
+        }
+      }
+    },
+    {
+      "description": "Correlation cliff at m=2: independence predicts 1e-2, the sharp upper bound stays 0.1. Stacking buys nothing under adversarial dependence.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.010000000000000002,
+        "lower": 0.0,
+        "understatement_factor": 9.999999999999998,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "cliff-homogeneous-m2",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "G0": 0.1,
+          "G1": 0.1
+        }
+      }
+    },
+    {
+      "description": "Correlation cliff at m=3: independence predicts 1e-3, the sharp upper bound stays 0.1. Stacking buys nothing under adversarial dependence.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.0010000000000000002,
+        "lower": 0.0,
+        "understatement_factor": 99.99999999999999,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "cliff-homogeneous-m3",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "G0": 0.1,
+          "G1": 0.1,
+          "G2": 0.1
+        }
+      }
+    },
+    {
+      "description": "Correlation cliff at m=4: independence predicts 1e-4, the sharp upper bound stays 0.1. Stacking buys nothing under adversarial dependence.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 0.00010000000000000003,
+        "lower": 0.0,
+        "understatement_factor": 999.9999999999998,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "cliff-homogeneous-m4",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "G0": 0.1,
+          "G1": 0.1,
+          "G2": 0.1,
+          "G3": 0.1
+        }
+      }
+    },
+    {
+      "description": "Correlation cliff at m=5: independence predicts 1e-5, the sharp upper bound stays 0.1. Stacking buys nothing under adversarial dependence.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 1.0000000000000004e-05,
+        "lower": 0.0,
+        "understatement_factor": 9999.999999999996,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "cliff-homogeneous-m5",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "G0": 0.1,
+          "G1": 0.1,
+          "G2": 0.1,
+          "G3": 0.1,
+          "G4": 0.1
+        }
+      }
+    },
+    {
+      "description": "Correlation cliff at m=8: independence predicts 1e-8, the sharp upper bound stays 0.1. Stacking buys nothing under adversarial dependence.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 1.0000000000000005e-08,
+        "lower": 0.0,
+        "understatement_factor": 9999999.999999996,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "cliff-homogeneous-m8",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "G0": 0.1,
+          "G1": 0.1,
+          "G2": 0.1,
+          "G3": 0.1,
+          "G4": 0.1,
+          "G5": 0.1,
+          "G6": 0.1,
+          "G7": 0.1
+        }
+      }
+    },
+    {
+      "description": "Correlation cliff at m=10: independence predicts 1e-10, the sharp upper bound stays 0.1. Stacking buys nothing under adversarial dependence.",
+      "expect": {
+        "binding_event": null,
+        "independence_point": 1.0000000000000006e-10,
+        "lower": 0.0,
+        "understatement_factor": 999999999.9999995,
+        "upper": 0.1,
+        "width": 0.1
+      },
+      "id": "cliff-homogeneous-m10",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "G0": 0.1,
+          "G1": 0.1,
+          "G2": 0.1,
+          "G3": 0.1,
+          "G4": 0.1,
+          "G5": 0.1,
+          "G6": 0.1,
+          "G7": 0.1,
+          "G8": 0.1,
+          "G9": 0.1
+        }
+      }
+    }
+  ],
+  "corpus": "cc-kernel-v1",
+  "kind": "accept",
+  "tolerance": 1e-12
+}

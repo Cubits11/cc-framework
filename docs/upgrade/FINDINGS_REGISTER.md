@@ -34,7 +34,7 @@ Severity scale:
 | [F-09](#f-09) | **S3** | The kernel calculus is independently reimplemented three times | W5 |
 | [F-10](#f-10) | **S3** | Vinctura's requested cross-language guard surface does not exist | W5 |
 | [F-11](#f-11) | S3 | Ghost-Ark's binding ingest rule has no enforcing code here | W6 |
-| [F-12](#f-12) | S2 | The claim-boundary manifest is validated by nothing | W2 |
+| [F-12](#f-12) | S4 | The manifest validator has two narrow unenforced gaps | W2 |
 | [F-13](#f-13) | S2 | No coverage gate; the report CLI is at 0% | W4 |
 | [F-14](#f-14) | S2 | `core/stats.py` is 38% covered across 756 statements | W4 |
 | [F-15](#f-15) | S4 | Two divergent theorem ledgers | W2 |
@@ -397,26 +397,60 @@ refused, not defaulted.
 
 ## F-12
 
-**The claim-boundary manifest is validated by nothing.** — S2, owner W2
+**The manifest validator has two narrow unenforced gaps.** — S4, owner W2
+
+> **Corrected 2026-08-19.** This finding was first written as "the
+> claim-boundary manifest is validated by nothing," at severity S2. That was
+> wrong. The original grep covered `.github/workflows/` and `Makefile`, found
+> nothing, and I concluded the validator was unwired — without checking
+> `tests/`, where it is in fact called. The corrected finding is below, and the
+> enforcement score in
+> [COMMITTEE_SCORECARD.md](COMMITTEE_SCORECARD.md#claim-discipline-enforcement)
+> was raised from 2.1 to 4.0 as a result.
 
 `docs/claims/CLAIM_BOUNDARY_MANIFEST.md` and its JSON companion define C0–C5
 claim levels and map every public claim to evidence, tests, files, and
-non-claims. It is one of the best-designed artifacts in the repository.
-`scripts/validate_claim_boundary_manifest.py` exists to check it.
+non-claims. It is one of the best-designed artifacts in the repository, and it
+**is** enforced: `tests/unit/docs/test_claim_boundary_manifest.py` calls
+`scripts/validate_claim_boundary_manifest.py`, and that test runs in the normal
+pytest suite, which CI runs on four Python versions.
 
-```bash
-grep -rn "validate_claim_boundary_manifest" .github/ Makefile
-# (no match)
+Measured against the current tree, the validator checks — and passes — all of:
+
+```
+validate_manifest errors: none
+claims in JSON: 8
 ```
 
-**Impact.** The manifest can drift from the code it describes — a renamed test, a
-moved module, a deleted file — and nothing reports it. An unenforced truth table
-degrades into a historical document, and the failure is silent: it still *looks*
-authoritative.
+- required top-level and per-claim keys;
+- unique claim ids;
+- every `level` resolving to a declared claim level;
+- **every `supporting_files` path existing on disk**;
+- non-empty `non_claims` on every claim;
+- non-empty `supporting_tests_or_commands` on every claim;
+- `forbidden_upgrades` entries carrying `from`, `to`, and `reason`.
 
-**Remedy.** W2 wires the validator into CI and pre-commit, extends it to assert
-that every named test path and source file exists, and adds a test that fails
-when a claim row references a nonexistent witness.
+**What is actually missing.** Two narrow gaps, both currently satisfied by
+discipline rather than by a gate:
+
+1. **Test paths are not checked for existence.** `supporting_files` entries are
+   verified against the filesystem; `supporting_tests_or_commands` entries are
+   only checked for being a non-empty list. A renamed test file would pass. All
+   named paths do currently exist — verified separately for this register — but
+   nothing keeps that true.
+2. **The Markdown and JSON manifests are not cross-checked.** They carry the
+   same eight claim ids today, with no id in one and not the other, but no test
+   asserts it. The prose table and the machine-checkable file can diverge
+   silently.
+
+**Impact.** Much smaller than first stated. The failure mode is a renamed test
+or a claim added to one manifest and not the other, not a wholly unenforced
+document.
+
+**Remedy.** Extend the validator to resolve path-like tokens in
+`supporting_tests_or_commands`, and add a test asserting the Markdown and JSON
+claim-id sets are equal. Roughly fifteen lines; it belongs in W2 with the claim
+scanner, not ahead of it.
 
 ---
 

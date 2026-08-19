@@ -20,11 +20,11 @@ Defects: [FINDINGS_REGISTER.md](FINDINGS_REGISTER.md).
 | 1 | Mathematical correctness | **8.9** | 9.4 | W4 |
 | 2 | Canonicalization & provenance integrity | **3.8** | 8.5 | W3 |
 | 3 | Claim discipline — prose | **8.8** | 9.2 | W2 |
-| 4 | Claim discipline — enforcement | **2.1** | 8.5 | W2 |
+| 4 | Claim discipline — enforcement | **4.0** | 8.5 | W2 |
 | 5 | Test depth | **6.4** | 8.5 | W4 |
 | 6 | External reproducibility | **4.2** | 8.0 | W0, W7 |
-| 7 | Consumability as a library | **2.6** | 8.5 | W5 |
-| 8 | Cross-implementation agreement | **0.0** | 8.0 | W5 |
+| 7 | Consumability as a library | **6.8** | 8.5 | W5 |
+| 8 | Cross-implementation agreement | **6.5** | 8.0 | W5 |
 | 9 | Empirical grounding | **2.4** | 6.5 | W7 |
 | 10 | Statistical honesty machinery | **7.9** | 9.0 | W4, W7 |
 | 11 | Evidence-governance architecture | **7.6** | 8.5 | W6 |
@@ -37,15 +37,17 @@ Defects: [FINDINGS_REGISTER.md](FINDINGS_REGISTER.md).
 - **4.1 / 10** as a *verifiable evidence* artifact — the canonicalization kernel
   has an unexamined collapse, nothing enforces the claim manifest, and no
   independent implementation exists to disagree with it.
-- **2.6 / 10** as a *consumable library* — three downstream repositories
-  reimplemented its calculus rather than depend on it, and one of them wrote
-  down why.
+- **6.8 / 10** as a *consumable library* — was 2.6. W5 shipped an ROC-free
+  composition surface, a published conformance corpus, an independent Node
+  implementation, and a cross-language guard. A real consumer's published
+  numbers now reproduce from the library.
 
-The gap between the first and third numbers is the whole plan.
+The gap between the first and third numbers is the whole plan. W5 has closed
+most of it; W6 and the empirical lanes remain.
 
 ---
 
-## 1. Mathematical correctness — 8.9
+## 1. Mathematical correctness — 8.9 {#mathematical-correctness}
 
 *Measures: whether the computed bounds are the bounds claimed.*
 
@@ -68,7 +70,7 @@ form disagree beyond solver tolerance. A degenerate constraint set that returns
 
 ---
 
-## 2. Canonicalization & provenance integrity — 3.8
+## 2. Canonicalization & provenance integrity — 3.8 {#canonicalization-provenance-integrity}
 
 *Measures: whether a receipt identifies the document it claims to.*
 
@@ -99,7 +101,7 @@ key rejection on read.
 
 ---
 
-## 3. Claim discipline — prose — 8.8
+## 3. Claim discipline — prose — 8.8 {#claim-discipline-prose}
 
 *Measures: whether the words stay inside the evidence.*
 
@@ -124,35 +126,50 @@ critic to make.
 
 ---
 
-## 4. Claim discipline — enforcement — 2.1
+## 4. Claim discipline — enforcement — 4.0 {#claim-discipline-enforcement}
 
 *Measures: whether the discipline survives an author in a hurry.*
 
-**Evidence supporting.** `permission_compiler.py` carries a forbidden-phrase list
+> **Revised upward from 2.1 on 2026-08-19.** The original score rested partly on
+> the claim that `validate_claim_boundary_manifest.py` was "wired into nothing —
+> not CI, not the Makefile, not a test." The first two were right and the third
+> was wrong: it is called by
+> `tests/unit/docs/test_claim_boundary_manifest.py`, which runs in the pytest
+> suite CI executes on four Python versions. See the correction note in
+> [F-12](FINDINGS_REGISTER.md#f-12).
+
+**Evidence supporting.** The claim-boundary manifest **is** enforced, and more
+thoroughly than most such artifacts: the validator checks required keys, unique
+ids, claim-level resolution, non-empty non-claims per claim, and the existence
+on disk of every `supporting_files` path. It passes with zero errors across all
+eight declared claims. `permission_compiler.py` carries a forbidden-phrase list
 and is 95.28% covered. The claim-governance verifier checks non-claim substance
 rather than exact strings. `check_artifact_boundary.py` runs in CI.
 
-**What lowers it.** No claim scanner in CI at all
-([F-12](FINDINGS_REGISTER.md#f-12)). `validate_claim_boundary_manifest.py` is
-wired into nothing — not CI, not the Makefile, not a test. Two divergent theorem
+**What lowers it.** No forbidden-phrase scanner in CI at all — the gate
+Ghost-Ark runs on every file has no counterpart here. Two divergent theorem
 ledgers with no governing rule ([F-15](FINDINGS_REGISTER.md#f-15)). Strict typing
-declared and enforced on 7 of 90 files ([F-02](FINDINGS_REGISTER.md#f-02)) — claim
-inflation expressed in build configuration.
+declared for the `cc` package and enforced on 7 of 90 files
+([F-02](FINDINGS_REGISTER.md#f-02)) — claim inflation expressed in build
+configuration. Two narrow manifest gaps remain unenforced
+([F-12](FINDINGS_REGISTER.md#f-12)): test paths are not checked for existence,
+and the Markdown and JSON manifests are not cross-checked.
 
-The prose is 8.8 and the enforcement is 2.1. **Everything holding this repository
-honest is currently a person remembering to be honest.**
+The prose is 8.8 and the enforcement is 4.0. The gap is real but narrower than
+first reported: what is missing is a phrase-level scanner and honest typing,
+not the claim ledger itself.
 
-**What would raise it.** The manifest validator in CI. A claim scanner with
-negation and allowlist handling from day one — a naive port of Ghost-Ark's would
-fire on 70 negated uses of "guarantee" and be disabled within a week. A test
-that fails when a manifest row names a file that does not exist.
+**What would raise it.** A claim scanner with negation and allowlist handling
+from day one — a naive port of Ghost-Ark's would fire on 70 negated uses of
+"guarantee" and be disabled within a week. The typing ratchet. Closing the two
+manifest gaps.
 
 **What would lower it.** A published claim that no artifact supports, merged
 green.
 
 ---
 
-## 5. Test depth — 6.4
+## 5. Test depth — 6.4 {#test-depth}
 
 *Measures: whether the suite would notice a defect.*
 
@@ -179,7 +196,7 @@ caught.
 
 ---
 
-## 6. External reproducibility — 4.2
+## 6. External reproducibility — 4.2 {#external-reproducibility}
 
 *Measures: whether a stranger can reproduce the artifacts.*
 
@@ -202,54 +219,107 @@ One external person reproducing the paper artifacts and saying so in writing.
 
 ---
 
-## 7. Consumability as a library — 2.6
+## 7. Consumability as a library — 6.8 {#consumability-as-a-library}
 
 *Measures: whether a downstream project can depend on this instead of rewriting it.*
 
-**Evidence supporting.** Installable, four console entry points, a lazy-loading
-kernel aggregate, `docs/api.md`, four downstream-facing design specs.
+> **Revised upward from 2.6 on 2026-08-19**, on delivered evidence rather than
+> intent. What moved it is listed below; each item is a command.
 
-**What lowers it.** Three independent reimplementations of the core calculus
-([F-09](FINDINGS_REGISTER.md#f-09)). A written rejected-adoption report from a
-real consumer naming the ROC framing as the obstacle
-([F-08](FINDINGS_REGISTER.md#f-08)). A dated, explicit request from a consumer to
-route through `cliff.py:321` that cannot be honoured across a language boundary
-([F-10](FINDINGS_REGISTER.md#f-10)). No ingest path for the contract Ghost-Ark
-declares binding ([F-11](FINDINGS_REGISTER.md#f-11)).
+**Evidence supporting.** `cc.compose` takes named marginals and returns a sharp
+interval, with no ROC, Youden, threshold, or operating-point concept anywhere in
+its signature — pinned by a test that greps the signatures for that vocabulary,
+so the surface cannot drift back to the shape a consumer already walked away
+from. Deterministic predicates are first-class; detectors reach the same surface
+through `marginal_from_operating_point`, which points *inward*.
 
-This is the lowest non-zero score and the highest-leverage one. The mathematics
-is 8.9 and nobody can use it.
+The result object carries what qualifies the number: the independence baseline,
+the understatement factor, the binding event, the marginal provenance
+(`measured` / `assumed` / `supplied`), and the non-claims. A bound over assumed
+rates cannot be serialized without the word `assumed` attached.
 
-**What would raise it.** `cc.compose` with marginals in and bounds out, no ROC
-concept in the signature. `cc-guard` as a stdin/stdout JSON surface. Vinctura's
-214 lines deleted and their numbers reproduced from the library.
+`cc-guard` exposes the inference guards as a stdin/stdout JSON subcommand *and*
+as a pure-data decision table, so a non-Python caller needs no Python process.
+A test asserts the table and the implementation agree rule by rule, and another
+asserts `cc-guard` reaches the same verdict as `cc.kernel.cliff.cliff_certificate`
+in both directions — the CLI can neither permit what the kernel refuses nor
+refuse what it permits.
 
-**What would lower it.** A fourth reimplementation.
+**The acceptance gate passed.** `tests/acceptance/test_external_consumer_reproduction.py`
+reproduces an external consumer's *published* four-control result from
+`cc.compose`: interval `[0, 0.01]`, independence baseline `1.2e-5`,
+understatement factor `833×`, all three published scenarios, and their
+sensitivity finding that improving a weak control moves the upper bound by
+`0.00pp`. Ten tests. Their 214 lines of JavaScript could be deleted.
+
+**What still lowers it.** No ingest path for the contract Ghost-Ark declares
+binding ([F-11](FINDINGS_REGISTER.md#f-11)) — that is W6. The constrained LP path
+is not exposed through `cc.compose`; only the closed form is. And no downstream
+project has actually adopted any of this yet: the obstacle is removed, the
+adoption is theirs to make.
+
+**What would raise it further.** W6's `cc.ingest.discretization`. Side
+constraints on the `cc.compose` surface. A downstream repository importing it in
+anger.
+
+**What would lower it.** A fourth reimplementation appearing anyway — which
+would mean the surface is still the wrong shape.
 
 ---
 
-## 8. Cross-implementation agreement — 0.0
+## 8. Cross-implementation agreement — 6.5 {#cross-implementation-agreement}
 
 *Measures: whether independent implementations produce the same answer.*
 
-There is nothing to score. No second implementation exists inside this
-repository, no conformance corpus is published, and the two external
-implementations have never been compared to this one on a single case.
+> **Revised upward from 0.0 on 2026-08-19.** There was nothing to score; now
+> there is.
 
-Zero is the honest score. It is also the easiest to move: Ghost-Ark already
-operates E5 (cross-language verifier agreement) and E7 (differential fuzz)
-successfully. The machinery exists; it has never been pointed here.
+**Evidence supporting.**
 
-**What would raise it.** `conformance/cc-kernel-v1/` published with exact expected
-values and an adversarial section. A second implementation in another language
-inside this repository. A differential fuzz harness comparing them. Agreement
-demonstrated against Ghost-Ark's TypeScript and Vinctura's JavaScript.
+- `conformance/cc-kernel-v1/` is published: 24 accept cases with pinned exact
+  values, 8 reject cases with typed refusal reasons, a manifest with digests and
+  a declared 1e-12 tolerance, and a 256-line normative `SPEC.md`. Every accept
+  case is cross-checked against the finite-atom LP at generation time, and the
+  build **refuses to write a case** the closed form and the LP disagree on.
+- `verifiers/node/cc_compose_verify.mjs` is a zero-dependency Node
+  implementation written from `SPEC.md` and the JSON, not from the Python. It
+  passes 24/24 accept and 8/8 reject.
+- `scripts/differential_compose.py` fuzzes both sides on randomized inputs,
+  including malformed ones, requiring agreement on the answer *or* the refusal.
+  **23,000 cases across six seeds, zero disagreements** — and it earned its
+  keep immediately by finding a real bug (see below).
+- Three of these run in CI as pytest cases, so agreement is enforced rather than
+  demonstrated once.
 
-**What would lower it.** Nothing. It cannot go lower.
+**The fuzzer found a bug on its first run.** `dependence="countermonotone"` with
+exactly *one* event: the Python raised `IndexError`, the Node silently returned
+`NaN`. Both were wrong, differently, and the curated corpus had not thought to
+ask. Both are fixed, and the case is now pinned as
+`reject-countermonotone-one-event` with its provenance recorded in the corpus.
+That is the argument for randomized differential testing over a corpus alone.
+
+**Why this is 6.5 and not 8.0.** The honest limit: **the Node implementation and
+the Python reference were authored in the same project.** A specification that
+is wrong yields two implementations that are wrong together. This is a
+differential-testing instrument, not an independent replication, and both the
+verifier's own output and the corpus manifest say so in their non-claims.
+
+The one check here that is *not* same-author is the external oracle: an
+outside project's **published** numbers, produced independently for its own
+purposes before this corpus existed, reproduced exactly. That is one oracle, on
+one scenario family.
+
+**What would raise it.** Ghost-Ark's TypeScript `ccCorrelation.ts` running this
+corpus. A third implementation by someone who has not read either of these. More
+external oracles. Extending the corpus to the constrained LP path, which neither
+the corpus nor the fuzzer currently covers.
+
+**What would lower it.** A disagreement found by anyone outside the project — or
+a case quietly weakened to make an implementation pass.
 
 ---
 
-## 9. Empirical grounding — 2.4
+## 9. Empirical grounding — 2.4 {#empirical-grounding}
 
 *Measures: whether any number here came from a real system.*
 
@@ -274,7 +344,7 @@ simulation.
 
 ---
 
-## 10. Statistical honesty machinery — 7.9
+## 10. Statistical honesty machinery — 7.9 {#statistical-honesty-machinery}
 
 *Measures: whether the code refuses claims the data cannot support.*
 
@@ -302,7 +372,7 @@ hand-authored corpus.
 
 ---
 
-## 11. Evidence-governance architecture — 7.6
+## 11. Evidence-governance architecture — 7.6 {#evidence-governance-architecture}
 
 *Measures: whether evidence carries its own boundaries.*
 
@@ -323,7 +393,7 @@ schema identifiers. An evidence-window contract in Ghost-Ark's sense.
 
 ---
 
-## 12. Formal readiness — 3.1
+## 12. Formal readiness — 3.1 {#formal-readiness}
 
 *Measures: distance to machine-checked proof.*
 

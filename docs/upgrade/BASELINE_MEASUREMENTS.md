@@ -329,17 +329,25 @@ is not the convention its sibling repositories use.
 | Artifact | Lines | Enforced by |
 |---|---:|---|
 | `docs/research/NON_CLAIMS.md` | — | prose + verifier substring engine |
-| `docs/claims/CLAIM_BOUNDARY_MANIFEST.md` (C0–C5 levels) | — | **nothing** |
-| `docs/claims/claim_boundary_manifest.v0.1.json` | — | **nothing** |
-| `scripts/validate_claim_boundary_manifest.py` | — | **nothing** |
+| `docs/claims/CLAIM_BOUNDARY_MANIFEST.md` (C0–C5 levels) | — | not cross-checked against the JSON |
+| `docs/claims/claim_boundary_manifest.v0.1.json` | — | `tests/unit/docs/test_claim_boundary_manifest.py` |
+| `scripts/validate_claim_boundary_manifest.py` | — | called by that test, which CI runs |
 | `src/cc/evidence/permission_compiler.py` forbidden-phrase list | 202 stmts | unit tests |
 | `docs/theory/theorem_ledger.md` | 10 KB | test witnesses named per theorem |
 | `docs/research/THEOREM_LEDGER.md` | 3 KB | — (second, divergent ledger) |
 
 `grep` across `.github/workflows/` and `.pre-commit-config.yaml` for
-`claim`/`scan` returns only Bandit and detect-secrets. **No claim gate runs in
-CI.** `scripts/validate_claim_boundary_manifest.py` is referenced by no
-workflow, no Makefile target, and no test.
+`claim`/`scan` returns only Bandit and detect-secrets, so **no forbidden-phrase
+scanner runs in CI**.
+
+The claim-boundary manifest, however, *is* enforced — via pytest rather than a
+named workflow step. `tests/unit/docs/test_claim_boundary_manifest.py` calls
+`validate_claim_boundary_manifest.validate_manifest`, which checks required
+keys, unique ids, level resolution, non-empty non-claims, and **the existence of
+every `supporting_files` path on disk**. It passes with zero errors over all
+eight declared claims. See the correction note in
+[F-12](FINDINGS_REGISTER.md#f-12); an earlier draft of this document said
+otherwise and was wrong.
 
 ### Proto-scan: Ghost-Ark's forbidden patterns applied here
 
@@ -377,8 +385,8 @@ it needs negation and allowlist handling from day one. See
 | mypy | yes | **7 files of 90** |
 | pytest | yes | full suite, Python 3.10–3.13 |
 | coverage threshold | **no** | — |
-| claim scanner | **no** | — |
-| claim-boundary manifest validation | **no** | — |
+| claim scanner (forbidden phrases) | **no** | — |
+| claim-boundary manifest validation | yes | via pytest, not a named CI step |
 | artifact boundary | yes | `scripts/check_artifact_boundary.py --static` |
 | package build + twine check | yes | — |
 | enterprise smoke (moto) | yes | — |

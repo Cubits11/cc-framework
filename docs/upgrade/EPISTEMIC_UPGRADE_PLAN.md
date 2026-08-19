@@ -195,8 +195,11 @@ handling and an allowlist are day-one requirements, not refinements.
      because reviewer-facing claim text lives in build files too;
    - exclusion of generated output, so the verdict describes the committed tree
      rather than local run state.
-2. Wire `scripts/validate_claim_boundary_manifest.py` into CI and pre-commit, and
-   extend it to assert that **every path a claim row names actually exists**.
+2. Close the two residual manifest gaps ([F-12](FINDINGS_REGISTER.md#f-12), corrected):
+   resolve path-like tokens in `supporting_tests_or_commands`, and assert the
+   Markdown and JSON claim-id sets are equal. The validator already runs (via
+   pytest) and already checks `supporting_files` existence — an earlier draft of
+   this plan said otherwise and was wrong.
 3. Resolve the two theorem ledgers. `docs/theory/theorem_ledger.md` governs; the
    other becomes a pointer or is deleted. Add a test asserting exactly one.
 4. **Adopt Vinctura's rule:** *no orphan claims — every public sentence carries
@@ -329,6 +332,12 @@ on the mutated subset, nothing wider.
 
 ### W5 — Make the kernel consumable {#w5}
 
+> **DELIVERED 2026-08-19.** Consumability **2.6 → 6.8**, cross-implementation
+> agreement **0.0 → 6.5**. Evidence in
+> [§3.5 Delivery record](#w5-delivery-record) below; scores and their limits in
+> [COMMITTEE_SCORECARD.md](COMMITTEE_SCORECARD.md#consumability-as-a-library).
+> C4, C5, C6 and the C2 corpus are shipped. C1, C3, C7 remain with W3 and W6.
+
 **Findings:** [F-08](FINDINGS_REGISTER.md#f-08) **S3**, [F-09](FINDINGS_REGISTER.md#f-09) **S3**, [F-10](FINDINGS_REGISTER.md#f-10) **S3**
 · **Contracts:** [C2, C4, C5, C6](DOWNSTREAM_CONTRACTS.md#contract-summary)
 · **Effort:** 4–6 weeks · **Highest leverage**
@@ -394,6 +403,46 @@ and the consumer noticed before this repository did.
 **Does not establish.** That downstream projects will adopt it. That is their
 decision. The gate is that adoption becomes *possible* and that a real consumer's
 published numbers reproduce.
+
+#### Delivery record {#w5-delivery-record}
+
+Measured on 2026-08-19. Every row is a command.
+
+| Deliverable | Shipped as | Evidence |
+|---|---|---|
+| ROC-free surface | `src/cc/compose/` | 34 unit tests; a test greps the public signatures for `roc`, `youden`, `tpr`, `fpr`, `threshold`, `operating_point` and fails if any reappears |
+| Conformance corpus | `conformance/cc-kernel-v1/` | 24 accept + 8 reject cases, `SPEC.md` (256 lines), manifest with digests, 1e-12 tolerance |
+| Second implementation | `verifiers/node/cc_compose_verify.mjs` | zero-dependency Node, written from `SPEC.md`; 24/24 accept, 8/8 reject |
+| Differential harness | `scripts/differential_compose.py` | 23,000 randomized cases across 6 seeds, **0 disagreements** |
+| Cross-language guard | `src/cc/cli/guard.py`, `cc-guard` | stdin/stdout JSON **and** a pure-data decision table; table-vs-code agreement asserted |
+| Acceptance gate | `tests/acceptance/` | an external consumer's **published** four-control result reproduced: `[0, 0.01]`, independence `1.2e-5`, **833×**, all three scenarios, their sensitivity finding |
+
+Enforced by `make conformance`, `make differential`, `make acceptance`,
+`make test-compose`, and two new CI jobs.
+
+**Numbers.** Suite 689 → **808 passing**, 0 failing. Coverage 69.91% → **70.13%**.
+`cc/compose/_bounds.py` **97.09%**, `cc/cli/guard.py` **97.56%**. The closed form
+agrees with the finite-atom LP to **3.3e-16** over 600 randomized cases.
+
+**The fuzzer earned its keep on its first run.** `dependence="countermonotone"`
+with exactly one event: the Python raised `IndexError`, the Node silently
+returned `NaN`. Both wrong, differently; the curated corpus had not thought to
+ask. Both fixed, and pinned as `reject-countermonotone-one-event`. That is the
+argument for randomized differential testing over a corpus alone.
+
+**Honest limits.** The Node implementation and the Python reference were
+authored in the same project — a wrong specification yields two implementations
+wrong together. This is a differential-testing instrument, not an independent
+replication, and both the verifier output and the corpus manifest say so in
+their non-claims. The one genuinely non-same-author check is the external
+oracle, and it is **one** oracle on **one** scenario family. Neither the corpus
+nor the fuzzer covers the constrained LP path. No downstream project has adopted
+any of this yet: the obstacle is removed, the adoption is theirs.
+
+**Also fixed in passing.** [F-01](FINDINGS_REGISTER.md#f-01): `build`,
+`setuptools`, and `wheel` added to the `[test]` extra, plus a CI job that
+installs `.[test]` specifically, so the extra strangers are told to use is the
+extra that is tested.
 
 ---
 
