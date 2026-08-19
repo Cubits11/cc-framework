@@ -329,6 +329,7 @@ test-compose: install
 # unintended-kernel class remains, so the findings stay falsifiable.
 canon-probe: install
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/canonicalization_probe.py
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/canonical -q
 
 test-week3: install
 	$(ACT); pytest -q --disable-warnings \

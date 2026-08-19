@@ -73,13 +73,13 @@
         "bytes": 4559,
         "path": "extremal_lower.json",
         "role": "extremal_scenario",
-        "sha256": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f"
+        "sha256": "bb9e9cf4e1aec1aef6e670c06e10bad89cb96ccdb7222d1ec3919e79b3c7a120"
       },
       {
         "bytes": 4557,
         "path": "extremal_upper.json",
         "role": "extremal_scenario",
-        "sha256": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3"
+        "sha256": "f2aaf4d8b700069449f3364068fc024f28f718173aa9f9312137b29788541925"
       }
     ],
     "audit_log": {
@@ -111,8 +111,8 @@
     }
   },
   "receipt": {
-    "canonical_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
-    "canonicalization_method": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded",
+    "canonical_hash": "78242a02a5af310883110c3692c8f477418e63d59b69487792ae7a579ce6d5de",
+    "canonicalization_method": "cc.canonical.v2/RFC8785; receipt.canonical_hash excluded",
     "hash_algorithm": "sha256",
     "previous_hash": null
   },

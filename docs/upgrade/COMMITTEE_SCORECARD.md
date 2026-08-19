@@ -18,7 +18,7 @@ Defects: [FINDINGS_REGISTER.md](FINDINGS_REGISTER.md).
 | # | Dimension | Now | Target (v0.4) | Workstream |
 |---|---|---:|---:|---|
 | 1 | Mathematical correctness | **8.9** | 9.4 | W4 |
-| 2 | Canonicalization & provenance integrity | **3.8** | 8.5 | W3 |
+| 2 | Canonicalization & provenance integrity | **8.2** | 8.5 | W3 |
 | 3 | Claim discipline — prose | **8.8** | 9.2 | W2 |
 | 4 | Claim discipline — enforcement | **4.0** | 8.5 | W2 |
 | 5 | Test depth | **6.4** | 8.5 | W4 |
@@ -70,32 +70,46 @@ form disagree beyond solver tolerance. A degenerate constraint set that returns
 
 ---
 
-## 2. Canonicalization & provenance integrity — 3.8 {#canonicalization-provenance-integrity}
+## 2. Canonicalization & provenance integrity — 8.2 {#canonicalization-provenance-integrity}
 
 *Measures: whether a receipt identifies the document it claims to.*
 
-**Evidence supporting.** Canonical form is deterministic, sorted, compact,
-UTF-8, rejects NaN/Infinity, rejects non-string keys, rejects non-JSON-native
-types, and excludes the receipt hash from its own preimage. 91.89% covered.
-That is a real, careful implementation.
+> **Revised upward from 3.8 on 2026-08-19**, on delivered evidence. Every S1
+> finding in this dimension is fixed. See
+> [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md).
 
-**What lowers it, now.** [F-03](FINDINGS_REGISTER.md#f-03): two Unicode-distinct
-keys silently become one, with no error, inside the function every signed
-artifact routes through. [F-04](FINDINGS_REGISTER.md#f-04): five of six number
-forms diverge from RFC 8785. [F-05](FINDINGS_REGISTER.md#f-05): integers above
-2^53 cannot survive a JS verifier. [F-07](FINDINGS_REGISTER.md#f-07): duplicate
-keys accepted last-wins on read.
+**Evidence supporting.** `cc.canonical.v2` implements RFC 8785: ECMAScript
+`Number::toString` number forms, UTF-16 code-unit key ordering, no
+normalization, and one declared narrowing (the IEEE-754 safe integer range)
+documented rather than left implicit. 15 of 15 probed number forms conform.
 
-The score is not 3.8 because the code is careless. It is 3.8 because the code is
-careful and **has never been attacked**. Ghost-Ark found five unintended kernel
-members in its own pipeline by building a 31-class census. cc-framework has not
-run the equivalent, and the one pass performed for this plan found four issues
-in under an hour.
+The census at `scripts/canonicalization_probe.py` runs 14 declared-intent
+classes across both profiles and reports, under v2: **12 sound, 1 fail-closed,
+1 sound-by-rejection** — zero `unintended-kernel`, zero `rejection-asymmetry`,
+zero `over-discrimination`. Four positive controls pass, which is what makes the
+result a fix rather than a trade. `tests/unit/canonical/` holds all of it with 57
+tests, and a further test asserts v1 *still* carries its defects, so the legacy
+profile cannot be silently "fixed" out from under historical receipts.
 
-**What would raise it.** A committed adversarial corpus with declared intent per
-class. Collision detection that fails closed. A documented, versioned
-`cc.canonical.v1` profile stating its relationship to RFC 8785. Strict duplicate-
-key rejection on read.
+Duplicate keys are refused on read at any nesting depth, wired into the report
+CLI, the claim-governance readers, and the Merkle log.
+
+Migration was done without breaking history: verification dispatches on the
+profile each receipt declares, and every regenerated capsule artifact was diffed
+with hashes, hash-derived ids, and the profile identifier scrubbed. All eleven
+were byte-identical under that scrub — only hashes moved.
+
+**What still lowers it.** No fuzzing of the canonicalizer: every class was
+authored by hand, so the census establishes that the declared classes behave as
+declared and nothing about the rest of the input space. **No cross-language
+differential test on receipts** — the corpus establishes agreement on the
+composition kernel, but nothing yet re-canonicalizes a CC report in another
+language and compares digests, so "cross-language verifiable" currently
+describes v2's design rather than a demonstrated result. No external reviewer
+has attacked either profile.
+
+**What would raise it further.** A receipt-level differential against a
+non-Python JCS implementation. A fuzzer over the canonicalizer.
 
 **What would lower it.** A collision found by anyone outside the project.
 

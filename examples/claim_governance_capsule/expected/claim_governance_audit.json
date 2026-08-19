@@ -192,8 +192,8 @@
       "path": "extremal_lower.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "extremal_scenario",
-      "sha256_actual": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f",
-      "sha256_expected": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f",
+      "sha256_actual": "bb9e9cf4e1aec1aef6e670c06e10bad89cb96ccdb7222d1ec3919e79b3c7a120",
+      "sha256_expected": "bb9e9cf4e1aec1aef6e670c06e10bad89cb96ccdb7222d1ec3919e79b3c7a120",
       "status": "present"
     },
     {
@@ -202,8 +202,8 @@
       "path": "extremal_upper.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "extremal_scenario",
-      "sha256_actual": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3",
-      "sha256_expected": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3",
+      "sha256_actual": "f2aaf4d8b700069449f3364068fc024f28f718173aa9f9312137b29788541925",
+      "sha256_expected": "f2aaf4d8b700069449f3364068fc024f28f718173aa9f9312137b29788541925",
       "status": "present"
     },
     {
@@ -247,7 +247,7 @@
   "reasons": [],
   "receipt": {
     "artifact_hashes_verified": true,
-    "canonical_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
+    "canonical_hash": "78242a02a5af310883110c3692c8f477418e63d59b69487792ae7a579ce6d5de",
     "reason": "Canonical report hash verified. Evidence artifact hashes verified. Receipt verification checks artifact integrity only; it does not prove statistical validity, deployment safety, production readiness, or compliance.",
     "report_hash_verified": true
   },
@@ -270,8 +270,8 @@
     "present": true,
     "scenario_count": 2,
     "scenario_ids": [
-      "scenario-frechet-lower-7a00219842c1",
-      "scenario-frechet-upper-bff6e6e0b031"
+      "scenario-frechet-lower-83135b67bb38",
+      "scenario-frechet-upper-2292c147ab06"
     ]
   },
   "schema": "cc/claim-governance-audit.v1",

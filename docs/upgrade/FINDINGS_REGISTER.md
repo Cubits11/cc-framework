@@ -25,11 +25,11 @@ Severity scale:
 |---|---|---|---|
 | [F-01](#f-01) | S2 | The declared `[test]` extra cannot run the test suite | W0 |
 | [F-02](#f-02) | S2 | `strict = true` mypy is declared for `cc`, enforced on 7 of 90 files | W1 |
-| [F-03](#f-03) | **S1** | Canonicalization silently merges Unicode-distinct keys | W3 |
-| [F-04](#f-04) | **S1** | Canonical form is not RFC 8785; five of six number forms diverge | W3 |
-| [F-05](#f-05) | **S1** | Cross-language receipt divergence above 2^53 is undetectable | W3, W5 |
-| [F-06](#f-06) | S2 | `-0.0` and `0.0` produce different receipts for identical numbers | W3 |
-| [F-07](#f-07) | S2 | Duplicate JSON keys are accepted last-wins on the parse side | W3 |
+| [F-03](#f-03) | ~~S1~~ **FIXED** | Canonicalization silently merges Unicode-distinct keys | W3 |
+| [F-04](#f-04) | ~~S1~~ **FIXED** | Canonical form is not RFC 8785; five of six number forms diverge | W3 |
+| [F-05](#f-05) | ~~S1~~ **FIXED** | Cross-language receipt divergence above 2^53 is undetectable | W3, W5 |
+| [F-06](#f-06) | ~~S2~~ **FIXED** | `-0.0` and `0.0` produce different receipts for identical numbers | W3 |
+| [F-07](#f-07) | ~~S2~~ **FIXED** | Duplicate JSON keys are accepted last-wins on the parse side | W3 |
 | [F-08](#f-08) | **S3** | A real consumer read the composition API and rejected it | W5 |
 | [F-09](#f-09) | **S3** | The kernel calculus is independently reimplemented three times | W5 |
 | [F-10](#f-10) | **S3** | Vinctura's requested cross-language guard surface does not exist | W5 |
@@ -102,6 +102,14 @@ scope becomes true incrementally and cannot regress.
 
 ## F-03
 
+> **FIXED 2026-08-19 by W3.** `cc.canonical.v2` (RFC 8785) is now the default
+> profile; `cc.canonical.v1` is retained read-only so pre-migration receipts stay
+> verifiable, and verification dispatches on the profile each receipt declares.
+> See [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md). The census
+> at `scripts/canonicalization_probe.py` now reports zero `unintended-kernel`,
+> zero `rejection-asymmetry`, and zero `over-discrimination` under v2, and
+> `tests/unit/canonical/` holds it there.
+
 **Canonicalization silently merges Unicode-distinct keys.** — **S1**, owner W3
 
 `_normalize_json_value` applies `unicodedata.normalize("NFC", key)` to every
@@ -147,14 +155,28 @@ The irony is load-bearing: `b2b-spatial-intelligence-engine` ships a research
 module titled `01-canonicalization-collapse.html`. The sibling repositories study
 this defect class. This repository has it.
 
-**Remedy.** Normalization must **detect** collision rather than resolve it. After
-normalizing, compare key-set cardinality; if it shrank, raise
-`CanonicalJSONError` naming both colliding keys. Fail closed. Add the pair to a
-committed adversarial corpus (W3) so the fix cannot silently regress.
+**Remedy as shipped** — and it is *not* the remedy first proposed here. The
+original plan was to detect the collision and fail closed. The better fix, taken
+instead, was to stop normalizing at all: RFC 8785 is explicit that normalization
+is the producer's responsibility, and a canonicalizer that mutates content is not
+a canonicalizer. Two keys that differ in Unicode form are two keys, which is what
+JSON says they are, so there is nothing left to collide.
+
+The detection is still available as `assert_no_confusable_keys`, an **opt-in
+producer lint** that is deliberately off the hash path — v1's mistake was
+precisely that a content-altering rule lived inside canonicalization.
 
 ---
 
 ## F-04
+
+> **FIXED 2026-08-19 by W3.** `cc.canonical.v2` (RFC 8785) is now the default
+> profile; `cc.canonical.v1` is retained read-only so pre-migration receipts stay
+> verifiable, and verification dispatches on the profile each receipt declares.
+> See [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md). The census
+> at `scripts/canonicalization_probe.py` now reports zero `unintended-kernel`,
+> zero `rejection-asymmetry`, and zero `over-discrimination` under v2, and
+> `tests/unit/canonical/` holds it there.
 
 **The canonical form is not RFC 8785, and diverges on five of six number
 forms.** — **S1**, owner W3
@@ -177,15 +199,21 @@ an independent verifier, and the family Ghost-Ark surveyed in
 report. Independent verification is impossible not because of a bug but because
 the two sides never agreed on what the bytes are.
 
-**Remedy.** Choose deliberately and document the choice with its consequences:
-either adopt RFC 8785 number serialization, or declare `cc.canonical.v1` as an
-explicitly non-JCS profile with a written rationale and a conformance corpus.
-Either is defensible. Silence is not — and the choice must be made **before** an
-independent verifier is written, not after.
+**Remedy as shipped.** RFC 8785 adopted. `_es_number_to_string` implements the
+ECMAScript `Number::toString` algorithm; 15 of 15 probed forms now conform, and
+`tests/unit/canonical/` pins 16 of them individually.
 
 ---
 
 ## F-05
+
+> **FIXED 2026-08-19 by W3.** `cc.canonical.v2` (RFC 8785) is now the default
+> profile; `cc.canonical.v1` is retained read-only so pre-migration receipts stay
+> verifiable, and verification dispatches on the profile each receipt declares.
+> See [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md). The census
+> at `scripts/canonicalization_probe.py` now reports zero `unintended-kernel`,
+> zero `rejection-asymmetry`, and zero `over-discrimination` under v2, and
+> `tests/unit/canonical/` holds it there.
 
 **Cross-language receipt divergence above 2^53 is undetectable here.** — **S1**, owner W3, W5
 
@@ -206,14 +234,24 @@ large integer count is verified there, the two sides disagree — and nothing in
 either repository would notice, because there is no differential test spanning
 them.
 
-**Remedy.** Two parts, both required. (1) Constrain the schema: integers in
-receipt-covered positions are bounded to the IEEE-754 safe range, or carried as
-strings. (2) Build the differential harness (W5) so divergence is *caught*, not
-argued about.
+**Remedy as shipped.** v2 refuses any integer with `|n| > 2**53 - 1` rather
+than emitting bytes that cannot survive a round trip through a conforming parser.
+This is a declared *narrowing* of RFC 8785 — JCS is defined over doubles, and
+Python's `int` has no such bound — documented in
+[CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md) rather than left as
+an undocumented difference. Floats are unaffected.
 
 ---
 
 ## F-06
+
+> **FIXED 2026-08-19 by W3.** `cc.canonical.v2` (RFC 8785) is now the default
+> profile; `cc.canonical.v1` is retained read-only so pre-migration receipts stay
+> verifiable, and verification dispatches on the profile each receipt declares.
+> See [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md). The census
+> at `scripts/canonicalization_probe.py` now reports zero `unintended-kernel`,
+> zero `rejection-asymmetry`, and zero `over-discrimination` under v2, and
+> `tests/unit/canonical/` holds it there.
 
 **`-0.0` and `0.0` produce different receipts for the same number.** — S2, owner W3
 
@@ -231,14 +269,21 @@ breaks replay determinism whenever an LP solver returns a negative zero, which
 `scipy.optimize.linprog` does routinely at a lower bound of zero. A replay that
 should be byte-identical will not be.
 
-**Remedy.** Normalize `-0.0` to `0.0` before serialization. Add both to the
-corpus, and add the positive control that genuinely distinct near-zero values
-stay distinct — a strict rule that rejects honest documents is not a fix, it is
-a trade.
+**Remedy as shipped.** Fixed as a consequence of adopting RFC 8785, which
+requires `-0` to serialize as `0`. The positive controls hold: `5e-324` and other
+genuinely distinct near-zero values remain distinct.
 
 ---
 
 ## F-07
+
+> **FIXED 2026-08-19 by W3.** `cc.canonical.v2` (RFC 8785) is now the default
+> profile; `cc.canonical.v1` is retained read-only so pre-migration receipts stay
+> verifiable, and verification dispatches on the profile each receipt declares.
+> See [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md). The census
+> at `scripts/canonicalization_probe.py` now reports zero `unintended-kernel`,
+> zero `rejection-asymmetry`, and zero `over-discrimination` under v2, and
+> `tests/unit/canonical/` holds it there.
 
 **Duplicate JSON keys are accepted last-wins on the parse side.** — S2, owner W3
 
@@ -255,9 +300,10 @@ reads. Ghost-Ark's E1 records `duplicate-key-last-wins` as an unintended kernel
 member in four of five arms; the one sound arm was the one with a different
 parser.
 
-**Remedy.** Read receipt-covered JSON through a strict loader with an
-`object_pairs_hook` that raises on repeated keys. Applies to the report reader,
-the evidence-bundle reader, and the claim-envelope reader alike.
+**Remedy as shipped.** `strict_json_loads` raises `DuplicateJSONKeyError` on
+any repeated key, at any nesting depth, and is wired into the report CLI reader,
+the claim-governance report and artifact readers, and the Merkle transparency-log
+line reader.
 
 ---
 

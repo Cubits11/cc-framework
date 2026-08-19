@@ -40,23 +40,36 @@
     "git": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["commit", "dirty", "branch"],
+      "required": [
+        "commit",
+        "dirty",
+        "branch"
+      ],
       "properties": {
         "commit": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "dirty": {
           "type": "boolean"
         },
         "branch": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "environment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["python_version", "platform"],
+      "required": [
+        "python_version",
+        "platform"
+      ],
       "properties": {
         "python_version": {
           "type": "string",
@@ -81,24 +94,42 @@
     "run": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["run_id", "config_path", "config_hash", "seed", "command"],
+      "required": [
+        "run_id",
+        "config_path",
+        "config_hash",
+        "seed",
+        "command"
+      ],
       "properties": {
         "run_id": {
           "type": "string",
           "minLength": 1
         },
         "config_path": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "config_hash": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[0-9a-f]{64}$"
         },
         "seed": {
-          "type": ["integer", "null"]
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "command": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -121,17 +152,26 @@
       ],
       "properties": {
         "target_fpr": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
         "alpha_cap": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
         "realized_fpr": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
@@ -139,10 +179,16 @@
           "type": "object"
         },
         "threshold": {
-          "type": ["number", "null"]
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "status": {
-          "enum": ["pass", "fail"]
+          "enum": [
+            "pass",
+            "fail"
+          ]
         }
       },
       "anyOf": [
@@ -185,7 +231,10 @@
         "interval": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["lower", "upper"],
+          "required": [
+            "lower",
+            "upper"
+          ],
           "properties": {
             "lower": {
               "type": "number"
@@ -196,12 +245,18 @@
           }
         },
         "confidence_level": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
         "delta": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
@@ -239,7 +294,11 @@
       "type": "object",
       "description": "Evidence references bound by SHA-256 hashes. These hashes identify bytes for audit; they do not prove that the evidence is sufficient for release or compliance.",
       "additionalProperties": false,
-      "required": ["artifacts", "audit_log", "figure_manifest"],
+      "required": [
+        "artifacts",
+        "audit_log",
+        "figure_manifest"
+      ],
       "properties": {
         "artifacts": {
           "type": "array",
@@ -273,7 +332,11 @@
       "type": "object",
       "description": "The single claim this report is allowed to support, plus explicit boundaries on what the report does not claim.",
       "additionalProperties": false,
-      "required": ["statement", "allowed_claim_level", "non_claims"],
+      "required": [
+        "statement",
+        "allowed_claim_level",
+        "non_claims"
+      ],
       "properties": {
         "statement": {
           "type": "string",
@@ -295,10 +358,16 @@
       "allOf": [
         {
           "if": {
-            "required": ["allowed_claim_level"],
+            "required": [
+              "allowed_claim_level"
+            ],
             "properties": {
               "allowed_claim_level": {
-                "enum": ["bounded_empirical", "reproducible_run", "release_claim"]
+                "enum": [
+                  "bounded_empirical",
+                  "reproducible_run",
+                  "release_claim"
+                ]
               }
             }
           },
@@ -332,11 +401,17 @@
           "const": "sha256"
         },
         "canonicalization_method": {
-          "description": "Exact deterministic JSON method used before hashing. All report fields except receipt.canonical_hash are included.",
-          "const": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded"
+          "description": "Canonicalization profile used before hashing. All report fields except receipt.canonical_hash are included. Verification MUST dispatch on this value rather than assuming the current default: pre-migration receipts carry the legacy profile and must stay verifiable. See docs/architecture/CANONICAL_PROFILE.md.",
+          "enum": [
+            "cc.canonical.v2/RFC8785; receipt.canonical_hash excluded",
+            "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded"
+          ]
         },
         "previous_hash": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[0-9a-f]{64}$"
         }
       }
@@ -368,7 +443,12 @@
       "type": "object",
       "description": "Named evidence file with its byte count and SHA-256 digest.",
       "additionalProperties": false,
-      "required": ["path", "sha256", "bytes", "role"],
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "role"
+      ],
       "properties": {
         "path": {
           "type": "string",

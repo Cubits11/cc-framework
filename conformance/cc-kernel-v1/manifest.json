@@ -2,7 +2,7 @@
   "corpus": "cc-kernel-v1",
   "files": {
     "cases/adversarial.json": "a394f6220cf04586f20ba1b504e01e51dc0810d8f1c0d79667b2a8b697ff71d4",
-    "cases/composition.json": "4103169ff792a097fc281c5afeca5a4d7fe364720cb571f92922ab8c0b4c24d1"
+    "cases/composition.json": "71740d53edd0b9e9fb297e6b84a6d1c508c1ee2c5fde27e6bf9b496e623b7492"
   },
   "non_claims": [
     "Passing this corpus establishes that an implementation computes the same intervals as the reference on these cases. It does not establish that either implementation is correct: two implementations can share a misreading.",

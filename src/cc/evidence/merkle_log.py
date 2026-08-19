@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from cc.reporting.canonical import canonical_json_bytes
+from cc.reporting.canonical import CanonicalJSONError, canonical_json_bytes, strict_json_loads
 
 EMPTY_ROOT_HASH = hashlib.sha256(b"").hexdigest()
 LOG_RECORD_SCHEMA = "cc/merkle-log-record.v1"
@@ -422,9 +422,14 @@ class MerkleLog:
                 if not raw.strip():
                     continue
                 try:
-                    entry = json.loads(raw)
+                    # A log line that repeats a key must not be silently
+                    # resolved: the leaf hash would cover the survivor, not the
+                    # line as written (finding F-07).
+                    entry = strict_json_loads(raw)
                 except json.JSONDecodeError as exc:
                     raise MerkleLogError(f"line {line_number}: invalid JSON") from exc
+                except CanonicalJSONError as exc:
+                    raise MerkleLogError(f"line {line_number}: {exc}") from exc
                 if not isinstance(entry, Mapping):
                     raise MerkleLogError(f"line {line_number}: log entry must be an object")
                 if entry.get("schema") != LOG_RECORD_SCHEMA:

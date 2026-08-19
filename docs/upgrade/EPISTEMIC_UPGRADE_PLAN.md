@@ -225,6 +225,14 @@ words.
 
 ### W3 — Attack the canonicalization kernel {#w3}
 
+> **DELIVERED 2026-08-19.** Canonicalization & provenance integrity
+> **3.8 → 8.2**. All five findings fixed (F-03, F-04, F-05 at S1; F-06, F-07 at
+> S2). `cc.canonical.v2` (RFC 8785) is the default; `cc.canonical.v1` is
+> read-only so historical receipts stay verifiable. Delivery record in
+> [§3.3 below](#w3-delivery-record); profile documented in
+> [CANONICAL_PROFILE.md](../architecture/CANONICAL_PROFILE.md). Contract
+> [C3](DOWNSTREAM_CONTRACTS.md#contract-summary) is shipped.
+
 **Findings:** [F-03](FINDINGS_REGISTER.md#f-03) **S1**, [F-04](FINDINGS_REGISTER.md#f-04) **S1**, [F-05](FINDINGS_REGISTER.md#f-05) **S1**, [F-06](FINDINGS_REGISTER.md#f-06), [F-07](FINDINGS_REGISTER.md#f-07)
 · **Effort:** 2–3 weeks · **Highest severity**
 
@@ -279,6 +287,47 @@ failing is a kernel regression.
 **Does not establish.** That the canonicalizer has no collisions — only that it
 has none in the declared classes. The corpus is a census and its size is an
 authoring decision, so it carries no interval and no coverage claim.
+
+#### Delivery record {#w3-delivery-record}
+
+| Deliverable | Shipped as | Evidence |
+|---|---|---|
+| RFC 8785 profile | `cc.canonical.v2` in `src/cc/reporting/canonical.py` | 15/15 probed number forms conform; 16 pinned individually |
+| Legacy profile retained | `cc.canonical.v1`, read-only | verification dispatches on the declared profile; a test asserts v1 still carries its defects |
+| Collision fixed | no normalization, per RFC 8785 | two byte-distinct keys go in, two come out, at top level and nested |
+| Producer lint | `assert_no_confusable_keys` | opt-in, deliberately off the hash path |
+| Strict reads | `strict_json_loads` | wired into the report CLI, claim-governance readers, Merkle log |
+| Integer bound | `MAX_SAFE_INTEGER` | declared narrowing of JCS, documented not implicit |
+| Census | `scripts/canonicalization_probe.py` | 14 classes, both profiles, 4 positive controls |
+| Corpus | `tests/unit/canonical/` | 57 tests |
+
+**The remedy shipped is not the one first proposed here.** The plan said
+normalization must *detect* collision and fail closed. The better fix, taken
+instead, was to stop normalizing: RFC 8785 makes normalization the producer's
+job, and a canonicalizer that mutates content is not a canonicalizer. With no
+normalization there is nothing left to collide.
+
+**Numbers.** v2 census: 12 sound, 1 fail-closed, 1 sound-by-rejection; zero
+`unintended-kernel`, zero `rejection-asymmetry`, zero `over-discrimination`.
+Suite 816 → **873 passing**, 0 failing.
+
+**Migration was verified, not assumed.** Every regenerated capsule artifact was
+diffed with hashes, hash-derived ids, and the profile identifier scrubbed; all
+eleven were byte-identical under that scrub. No content, no claim text, and no
+non-claim changed — only hashes moved.
+
+**One intent was corrected.** `int-vs-float-same-value` moved from `distinct` to
+`equivalent`: the original declaration described Python's type system, not
+JSON's, which has one number type. Correcting a declaration that was wrong about
+the domain is legitimate; correcting one to flatter a result is not. Recorded in
+the probe source and the profile doc rather than edited away.
+
+**Honest limits.** No fuzzing of the canonicalizer — every class was authored by
+hand. **No cross-language differential on receipts yet**: the corpus establishes
+agreement on the composition kernel, but nothing re-canonicalizes a CC report in
+another language and compares digests, so "cross-language verifiable" describes
+v2's design rather than a demonstrated result. No external reviewer has attacked
+either profile.
 
 ---
 
