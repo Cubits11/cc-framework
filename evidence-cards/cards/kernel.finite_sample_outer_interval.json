@@ -1,0 +1,63 @@
+{
+  "artifacts": [
+    {
+      "bytes": 4317,
+      "missing": false,
+      "path": "docs/theory/finite_sample_identification.md",
+      "sha256": "a7228c069ed5cc20677f9b06fadf81112fc9f604e310cbe6fd080b522c9709c0"
+    },
+    {
+      "bytes": 10127,
+      "missing": false,
+      "path": "docs/theory/theorem_ledger.md",
+      "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+    },
+    {
+      "bytes": 20804,
+      "missing": false,
+      "path": "src/cc/kernel/sample_complexity.py",
+      "sha256": "aaef21b3d037a4e23cd067bdf2585227899feefe05634d9b7cd07a03223295f6"
+    },
+    {
+      "bytes": 33874,
+      "missing": false,
+      "path": "src/cc/kernel/sensitivity.py",
+      "sha256": "6ff24bf54969a046c774c8b3ab251de31fbb4c0d505db88a9b4b283aea562422"
+    }
+  ],
+  "assumptions": [
+    "Labels and the query are fixed before the data are seen.",
+    "Counts are iid Bernoulli draws from the target population.",
+    "Moment coverage holds simultaneously across constraints.",
+    "The exact assumptions supplied to the LP are true of that population."
+  ],
+  "card_id": "kernel.finite_sample_outer_interval",
+  "claim": "Under stated iid Bernoulli sampling assumptions and simultaneous moment coverage, count-derived LP intervals form an outer confidence interval for the target query.",
+  "command": [
+    "pytest tests/unit/kernel/test_finite_sample_constraints.py",
+    "pytest tests/unit/kernel/test_sample_complexity.py",
+    "make test-kernel"
+  ],
+  "counterevidence": [],
+  "falsifier": "A simulation under the stated iid Bernoulli sampling in which count-derived intervals cover the true query value at a rate materially below the nominal level.",
+  "label_meanings": {
+    "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "local-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C3",
+  "non_claims": [
+    "Not valid after uncorrected adaptive target selection.",
+    "Not a deployment certificate."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+  "supersedes": null
+}

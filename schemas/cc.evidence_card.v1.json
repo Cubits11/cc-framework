@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-framework.local/schemas/cc.evidence_card.v1.json",
+  "title": "cc.evidence_card.v1",
+  "description": "One claim with everything needed to disagree with it. The three labels are ORTHOGONAL and a consumer MUST NOT collapse them into a single status: evidence_state says where evidence came from, verdict says what happened when the command ran, publication_state says where the card is in its own lifecycle. None implies another. This schema deliberately defines no aggregate score, badge, or health field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "card_id",
+    "claim",
+    "maturity",
+    "source_revision",
+    "command",
+    "artifacts",
+    "labels",
+    "label_meanings",
+    "falsifier",
+    "assumptions",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cc.evidence_card.v1"
+    },
+    "card_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim": {
+      "type": "string",
+      "minLength": 1
+    },
+    "maturity": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Claim-boundary level, e.g. C3. Not a quality rating."
+    },
+    "source_revision": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Git revision the card was generated from. A '-dirty' suffix means the working tree differed."
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "How a reader reproduces this. A claim no command can demonstrate is an assertion."
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "missing"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "missing": {
+            "type": "boolean",
+            "description": "True when a claim names a path that does not exist. Recorded, not skipped."
+          }
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_state",
+        "verdict",
+        "publication_state"
+      ],
+      "description": "All three are required. A surface showing fewer will show the flattering one.",
+      "properties": {
+        "evidence_state": {
+          "enum": [
+            "local-only",
+            "aws-synth-only",
+            "aws-live",
+            "illustrative"
+          ]
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            "unverifiable",
+            "not-run"
+          ],
+          "description": "'unverifiable' is not a fail: the check could not be performed at all. 'not-run' claims no result."
+        },
+        "publication_state": {
+          "enum": [
+            "draft",
+            "released",
+            "superseded",
+            "retracted"
+          ],
+          "description": "'released' says a card was reviewed for release, not that its claim is true."
+        }
+      }
+    },
+    "label_meanings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_state",
+        "verdict",
+        "publication_state"
+      ],
+      "description": "Gloss shown beside each value so a reader never infers what a bare token means.",
+      "properties": {
+        "evidence_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verdict": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_state": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "result_detail": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "What actually ran. Required whenever verdict is pass or fail."
+    },
+    "falsifier": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What observation would show this claim is wrong. Required: a claim with no falsifier is not evidence."
+    },
+    "counterevidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "What this card explicitly does not establish."
+    },
+    "supersedes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "retraction_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "labels": {
+            "properties": {
+              "verdict": {
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              }
+            },
+            "required": [
+              "verdict"
+            ]
+          }
+        },
+        "required": [
+          "labels"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result_detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "result_detail"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "labels": {
+            "properties": {
+              "publication_state": {
+                "const": "retracted"
+              }
+            },
+            "required": [
+              "publication_state"
+            ]
+          }
+        },
+        "required": [
+          "labels"
+        ]
+      },
+      "then": {
+        "properties": {
+          "retraction_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "retraction_reason"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "labels": {
+            "properties": {
+              "publication_state": {
+                "const": "superseded"
+              }
+            },
+            "required": [
+              "publication_state"
+            ]
+          }
+        },
+        "required": [
+          "labels"
+        ]
+      },
+      "then": {
+        "properties": {
+          "supersedes": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "supersedes"
+        ]
+      }
+    }
+  ]
+}

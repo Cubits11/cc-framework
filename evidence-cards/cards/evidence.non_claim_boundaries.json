@@ -1,0 +1,72 @@
+{
+  "artifacts": [
+    {
+      "bytes": 18617,
+      "missing": false,
+      "path": "README.md",
+      "sha256": "d520223b5a10c364ed90ce56cfdce9b7441566fe9f692001b04d375caf3f92bb"
+    },
+    {
+      "bytes": 7871,
+      "missing": false,
+      "path": "docs/validation_matrix.md",
+      "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+    },
+    {
+      "bytes": 10127,
+      "missing": false,
+      "path": "docs/theory/theorem_ledger.md",
+      "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+    },
+    {
+      "bytes": 4687,
+      "missing": false,
+      "path": "docs/briefs/rick_mergenthaler_ai_safety_disclosure_controls.md",
+      "sha256": "65240508d532ad7467aa4c2c14b67ae32a1acd68a3b21c5b6f37dd8984536b2f"
+    },
+    {
+      "bytes": 2437,
+      "missing": false,
+      "path": "docs/briefs/three_minute_demo.md",
+      "sha256": "ef4ae474b3fe93aa1aa0b5d02a3ea58fda616da30b4a47c7a640a84fa115bd40"
+    },
+    {
+      "bytes": 6636,
+      "missing": false,
+      "path": "docs/research/NON_CLAIMS.md",
+      "sha256": "07078d42ed5686e9c029f9588c69b5abea59ffbb5cf1140340cb150ad32adefa"
+    }
+  ],
+  "assumptions": [
+    "The producer declares evidence roles honestly; the verifier checks structure, not sincerity.",
+    "The v0 non-claims engine detects the intended substance rather than only exact strings."
+  ],
+  "card_id": "evidence.non_claim_boundaries",
+  "claim": "Documentation and reporting surfaces explicitly separate what each validation result supports from what it does not support.",
+  "command": [
+    ".venv/bin/mkdocs build --strict",
+    "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence",
+    "PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py"
+  ],
+  "counterevidence": [],
+  "falsifier": "An evidence-bound claim package that passes verify-claim-governance while omitting a non-claim its declared evidence roles require.",
+  "label_meanings": {
+    "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "local-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C4",
+  "non_claims": [
+    "Does not prevent bad-faith actors from making misleading claims outside the framework."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+  "supersedes": null
+}

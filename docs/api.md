@@ -50,6 +50,21 @@ implementation.
 A permitted verdict means the guard found no reason to refuse. It does not mean
 an estimate is correct or a measurement was well designed.
 
+`cc.evidence_card` is the stable surface for emitting `cc.evidence_card.v1`
+cards and the `cc.site_evidence_manifest.v1` bundle. Its supported symbols are
+the names exported by `cc.evidence_card.__all__`, including `EvidenceCard`,
+`ArtifactRef`, `cards_to_site_manifest`, and `render_labels`.
+
+Its three labels — `evidence_state`, `verdict`, and `publication_state` — are
+orthogonal and part of the contract. No consumer may collapse them into a single
+status, and the module deliberately provides no composite property, no aggregate
+field, and no single-label renderer. Adding one is a breaking change to this
+contract, not a convenience.
+
+`cc.evidence_card` does not establish that any claim is true. A card records a
+claim, the command that tests it, what would falsify it, and what it does not
+claim.
+
 The evidence/reporting surface is stable only where it is used for release
 evidence and claim-governance capsules:
 

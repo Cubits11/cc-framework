@@ -75,6 +75,8 @@ jobs:
         # Gates on cc.canonical.v2 only. v1 is retained read-only for
         # historical receipts and is expected to carry its known defects.
         run: python scripts/canonicalization_probe.py
+      - name: Evidence cards are current
+        run: python scripts/build_evidence_cards.py --check
       - name: Corpus is current
         run: python scripts/build_conformance_corpus.py --check
       - name: Independent Node implementation agrees
@@ -82,7 +84,7 @@ jobs:
       - name: Differential fuzz
         run: python scripts/differential_compose.py --cases 4000 --seed 1
       - name: Conformance, canonicalization and acceptance suites
-        run: pytest -q tests/conformance tests/acceptance tests/unit/compose tests/unit/cli tests/unit/canonical
+        run: pytest -q tests/conformance tests/acceptance tests/unit/compose tests/unit/cli tests/unit/canonical tests/unit/evidence_card
 
   test-extra-is-sufficient:
     name: the documented install path works

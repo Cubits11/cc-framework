@@ -1,0 +1,63 @@
+{
+  "artifacts": [
+    {
+      "bytes": 18617,
+      "missing": false,
+      "path": "README.md",
+      "sha256": "d520223b5a10c364ed90ce56cfdce9b7441566fe9f692001b04d375caf3f92bb"
+    },
+    {
+      "bytes": 10127,
+      "missing": false,
+      "path": "docs/theory/theorem_ledger.md",
+      "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+    },
+    {
+      "bytes": 21621,
+      "missing": false,
+      "path": "src/cc/kernel/frechet_classes.py",
+      "sha256": "60109fb97bc22bc732b1aa7fe660b5e4c4d03c5d1f2e13e4b2e54b1e032d1c58"
+    },
+    {
+      "bytes": 33874,
+      "missing": false,
+      "path": "src/cc/kernel/sensitivity.py",
+      "sha256": "6ff24bf54969a046c774c8b3ab251de31fbb4c0d505db88a9b4b283aea562422"
+    }
+  ],
+  "assumptions": [
+    "Exact singleton marginals are supplied; they are not estimated here.",
+    "No side constraints beyond the marginals.",
+    "Finite binary atom space with deterministic atom ordering.",
+    "IEEE-754 double arithmetic; agreement is asserted only to the declared tolerance."
+  ],
+  "card_id": "kernel.frechet_bounds",
+  "claim": "The strict kernel computes classical Fréchet-Hoeffding bounds for finite binary guardrail failure composition under exact singleton marginals and no additional side constraints.",
+  "command": [
+    "pytest tests/unit/kernel/test_classical_frechet_special_cases.py",
+    "make test-kernel"
+  ],
+  "counterevidence": [],
+  "falsifier": "A marginal configuration in which identified_region returns an interval differing from max(0, sum(p) - (m-1)) and min(p) by more than the declared solver tolerance.",
+  "label_meanings": {
+    "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "local-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C3",
+  "non_claims": [
+    "Does not assume independence.",
+    "Does not prove deployment safety.",
+    "Does not prove marginals are representative."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+  "supersedes": null
+}

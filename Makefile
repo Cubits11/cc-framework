@@ -113,7 +113,7 @@ GOV_CAPSULE_TESTS    := tests/integration/test_claim_governance_capsule.py
 	dev install setup init lock deps \
 	fmt lint type security package-build \
 	test test-unit test-int test-kernel test-release test-reporting test-week3 test-week6 cov bench \
-	conformance differential acceptance test-compose canon-probe \
+	conformance differential acceptance test-compose canon-probe evidence-cards \
 	check-artifact-boundary check-repro-clean \
 	enterprise-smoke \
 	reproduce-smoke reproduce-mvp reproduce-figures figures reports ccc \
@@ -327,6 +327,12 @@ test-compose: install
 
 # Reproduces the S1 canonicalization findings. Exits non-zero while any
 # unintended-kernel class remains, so the findings stay falsifiable.
+# Evidence cards for an external Atlas. The committed cards are the not-run
+# scaffold: verdicts are host-specific and must not be published from a laptop.
+evidence-cards: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/build_evidence_cards.py --check
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/evidence_card -q
+
 canon-probe: install
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/canonicalization_probe.py
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/canonical -q
