@@ -4,10 +4,10 @@
     {
       "artifacts": [
         {
-          "bytes": 18617,
+          "bytes": 19959,
           "missing": false,
           "path": "README.md",
-          "sha256": "d520223b5a10c364ed90ce56cfdce9b7441566fe9f692001b04d375caf3f92bb"
+          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
         },
         {
           "bytes": 10127,
@@ -61,7 +61,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
@@ -118,7 +118,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
@@ -181,7 +181,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
@@ -258,16 +258,16 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
       "artifacts": [
         {
-          "bytes": 18617,
+          "bytes": 19959,
           "missing": false,
           "path": "README.md",
-          "sha256": "d520223b5a10c364ed90ce56cfdce9b7441566fe9f692001b04d375caf3f92bb"
+          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
         },
         {
           "bytes": 7871,
@@ -294,10 +294,10 @@
           "sha256": "ef4ae474b3fe93aa1aa0b5d02a3ea58fda616da30b4a47c7a640a84fa115bd40"
         },
         {
-          "bytes": 6636,
+          "bytes": 7225,
           "missing": false,
           "path": "docs/research/NON_CLAIMS.md",
-          "sha256": "07078d42ed5686e9c029f9588c69b5abea59ffbb5cf1140340cb150ad32adefa"
+          "sha256": "8ba6e6a27c445a282b07d1ba704544382570b2c7285f4f73238dec7658428627"
         }
       ],
       "assumptions": [
@@ -330,7 +330,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
@@ -360,10 +360,10 @@
           "sha256": "ca05c26005224d62a288d2c9f396fe08fc3fca3f48e5f8c10f45421898a61ff8"
         },
         {
-          "bytes": 6636,
+          "bytes": 7225,
           "missing": false,
           "path": "docs/research/NON_CLAIMS.md",
-          "sha256": "07078d42ed5686e9c029f9588c69b5abea59ffbb5cf1140340cb150ad32adefa"
+          "sha256": "8ba6e6a27c445a282b07d1ba704544382570b2c7285f4f73238dec7658428627"
         }
       ],
       "assumptions": [
@@ -398,7 +398,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
@@ -466,7 +466,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     },
     {
@@ -478,10 +478,10 @@
           "sha256": "5aafa0ce83ebd3eba11dad99326efaa8516b6fcbd51f62304f3bceee25622baa"
         },
         {
-          "bytes": 18617,
+          "bytes": 19959,
           "missing": false,
           "path": "README.md",
-          "sha256": "d520223b5a10c364ed90ce56cfdce9b7441566fe9f692001b04d375caf3f92bb"
+          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
         }
       ],
       "assumptions": [
@@ -513,7 +513,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
       "supersedes": null
     }
   ],
@@ -565,5 +565,5 @@
     "A card with verdict 'not-run' has no result. It must not be displayed as passing, pending, or healthy."
   ],
   "schema_version": "cc.site_evidence_manifest.v1",
-  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty"
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53"
 }

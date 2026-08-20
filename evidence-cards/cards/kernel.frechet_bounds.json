@@ -1,10 +1,10 @@
 {
   "artifacts": [
     {
-      "bytes": 18617,
+      "bytes": 19959,
       "missing": false,
       "path": "README.md",
-      "sha256": "d520223b5a10c364ed90ce56cfdce9b7441566fe9f692001b04d375caf3f92bb"
+      "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
     },
     {
       "bytes": 10127,
@@ -58,6 +58,6 @@
   "result_detail": null,
   "retraction_reason": null,
   "schema_version": "cc.evidence_card.v1",
-  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
   "supersedes": null
 }

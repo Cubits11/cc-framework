@@ -25,10 +25,10 @@
       "sha256": "ca05c26005224d62a288d2c9f396fe08fc3fca3f48e5f8c10f45421898a61ff8"
     },
     {
-      "bytes": 6636,
+      "bytes": 7225,
       "missing": false,
       "path": "docs/research/NON_CLAIMS.md",
-      "sha256": "07078d42ed5686e9c029f9588c69b5abea59ffbb5cf1140340cb150ad32adefa"
+      "sha256": "8ba6e6a27c445a282b07d1ba704544382570b2c7285f4f73238dec7658428627"
     }
   ],
   "assumptions": [
@@ -63,6 +63,6 @@
   "result_detail": null,
   "retraction_reason": null,
   "schema_version": "cc.evidence_card.v1",
-  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
   "supersedes": null
 }
