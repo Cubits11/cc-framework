@@ -30,16 +30,43 @@ FILM = HERE / "film.html"
 WIDTH, HEIGHT = 1920, 1080
 
 
+def _has_x264(binary: str) -> bool:
+    try:
+        out = subprocess.run([binary, "-hide_banner", "-encoders"],
+                             capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "libx264" in out.stdout
+
+
 def find_ffmpeg() -> str:
+    """First ffmpeg on the box that can actually encode H.264.
+
+    Playwright ships an ffmpeg built only for VP8 screen recording, so it is
+    tried last and usually rejected here.
+    """
+    candidates: list[str] = []
     if os.environ.get("FFMPEG"):
-        return os.environ["FFMPEG"]
+        candidates.append(os.environ["FFMPEG"])
     on_path = shutil.which("ffmpeg")
     if on_path:
-        return on_path
+        candidates.append(on_path)
+    try:
+        import imageio_ffmpeg
+
+        candidates.append(imageio_ffmpeg.get_ffmpeg_exe())
+    except Exception:
+        pass
     root = Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers"))
-    for candidate in sorted(root.glob("ffmpeg-*/ffmpeg-linux")):
-        return str(candidate)
-    raise SystemExit("ffmpeg not found: set FFMPEG=/path/to/ffmpeg")
+    candidates += [str(p) for p in sorted(root.glob("ffmpeg-*/ffmpeg-linux"))]
+
+    for candidate in candidates:
+        if _has_x264(candidate):
+            return candidate
+    raise SystemExit(
+        "no ffmpeg with libx264 found. `pip install imageio-ffmpeg`, or set "
+        "FFMPEG=/path/to/ffmpeg (the Playwright bundle is VP8-only)."
+    )
 
 
 def find_chromium() -> str | None:
@@ -103,18 +130,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--verdict", type=Path, default=None,
                     help="JSON file holding a real verifier result to display")
     ap.add_argument("--keep-frames", action="store_true")
+    ap.add_argument("--encode-only", action="store_true",
+                    help="reuse frames already on disk instead of re-capturing")
     args = ap.parse_args(argv)
 
     verdict = json.loads(args.verdict.read_text()) if args.verdict else None
     args.out_dir.mkdir(parents=True, exist_ok=True)
     frames_dir = args.out_dir / f".frames-{args.cut}"
-    if frames_dir.exists():
-        shutil.rmtree(frames_dir)
-    frames_dir.mkdir(parents=True)
-
     ffmpeg = find_ffmpeg()
-    print(f"capturing {args.cut} at {args.fps}fps -> {frames_dir}")
-    total = capture(frames_dir, args.cut, args.fps, verdict)
+
+    if args.encode_only:
+        total = len(list(frames_dir.glob("f*.png")))
+        if not total:
+            raise SystemExit(f"--encode-only: no frames in {frames_dir}")
+        print(f"reusing {total} frames in {frames_dir}")
+    else:
+        if frames_dir.exists():
+            shutil.rmtree(frames_dir)
+        frames_dir.mkdir(parents=True)
+        print(f"capturing {args.cut} at {args.fps}fps -> {frames_dir}")
+        total = capture(frames_dir, args.cut, args.fps, verdict)
 
     outputs = encode(ffmpeg, frames_dir, args.out_dir, args.cut, args.fps)
     poster_idx = min(total - 1, int(round(args.poster_at * args.fps)))
