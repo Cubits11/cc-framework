@@ -8,7 +8,7 @@ The moment a seductive story is forced to become a test.
 
 ```text
 A story can start a question.
-It cannot finish an answer.
+Evidence must finish the answer.
 ```
 
 Campaign line: **Keep the wonder. Check the claim.**

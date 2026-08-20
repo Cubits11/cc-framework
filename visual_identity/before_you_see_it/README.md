@@ -4,7 +4,7 @@ A 15-second film about the moment a seductive story is forced to become a test.
 
 ```text
 A story can start a question.
-It cannot finish an answer.
+Evidence must finish the answer.
 ```
 
 **Keep the wonder. Check the claim.**
@@ -16,6 +16,7 @@ It cannot finish an answer.
 | Render | [render_film.py](render_film.py) - deterministic frame capture and encode |
 | Chamber | Chamber 00 of the [Claim Observatory](../claim_observatory/WORLD_BIBLE_V3.md) |
 | Method | [Future Expansion](../../docs/research/future-expansion/README.md) - the research package the film dramatizes |
+| Page | [Canonical page](../canonical_page/index.html) - the film, transcript, ledger, limits strip, and one real check |
 
 ## Watch it
 
@@ -45,6 +46,7 @@ Same film, same timing, same frames. Only the final lockup changes.
 | --- | --- | --- |
 | `cc-framework` | CC-FRAMEWORK | Keep the wonder. Check the claim. |
 | `ghost-ark` | GHOST-ARK | Evidence you can inspect. |
+| `cubits11` | CUBITS11 | Keep the wonder. Check the claim. |
 
 ## The verdict rule
 

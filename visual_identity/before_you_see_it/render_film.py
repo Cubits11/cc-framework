@@ -32,8 +32,9 @@ WIDTH, HEIGHT = 1920, 1080
 
 def _has_x264(binary: str) -> bool:
     try:
-        out = subprocess.run([binary, "-hide_banner", "-encoders"],
-                             capture_output=True, text=True, timeout=30)
+        out = subprocess.run(
+            [binary, "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=30
+        )
     except (OSError, subprocess.SubprocessError):
         return False
     return "libx264" in out.stdout
@@ -79,7 +80,7 @@ def find_chromium() -> str | None:
 def capture(frames_dir: Path, cut: str, fps: int, verdict: dict | None) -> int:
     from playwright.sync_api import sync_playwright
 
-    total = int(round(15.0 * fps))
+    total = round(15.0 * fps)
     url = f"{FILM.as_uri()}?capture=1&cut={cut}"
     launch: dict = {"args": ["--force-color-profile=srgb", "--font-render-hinting=none"]}
     exe = find_chromium()
@@ -108,30 +109,71 @@ def encode(ffmpeg: str, frames_dir: Path, out_dir: Path, cut: str, fps: int) -> 
     webm = out_dir / f"{stem}.webm"
     common = [ffmpeg, "-y", "-framerate", str(fps), "-i", str(frames_dir / "f%05d.png")]
     subprocess.run(
-        common + ["-c:v", "libx264", "-preset", "slow", "-crf", "19",
-                  "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(mp4)],
-        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [
+            *common,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "slow",
+            "-crf",
+            "19",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(mp4),
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     subprocess.run(
-        common + ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32",
-                  "-pix_fmt", "yuv420p", "-row-mt", "1", str(webm)],
-        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [
+            *common,
+            "-c:v",
+            "libvpx-vp9",
+            "-b:v",
+            "0",
+            "-crf",
+            "32",
+            "-pix_fmt",
+            "yuv420p",
+            "-row-mt",
+            "1",
+            str(webm),
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     return [mp4, webm]
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--cut", choices=["cc-framework", "ghost-ark"], default="cc-framework")
+    ap.add_argument(
+        "--cut", choices=["cc-framework", "ghost-ark", "cubits11"], default="cc-framework"
+    )
     ap.add_argument("--fps", type=int, default=60)
     ap.add_argument("--out-dir", type=Path, default=HERE / "renders")
-    ap.add_argument("--poster-at", type=float, default=7.6,
-                    help="seconds; the poster frame is pulled from this moment")
-    ap.add_argument("--verdict", type=Path, default=None,
-                    help="JSON file holding a real verifier result to display")
+    ap.add_argument(
+        "--poster-at",
+        type=float,
+        default=7.6,
+        help="seconds; the poster frame is pulled from this moment",
+    )
+    ap.add_argument(
+        "--verdict",
+        type=Path,
+        default=None,
+        help="JSON file holding a real verifier result to display",
+    )
     ap.add_argument("--keep-frames", action="store_true")
-    ap.add_argument("--encode-only", action="store_true",
-                    help="reuse frames already on disk instead of re-capturing")
+    ap.add_argument(
+        "--encode-only",
+        action="store_true",
+        help="reuse frames already on disk instead of re-capturing",
+    )
     args = ap.parse_args(argv)
 
     verdict = json.loads(args.verdict.read_text()) if args.verdict else None
@@ -152,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         total = capture(frames_dir, args.cut, args.fps, verdict)
 
     outputs = encode(ffmpeg, frames_dir, args.out_dir, args.cut, args.fps)
-    poster_idx = min(total - 1, int(round(args.poster_at * args.fps)))
+    poster_idx = min(total - 1, round(args.poster_at * args.fps))
     poster = args.out_dir / f"poster__{args.cut}.png"
     shutil.copyfile(frames_dir / f"f{poster_idx:05d}.png", poster)
     outputs.append(poster)

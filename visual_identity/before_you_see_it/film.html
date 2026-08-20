@@ -7,7 +7,7 @@
 
   Preview:  open in a browser (plays on load, click to replay)
   Capture:  ?capture=1   disables playback; the host calls window.__seek(t)
-  Cut:      ?cut=cc-framework | ghost-ark
+  Cut:      ?cut=cc-framework | ghost-ark | cubits11
   Verdict:  window.__VERDICT = {state, detail} injected before seek. If absent,
             the result card is marked ILLUSTRATION on screen. The film never
             displays a verdict it did not receive.
@@ -115,7 +115,15 @@
 const W = 1920, H = 1080, DUR = 15.0;
 const Q = new URLSearchParams(location.search);
 const CAPTURE = Q.get("capture") === "1";
-const CUT = Q.get("cut") === "ghost-ark" ? "ghost-ark" : "cc-framework";
+const CUTS = {
+  "cc-framework": { mark:"CC-FRAMEWORK", tag:"Keep the wonder. Check the claim.",
+                    foot:"Not a safety proof. A method for making claims checkable." },
+  "ghost-ark":    { mark:"GHOST-ARK",    tag:"Evidence you can inspect.",
+                    foot:"Replay the receipt. Inspect the non-claims." },
+  "cubits11":     { mark:"CUBITS11",     tag:"Keep the wonder. Check the claim.",
+                    foot:"Make the claim smaller. Make the evidence stronger." }
+};
+const CUT = CUTS[Q.get("cut")] ? Q.get("cut") : "cc-framework";
 
 const COL = {
   ground:"#0E0E10", amber:"#E9A23B", white:"#EDF2F7", blue:"#7FA8D9",
@@ -323,11 +331,9 @@ const L = [$("l1"),$("l2"),$("l3"),$("l4")];
 const CARDS = [$("c1"),$("c2"),$("c3"),$("c4"),$("c5")];
 CARDS.forEach((c,i)=>{ c.querySelector(".accent").style.background = ACCENT[i]; });
 $("bar").querySelectorAll("i").forEach((s,i)=>{ s.style.background = ACCENT[i]; });
-if (CUT === "ghost-ark"){
-  $("mark").textContent = "GHOST-ARK";
-  $("tag").textContent  = "Evidence you can inspect.";
-  $("foot").textContent = "Replay the receipt. Inspect the non-claims.";
-}
+$("mark").textContent = CUTS[CUT].mark;
+$("tag").textContent  = CUTS[CUT].tag;
+$("foot").textContent = CUTS[CUT].foot;
 
 const CARD_W=300, GAP=28;
 const spanOf = v => v*CARD_W + (v-1)*GAP;
