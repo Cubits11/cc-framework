@@ -51,13 +51,16 @@ differentiator, and it is also honest, which is why it is sustainable.
 
 Each points back to the same object. None is standalone.
 
-| # | Angle | Core line | Ends at |
-| --- | --- | --- | --- |
-| 1 | The demonstration | A green check should have a falsifiable path to red. | The page. |
-| 2 | The boundary | Integrity is not truth: these bytes are those bytes, and that is all. | The limitation text. |
-| 3 | The self-attack | We tried to forge our own verified page. It worked. | [CH-001](challenges.md). |
-| 4 | The method | Name the claim, the falsifier, the control, and the non-claim — before the result exists. | The film. |
-| 5 | The invitation | Bring one claim that matters. Here is exactly what you get back. | [Claim intake](claim-intake.md). |
+| # | Angle | Core line | Ends at | Copy |
+| --- | --- | --- | --- | --- |
+| 1 | The demonstration | A green check should have a falsifiable path to red. | The page. | [draft](drafts/01-the-demonstration.md) |
+| 2 | The boundary | Integrity is not truth: these bytes are those bytes, and that is all. | The limitation text. | [draft](drafts/02-integrity-is-not-truth.md) |
+| 3 | The self-attack | We tried to forge our own verified page. It worked. | [CH-001](challenges.md). | [draft](drafts/03-we-forged-our-own-page.md) |
+| 4 | The method | Name the claim, the falsifier, the control, and the non-claim — before the result exists. | The film. | [draft](drafts/04-name-it-before-you-see-it.md) |
+| 5 | The invitation | Bring one claim that matters. Here is exactly what you get back. | [Claim intake](claim-intake.md). | [draft](drafts/05-bring-one-claim.md) |
+
+All five are written and sit in [`drafts/`](drafts/README.md), in publishable
+form, for the author to edit into his own voice.
 
 Post 3 is the one that will travel furthest, because publishing a successful
 attack on your own verification is rare enough to be surprising and cheap enough

@@ -57,6 +57,7 @@ claiming they should merge.
 | [Challenges](challenges.md) | Open adversarial challenges, and the results of the ones already run. |
 | [Visibility manifold](visibility-manifold.md) | The method for turning one inspectable object into many entry points. |
 | [Distribution packet 001](distribution-packet.md) | The first packet, and the posts derived from it. |
+| [Drafts](drafts/README.md) | The five posts, written out in publishable form. |
 | [Claim intake](claim-intake.md) | The participation loop. What actually happens when someone brings a claim. |
 | [Release freeze](release-freeze.md) | What ships, what is not claimed, and the one action a visitor should take. |
 
