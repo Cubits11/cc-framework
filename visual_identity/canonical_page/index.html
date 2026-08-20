@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bring one claim that matters — Cubits11</title>
+<meta name="description" content="A public method for turning technical promises into questions that can genuinely fail.">
+<style>
+  :root{
+    --ground:#0E0E10; --panel:#141519; --line:rgba(237,242,247,.14);
+    --amber:#E9A23B; --white:#EDF2F7; --blue:#7FA8D9; --cyan:#5FD3D0;
+    --rose:#D9534F; --pale:#C9CEDA; --dim:rgba(237,242,247,.56);
+    --serif:"Bitstream Charter","Liberation Serif",Georgia,serif;
+    --mono:"DejaVu Sans Mono","Liberation Mono",ui-monospace,monospace;
+    --sans:"Liberation Sans","DejaVu Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--white);font-family:var(--sans);
+       line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+  section{padding:88px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:0}
+  h2{font-family:var(--mono);font-size:13px;letter-spacing:.30em;text-transform:uppercase;
+     color:var(--dim);font-weight:400;margin:0 0 34px}
+  h3{font-family:var(--serif);font-size:30px;font-weight:400;margin:0 0 16px;letter-spacing:.01em}
+  p{margin:0 0 20px;color:rgba(237,242,247,.80);max-width:66ch}
+  a{color:var(--blue)}
+  code,kbd{font-family:var(--mono);font-size:.92em}
+
+  /* hero */
+  .hero{padding:96px 0 72px;text-align:center}
+  .lockup{font-family:var(--mono);font-size:13px;letter-spacing:.34em;color:var(--dim);
+          text-transform:uppercase;margin-bottom:38px}
+  .flag{font-family:var(--serif);font-size:clamp(30px,5vw,54px);line-height:1.24;margin:0 auto 14px;
+        max-width:20ch}
+  .flag em{font-style:normal;color:var(--amber)}
+  .flag b{font-weight:400;color:var(--white)}
+  .sub{font-family:var(--serif);font-size:22px;color:var(--dim);margin-bottom:52px}
+  video{width:100%;max-width:1024px;border:1px solid var(--line);background:#000;display:block;margin:0 auto}
+  .cap{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:rgba(237,242,247,.40);
+       margin-top:16px;text-align:center}
+
+  /* thesis */
+  .thesis{font-family:var(--serif);font-size:clamp(24px,3.2vw,36px);line-height:1.42;max-width:24ch}
+  .rule{display:flex;gap:5px;width:320px;height:5px;margin:34px 0}
+  .rule i{flex:1}
+
+  /* transcript */
+  .tx{width:100%;border-collapse:collapse;font-size:15px}
+  .tx td{padding:13px 16px 13px 0;border-bottom:1px solid rgba(237,242,247,.07);vertical-align:top}
+  .tx td:first-child{font-family:var(--mono);font-size:12px;color:rgba(237,242,247,.38);
+                     white-space:nowrap;width:104px;letter-spacing:.06em}
+  .tx .oc{font-family:var(--mono);letter-spacing:.14em;font-size:13px;color:var(--white)}
+  .tx .beat{color:var(--dim)}
+  .vo{border-left:2px solid var(--amber);padding:4px 0 4px 22px;font-family:var(--serif);
+      font-size:21px;color:rgba(237,242,247,.86);margin:36px 0 0;max-width:60ch}
+
+  /* ledger */
+  .lg{width:100%;border-collapse:collapse;font-size:14.5px}
+  .lg th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.20em;
+         text-transform:uppercase;color:rgba(237,242,247,.40);font-weight:400;
+         padding:0 18px 12px 0;border-bottom:1px solid var(--line)}
+  .lg td{padding:15px 18px 15px 0;border-bottom:1px solid rgba(237,242,247,.07);vertical-align:top;
+         color:rgba(237,242,247,.78)}
+  .lg .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;padding:3px 8px;
+           border:1px solid;white-space:nowrap}
+  .t-fore{color:var(--amber);border-color:rgba(233,162,59,.45)}
+  .t-caus{color:var(--rose);border-color:rgba(217,83,79,.45)}
+  .t-refl{color:var(--blue);border-color:rgba(127,168,217,.45)}
+  .t-emp{color:var(--pale);border-color:rgba(201,206,218,.40)}
+  .t-mkt{color:var(--dim);border-color:rgba(237,242,247,.22)}
+
+  /* the strip */
+  .strip{background:var(--panel);border-top:1px solid rgba(217,83,79,.40);
+         border-bottom:1px solid rgba(217,83,79,.40)}
+  .strip h2{color:var(--rose)}
+  .strip ul{margin:0;padding:0;list-style:none;display:grid;gap:14px;
+            grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .strip li{padding-left:22px;position:relative;color:rgba(237,242,247,.80);font-size:15px}
+  .strip li::before{content:"—";position:absolute;left:0;color:var(--rose)}
+
+  /* the check */
+  .check{display:grid;gap:22px;grid-template-columns:1fr 1fr}
+  @media(max-width:860px){.check{grid-template-columns:1fr}}
+  textarea{width:100%;height:270px;background:#0B0C0E;color:var(--pale);border:1px solid var(--line);
+           font-family:var(--mono);font-size:13px;line-height:1.65;padding:18px;resize:vertical;
+           tab-size:2}
+  textarea:focus{outline:none;border-color:rgba(127,168,217,.55)}
+  .panel{background:var(--panel);border:1px solid var(--line);padding:22px}
+  .row{font-family:var(--mono);font-size:12px;letter-spacing:.04em;margin-bottom:16px}
+  .row span{display:block;color:rgba(237,242,247,.38);letter-spacing:.18em;
+            text-transform:uppercase;font-size:10.5px;margin-bottom:6px}
+  .hash{word-break:break-all;color:var(--pale)}
+  .verdict{font-family:var(--mono);font-size:22px;letter-spacing:.10em;padding:16px 0 6px}
+  .v-ok{color:var(--blue)} .v-bad{color:var(--rose)}
+  .vnote{font-family:var(--mono);font-size:12px;color:rgba(237,242,247,.46);line-height:1.7}
+  button{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+         background:transparent;color:var(--white);border:1px solid var(--line);
+         padding:11px 16px;cursor:pointer;margin:4px 6px 0 0}
+  button:hover{border-color:rgba(237,242,247,.45)}
+  .prov{margin-top:26px;font-family:var(--mono);font-size:12px;color:rgba(237,242,247,.46);
+        line-height:1.9}
+  .prov b{color:rgba(237,242,247,.72);font-weight:400}
+
+  /* invitation + boundaries */
+  .invite{text-align:center}
+  .invite h3{font-size:clamp(28px,4.4vw,46px);max-width:none}
+  .bd{width:100%;border-collapse:collapse;font-size:14.5px}
+  .bd th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.20em;
+         text-transform:uppercase;color:rgba(237,242,247,.40);font-weight:400;
+         padding:0 18px 12px 0;border-bottom:1px solid var(--line)}
+  .bd td{padding:15px 18px 15px 0;border-bottom:1px solid rgba(237,242,247,.07);vertical-align:top;
+         color:rgba(237,242,247,.78)}
+  .bd td:first-child{font-family:var(--mono);font-size:13px;color:var(--white);white-space:nowrap}
+  footer{padding:60px 0 90px;color:rgba(237,242,247,.38);font-family:var(--mono);font-size:12px;
+         letter-spacing:.10em;line-height:2}
+</style>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="lockup">Pranav&nbsp;Bhave &nbsp;/&nbsp; Cubits11</div>
+    <div class="flag"><b>A story can start a question.</b><br><em>Evidence must finish the answer.</em></div>
+    <div class="sub">Keep the wonder. Check the claim.</div>
+    <video controls preload="metadata"
+           poster="../before_you_see_it/renders/poster__cubits11.png">
+      <source src="../before_you_see_it/renders/before_you_see_it__cubits11.mp4" type="video/mp4">
+      <source src="../before_you_see_it/renders/before_you_see_it__cubits11.webm" type="video/webm">
+    </video>
+    <div class="cap">Before You See It &nbsp;·&nbsp; 15.000s &nbsp;·&nbsp; silent master &nbsp;·&nbsp; transcript below</div>
+  </div>
+
+  <section>
+    <h2>The method</h2>
+    <div class="thesis">Before a green check becomes a claim, make its assumptions, evidence, and limits inspectable.</div>
+    <div class="rule"><i style="background:var(--blue)"></i><i style="background:var(--rose)"></i><i style="background:var(--cyan)"></i><i style="background:var(--amber)"></i><i style="background:var(--pale)"></i></div>
+    <p>I build research software and public experiences that turn vague technical
+    claims into inspectable evidence.</p>
+    <p>This is not a safety score, a certification, or a seal. It is a loop: name
+    the <b>claim</b>, name the <b>falsifier</b> that would end it, name the
+    <b>control</b> that could embarrass it, name the <b>non-claim</b> it will
+    never support — then lock all four before the result exists, and let the
+    result disagree.</p>
+    <p>The boldest thing a technical brand can say is <b>INCONCLUSIVE</b>. The
+    film says it on purpose, and when it has no verifier output to show it stamps
+    <code>ILLUSTRATION</code> on its own footage rather than imply a result it was
+    not given.</p>
+  </section>
+
+  <section>
+    <h2>Transcript</h2>
+    <table class="tx">
+      <tr><td>0.00–2.00</td><td><span class="oc">THIS FEELS TRUE.</span><div class="beat">A notebook under warm, almost oracular light. Gold embers drift. A slow push-in.</div></td></tr>
+      <tr><td>2.00–3.40</td><td><span class="oc">BUT WHAT WOULD COUNT?</span><div class="beat">Hard cut to cold. The embers quantize into 84 candidate matches — <i>blue notebook, cracked screen, curly hair, vending machine, felt like momentum</i>. The notebook drains of colour and becomes one cell among them.</div></td></tr>
+      <tr><td>3.40–6.50</td><td><span class="oc">CLAIM &nbsp; FALSIFIER &nbsp; CONTROL &nbsp; NON-CLAIM</span><div class="beat">Four tablets snap into a ledger that re-centres as each one lands.</div></td></tr>
+      <tr><td>6.50–9.50</td><td><span class="oc">NAME IT BEFORE YOU SEE IT.</span><div class="beat">A fifth slot appears, dashed and empty. A protocol bar locks a timestamp and a hash while that slot is still empty. Three seconds of near stillness.</div></td></tr>
+      <tr><td>9.50–11.80</td><td><span class="oc">LET THE RESULT DISAGREE.</span><div class="beat">The slot fills with INCONCLUSIVE, not a green tick. The falsifier's accent flares once. At 10.80 the result becomes NEXT EXPERIMENT.</div></td></tr>
+      <tr><td>11.80–15.00</td><td><span class="oc">CUBITS11 — KEEP THE WONDER. CHECK THE CLAIM.</span><div class="beat">The five accents compress into a ledger rule under the wordmark.</div></td></tr>
+    </table>
+    <p class="vo">“An intuition can start a question. Before you see an answer,
+    name what would count. Then let the result disagree.”</p>
+  </section>
+
+  <section>
+    <h2>Source ledger</h2>
+    <p>The film began with a real narrative source — a recorded tarot reading
+    brought into a working session as motivation. Before any of it was allowed
+    near a decision, every substantive statement was classified. This is the
+    short version; the
+    <a href="../../docs/research/future-expansion/source-ledger.md">full ledger</a>
+    carries every line, its testable translation, and the inference it forbids.</p>
+    <table class="lg">
+      <tr><th>Source statement</th><th>Class</th><th>Testable translation</th><th>Disallowed inference</th></tr>
+      <tr><td>“Things are about to turn in your favour.”</td><td><span class="tag t-fore">forecast</span></td><td>None directly. The nearest registerable question is whether a predeclared intervention moves a predeclared measure inside a fixed window.</td><td>That improvement is scheduled. Not usable for runway, hiring, spend, or pricing.</td></tr>
+      <tr><td>“You’ll see more signs and synchronicities.”</td><td><span class="tag t-caus">causal</span></td><td>Name the traction indicators and the window <i>before</i> any result is seen, then count them.</td><td>That noticing a coincidence afterwards is evidence. This is the failure mode the whole method exists to block.</td></tr>
+      <tr><td>“There’s been a lot of experimentation.”</td><td><span class="tag t-refl">reflection</span></td><td>Count experiments started, completed, and abandoned in a fixed prior period.</td><td>That an accurate description makes the forecasts accurate. Broad descriptions feel personal.</td></tr>
+      <tr><td>“A blue notebook. A cracked screen. Curly hair. A vending machine.”</td><td><span class="tag t-emp">empirical</span></td><td>The only literally checkable lines. Testable only under predeclaration, base-rate comparison, and a blinded control.</td><td>That a later match confirms anything. Each item is high-prevalence and elastic.</td></tr>
+      <tr><td>“There is money attached to this.”</td><td><span class="tag t-fore">forecast</span></td><td>None from this source. Conversion belongs to an experiment that exists independently of it.</td><td>Hard block: no revenue projection, pricing decision, spend commitment, or investor-facing statement rests on this.</td></tr>
+      <tr><td>“Hit like, subscribe, tell me in the comments.”</td><td><span class="tag t-mkt">funnel</span></td><td>Not a claim about the subject.</td><td>That felt resonance is independent of the source’s incentive to produce resonance.</td></tr>
+    </table>
+    <p style="margin-top:28px">Three method heuristics survived translation:
+    experiment then replicate then formalize; allocate on predeclared indicators;
+    freeze the protocol once it works. Each is independently defensible, and each
+    would survive the source being discarded entirely. That is the permitted use —
+    a story generated a question.</p>
+  </section>
+
+  <section class="strip">
+    <h2>What this does not establish</h2>
+    <ul>
+      <li>Nothing on this page proves any AI system, product, or claim is safe.</li>
+      <li>The check below establishes byte integrity only. It says nothing about whether the numbers inside the file are correct.</li>
+      <li>A digest match is not a statement about study design, sampling, labelling, or interpretation.</li>
+      <li>The film reports no measurement. Its result card is an illustration unless a real verdict was injected, and it labels itself when it is.</li>
+      <li>The source ledger does not establish that its source is accurate, predictive, or causal — only what may and may not be inferred from it.</li>
+      <li>Reproducing this capsule from its declared inputs does not establish that those inputs were measured. We forged our own verified page to check, and it worked — <a href="../../docs/research/epistemic-program/challenges.md">CH-001</a>.</li>
+      <li>No claim here has been externally reproduced yet. When it is, the discrepancies get published too.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>One real check</h2>
+    <h3>Change one character. Watch it fail closed.</h3>
+    <p>This is a real evidence file from this repository, and a real digest
+    recorded in its manifest. Your browser recomputes SHA-256 over exactly the
+    bytes in the box. Edit anything — a digit, a space — and the recomputation
+    stops matching. Nothing is simulated and no result is hard-coded.</p>
+
+    <div class="check">
+      <div>
+        <div class="row"><span>fixture · calibration_evidence</span></div>
+        <textarea id="doc" spellcheck="false" aria-label="evidence file contents"></textarea>
+        <button id="mutate">Mutate one byte</button>
+        <button id="restore">Restore</button>
+      </div>
+      <div class="panel">
+        <div class="row"><span>recorded in manifest</span><div class="hash" id="expected"></div></div>
+        <div class="row"><span>recomputed in your browser</span><div class="hash" id="actual">…</div></div>
+        <div class="verdict" id="verdict">…</div>
+        <div class="vnote" id="vnote"></div>
+      </div>
+    </div>
+
+    <div class="prov">
+      <b>fixture</b> &nbsp; examples/claim_governance_capsule/expected/calibration.json<br>
+      <b>digest</b> &nbsp; examples/claim_governance_capsule/manifest.expected.json<br>
+      <b>command</b> &nbsp; sha256sum examples/claim_governance_capsule/expected/calibration.json<br>
+      <b>limitation</b> &nbsp; Integrity only. This does not establish that 0.041666666667 is
+      the true false-positive rate, that the calibration was well designed, that the
+      population was representative, or that any system is safe.<br>
+      <b>and one level up</b> &nbsp; The capsule this fixture comes from reproduces deterministically
+      from its declared inputs. That is not the same as those inputs having been measured. We
+      changed an input, regenerated the whole chain, and every guard stayed green over a number
+      we invented — <a href="../../docs/research/epistemic-program/challenges.md">CH-001</a>.
+    </div>
+  </section>
+
+  <section class="invite">
+    <h2>The invitation</h2>
+    <h3>Bring one claim that matters.</h3>
+    <p style="margin:0 auto 22px">One sentence your team says in public and cannot
+    fully defend in private. A benchmark number, a security property, a “proven”
+    or a “guaranteed”. You get back a claim map, the evidence that supports it, the
+    alternative explanations, the smallest useful test, and a limitation statement
+    in plain English.</p>
+    <p style="margin:0 auto">Not validation. Not compliance. Not a seal of approval.
+    Better questions, stronger evidence, clearer public language, and a more useful
+    failure boundary.</p>
+  </section>
+
+  <section>
+    <h2>Boundaries</h2>
+    <table class="bd">
+      <tr><th>Name</th><th>Public role</th><th>Boundary</th></tr>
+      <tr><td>Pranav Bhave</td><td>Author, builder, speaker.</td><td>The human voice.</td></tr>
+      <tr><td>Cubits11</td><td>Independent studio for evidence design, research software, and education.</td><td>The commercial home. It sells clarity, never certainty.</td></tr>
+      <tr><td>CC-Framework</td><td>Research on what stacked guardrail evidence supports when failures may be correlated.</td><td>Not a safety score and not a certification.</td></tr>
+      <tr><td>Ghost-Ark</td><td>A separate institutional research artifact on bounded receipts and verifiable evidence.</td><td>Not a Cubits11 product and not a university endorsement. Referenced only as a labelled research case study, never as a commercial credential.</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    Pranav Bhave / Cubits11 &nbsp;·&nbsp; Make the claim smaller. Make the evidence stronger.<br>
+    This page states a method. It is not evidence that the method works.
+  </footer>
+</div>
+
+<script>
+"use strict";
+const DOC = "{\n  \"alpha_cap\": 0.05,\n  \"calibration_window\": {\n    \"lower\": 0.03,\n    \"upper\": 0.07\n  },\n  \"realized_fpr\": 0.041666666667,\n  \"status\": \"pass\",\n  \"target_fpr\": 0.05,\n  \"threshold\": 0.42\n}\n";
+const EXPECTED = "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014";
+
+const $ = id => document.getElementById(id);
+$("doc").value = DOC;
+$("expected").textContent = EXPECTED;
+
+async function sha256(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+async function check(){
+  const actual = await sha256($("doc").value);
+  $("actual").textContent = actual;
+  const ok = actual === EXPECTED;
+  const v = $("verdict");
+  v.textContent = ok ? "BYTES MATCH" : "FAIL CLOSED";
+  v.className = "verdict " + (ok ? "v-ok" : "v-bad");
+  $("vnote").textContent = ok
+    ? "These are the recorded bytes. That is all this establishes — not that the measurement is valid, and not that anything is safe."
+    : "The recomputed digest differs from the one in the manifest. A verifier rejects this artifact rather than repairing it or warning and continuing.";
+}
+
+$("doc").addEventListener("input", check);
+$("mutate").addEventListener("click", () => {
+  const t = $("doc").value;
+  const i = t.indexOf("0.041666666667");
+  $("doc").value = i < 0 ? t + " " : t.slice(0, i + 13) + "8" + t.slice(i + 14);
+  check();
+});
+$("restore").addEventListener("click", () => { $("doc").value = DOC; check(); });
+check();
+</script>
+</html>

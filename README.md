@@ -9,6 +9,36 @@ stacked-system failure, not a safety certification.**
 <!-- DOI badge placeholder: uncomment after Zenodo mints a DOI in Phase 2e. -->
 <!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.TODO.svg)](https://doi.org/10.5281/zenodo.TODO) -->
 
+---
+
+<p align="center">
+  <a href="visual_identity/before_you_see_it/README.md">
+    <img src="visual_identity/before_you_see_it/renders/poster__cc-framework.png" width="860"
+         alt="A frozen protocol: claim, falsifier, control, non-claim, and one empty result slot">
+  </a>
+</p>
+
+<p align="center">
+  <b>A story can start a question. It cannot finish an answer.</b><br>
+  <sub><a href="visual_identity/before_you_see_it/README.md"><b>Before You See It</b></a>
+  &nbsp;·&nbsp; a 15-second film &nbsp;·&nbsp; <i>Keep the wonder. Check the claim.</i></sub>
+</p>
+
+Those five cards are the entire discipline. Name the **claim**. Name the
+**falsifier** that would end it. Name the **control** that could embarrass it.
+Name the **non-claim** it will never support. Then lock all four *before* the
+result slot is filled, and let the result disagree.
+
+This repository is the machinery for doing that to composed AI guardrail
+evidence: Frechet-Hoeffding bounds that stay honest about unknown dependence,
+evidence roles that decide what a measurement is allowed to say, receipts that
+prove bytes and refuse to prove safety, and claims that expire. The film has one
+`INCONCLUSIVE` frame in it on purpose - and when it has no verifier output to
+show, it stamps `ILLUSTRATION` on its own footage rather than imply a result it
+was not given.
+
+---
+
 CC-Framework is a Python research framework for dependence-aware analysis of
 composed binary guardrail failures. It computes what available guardrail
 evidence supports under stated dependence assumptions. It does not certify that

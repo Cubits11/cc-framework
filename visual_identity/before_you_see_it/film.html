@@ -1,0 +1,433 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Before You See It</title>
+<!--
+  Before You See It - Chamber 00 of the Claim Observatory.
+  Deterministic 15.000s film. Every visual state is a pure function of time.
+
+  Preview:  open in a browser (plays on load, click to replay)
+  Capture:  ?capture=1   disables playback; the host calls window.__seek(t)
+  Cut:      ?cut=cc-framework | ghost-ark | cubits11
+  Verdict:  window.__VERDICT = {state, detail} injected before seek. If absent,
+            the result card is marked ILLUSTRATION on screen. The film never
+            displays a verdict it did not receive.
+-->
+<style>
+  :root{
+    --ground:#0E0E10; --ground-2:#17171B;
+    --lure-amber:#E9A23B; --protocol-white:#EDF2F7;
+    --evidence-blue:#7FA8D9; --confirmatory-cyan:#5FD3D0;
+    --invalidation-rose:#D9534F; --pale:#C9CEDA;
+    --serif:"Bitstream Charter","Liberation Serif",Georgia,serif;
+    --mono:"DejaVu Sans Mono","Liberation Mono",monospace;
+    --sans:"Liberation Sans","DejaVu Sans",sans-serif;
+  }
+  html,body{margin:0;height:100%;background:#000;overflow:hidden}
+  #stage{position:absolute;top:0;left:0;width:1920px;height:1080px;
+         background:var(--ground);transform-origin:0 0;overflow:hidden}
+  canvas{position:absolute;inset:0}
+  #ui{position:absolute;inset:0}
+  .line{position:absolute;left:0;right:0;text-align:center;font-family:var(--serif);
+        color:#F4F1EA;opacity:0;will-change:opacity,transform}
+  #l1{top:236px;font-size:74px;letter-spacing:.10em}
+  #l2{top:120px;font-size:62px;letter-spacing:.08em}
+  #l3{top:120px;font-size:62px;letter-spacing:.08em}
+  #l4{top:120px;font-size:62px;letter-spacing:.08em}
+
+  #ledger{position:absolute;left:0;top:322px;width:1920px;height:404px;opacity:0}
+  .card{position:absolute;top:0;width:300px;height:404px;box-sizing:border-box;
+        border:1px solid rgba(237,242,247,.30);background:rgba(20,22,27,.62);
+        padding:30px 26px;opacity:0;will-change:opacity,transform}
+  .card .accent{position:absolute;left:0;top:0;bottom:0;width:3px}
+  .card .k{font-family:var(--mono);font-size:21px;letter-spacing:.24em;
+           color:var(--protocol-white);text-transform:uppercase}
+  .card .d{margin-top:20px;font-family:var(--serif);font-size:23px;line-height:1.42;
+           color:rgba(237,242,247,.62)}
+  .card .n{position:absolute;left:26px;bottom:26px;font-family:var(--mono);
+           font-size:13px;letter-spacing:.18em;color:rgba(237,242,247,.30)}
+  #c5{border-style:dashed;border-color:rgba(237,242,247,.34);background:rgba(20,22,27,.34)}
+  #c5 .k{color:rgba(237,242,247,.42)}
+  #verdict{position:absolute;left:26px;top:88px;right:26px;opacity:0}
+  #verdict .v{font-family:var(--mono);font-size:30px;letter-spacing:.10em;color:var(--pale)}
+  #verdict .s{margin-top:14px;font-family:var(--mono);font-size:14px;
+              letter-spacing:.10em;line-height:1.7;color:rgba(237,242,247,.44)}
+  #illus{position:absolute;right:26px;bottom:26px;font-family:var(--mono);font-size:11px;
+         letter-spacing:.26em;color:rgba(237,242,247,.30);opacity:0}
+
+  #protocol{position:absolute;top:772px;height:62px;box-sizing:border-box;
+            border:1px solid rgba(237,242,247,.20);background:rgba(16,18,22,.72);
+            display:flex;align-items:center;gap:34px;padding:0 26px;opacity:0;
+            font-family:var(--mono);font-size:15px;letter-spacing:.13em;
+            color:rgba(237,242,247,.58);white-space:nowrap}
+  #protocol b{color:var(--protocol-white);font-weight:400}
+
+  #lockup{position:absolute;left:0;right:0;top:396px;text-align:center;opacity:0}
+  #mark{font-family:var(--sans);font-size:66px;letter-spacing:.44em;
+        color:#F4F1EA;text-indent:.44em}
+  #bar{margin:44px auto 0;width:620px;height:6px;display:flex;gap:5px}
+  #bar i{flex:1;display:block}
+  #tag{margin-top:46px;font-family:var(--serif);font-size:35px;letter-spacing:.07em;
+       color:rgba(244,241,234,.90)}
+  #foot{margin-top:30px;font-family:var(--mono);font-size:15px;letter-spacing:.17em;
+        color:rgba(237,242,247,.34)}
+</style>
+
+<div id="stage">
+  <canvas id="world" width="1920" height="1080"></canvas>
+  <div id="ui">
+    <div class="line" id="l1">THIS FEELS TRUE.</div>
+    <div class="line" id="l2">BUT WHAT WOULD COUNT?</div>
+    <div class="line" id="l3">NAME IT BEFORE YOU SEE IT.</div>
+    <div class="line" id="l4">LET THE RESULT DISAGREE.</div>
+
+    <div id="ledger">
+      <div class="card" id="c1"><i class="accent"></i><div class="k">Claim</div>
+        <div class="d">What is asserted, and how narrowly.</div><div class="n">01</div></div>
+      <div class="card" id="c2"><i class="accent"></i><div class="k">Falsifier</div>
+        <div class="d">The result that would end this.</div><div class="n">02</div></div>
+      <div class="card" id="c3"><i class="accent"></i><div class="k">Control</div>
+        <div class="d">The comparison that could embarrass it.</div><div class="n">03</div></div>
+      <div class="card" id="c4"><i class="accent"></i><div class="k">Non-claim</div>
+        <div class="d">What this will never support.</div><div class="n">04</div></div>
+      <div class="card" id="c5"><i class="accent"></i><div class="k">Result</div>
+        <div id="illus">ILLUSTRATION</div>
+        <div id="verdict"><div class="v"></div><div class="s"></div></div>
+        <div class="n">05</div></div>
+    </div>
+
+    <div id="protocol">
+      <span>protocol frozen&nbsp; <b id="p-time">2026-08-20T14:36:00Z</b></span>
+      <span>sha256&nbsp; <b id="p-hash">3f9c…a7e1</b></span>
+      <span>result&nbsp; <b id="p-res">not yet observed</b></span>
+    </div>
+
+    <div id="lockup">
+      <div id="mark">CC-FRAMEWORK</div>
+      <div id="bar"><i></i><i></i><i></i><i></i><i></i></div>
+      <div id="tag">Keep the wonder. Check the claim.</div>
+      <div id="foot">Not a safety proof. A method for making claims checkable.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const W = 1920, H = 1080, DUR = 15.0;
+const Q = new URLSearchParams(location.search);
+const CAPTURE = Q.get("capture") === "1";
+const CUTS = {
+  "cc-framework": { mark:"CC-FRAMEWORK", tag:"Keep the wonder. Check the claim.",
+                    foot:"Not a safety proof. A method for making claims checkable." },
+  "ghost-ark":    { mark:"GHOST-ARK",    tag:"Evidence you can inspect.",
+                    foot:"Replay the receipt. Inspect the non-claims." },
+  "cubits11":     { mark:"CUBITS11",     tag:"Keep the wonder. Check the claim.",
+                    foot:"Make the claim smaller. Make the evidence stronger." }
+};
+const CUT = CUTS[Q.get("cut")] ? Q.get("cut") : "cc-framework";
+
+const COL = {
+  ground:"#0E0E10", amber:"#E9A23B", white:"#EDF2F7", blue:"#7FA8D9",
+  cyan:"#5FD3D0", rose:"#D9534F", pale:"#C9CEDA"
+};
+const ACCENT = [COL.blue, COL.rose, COL.cyan, COL.amber, COL.pale];
+
+/* ---- beats (seconds) ---------------------------------------------------- */
+const B = { lure:0.0, freeze:2.0, ledger:3.40, lock:6.50, disagree:9.50, lockup:11.80 };
+
+/* ---- pure helpers ------------------------------------------------------- */
+const clamp = (v,a,b)=>v<a?a:v>b?b:v;
+const k = (t,a,b)=>clamp((t-a)/(b-a),0,1);
+const eOut  = u=>1-Math.pow(1-u,3);
+const eOut5 = u=>1-Math.pow(1-u,5);
+const eIO   = u=>u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;
+const lerp  = (a,b,u)=>a+(b-a)*u;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---- deterministic ember field ------------------------------------------ */
+const rnd = mulberry32(0x5EED);
+const EM = [];
+for (let i=0;i<170;i++){
+  EM.push({ x0:rnd()*W, y0:rnd()*(H+240)-120, r:0.9+rnd()*2.6, sp:14+rnd()*34,
+            ph:rnd()*Math.PI*2, amp:8+rnd()*34, a:0.16+rnd()*0.66 });
+}
+const GC=12, GR=7, GX0=180, GY0=238, GW=(1740-180)/GC, GH=(926-238)/GR;
+const cell = i => ({ x:GX0+(i%GC)*GW+GW/2, y:GY0+Math.floor(i/GC)*GH+GH/2 });
+const driftY = (p,t)=>{ let y=p.y0-p.sp*t; const span=H+240; y=((y+120)%span+span)%span-120; return y; };
+const driftX = (p,t)=>p.x0+Math.sin(t*0.55+p.ph)*p.amp;
+
+/* candidate coincidences - the things that would all have felt like proof */
+const CAND = [
+  [ 1,"BLUE NOTEBOOK"], [ 4,"CRACKED SCREEN"], [ 8,"CURLY HAIR"], [10,"VENDING MACHINE"],
+  [14,"LAPTOP IN A CAR"], [18,"EMAIL SPIKE"], [21,"REPEAT CUSTOMER"], [27,"A GOOD WEEK"],
+  [31,"FELT LIKE MOMENTUM"], [36,"WARM INTRO"], [40,"BETTER NUMBERS"], [45,"SOMEONE NOTICED"],
+  [50,"RIGHT PLACE"], [55,"RIGHT TIME"], [61,"IT ALL CLICKED"], [68,"AN OPEN DOOR"]
+];
+const CANDMAP = new Map(CAND);
+
+/* ---- film grain (deterministic tiles) ----------------------------------- */
+const GRAIN=[];
+(function(){
+  const g=mulberry32(0xA11CE);
+  for(let n=0;n<6;n++){
+    const c=document.createElement("canvas"); c.width=480; c.height=270;
+    const x=c.getContext("2d"), d=x.createImageData(480,270);
+    for(let i=0;i<d.data.length;i+=4){const v=(g()*255)|0;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255;}
+    x.putImageData(d,0,0); GRAIN.push(c);
+  }
+})();
+
+const cv = document.getElementById("world"), cx = cv.getContext("2d");
+
+/* ---- world ------------------------------------------------------------- */
+function drawWorld(t){
+  cx.setTransform(1,0,0,1,0,0);
+  cx.clearRect(0,0,W,H);
+  cx.fillStyle = COL.ground; cx.fillRect(0,0,W,H);
+
+  // slow push-in during the lure only; it stops dead at the freeze
+  const push = 1 + 0.045*eIO(k(Math.min(t,B.freeze),0,B.freeze));
+  cx.setTransform(push,0,0,push,(W-W*push)/2,(H-H*push)/2);
+
+  const pre = t < B.freeze;
+
+  // key light: warm and oracular, then cut cold
+  const g = cx.createRadialGradient(
+      pre?620:960, pre?150:96, 40, pre?620:960, pre?150:96, pre?1180:1520);
+  const breathe = 0.30 + 0.05*Math.sin(t*1.9);
+  g.addColorStop(0, pre?`rgba(233,162,59,${breathe})`:"rgba(196,214,236,.16)");
+  g.addColorStop(.55, pre?"rgba(233,162,59,.045)":"rgba(196,214,236,.028)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  cx.fillStyle=g; cx.fillRect(0,0,W,H);
+
+  if (t >= B.freeze && t < B.freeze+0.05){            // the cut
+    cx.fillStyle="rgba(237,242,247,.09)"; cx.fillRect(0,0,W,H);
+  }
+
+  if (t >= B.ledger) drawFloorRings(t);
+  if (t < B.ledger+0.5) drawGrid(t);
+  drawEmbers(t);
+  if (t < B.freeze+0.55) drawNotebook(t);
+
+  cx.setTransform(1,0,0,1,0,0);
+  vignette();
+  grain(t);
+}
+
+function drawFloorRings(t){
+  const a = 0.05*k(t,B.ledger,B.ledger+1.2);
+  cx.strokeStyle=`rgba(237,242,247,${a})`; cx.lineWidth=1;
+  for(let i=0;i<4;i++){
+    cx.beginPath();
+    cx.ellipse(960, 1230, 430+i*300, 170+i*118, 0, 0, Math.PI*2);
+    cx.stroke();
+  }
+}
+
+function drawGrid(t){
+  const a = 0.16*k(t,B.freeze+0.05,B.freeze+0.55)*(1-k(t,B.ledger,B.ledger+0.42));
+  if (a<=0.001) return;
+  cx.strokeStyle=`rgba(237,242,247,${a})`; cx.lineWidth=1;
+  for(let c=0;c<=GC;c++){cx.beginPath();cx.moveTo(GX0+c*GW,GY0);cx.lineTo(GX0+c*GW,GY0+GR*GH);cx.stroke();}
+  for(let r=0;r<=GR;r++){cx.beginPath();cx.moveTo(GX0,GY0+r*GH);cx.lineTo(GX0+GC*GW,GY0+r*GH);cx.stroke();}
+
+  const la = 0.55*k(t,B.freeze+0.30,B.freeze+0.95)*(1-k(t,B.ledger-0.1,B.ledger+0.3));
+  cx.font = "11px 'DejaVu Sans Mono',monospace";
+  cx.textAlign="center"; cx.fillStyle=`rgba(237,242,247,${la})`;
+  for(const [i,label] of CAND){ const p=cell(i); cx.fillText(label, p.x, p.y+30); }
+}
+
+function drawEmbers(t){
+  const gone = k(t, B.ledger, B.ledger+0.55);
+  if (gone>=1) return;
+  for(let i=0;i<EM.length;i++){
+    const p=EM[i];
+    let x,y,col,al;
+    if (t < B.freeze){
+      x=driftX(p,t); y=driftY(p,t); col="233,162,59"; al=p.a;
+    } else {
+      const fx=driftX(p,B.freeze), fy=driftY(p,B.freeze);
+      const c=cell(i%(GC*GR));
+      const u=eOut5(k(t,B.freeze+0.05,B.freeze+0.72));
+      x=lerp(fx,c.x,u); y=lerp(fy,c.y,u);
+      col = u<1 ? "233,162,59" : "201,206,218";
+      al = p.a*(1-0.35*u);
+    }
+    al *= (1-gone);
+    const r=p.r*(t<B.freeze?1:1-0.3*k(t,B.freeze,B.freeze+0.72));
+    const gg=cx.createRadialGradient(x,y,0,x,y,r*7);
+    gg.addColorStop(0,`rgba(${col},${al})`);
+    gg.addColorStop(.35,`rgba(${col},${al*0.32})`);
+    gg.addColorStop(1,`rgba(${col},0)`);
+    cx.fillStyle=gg; cx.beginPath(); cx.arc(x,y,r*7,0,Math.PI*2); cx.fill();
+    cx.fillStyle=`rgba(255,246,232,${al*0.9})`;
+    cx.beginPath(); cx.arc(x,y,r*0.62,0,Math.PI*2); cx.fill();
+  }
+}
+
+/* the easter egg: an electric-blue notebook, demoted to one cell among many */
+function drawNotebook(t){
+  const fade = 1 - k(t, B.freeze, B.freeze+0.5);
+  if (fade<=0) return;
+  const warm = 1 - k(t, B.freeze, B.freeze+0.18);   // colour drains at the cut
+  const cxp=960, cyp=666, w=548, h=352;
+
+  cx.save();
+  cx.globalAlpha = fade;
+  // contact shadow
+  const sh=cx.createRadialGradient(cxp,cyp+150,10,cxp,cyp+150,470);
+  sh.addColorStop(0,"rgba(0,0,0,.72)"); sh.addColorStop(1,"rgba(0,0,0,0)");
+  cx.fillStyle=sh; cx.beginPath(); cx.ellipse(cxp,cyp+150,470,86,0,0,Math.PI*2); cx.fill();
+
+  cx.translate(cxp,cyp); cx.rotate(-0.075); cx.transform(1,0,-0.26,1,0,0);
+
+  const cover=cx.createLinearGradient(-w/2,-h/2,w/2,h/2);
+  cover.addColorStop(0, `rgb(${lerp(20,26,1-warm)|0},${lerp(46,50,1-warm)|0},${lerp(126,110,1-warm)|0})`);
+  cover.addColorStop(.55,`rgb(${lerp(46,44,1-warm)|0},${lerp(104,96,1-warm)|0},${lerp(224,186,1-warm)|0})`);
+  cover.addColorStop(1, `rgb(${lerp(15,22,1-warm)|0},${lerp(36,42,1-warm)|0},${lerp(96,86,1-warm)|0})`);
+  roundRect(-w/2,-h/2,w,h,10); cx.fillStyle=cover; cx.fill();
+
+  // page block
+  cx.fillStyle="rgba(238,236,228,.90)";
+  roundRect(w/2-16,-h/2+13,15,h-26,4); cx.fill();
+  // spine
+  cx.fillStyle="rgba(8,20,58,.72)"; cx.fillRect(-w/2+26,-h/2,16,h);
+  // gold rim light along the top edge
+  const rim=cx.createLinearGradient(-w/2,-h/2,w/2,-h/2);
+  rim.addColorStop(0,"rgba(233,162,59,0)");
+  rim.addColorStop(.42,`rgba(255,208,130,${.72*warm})`);
+  rim.addColorStop(1,"rgba(233,162,59,0)");
+  cx.fillStyle=rim; cx.fillRect(-w/2,-h/2,w,3);
+  // specular sweep
+  const sweepX=-w/2 + (0.16+0.5*(t/B.freeze))*w;
+  const sp=cx.createLinearGradient(sweepX-150,0,sweepX+150,0);
+  sp.addColorStop(0,"rgba(255,255,255,0)");
+  sp.addColorStop(.5,`rgba(255,255,255,${.075*warm})`);
+  sp.addColorStop(1,"rgba(255,255,255,0)");
+  roundRect(-w/2,-h/2,w,h,10); cx.fillStyle=sp; cx.fill();
+  // elastic band
+  cx.strokeStyle="rgba(10,18,44,.55)"; cx.lineWidth=7;
+  cx.beginPath(); cx.moveTo(w/2-96,-h/2); cx.lineTo(w/2-96,h/2); cx.stroke();
+  cx.restore();
+}
+function roundRect(x,y,w,h,r){
+  cx.beginPath(); cx.moveTo(x+r,y);
+  cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r);
+  cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath();
+}
+function vignette(){
+  const v=cx.createRadialGradient(960,520,240,960,520,1280);
+  v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(.62,"rgba(0,0,0,.30)");
+  v.addColorStop(1,"rgba(0,0,0,.72)");
+  cx.fillStyle=v; cx.fillRect(0,0,W,H);
+}
+function grain(t){
+  cx.save(); cx.globalAlpha=.030; cx.globalCompositeOperation="overlay";
+  cx.drawImage(GRAIN[Math.floor(t*24)%GRAIN.length],0,0,W,H); cx.restore();
+}
+
+/* ---- typography + cards ------------------------------------------------- */
+const $ = id => document.getElementById(id);
+const L = [$("l1"),$("l2"),$("l3"),$("l4")];
+const CARDS = [$("c1"),$("c2"),$("c3"),$("c4"),$("c5")];
+CARDS.forEach((c,i)=>{ c.querySelector(".accent").style.background = ACCENT[i]; });
+$("bar").querySelectorAll("i").forEach((s,i)=>{ s.style.background = ACCENT[i]; });
+$("mark").textContent = CUTS[CUT].mark;
+$("tag").textContent  = CUTS[CUT].tag;
+$("foot").textContent = CUTS[CUT].foot;
+
+const CARD_W=300, GAP=28;
+const spanOf = v => v*CARD_W + (v-1)*GAP;
+function visibleCount(t){
+  let v = 0;
+  for (let i=0;i<4;i++) v += eOut(k(t, SHOW[i], SHOW[i]+0.30));
+  v += eOut(k(t, B.lock+0.10, B.lock+0.42));
+  return Math.max(v, 1);
+}
+const cardX = (i, v) => (W-spanOf(v))/2 + i*(CARD_W+GAP);
+const SHOW=[B.ledger+.15, B.ledger+.75, B.ledger+1.35, B.ledger+1.95];
+
+function drawUI(t){
+  // thesis lines - hard cuts, never cross-dissolves
+  fade(L[0], k(t,.35,1.05) * (1-k(t,B.freeze-.02,B.freeze)));
+  fade(L[1], k(t,B.freeze+.15,B.freeze+.55) * (1-k(t,B.ledger-.02,B.ledger)));
+  fade(L[2], k(t,B.lock+.30,B.lock+.85) * (1-k(t,B.disagree-.02,B.disagree)));
+  fade(L[3], k(t,B.disagree+.20,B.disagree+.70) * (1-k(t,B.lockup-.02,B.lockup)));
+
+  const lg=$("ledger");
+  const out = 1-k(t,B.lockup,B.lockup+.55);
+  lg.style.opacity = String(out);
+  const vis = visibleCount(t);
+
+  for(let i=0;i<4;i++){
+    const c=CARDS[i], u=k(t,SHOW[i],SHOW[i]+.10);
+    const x=cardX(i,vis);
+    const s=1+0.055*(1-eOut5(u));
+    c.style.opacity=String(u);
+    c.style.transform=`translate(${x}px,${(1-u)*14}px) scale(${s})`;
+    // the falsifier flares when the result refuses to be impressive
+    if(i===1){
+      const fl=k(t,B.disagree+.18,B.disagree+.30)*(1-k(t,B.disagree+.30,B.disagree+.95));
+      c.style.boxShadow = fl>0.01 ? `0 0 ${34*fl}px rgba(217,83,79,${.55*fl})` : "none";
+    }
+  }
+  const c5=CARDS[4], u5=k(t,B.lock+.10,B.lock+.22);
+  c5.style.opacity=String(u5);
+  c5.style.transform=`translate(${cardX(4,vis)}px,${(1-u5)*14}px)`;
+
+  // protocol bar: frozen before the result exists
+  const p=$("protocol"), pu=k(t,B.lock+.55,B.lock+.95);
+  p.style.left=((W-spanOf(vis))/2)+"px"; p.style.width=spanOf(vis)+"px";
+  p.style.opacity=String(pu*out);
+  const clack = t>=B.lock+1.35 && t<B.lock+1.42;
+  p.style.borderColor = clack ? "rgba(237,242,247,.92)" : "rgba(237,242,247,.20)";
+
+  // the result
+  const v=$("verdict"), vu=k(t,B.disagree+.20,B.disagree+.40);
+  v.style.opacity=String(vu);
+  const injected = (typeof window.__VERDICT === "object" && window.__VERDICT);
+  const second = t >= B.disagree+1.30;
+  if (injected){
+    v.querySelector(".v").textContent = String(injected.state||"");
+    v.querySelector(".s").textContent = String(injected.detail||"");
+    v.querySelector(".v").style.color = injected.color || COL.pale;
+    $("illus").style.opacity="0";
+    $("p-res").textContent = "observed";
+  } else {
+    v.querySelector(".v").textContent = second ? "NEXT EXPERIMENT" : "INCONCLUSIVE";
+    v.querySelector(".s").textContent = second
+      ? "pre-registered\nwindow: 8 weeks"
+      : "control not separated\nn below the stop rule";
+    v.querySelector(".s").style.whiteSpace="pre-line";
+    v.querySelector(".v").style.color = second ? COL.cyan : COL.pale;
+    $("illus").style.opacity = String(0.9*vu*(1-k(t,B.lockup,B.lockup+.3)));
+    $("p-res").textContent = t>=B.disagree+.2 ? "observed" : "not yet observed";
+  }
+
+  // lockup
+  const lk=$("lockup"), lu=eOut(k(t,B.lockup+.35,B.lockup+1.25));
+  lk.style.opacity=String(lu*(1-k(t,DUR-.25,DUR)));
+  lk.style.transform=`translateY(${(1-lu)*16}px)`;
+  const bw=eOut5(k(t,B.lockup+.55,B.lockup+1.55));
+  $("bar").style.width=(620*bw)+"px";
+}
+function fade(el,v){ el.style.opacity=String(clamp(v,0,1)); }
+
+/* ---- clock -------------------------------------------------------------- */
+function frame(t){ drawWorld(t); drawUI(t); }
+window.__seek = t => { frame(clamp(+t,0,DUR)); };
+window.__duration = DUR;
+
+if (!CAPTURE){
+  const fit=()=>{ const s=Math.min(innerWidth/W,innerHeight/H);
+    const st=$("stage"); st.style.transform=`scale(${s})`;
+    st.style.left=((innerWidth-W*s)/2)+"px"; st.style.top=((innerHeight-H*s)/2)+"px"; };
+  addEventListener("resize",fit); fit();
+  let t0=null;
+  const loop=ts=>{ if(t0===null)t0=ts; const t=(ts-t0)/1000;
+    frame(Math.min(t,DUR)); if(t<DUR) requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  addEventListener("click",()=>{ t0=null; requestAnimationFrame(loop); });
+} else {
+  frame(0);
+}
+</script>
