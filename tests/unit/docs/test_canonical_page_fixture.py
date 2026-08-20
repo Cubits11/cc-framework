@@ -5,6 +5,12 @@ browser and compares it against a digest recorded in the deterministic claim
 governance capsule. If the capsule is regenerated and the page is not updated,
 the page would show a legitimate artifact failing closed - an honest-looking
 screen making a false statement. These tests fail first instead.
+
+What these tests do NOT establish: they check internal consistency between the
+page, the fixture, and the manifest. They cannot tell a measured input from an
+asserted one. Changing the capsule's declared input and regenerating the chain
+passes every guard here and in the capsule integration test - see CH-001 in
+docs/research/epistemic-program/challenges.md.
 """
 
 from __future__ import annotations

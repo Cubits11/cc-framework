@@ -14,6 +14,7 @@ Evidence must finish the answer.
 | Treatment | [DIRECTORS_CUT.md](DIRECTORS_CUT.md) - beats, color law, voiceover, sound, production rules |
 | Source | [film.html](film.html) - the film itself, one self-contained file |
 | Render | [render_film.py](render_film.py) - deterministic frame capture and encode |
+| Clip | [render_check_clip.py](render_check_clip.py) - Surface B, the ten-second `BYTES MATCH → FAIL CLOSED` clip, driven against the real page |
 | Chamber | Chamber 00 of the [Claim Observatory](../claim_observatory/WORLD_BIBLE_V3.md) |
 | Method | [Future Expansion](../../docs/research/future-expansion/README.md) - the research package the film dramatizes |
 | Page | [Canonical page](../canonical_page/index.html) - the film, transcript, ledger, limits strip, and one real check |

@@ -97,6 +97,7 @@ The experiment flow is illustrated in
 * [Audit and Evidence Boundaries](architecture/AUDIT_EVIDENCE_BOUNDARIES.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
 * [Future Expansion: Epistemic Research Upgrade](research/future-expansion/README.md)
+* [The Epistemic Program](research/epistemic-program/README.md)
 * [Public Positioning](product/PUBLIC_POSITIONING.md)
 * [Experiments Guide](experiments-guide.md)
 * [Reproducibility Notes](reproducibility.md)

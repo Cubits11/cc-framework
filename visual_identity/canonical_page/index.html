@@ -192,6 +192,7 @@
       <li>A digest match is not a statement about study design, sampling, labelling, or interpretation.</li>
       <li>The film reports no measurement. Its result card is an illustration unless a real verdict was injected, and it labels itself when it is.</li>
       <li>The source ledger does not establish that its source is accurate, predictive, or causal — only what may and may not be inferred from it.</li>
+      <li>Reproducing this capsule from its declared inputs does not establish that those inputs were measured. We forged our own verified page to check, and it worked — <a href="../../docs/research/epistemic-program/challenges.md">CH-001</a>.</li>
       <li>No claim here has been externally reproduced yet. When it is, the discrepancies get published too.</li>
     </ul>
   </section>
@@ -225,7 +226,11 @@
       <b>command</b> &nbsp; sha256sum examples/claim_governance_capsule/expected/calibration.json<br>
       <b>limitation</b> &nbsp; Integrity only. This does not establish that 0.041666666667 is
       the true false-positive rate, that the calibration was well designed, that the
-      population was representative, or that any system is safe.
+      population was representative, or that any system is safe.<br>
+      <b>and one level up</b> &nbsp; The capsule this fixture comes from reproduces deterministically
+      from its declared inputs. That is not the same as those inputs having been measured. We
+      changed an input, regenerated the whole chain, and every guard stayed green over a number
+      we invented — <a href="../../docs/research/epistemic-program/challenges.md">CH-001</a>.
     </div>
   </section>
 
