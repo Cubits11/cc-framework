@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from cc.evidence.claim_governance import GovernanceVerdict, verify_claim_governance
+from cc.reporting.canonical import strict_json_loads
 from cc.reporting.report import (
     CLAIM_LEVEL_DESCRIPTIONS,
     CLAIM_LEVELS,
@@ -237,7 +238,10 @@ def _cmd_verify_claim_governance(args: argparse.Namespace) -> int:
 def _read_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"JSON input not found: {path}")
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    # strict_json_loads, not json.loads: a repeated key would otherwise be
+    # silently resolved last-wins, and the receipt computed over the survivor
+    # would attest to a document the sender did not send (finding F-07).
+    payload = strict_json_loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return payload

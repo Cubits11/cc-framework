@@ -116,6 +116,13 @@ test = [
   "pandas>=2.2",
   "matplotlib>=3.8",
   "scikit-learn>=1.3",
+  # tests/unit/packaging/ subprocesses `python -m build --no-isolation`, which
+  # needs the build frontend and the setuptools backend present in the same
+  # environment. Without these three the declared test extra cannot run the
+  # test suite (upgrade finding F-01).
+  "build>=1.2",
+  "setuptools>=69",
+  "wheel",
 ]
 
 security = [
@@ -133,6 +140,7 @@ all = [
 cc-bundle = "cc.core.evidence_bundle:main"
 cc-cartographer = "cc.cartographer.cli:main"
 cc-dependence-bench = "cc.evals.dependence_benchmark:main"
+cc-guard = "cc.cli.guard:main"
 cc-report = "cc.reporting.cli:main"
 
 [project.urls]

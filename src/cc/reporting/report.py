@@ -45,14 +45,15 @@ from pydantic import (
 )
 
 from cc import __version__ as framework_version_default
-from cc.reporting.canonical import sha256_canonical
+from cc.reporting.canonical import DEFAULT_PROFILE, sha256_canonical
 
 SCHEMA_VERSION = "cc.report.v0.3.1"
 HASH_ALGORITHM = "sha256"
-CANONICALIZATION_METHOD = (
-    "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); "
-    "receipt.canonical_hash excluded"
-)
+#: Profile written into new receipts. Reports produced before the RFC 8785
+#: migration carry the legacy profile instead, and verification dispatches on
+#: whichever profile the receipt itself declares -- see
+#: ``docs/architecture/CANONICAL_PROFILE.md``.
+CANONICALIZATION_METHOD = DEFAULT_PROFILE
 
 # Report maturity/support labels.
 #
@@ -323,9 +324,13 @@ class ClaimSummaryModel(_StrictReportModel):
 class ReportReceiptModel(_StrictReportModel):
     canonical_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     hash_algorithm: Literal["sha256"]
+    #: Both profiles are accepted on read. New reports are written with
+    #: the RFC 8785 profile; the legacy one appears only on pre-migration receipts,
+    #: which must stay verifiable.
     canonicalization_method: Literal[
+        "cc.canonical.v2/RFC8785; receipt.canonical_hash excluded",
         "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); "
-        "receipt.canonical_hash excluded"
+        "receipt.canonical_hash excluded",
     ]
     previous_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
@@ -384,11 +389,17 @@ class CCReport(_StrictReportModel):
                 + ", ".join(overclaims)
             )
 
-        computed_hash = sha256_canonical(payload)
+        # Dispatch on the profile the receipt declares, not on the current
+        # default. Recomputing a pre-migration receipt under RFC 8785 would
+        # report a mismatch for a report that is in fact intact, which is the
+        # opposite of what a receipt is for.
+        computed_hash = sha256_canonical(payload, profile=self.receipt.canonicalization_method)
         if computed_hash != self.receipt.canonical_hash:
             raise ValueError(
                 "receipt.canonical_hash does not match canonical report payload: "
-                f"expected {self.receipt.canonical_hash}, computed {computed_hash}"
+                f"expected {self.receipt.canonical_hash}, computed {computed_hash} "
+                f"under canonicalization profile "
+                f"{self.receipt.canonicalization_method!r}"
             )
         return self
 

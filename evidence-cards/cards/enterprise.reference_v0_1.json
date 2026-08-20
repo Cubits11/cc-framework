@@ -1,0 +1,68 @@
+{
+  "artifacts": [
+    {
+      "bytes": 7871,
+      "missing": false,
+      "path": "docs/validation_matrix.md",
+      "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+    },
+    {
+      "bytes": 18487,
+      "missing": false,
+      "path": "docs/release/V0_3_RC1_CHECKLIST.md",
+      "sha256": "87cbba56c855c978f37d31c63f6354b025c5cb8a2e37bebc944e4a2f0794dc3f"
+    },
+    {
+      "bytes": 16907,
+      "missing": false,
+      "path": "src/cc/enterprise/aws_reference.py",
+      "sha256": "f9138cd1d0cd1eaa2b5db0b1be5b95f0ff507a3081cec4a4aa7cad9bcdaaa9d4"
+    },
+    {
+      "bytes": 5144,
+      "missing": false,
+      "path": "infra/lambda/verify_handler.py",
+      "sha256": "d1bbcefddda9c91578ac9d4d6fda9113da6fccbd965cd42c49b7592f602e8ee2"
+    },
+    {
+      "bytes": 634,
+      "missing": false,
+      "path": "apps/dashboard/scripts/require-enterprise-bundle.mjs",
+      "sha256": "013caae404ca3b0ed3557dc61bb1887d4708f1f0d6803499702444f1f12414c5"
+    }
+  ],
+  "assumptions": [
+    "moto emulates the AWS behaviours under test faithfully enough for the checks performed.",
+    "Emulated evidence is never live evidence, and no live-AWS claim rests on this lane."
+  ],
+  "card_id": "enterprise.reference_v0_1",
+  "claim": "Enterprise Reference v0.1 is an experimental evidence-integrity reference architecture with moto-backed smoke tests.",
+  "command": [
+    "make enterprise-smoke",
+    "PYTHONPATH=src .venv/bin/pytest tests/integration/test_enterprise_aws_emulation.py tests/e2e/test_enterprise_smoke.py -q"
+  ],
+  "counterevidence": [],
+  "falsifier": "An enterprise emulation run that reports success while omitting a KMS verification or object-integrity check the reference claims to perform.",
+  "label_meanings": {
+    "evidence_state": "Produced against synthesized or emulated AWS, not a live account. Synthetic evidence is never live evidence.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "aws-synth-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C0/C2",
+  "non_claims": [
+    "Not enterprise-ready.",
+    "Not live-AWS proof.",
+    "Not compliance certification.",
+    "Not deployment safety."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "7e007eaac73f562ee259d3457caee802f891ebdd-dirty",
+  "supersedes": null
+}

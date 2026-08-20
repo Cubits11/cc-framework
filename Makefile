@@ -113,6 +113,7 @@ GOV_CAPSULE_TESTS    := tests/integration/test_claim_governance_capsule.py
 	dev install setup init lock deps \
 	fmt lint type security package-build \
 	test test-unit test-int test-kernel test-release test-reporting test-week3 test-week6 cov bench \
+	conformance differential acceptance test-compose canon-probe evidence-cards \
 	check-artifact-boundary check-repro-clean \
 	enterprise-smoke \
 	reproduce-smoke reproduce-mvp reproduce-figures figures reports ccc \
@@ -301,6 +302,41 @@ test-release: test-kernel
 
 test-reporting: install
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/reporting -q
+
+# --- cross-implementation agreement (upgrade workstream W5) -----------------
+# Agreement here establishes that two implementations of one specification
+# compute the same values. It does NOT establish that either is correct: both
+# were authored in this project and can share a misreading of the spec.
+
+conformance: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/build_conformance_corpus.py --check
+	node verifiers/node/cc_compose_verify.mjs
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/conformance -q
+
+differential: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/differential_compose.py --cases 4000 --seed 1
+
+# The acceptance gate for consumability: an external consumer's PUBLISHED
+# four-control result, reproduced from cc.compose. Not "the API exists" --
+# their numbers, from this library.
+acceptance: install
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/acceptance -q
+
+test-compose: install
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/compose tests/unit/cli -q
+	$(VENV_DIR)/bin/ruff check src/cc/compose src/cc/cli/guard.py
+
+# Reproduces the S1 canonicalization findings. Exits non-zero while any
+# unintended-kernel class remains, so the findings stay falsifiable.
+# Evidence cards for an external Atlas. The committed cards are the not-run
+# scaffold: verdicts are host-specific and must not be published from a laptop.
+evidence-cards: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/build_evidence_cards.py --check
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/evidence_card -q
+
+canon-probe: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/canonicalization_probe.py
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/canonical -q
 
 test-week3: install
 	$(ACT); pytest -q --disable-warnings \

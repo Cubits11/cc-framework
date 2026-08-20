@@ -1,7 +1,7 @@
 {
   "schema_version": "cc.claim_boundary_manifest.v0.1",
   "generated_for": "cc-framework",
-  "purpose": "Map public CC-Framework claims to evidence, validation lanes, supporting files, tests or commands, and explicit non-claims so that public communication remains evidence-bound.",
+  "purpose": "Map public CC-Framework claims to evidence, validation lanes, supporting files, tests or commands, and explicit non-claims so that public communication remains evidence-bound. Every claim additionally carries a falsifier, its assumptions, and an evidence state, so that it can be rendered as an evidence card without the renderer inventing any of them.",
   "claim_levels": {
     "C0": "Repository Metadata Claim: basic facts about files, docs, package metadata, or repository organization.",
     "C1": "Structural Validation Claim: a schema, report, or artifact conforms to declared validation rules.",
@@ -24,7 +24,7 @@
         "src/cc/kernel/sensitivity.py"
       ],
       "supporting_tests_or_commands": [
-        "tests/unit/kernel/test_classical_frechet_special_cases.py",
+        "pytest tests/unit/kernel/test_classical_frechet_special_cases.py",
         "make test-kernel"
       ],
       "non_claims": [
@@ -32,7 +32,15 @@
         "Does not prove deployment safety.",
         "Does not prove marginals are representative."
       ],
-      "risk_if_overstated": "Could be misrepresented as a safety certification or as evidence that exact singleton marginals identify the true deployment risk."
+      "risk_if_overstated": "Could be misrepresented as a safety certification or as evidence that exact singleton marginals identify the true deployment risk.",
+      "evidence_state": "local-only",
+      "falsifier": "A marginal configuration in which identified_region returns an interval differing from max(0, sum(p) - (m-1)) and min(p) by more than the declared solver tolerance.",
+      "assumptions": [
+        "Exact singleton marginals are supplied; they are not estimated here.",
+        "No side constraints beyond the marginals.",
+        "Finite binary atom space with deterministic atom ordering.",
+        "IEEE-754 double arithmetic; agreement is asserted only to the declared tolerance."
+      ]
     },
     {
       "id": "kernel.identified_interval",
@@ -46,8 +54,8 @@
         "docs/api.md"
       ],
       "supporting_tests_or_commands": [
-        "tests/unit/kernel/test_sensitivity.py",
-        "tests/unit/kernel/test_monotonic_tightening.py",
+        "pytest tests/unit/kernel/test_sensitivity.py",
+        "pytest tests/unit/kernel/test_monotonic_tightening.py",
         "make test-kernel"
       ],
       "non_claims": [
@@ -55,7 +63,14 @@
         "Does not validate semantic safety.",
         "Does not establish representativeness."
       ],
-      "risk_if_overstated": "Could turn a conditional mathematical identification result into an unsupported empirical or deployment claim."
+      "risk_if_overstated": "Could turn a conditional mathematical identification result into an unsupported empirical or deployment claim.",
+      "evidence_state": "local-only",
+      "falsifier": "A feasible atom distribution whose query value falls outside the reported interval, or a value strictly inside the interval attained by no feasible distribution.",
+      "assumptions": [
+        "The constraint set defines a nonempty feasible polytope.",
+        "Constraints and the query are linear in the atom probabilities.",
+        "The LP solver reports optimal status rather than a tolerance-limited stop."
+      ]
     },
     {
       "id": "kernel.finite_sample_outer_interval",
@@ -70,15 +85,23 @@
         "src/cc/kernel/sensitivity.py"
       ],
       "supporting_tests_or_commands": [
-        "tests/unit/kernel/test_finite_sample_constraints.py",
-        "tests/unit/kernel/test_sample_complexity.py",
+        "pytest tests/unit/kernel/test_finite_sample_constraints.py",
+        "pytest tests/unit/kernel/test_sample_complexity.py",
         "make test-kernel"
       ],
       "non_claims": [
         "Not valid after uncorrected adaptive target selection.",
         "Not a deployment certificate."
       ],
-      "risk_if_overstated": "Could imply finite-sample uncertainty handling proves future behavior or deployment safety outside the named assumptions."
+      "risk_if_overstated": "Could imply finite-sample uncertainty handling proves future behavior or deployment safety outside the named assumptions.",
+      "evidence_state": "local-only",
+      "falsifier": "A simulation under the stated iid Bernoulli sampling in which count-derived intervals cover the true query value at a rate materially below the nominal level.",
+      "assumptions": [
+        "Labels and the query are fixed before the data are seen.",
+        "Counts are iid Bernoulli draws from the target population.",
+        "Moment coverage holds simultaneously across constraints.",
+        "The exact assumptions supplied to the LP are true of that population."
+      ]
     },
     {
       "id": "reporting.receipt_integrity",
@@ -95,8 +118,8 @@
         "src/cc/evidence/anchoring.py"
       ],
       "supporting_tests_or_commands": [
-        "tests/unit/reporting/test_reporting.py",
-        "tests/unit/evidence/test_transparency_log_adversarial.py",
+        "pytest tests/unit/reporting/test_reporting.py",
+        "pytest tests/unit/evidence/test_transparency_log_adversarial.py",
         "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence tests/unit/reporting"
       ],
       "non_claims": [
@@ -106,7 +129,14 @@
         "Does not prove compliance.",
         "Does not prove safety."
       ],
-      "risk_if_overstated": "Could convert byte integrity or provenance into an unsupported empirical validity, compliance, or safety claim."
+      "risk_if_overstated": "Could convert byte integrity or provenance into an unsupported empirical validity, compliance, or safety claim.",
+      "evidence_state": "local-only",
+      "falsifier": "Two byte-distinct payloads that a consumer needs distinguished receiving the same canonical hash, or a payload whose recomputed hash differs from its receipt while its bytes are unchanged.",
+      "assumptions": [
+        "SHA-256 remains collision resistant.",
+        "The canonicalization profile named on the receipt is the one used to verify it.",
+        "Receipt-covered JSON is read with strict duplicate-key rejection."
+      ]
     },
     {
       "id": "evidence.non_claim_boundaries",
@@ -130,7 +160,13 @@
       "non_claims": [
         "Does not prevent bad-faith actors from making misleading claims outside the framework."
       ],
-      "risk_if_overstated": "Could imply documentation controls alone prevent institutional overclaiming or misuse outside the repository."
+      "risk_if_overstated": "Could imply documentation controls alone prevent institutional overclaiming or misuse outside the repository.",
+      "evidence_state": "local-only",
+      "falsifier": "An evidence-bound claim package that passes verify-claim-governance while omitting a non-claim its declared evidence roles require.",
+      "assumptions": [
+        "The producer declares evidence roles honestly; the verifier checks structure, not sincerity.",
+        "The v0 non-claims engine detects the intended substance rather than only exact strings."
+      ]
     },
     {
       "id": "release.paper_core_v0_3_rc1",
@@ -155,7 +191,13 @@
       "non_claims": [
         "Does not promote enterprise, dashboard, vendor, cloud, or experimental lanes into paper core."
       ],
-      "risk_if_overstated": "Could present a release-candidate paper-core boundary as whole-repository production quality."
+      "risk_if_overstated": "Could present a release-candidate paper-core boundary as whole-repository production quality.",
+      "evidence_state": "local-only",
+      "falsifier": "A paper artifact that reproduce_paper.py regenerates with different bytes, or a theorem-ledger row whose named test does not exist or does not exercise the stated implementation.",
+      "assumptions": [
+        "The pinned environment and seeds reproduce the recorded run.",
+        "Artifact determinism is a property of this host and toolchain, not of the mathematics."
+      ]
     },
     {
       "id": "enterprise.reference_v0_1",
@@ -180,7 +222,13 @@
         "Not compliance certification.",
         "Not deployment safety."
       ],
-      "risk_if_overstated": "Could imply a moto-backed reference path is production infrastructure, live-cloud validation, compliance certification, or deployment safety."
+      "risk_if_overstated": "Could imply a moto-backed reference path is production infrastructure, live-cloud validation, compliance certification, or deployment safety.",
+      "evidence_state": "aws-synth-only",
+      "falsifier": "An enterprise emulation run that reports success while omitting a KMS verification or object-integrity check the reference claims to perform.",
+      "assumptions": [
+        "moto emulates the AWS behaviours under test faithfully enough for the checks performed.",
+        "Emulated evidence is never live evidence, and no live-AWS claim rests on this lane."
+      ]
     },
     {
       "id": "open_core.strategy",
@@ -199,7 +247,13 @@
         "Does not make the project a product today.",
         "Does not claim enterprise readiness."
       ],
-      "risk_if_overstated": "Could turn a strategic boundary document into an unsupported claim that a commercial product already exists."
+      "risk_if_overstated": "Could turn a strategic boundary document into an unsupported claim that a commercial product already exists.",
+      "evidence_state": "local-only",
+      "falsifier": "A module the strategy document places in the open core that is absent from the published wheel, or an importable wheel surface classified nowhere in docs/api.md.",
+      "assumptions": [
+        "The wheel built in CI is the artifact the strategy describes.",
+        "Classification in docs/api.md is kept current by the packaging boundary test."
+      ]
     }
   ],
   "forbidden_upgrades": [

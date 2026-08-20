@@ -20,22 +20,22 @@
       "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014"
     },
     {
-      "bytes": 4702,
+      "bytes": 4642,
       "filename": "cc_report.json",
       "role": "cc_report",
-      "sha256": "faad40a4f2018b2031593452c32c8f1e33fe8d139fe7b96c4b158f41961ff012"
+      "sha256": "1b146071b42260efd2965b93ca5f2b50c926150aa70b7f20fa6cfc60fb245bf5"
     },
     {
       "bytes": 21103,
       "filename": "claim_envelope.json",
       "role": "claim_envelope",
-      "sha256": "2f686a9b0e095f19f4af6ca7d36f4c7ed19e386bc8f83d1412f83b3eeaa75658"
+      "sha256": "130c53195c2ebd2be37aebfc5fb9a4e22e29e74d1e8984f0a744a0f1a3192e9d"
     },
     {
       "bytes": 13150,
       "filename": "claim_governance_audit.json",
       "role": "claim_governance_audit",
-      "sha256": "9af0d97908983987051b78703fc7c7b13caea859202fff307daaeb9061cf0498"
+      "sha256": "cf9f6c659f9f99581f975e9bbb81e9b3ee116ec3582d3136a848cfabb3f4ec7a"
     },
     {
       "bytes": 3712,
@@ -59,13 +59,13 @@
       "bytes": 4559,
       "filename": "extremal_lower.json",
       "role": "extremal_scenario",
-      "sha256": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f"
+      "sha256": "bb9e9cf4e1aec1aef6e670c06e10bad89cb96ccdb7222d1ec3919e79b3c7a120"
     },
     {
       "bytes": 4557,
       "filename": "extremal_upper.json",
       "role": "extremal_scenario",
-      "sha256": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3"
+      "sha256": "f2aaf4d8b700069449f3364068fc024f28f718173aa9f9312137b29788541925"
     }
   ],
   "fixed_now": "2026-01-02T00:00:00Z",
@@ -85,7 +85,7 @@
   ],
   "pass_caveat": "PASS means internal consistency under verifier rules; it does not mean the AI system is safe in deployment.",
   "report_id": "cc-claim-governance-capsule",
-  "report_receipt_sha256": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
+  "report_receipt_sha256": "78242a02a5af310883110c3692c8f477418e63d59b69487792ae7a579ce6d5de",
   "schema_version": "cc.claim_governance_capsule_manifest.v1",
   "seed": 314159
 }

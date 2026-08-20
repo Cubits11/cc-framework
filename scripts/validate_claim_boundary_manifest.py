@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
-
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "docs" / "claims" / "claim_boundary_manifest.v0.1.json"
@@ -29,7 +29,16 @@ CLAIM_REQUIRED = {
     "supporting_tests_or_commands",
     "non_claims",
     "risk_if_overstated",
+    # Required so every claim can be rendered as an evidence card without the
+    # renderer inventing anything. A claim with no falsifier is an assertion.
+    "evidence_state",
+    "falsifier",
+    "assumptions",
 }
+
+#: Where a claim's evidence came from. Mirrors cc.evidence_card.EVIDENCE_STATES;
+#: a test asserts the two lists agree.
+EVIDENCE_STATES = ("local-only", "aws-synth-only", "aws-live", "illustrative")
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> dict[str, Any]:
@@ -94,6 +103,34 @@ def validate_manifest(manifest: dict[str, Any], root: Path = ROOT) -> list[str]:
         tests = claim.get("supporting_tests_or_commands")
         if not isinstance(tests, list) or not tests:
             errors.append(f"{claim_id}: supporting_tests_or_commands must be a non-empty list")
+        else:
+            # Path-like tokens in a command must resolve. A renamed test would
+            # otherwise leave the claim pointing at nothing.
+            for entry in tests:
+                if not isinstance(entry, str) or not entry.strip():
+                    errors.append(f"{claim_id}: command entries must be non-empty strings")
+                    continue
+                for token in re.findall(r"(?:tests|src|scripts|examples)/[\w/.\-]+", entry):
+                    if not (root / token.split("::")[0]).exists():
+                        errors.append(f"{claim_id}: command names a missing path: {token}")
+
+        evidence_state = claim.get("evidence_state")
+        if evidence_state not in EVIDENCE_STATES:
+            errors.append(
+                f"{claim_id}: evidence_state must be one of {EVIDENCE_STATES}, "
+                f"got {evidence_state!r}"
+            )
+
+        falsifier = claim.get("falsifier")
+        if not isinstance(falsifier, str) or not falsifier.strip():
+            errors.append(
+                f"{claim_id}: falsifier must be a non-empty string. A claim no "
+                "observation could refute is an assertion, not evidence."
+            )
+
+        assumptions = claim.get("assumptions")
+        if not isinstance(assumptions, list) or not assumptions:
+            errors.append(f"{claim_id}: assumptions must be a non-empty list")
 
     forbidden_upgrades = manifest.get("forbidden_upgrades")
     if not isinstance(forbidden_upgrades, list) or not forbidden_upgrades:
