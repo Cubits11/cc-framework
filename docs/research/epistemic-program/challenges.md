@@ -77,15 +77,95 @@ rung 4 of the ladder in
 - Closing rung 4 requires an anchor outside the repository. There is none today,
   and the documents now say so rather than implying otherwise.
 
-## Open
-
 ### CH-002 — Close rung 4
 
-Propose a mechanism that would let an outside reviewer distinguish a measured
-input from an asserted one, without requiring them to trust the author. Signature
-over the input at collection time, an independent measuring party, a
-transparency log outside the author's control — or an argument that no
-repository-local mechanism can do it, which would also be a result.
+**Challenge.** Propose a mechanism that would let an outside reviewer
+distinguish a measured input from an asserted one, without requiring them to
+trust the author.
+
+**Answer: no repository-local mechanism can, and the reason is uncomfortable —
+deterministic reproducibility is what makes the forgery cheap.**
+
+#### The argument
+
+Let `R` be a repository controlled by author `A`, and let `V` be any
+verification procedure whose inputs are entirely contained in `R`. `V` cannot
+distinguish "input `x` was measured" from "input `x` was asserted by `A`".
+
+`V` is a function of `R`'s contents, so `A` can compute it. To place a chosen
+value `x'` into a state that `V` accepts, `A` does not need to invert anything:
+the generator's outputs are a deterministic function of its inputs, and the
+checks verify exactly that functional relationship. So `A` edits `x'`,
+regenerates, and `V(R') = holds` by construction. CH-001 is this argument
+executed rather than asserted.
+
+The uncomfortable part is that the property being exploited is the one we want.
+Reproducibility guarantees that a change to an input propagates consistently
+through every downstream artifact, hash, and receipt. That is exactly why the
+capsule is valuable — and it applies to honest and dishonest inputs equally:
+
+> **Reproducibility amplifies consistency, not truth.**
+
+A less reproducible pipeline would be *harder* to forge coherently, and worse in
+every other respect. This is not an argument against reproducible builds. It is
+an argument for knowing which of the two things they establish.
+
+#### One cheap partial defence, and its limit
+
+`realized_fpr` is `0.041666666667`, which is exactly `1/24`. The capsule ships
+`inputs/failure_matrix.csv`, which has exactly 24 rows. The declared statistic
+has a denominator structure matching the declared sample size — but nothing
+checks the relationship, because the summary is a *declared input* rather than a
+*derived* one.
+
+CH-001's forgery set it to `0.011111111111`, which is `1/90`. That is not
+expressible as a count over 24 observations. A **derivability check** — requiring
+declared statistics to be expressible over the declared sample size — would have
+caught it, costs almost nothing, and needs no external party.
+
+It does not close rung 4. An attacker who picks `2/24` instead of `1/90` passes.
+It raises the cost of forgery from *any number* to *any number consistent with
+the declared n*, which is a real improvement and a bounded one.
+
+**It is deliberately not implemented.** The columns of the failure matrix give
+rates of 9/24, 12/24, and 9/24; none is 1/24. So `realized_fpr` is plausibly a
+false-positive count over the same 24 prompts, and plausibly a quantity from a
+different sample that happens to share a denominator. Implementing a check that
+assumes the first reading would encode an unverified assumption about what the
+field means — the same error class this whole program is about, committed in the
+act of defending against it. The correct next step is to establish what the field
+denotes, then check it.
+
+#### What would actually close it
+
+Ranked by cost, each closing a different threat:
+
+| Anchor | Closes | Leaves open |
+| --- | --- | --- |
+| Timestamp the input at collection (RFC 3161, a transparency log) | Fabricating or revising an input *after seeing results* | Fabricating it at collection time |
+| Signature by the measuring instrument or a second party | Binding the value to someone other than its writer | Trust in that party |
+| Independent replication | Measurement itself | Nothing — but it is a social process, not a mechanism |
+
+Only the third establishes measurement, and it is definitionally not
+repository-local. The first is the cheapest and maps precisely onto
+preregistration: freeze the protocol, and the input, before the observation.
+
+#### Convergence worth noting
+
+This is the same shape as the attestation boundary in the
+[eight-week plan](../future-expansion/eight-week-plan.md): an enclave attests a
+measurement, App Attest validates an app instance, C2PA binds an assertion to an
+artifact — and none of them establishes that the assertion is true. Rung 4 is
+that boundary, met from the reproducible-build direction instead of the
+hardware-attestation direction. Two tracks, one wall.
+
+#### Status
+
+Partially answered. The impossibility argument is stated and demonstrated; the
+anchors are named and **none is implemented**. CH-002 stays open for anyone who
+can refute the argument or implement the first anchor.
+
+## Open
 
 ### CH-003 — Make the film show something false
 

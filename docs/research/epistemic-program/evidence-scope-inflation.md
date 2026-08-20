@@ -109,10 +109,12 @@ Four things make that happen in practice:
    reserved words rejected by the report validator, a language quarantine over
    paper prose, forbidden *upgrades* enumerated in the claim manifest.
 4. **An external anchor, or an honest admission that there is none.** Rung 4
-   cannot be closed from inside the repository. It needs a signature over the
-   input at collection time, an independent party who performed the measurement,
-   or a transparency log outside the author's control. Until one exists, the
-   correct move is to say so — which is what this document does.
+   cannot be closed from inside the repository — [CH-002](challenges.md) gives
+   the argument and the reason: deterministic regeneration lets the author
+   construct any state a local check accepts, so reproducibility amplifies
+   consistency rather than truth. Closing it needs a timestamp at collection, a
+   second party who measured, or independent replication. None is implemented
+   here, and the correct move until one is, is to say so.
 
 ## What this is not
 

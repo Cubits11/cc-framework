@@ -70,9 +70,15 @@ argument, and it is the only thing the release asks for.
 
 ## The next artifact
 
-CH-002: close rung 4, or establish that no repository-local mechanism can. It is
-the highest-value open question in the program, it came out of attacking our own
-work, and either outcome is publishable.
+CH-002 was attempted in the same session and came back with the second outcome:
+no repository-local mechanism can distinguish a measured input from an asserted
+one, because deterministic regeneration lets the author construct any state the
+checks accept. Reproducibility amplifies consistency, not truth.
+
+So the next artifact is the cheapest anchor from that write-up — timestamping an
+input at collection, outside the author's control — plus establishing what
+`realized_fpr` actually denotes, which is a prerequisite for the derivability
+check that was deliberately left unimplemented.
 
 ## Frozen
 
