@@ -186,6 +186,50 @@ The kernel's intervals should tighten monotonically as constraints are added.
 Find declared evidence whose addition makes the reported interval wider, or an
 argument for why the monotonicity test does not cover a real case.
 
+### CH-006 — A docstring contract, falsified by a property test
+
+**Not opened by us.** Hypothesis found it while the full suite was running at
+the end of this session, and it is recorded here because a challenge programme
+that only publishes the challenges it chose is not a challenge programme.
+
+`ModelBase.migrate()` is documented as best-effort, and its test states the
+contract explicitly:
+
+> migrate() should be best-effort and never throw on arbitrary old dicts.
+
+It throws. Given `{"updated_at": ""}` it raises a `ValidationError`, because
+`migrate()` passes arbitrary values straight into `model_validate` and
+`updated_at` carries a validator that rejects a non-numeric timestamp.
+
+| Fact | Status |
+| --- | --- |
+| Reproduces on `main` | Yes, identically — verified in a detached worktree |
+| Touched by this branch | No. `src/cc/core/models.py` is unmodified here |
+| Deterministic in CI | No. The failing example lives in a gitignored `.hypothesis/` database, so CI may or may not draw it |
+
+#### The interesting part
+
+The obvious fix — make `migrate()` swallow invalid values for known fields — is
+**silent repair**, which this repository rejects everywhere else. The report
+validator refuses rather than repairing. The governance verifier fails closed.
+A migration that quietly drops a malformed timestamp would hide exactly the kind
+of data problem the rest of the codebase is built to surface.
+
+So the defect is plausibly in the *contract*, not the code:
+
+| Option | Effect | Cost |
+| --- | --- | --- |
+| A — make `migrate()` best-effort for real | Honours the docstring | Silent repair; contradicts the repository's fail-closed posture |
+| B — narrow the contract | `migrate()` must not throw on **unknown** keys; a known field with an invalid value fails closed, as it should | Changes a documented contract and a test in the core model layer |
+
+**Recommendation: B**, with the Hypothesis strategy excluding known field names
+and an explicit test asserting that an invalid known field *does* raise.
+
+**Not applied.** This is a semantic decision in the core model layer, made on a
+pre-existing bug that is unrelated to this branch's work. Changing it
+unilaterally would be its own kind of scope inflation — repairing something
+quietly because it was inconvenient to the session's green build.
+
 ## How results are handled
 
 1. Reproduce it here, in a detached worktree, with the commands recorded.
