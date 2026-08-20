@@ -119,6 +119,7 @@ GOV_CAPSULE_TESTS    := tests/integration/test_claim_governance_capsule.py
 	reproduce-paper verify-paper-artifacts paper-smoke \
 	verify-invariants verify-statistics verify-audit \
 	docs docs-serve \
+	film film-ghost-ark \
 	docker-build docker-run \
 	clean distclean \
 	carto-install carto-smoke carto-mvp carto-verify-audit carto-verify-stats carto-suggest \
@@ -471,6 +472,19 @@ docs: install
 
 docs-serve: install
 	$(ACT); mkdocs serve -a 127.0.0.1:8000
+
+# ======================================================================
+# Film
+# ======================================================================
+# "Before You See It" - deterministic 15s film, rendered frame by frame from
+# visual_identity/before_you_see_it/film.html. Needs playwright + a chromium
+# build; see that directory's README.
+
+film: install
+	$(ACT); python visual_identity/before_you_see_it/render_film.py --cut cc-framework
+
+film-ghost-ark: install
+	$(ACT); python visual_identity/before_you_see_it/render_film.py --cut ghost-ark
 
 # ======================================================================
 # Verifications

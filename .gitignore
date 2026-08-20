@@ -58,3 +58,7 @@ protocol_*.jsonl
 
 # Generated bundles and built docs (never track)
 *.zip
+
+# Film render intermediates (the .mp4 masters and posters are tracked; these are not)
+visual_identity/before_you_see_it/renders/.frames-*/
+visual_identity/before_you_see_it/renders/*.webm
