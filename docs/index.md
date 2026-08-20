@@ -96,6 +96,7 @@ The experiment flow is illustrated in
 * [Repository Migration Manifest](release/MIGRATION_MANIFEST.md)
 * [Audit and Evidence Boundaries](architecture/AUDIT_EVIDENCE_BOUNDARIES.md)
 * [CC Reports and Receipts](research/CC_REPORTS.md)
+* [Future Expansion: Epistemic Research Upgrade](research/future-expansion/README.md)
 * [Experiments Guide](experiments-guide.md)
 * [Reproducibility Notes](reproducibility.md)
 
