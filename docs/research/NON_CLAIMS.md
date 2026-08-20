@@ -48,6 +48,9 @@ The project does not claim:
   input and regenerating the chain yields a fully self-consistent capsule, a
   valid receipt, and a PASS verdict over a fabricated value. See
   `docs/research/epistemic-program/challenges.md` (CH-001).
+- A scalar that happens to be expressible over a checked-in row count is not
+  thereby derived from that matrix. The event, population, and numerator must
+  be explicitly declared and checked before any derivation claim is made.
 - A PASS verdict from `cc-report verify-claim-governance` means the
   evidence-bound claim package is internally consistent under the verifier
   rules. It does not mean the AI system is safe in deployment.

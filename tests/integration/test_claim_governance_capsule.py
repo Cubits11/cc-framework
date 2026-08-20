@@ -152,6 +152,160 @@ def test_claim_governance_capsule_temp_copy_regeneration_is_byte_identical(
         ).read_bytes()
 
 
+def test_capsule_marks_current_realized_fpr_as_asserted_not_matrix_derived() -> None:
+    result = run_capsule()
+    assert result.returncode == 0, result.stderr + result.stdout
+
+    calibration = load_json(OUTPUTS / "calibration.json")
+    provenance = calibration["realized_fpr_provenance"]
+
+    assert provenance["schema"] == "cc.calibration.realized-fpr-provenance.v1"
+    assert provenance["field"] == "realized_fpr"
+    assert provenance["semantics"]["status"] == "unresolved"
+    assert provenance["origin"] == {"kind": "asserted"}
+    assert provenance["external_anchor"] is None
+    assert provenance["verification"]["origin"]["status"] == "asserted_not_derivable"
+    assert any("does not infer a numerator" in item.lower() for item in provenance["non_claims"])
+
+
+def test_forged_asserted_calibration_value_remains_regenerable_and_visibly_asserted(
+    tmp_path: Path,
+) -> None:
+    """CH-001 still holds: an asserted upstream value can be regenerated coherently."""
+
+    capsule_root = tmp_path / "asserted-forgery"
+    shutil.copytree(CAPSULE, capsule_root)
+    config_path = capsule_root / "inputs" / "capsule_config.json"
+    config = load_json(config_path)
+    config["calibration"]["realized_fpr"] = 0.011111111111
+    write_json(config_path, config)
+
+    result = run_capsule_at(capsule_root, "--update-expected")
+    assert result.returncode == 0, result.stderr + result.stdout
+
+    calibration = load_json(capsule_root / "outputs" / "calibration.json")
+    provenance = calibration["realized_fpr_provenance"]
+    assert calibration["realized_fpr"] == 0.011111111111
+    assert provenance["origin"] == {"kind": "asserted"}
+    assert provenance["verification"]["origin"]["status"] == "asserted_not_derivable"
+
+
+def test_capsule_checks_opt_in_deterministically_derived_calibration_rate(tmp_path: Path) -> None:
+    capsule_root = tmp_path / "derived-capsule"
+    shutil.copytree(CAPSULE, capsule_root)
+    config_path = capsule_root / "inputs" / "capsule_config.json"
+    config = load_json(config_path)
+    config["calibration"]["realized_fpr"] = 0.375
+    config["calibration"]["realized_fpr_provenance"] = {
+        "schema": "cc.calibration.realized-fpr-provenance.v1",
+        "field": "realized_fpr",
+        "semantics": {
+            "status": "defined",
+            "numerator": "Rows whose guardrail_keyword value equals one.",
+            "denominator": "All checked-in failure-matrix rows.",
+            "population": "The checked-in capsule failure-matrix rows.",
+        },
+        "origin": {
+            "kind": "deterministic_derivation",
+            "algorithm": "binary_column_rate/v1",
+            "source": {
+                "path": "inputs/failure_matrix.csv",
+                "sha256": sha256(capsule_root / "inputs" / "failure_matrix.csv"),
+            },
+            "column": "guardrail_keyword",
+            "inclusion_rule": "all_rows",
+            "exact_result": {"numerator": 9, "denominator": 24},
+            "rendering": {"decimal_places": 12, "rounding": "half_even"},
+        },
+        "external_anchor": None,
+    }
+    write_json(config_path, config)
+
+    result = run_capsule_at(capsule_root, "--update-expected")
+    assert result.returncode == 0, result.stderr + result.stdout
+
+    calibration = load_json(capsule_root / "outputs" / "calibration.json")
+    verification = calibration["realized_fpr_provenance"]["verification"]["origin"]
+    assert verification == {
+        "computed_value": "0.375000000000",
+        "denominator_count": 24,
+        "numerator_count": 9,
+        "source_sha256": sha256(capsule_root / "inputs" / "failure_matrix.csv"),
+        "status": "derivation_verified_from_declared_bytes",
+    }
+
+    config["calibration"]["realized_fpr_provenance"]["origin"]["source"]["sha256"] = "0" * 64
+    write_json(config_path, config)
+    stale_source = run_capsule_at(capsule_root)
+    assert stale_source.returncode == 1
+    assert "source sha256 does not match matrix" in stale_source.stdout
+
+
+def test_capsule_rejects_a_wrong_opt_in_derived_calibration_rate(tmp_path: Path) -> None:
+    capsule_root = tmp_path / "mismatched-derived-capsule"
+    shutil.copytree(CAPSULE, capsule_root)
+    config_path = capsule_root / "inputs" / "capsule_config.json"
+    config = load_json(config_path)
+    config["calibration"]["realized_fpr"] = 0.011111111111
+    config["calibration"]["realized_fpr_provenance"] = {
+        "schema": "cc.calibration.realized-fpr-provenance.v1",
+        "field": "realized_fpr",
+        "semantics": {
+            "status": "defined",
+            "numerator": "Rows whose guardrail_keyword value equals one.",
+            "denominator": "All checked-in failure-matrix rows.",
+            "population": "The checked-in capsule failure-matrix rows.",
+        },
+        "origin": {
+            "kind": "deterministic_derivation",
+            "algorithm": "binary_column_rate/v1",
+            "source": {
+                "path": "inputs/failure_matrix.csv",
+                "sha256": sha256(capsule_root / "inputs" / "failure_matrix.csv"),
+            },
+            "column": "guardrail_keyword",
+            "inclusion_rule": "all_rows",
+            "exact_result": {"numerator": 9, "denominator": 24},
+            "rendering": {"decimal_places": 12, "rounding": "half_even"},
+        },
+        "external_anchor": None,
+    }
+    write_json(config_path, config)
+
+    result = run_capsule_at(capsule_root)
+    assert result.returncode == 1
+    assert "does not match the deterministic guardrail_keyword rate" in result.stdout
+
+
+def test_capsule_records_but_does_not_fetch_an_external_anchor(tmp_path: Path) -> None:
+    capsule_root = tmp_path / "anchored-capsule"
+    shutil.copytree(CAPSULE, capsule_root)
+    config_path = capsule_root / "inputs" / "capsule_config.json"
+    config = load_json(config_path)
+    config["calibration"]["realized_fpr_provenance"]["external_anchor"] = {
+        "mechanism": "reference_only/v1",
+        "uri": "https://example.test/calibration/receipt",
+        "subject_sha256": calibration_anchor_subject_hash(config["calibration"]),
+        "issued_at": "2026-01-01T00:00:00Z",
+        "issuer": "fixture instrument",
+    }
+    write_json(config_path, config)
+
+    result = run_capsule_at(capsule_root, "--update-expected")
+    assert result.returncode == 0, result.stderr + result.stdout
+
+    calibration = load_json(capsule_root / "outputs" / "calibration.json")
+    assert calibration["realized_fpr_provenance"]["verification"]["external_anchor"]["status"] == (
+        "reference_recorded_not_externally_verified"
+    )
+
+    config["calibration"]["realized_fpr"] = 0.125
+    write_json(config_path, config)
+    wrong_subject = run_capsule_at(capsule_root)
+    assert wrong_subject.returncode == 1
+    assert "does not bind this exact subject" in wrong_subject.stdout
+
+
 def test_claim_governance_capsule_tamper_changes_manifest_and_governance_verdict(
     tmp_path: Path,
 ) -> None:
@@ -255,13 +409,14 @@ def run_capsule() -> subprocess.CompletedProcess[str]:
     )
 
 
-def run_capsule_at(capsule_dir: Path) -> subprocess.CompletedProcess[str]:
+def run_capsule_at(capsule_dir: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             sys.executable,
             str(CAPSULE / "build_capsule.py"),
             "--capsule-dir",
             str(capsule_dir),
+            *args,
         ],
         cwd=ROOT,
         env=env(),
@@ -299,6 +454,29 @@ def load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
     return payload
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def calibration_anchor_subject_hash(calibration: dict[str, Any]) -> str:
+    provenance = calibration["realized_fpr_provenance"]
+    subject = {
+        "schema": provenance["schema"],
+        "field": provenance["field"],
+        "value": str(calibration["realized_fpr"]),
+        "semantics": provenance["semantics"],
+        "origin": provenance["origin"],
+    }
+    encoded = json.dumps(
+        subject,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def assert_json_equal(

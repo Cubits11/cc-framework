@@ -266,8 +266,8 @@
 
 <script>
 "use strict";
-const DOC = "{\n  \"alpha_cap\": 0.05,\n  \"calibration_window\": {\n    \"lower\": 0.03,\n    \"upper\": 0.07\n  },\n  \"realized_fpr\": 0.041666666667,\n  \"status\": \"pass\",\n  \"target_fpr\": 0.05,\n  \"threshold\": 0.42\n}\n";
-const EXPECTED = "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014";
+const DOC = "{\n  \"alpha_cap\": 0.05,\n  \"calibration_window\": {\n    \"lower\": 0.03,\n    \"upper\": 0.07\n  },\n  \"realized_fpr\": 0.041666666667,\n  \"realized_fpr_provenance\": {\n    \"external_anchor\": null,\n    \"field\": \"realized_fpr\",\n    \"non_claims\": [\n      \"Calibration provenance records how a value is described; it does not establish that the value was measured, that labels are correct, or that the population is representative.\",\n      \"This value is asserted; the capsule does not infer a numerator, denominator, event, or relation to failure_matrix.csv.\",\n      \"The event, numerator, denominator, and source population remain unresolved in this fixture.\"\n    ],\n    \"origin\": {\n      \"kind\": \"asserted\"\n    },\n    \"schema\": \"cc.calibration.realized-fpr-provenance.v1\",\n    \"semantics\": {\n      \"reason\": \"The repository does not establish realized_fpr's numerator, denominator, event, or source population.\",\n      \"status\": \"unresolved\"\n    },\n    \"verification\": {\n      \"external_anchor\": {\n        \"status\": \"absent\"\n      },\n      \"origin\": {\n        \"reason\": \"The capsule records this declared value without inferring an event, denominator, or source population.\",\n        \"status\": \"asserted_not_derivable\"\n      }\n    }\n  },\n  \"status\": \"pass\",\n  \"target_fpr\": 0.05,\n  \"threshold\": 0.42\n}\n";
+const EXPECTED = "a7d8be80173008354fd1936a45136f88ba3c62a524e4f42dc763ad0c019eb3d4";
 
 const $ = id => document.getElementById(id);
 $("doc").value = DOC;

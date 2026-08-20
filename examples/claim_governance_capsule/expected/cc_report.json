@@ -46,10 +46,10 @@
         "sha256": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74"
       },
       {
-        "bytes": 189,
+        "bytes": 1289,
         "path": "calibration.json",
         "role": "calibration_evidence",
-        "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014"
+        "sha256": "a7d8be80173008354fd1936a45136f88ba3c62a524e4f42dc763ad0c019eb3d4"
       },
       {
         "bytes": 3712,
@@ -111,7 +111,7 @@
     }
   },
   "receipt": {
-    "canonical_hash": "78242a02a5af310883110c3692c8f477418e63d59b69487792ae7a579ce6d5de",
+    "canonical_hash": "9742e11a31f35697d6170b4ea228a0371b60fd708b57606a01ac91b5385cdad2",
     "canonicalization_method": "cc.canonical.v2/RFC8785; receipt.canonical_hash excluded",
     "hash_algorithm": "sha256",
     "previous_hash": null
@@ -119,7 +119,7 @@
   "report_id": "cc-claim-governance-capsule",
   "run": {
     "command": "examples/claim_governance_capsule/reproduce.sh",
-    "config_hash": "7342579696302b3673c868baf7affb4ffe794ec00d0e51b70e8e5f61d74639d2",
+    "config_hash": "1451bd242ca3069cac394eb2f84f4833db303938e90bf451dea41d4bcd1784e0",
     "config_path": "examples/claim_governance_capsule/inputs/capsule_config.json",
     "run_id": "claim-governance-capsule-run",
     "seed": 314159

@@ -66,7 +66,9 @@ argument, and it is the only thing the release asks for.
   updated limitation to be live, so it lands on an artifact that already
   reflects the finding.
 - Any paid offer. The offers are defined; none has been sold or delivered.
-- CH-002 through CH-005. Open, unattempted, and published as open.
+- CH-002. Attempted and partially answered; its current field remains asserted
+  with unresolved semantics, and no independent anchor exists yet.
+- CH-003 through CH-005. Open, unattempted, and published as open.
 
 ## The next artifact
 
@@ -75,10 +77,14 @@ no repository-local mechanism can distinguish a measured input from an asserted
 one, because deterministic regeneration lets the author construct any state the
 checks accept. Reproducibility amplifies consistency, not truth.
 
-So the next artifact is the cheapest anchor from that write-up — timestamping an
-input at collection, outside the author's control — plus establishing what
-`realized_fpr` actually denotes, which is a prerequisite for the derivability
-check that was deliberately left unimplemented.
+The completed local step is an explicit provenance record: `realized_fpr` is
+now labelled as semantically unresolved and asserted, rather than silently
+looking derived because it resembles `1/24`. A future derivation must name its
+event, population, source bytes, counts, and rendering; this fixture does not.
+
+The next artifact remains the cheapest external anchor from that write-up —
+timestamping an input at collection, outside the author's control. It requires
+an independent service or measuring party and is not simulated here.
 
 ## Frozen
 

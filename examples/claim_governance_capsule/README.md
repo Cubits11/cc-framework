@@ -34,6 +34,28 @@ confirmatory-failure-matrix artifact because those verifier layers are already
 implemented in this repository. It does not emit a fake package/signature layer
 beyond the manifest.
 
+## Calibration provenance
+
+`calibration.realized_fpr` has an explicit provenance record in the checked-in
+input and generated `calibration.json`. It separates three questions that must
+not collapse: what the field means, how the local value was obtained, and
+whether an external record binds that declaration. The current fixture has
+**unresolved** semantics, an **asserted** origin, and no external anchor. Its
+numerical resemblance to `1/24` is not treated as a derivation from the 24-row
+failure matrix.
+
+| Axis | Current value | What the builder checks | What it still does not establish |
+| --- | --- | --- | --- |
+| Semantics | `unresolved` | Requires a reason saying what has not been established. | That the field denotes any particular event or population. |
+| Origin | `asserted` | Records the value without inferring a derivation. | That the number was measured, or that it relates to the matrix. |
+| Origin (future) | `deterministic_derivation` | A named binary matrix column, source digest, exact numerator/denominator, decimal rendering, and scalar value must agree. | That the declared column is semantically a false-positive rate or that the matrix is representative. |
+| External reference | `null` | A future `reference_only/v1` record must bind the exact value, semantics, and origin with an HTTPS URI, issuer, timestamp, and subject hash. The builder does not fetch it. | That the external party measured the value correctly. |
+
+The future origin and anchor paths are independent: an asserted value can be
+referenced externally, and a derivation can be referenced externally. Neither
+path upgrades this fixture by itself. This is the CH-002 boundary in
+[`docs/research/epistemic-program/challenges.md`](../../docs/research/epistemic-program/challenges.md).
+
 ## Run
 
 From the repository root:
@@ -103,3 +125,5 @@ examples/claim_governance_capsule/reproduce.sh --update-expected
   operational safety.
 - The confirmatory protocol checks fixed-plan separation; it does not certify
   external validity or release readiness.
+- A calibrated value marked `asserted` is a declared input, not a measurement
+  derived from the checked-in failure matrix.

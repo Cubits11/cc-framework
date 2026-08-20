@@ -20,6 +20,7 @@ import shutil
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from datetime import datetime, timezone
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +71,13 @@ OUTPUT_ROLES = {
     "extremal_lower.json": "extremal_scenario",
     "extremal_upper.json": "extremal_scenario",
 }
+
+CALIBRATION_PROVENANCE_SCHEMA = "cc.calibration.realized-fpr-provenance.v1"
+CALIBRATION_ORIGIN_KINDS = frozenset({"asserted", "deterministic_derivation"})
+CALIBRATION_PROVENANCE_NON_CLAIM = (
+    "Calibration provenance records how a value is described; it does not establish that the "
+    "value was measured, that labels are correct, or that the population is representative."
+)
 
 
 class CapsuleError(RuntimeError):
@@ -145,7 +153,12 @@ def build_capsule(capsule_dir: Path) -> None:
     )
     write_json(outputs_dir / "bounds.json", bounds_payload)
 
-    calibration_payload = dict(config["calibration"])
+    calibration_payload = build_calibration_payload(
+        calibration=config["calibration"],
+        rows=rows,
+        guardrails=guardrails,
+        matrix_sha256=input_hash,
+    )
     write_json(outputs_dir / "calibration.json", calibration_payload)
 
     write_json(
@@ -317,6 +330,359 @@ def build_confirmatory_failure_matrix_payload(
             "validity or representativeness.",
         ],
     }
+
+
+def build_calibration_payload(
+    *,
+    calibration: Any,
+    rows: Sequence[Mapping[str, int | str]],
+    guardrails: tuple[str, ...],
+    matrix_sha256: str,
+) -> dict[str, Any]:
+    """Emit calibration with independent semantic, origin, and anchor axes.
+
+    The current fixture deliberately records unresolved semantics and an
+    asserted origin. A future fixture may opt into an allowlisted deterministic
+    derivation only after it declares a concrete event, denominator, and
+    population. An external anchor, if supplied, is a separate reference that
+    can accompany either origin; this local builder never calls it proof of a
+    measurement.
+    """
+
+    if not isinstance(calibration, Mapping):
+        raise CapsuleError("calibration must be an object")
+
+    payload = dict(calibration)
+    realized_fpr = _decimal_probability(payload.get("realized_fpr"), "calibration.realized_fpr")
+    raw_provenance = payload.get("realized_fpr_provenance")
+    if not isinstance(raw_provenance, Mapping):
+        raise CapsuleError("calibration.realized_fpr_provenance must be an object")
+
+    provenance = dict(raw_provenance)
+    _require_exact_keys(
+        provenance,
+        {"schema", "field", "semantics", "origin", "external_anchor"},
+        "calibration.realized_fpr_provenance",
+    )
+    if provenance["schema"] != CALIBRATION_PROVENANCE_SCHEMA:
+        raise CapsuleError(
+            f"calibration.realized_fpr_provenance.schema must be {CALIBRATION_PROVENANCE_SCHEMA}"
+        )
+    if provenance["field"] != "realized_fpr":
+        raise CapsuleError("calibration provenance field must be realized_fpr")
+
+    semantics = _validate_calibration_semantics(provenance["semantics"])
+    origin, origin_verification = _validate_calibration_origin(
+        origin=provenance["origin"],
+        semantics=semantics,
+        realized_fpr=realized_fpr,
+        rows=rows,
+        guardrails=guardrails,
+        matrix_sha256=matrix_sha256,
+    )
+    anchor_subject = _anchor_subject(
+        realized_fpr=realized_fpr,
+        semantics=semantics,
+        origin=origin,
+    )
+    external_anchor, anchor_verification = _validate_external_anchor(
+        provenance["external_anchor"],
+        subject=anchor_subject,
+    )
+
+    payload["realized_fpr_provenance"] = {
+        "schema": CALIBRATION_PROVENANCE_SCHEMA,
+        "field": "realized_fpr",
+        "semantics": semantics,
+        "origin": origin,
+        "external_anchor": external_anchor,
+        "verification": {
+            "origin": origin_verification,
+            "external_anchor": anchor_verification,
+        },
+        "non_claims": _provenance_non_claims(
+            semantics=semantics,
+            origin=origin,
+            external_anchor=external_anchor,
+        ),
+    }
+    return payload
+
+
+def _validate_calibration_semantics(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise CapsuleError("calibration provenance.semantics must be an object")
+    semantics = dict(value)
+    status = semantics.get("status")
+    if status == "unresolved":
+        _require_exact_keys(
+            semantics,
+            {"status", "reason"},
+            "unresolved calibration semantics",
+        )
+        _require_nonblank(semantics["reason"], "calibration provenance.semantics.reason")
+        return semantics
+    if status == "defined":
+        _require_exact_keys(
+            semantics,
+            {"status", "numerator", "denominator", "population"},
+            "defined calibration semantics",
+        )
+        for field_name in ("numerator", "denominator", "population"):
+            _require_nonblank(
+                semantics[field_name], f"calibration provenance.semantics.{field_name}"
+            )
+        return semantics
+    raise CapsuleError("calibration provenance.semantics.status must be unresolved or defined")
+
+
+def _validate_calibration_origin(
+    *,
+    origin: Any,
+    semantics: Mapping[str, Any],
+    realized_fpr: Decimal,
+    rows: Sequence[Mapping[str, int | str]],
+    guardrails: tuple[str, ...],
+    matrix_sha256: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not isinstance(origin, Mapping):
+        raise CapsuleError("calibration provenance.origin must be an object")
+    origin_payload = dict(origin)
+    kind = origin_payload.get("kind")
+    if kind not in CALIBRATION_ORIGIN_KINDS:
+        allowed = ", ".join(sorted(CALIBRATION_ORIGIN_KINDS))
+        raise CapsuleError(f"calibration provenance origin kind must be one of: {allowed}")
+    if kind == "asserted":
+        _require_exact_keys(origin_payload, {"kind"}, "asserted calibration origin")
+        return (
+            origin_payload,
+            {
+                "status": "asserted_not_derivable",
+                "reason": (
+                    "The capsule records this declared value without inferring an event, "
+                    "denominator, or source population."
+                ),
+            },
+        )
+
+    if semantics["status"] != "defined":
+        raise CapsuleError("deterministic calibration derivation requires defined semantics")
+    _require_exact_keys(
+        origin_payload,
+        {"kind", "algorithm", "source", "column", "inclusion_rule", "exact_result", "rendering"},
+        "deterministic calibration origin",
+    )
+    if origin_payload["algorithm"] != "binary_column_rate/v1":
+        raise CapsuleError(
+            "deterministic calibration origin algorithm must be binary_column_rate/v1"
+        )
+    if origin_payload["inclusion_rule"] != "all_rows":
+        raise CapsuleError("deterministic calibration origin inclusion_rule must be all_rows")
+
+    source = origin_payload["source"]
+    if not isinstance(source, Mapping):
+        raise CapsuleError("deterministic calibration origin.source must be an object")
+    source_payload = dict(source)
+    _require_exact_keys(
+        source_payload,
+        {"path", "sha256"},
+        "deterministic calibration origin.source",
+    )
+    if source_payload["path"] != "inputs/failure_matrix.csv":
+        raise CapsuleError("deterministic calibration derivation must use failure_matrix.csv")
+    if source_payload["sha256"] != matrix_sha256:
+        raise CapsuleError(
+            "deterministic calibration derivation source sha256 does not match matrix"
+        )
+
+    column = origin_payload["column"]
+    if not isinstance(column, str) or column not in guardrails:
+        raise CapsuleError("deterministic calibration origin column must name a guardrail")
+
+    exact_result = origin_payload["exact_result"]
+    if not isinstance(exact_result, Mapping):
+        raise CapsuleError("deterministic calibration origin.exact_result must be an object")
+    exact_result_payload = dict(exact_result)
+    _require_exact_keys(
+        exact_result_payload,
+        {"numerator", "denominator"},
+        "deterministic calibration origin.exact_result",
+    )
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
+        for value in exact_result_payload.values()
+    ):
+        raise CapsuleError(
+            "deterministic calibration exact_result counts must be non-negative integers"
+        )
+
+    rendering = origin_payload["rendering"]
+    if not isinstance(rendering, Mapping):
+        raise CapsuleError("deterministic calibration origin.rendering must be an object")
+    rendering_payload = dict(rendering)
+    _require_exact_keys(
+        rendering_payload,
+        {"decimal_places", "rounding"},
+        "deterministic calibration origin.rendering",
+    )
+    if rendering_payload != {"decimal_places": 12, "rounding": "half_even"}:
+        raise CapsuleError(
+            "deterministic calibration rendering must use 12 decimal places and half_even rounding"
+        )
+
+    denominator_count = len(rows)
+    numerator_count = sum(int(row[column]) for row in rows)
+    if exact_result_payload != {
+        "numerator": numerator_count,
+        "denominator": denominator_count,
+    }:
+        raise CapsuleError(
+            "deterministic calibration exact_result does not match the checked-in matrix count"
+        )
+    computed_value = (Decimal(numerator_count) / Decimal(denominator_count)).quantize(
+        Decimal("0.000000000001"),
+        rounding=ROUND_HALF_EVEN,
+    )
+    if realized_fpr != computed_value:
+        raise CapsuleError(
+            "calibration.realized_fpr does not match the deterministic "
+            f"{column} rate: declared {realized_fpr}, computed {computed_value}"
+        )
+    return (
+        origin_payload,
+        {
+            "status": "derivation_verified_from_declared_bytes",
+            "source_sha256": matrix_sha256,
+            "numerator_count": numerator_count,
+            "denominator_count": denominator_count,
+            "computed_value": format(computed_value, ".12f"),
+        },
+    )
+
+
+def _anchor_subject(
+    *,
+    realized_fpr: Decimal,
+    semantics: Mapping[str, Any],
+    origin: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "schema": CALIBRATION_PROVENANCE_SCHEMA,
+        "field": "realized_fpr",
+        "value": format(realized_fpr, "f"),
+        "semantics": dict(semantics),
+        "origin": dict(origin),
+    }
+
+
+def _validate_external_anchor(
+    anchor: Any,
+    *,
+    subject: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    if anchor is None:
+        return None, {"status": "absent"}
+    if not isinstance(anchor, Mapping):
+        raise CapsuleError("calibration provenance.external_anchor must be an object or null")
+    anchor_payload = dict(anchor)
+    _require_exact_keys(
+        anchor_payload,
+        {"mechanism", "uri", "subject_sha256", "issued_at", "issuer"},
+        "calibration provenance.external_anchor",
+    )
+    if anchor_payload["mechanism"] != "reference_only/v1":
+        raise CapsuleError(
+            "calibration provenance external_anchor mechanism must be reference_only/v1"
+        )
+    uri = anchor_payload["uri"]
+    if not isinstance(uri, str) or not uri.startswith("https://"):
+        raise CapsuleError("calibration provenance external_anchor.uri must be an https URL")
+    digest = anchor_payload["subject_sha256"]
+    if (
+        not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+    ):
+        raise CapsuleError(
+            "calibration provenance external_anchor.subject_sha256 must be lowercase hex"
+        )
+    expected_subject_hash = hash_json(subject)
+    if digest != expected_subject_hash:
+        raise CapsuleError(
+            "calibration provenance external_anchor does not bind this exact subject"
+        )
+    _require_nonblank(anchor_payload["issuer"], "calibration provenance external_anchor.issuer")
+    if not isinstance(anchor_payload["issued_at"], str):
+        raise CapsuleError("calibration provenance external_anchor.issued_at must be a timestamp")
+    parse_utc(anchor_payload["issued_at"])
+    return (
+        anchor_payload,
+        {
+            "status": "reference_recorded_not_externally_verified",
+            "reason": (
+                "The capsule checked that the reference binds this declared subject, but did "
+                "not contact the issuer or verify that it measured the value."
+            ),
+        },
+    )
+
+
+def _provenance_non_claims(
+    *,
+    semantics: Mapping[str, Any],
+    origin: Mapping[str, Any],
+    external_anchor: Mapping[str, Any] | None,
+) -> list[str]:
+    non_claims = [CALIBRATION_PROVENANCE_NON_CLAIM]
+    if origin["kind"] == "asserted":
+        non_claims.append(
+            "This value is asserted; the capsule does not infer a numerator, denominator, event, "
+            "or relation to failure_matrix.csv."
+        )
+    else:
+        non_claims.append(
+            "The deterministic derivation verifies only the declared calculation over named bytes; "
+            "it does not establish that the named binary column is a false-positive rate."
+        )
+    if semantics["status"] == "unresolved":
+        non_claims.append(
+            "The event, numerator, denominator, and source population remain unresolved in this fixture."
+        )
+    if external_anchor is not None:
+        non_claims.append(
+            "The external reference is recorded but not externally verified by this capsule."
+        )
+    return non_claims
+
+
+def _decimal_probability(value: Any, field_name: str) -> Decimal:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise CapsuleError(f"{field_name} must be a finite probability")
+    try:
+        numeric = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise CapsuleError(f"{field_name} must be a finite probability") from exc
+    if not numeric.is_finite() or not Decimal("0") <= numeric <= Decimal("1"):
+        raise CapsuleError(f"{field_name} must be a finite probability")
+    return numeric
+
+
+def _require_nonblank(value: Any, field_name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise CapsuleError(f"{field_name} must be a non-empty string")
+
+
+def _require_exact_keys(payload: Mapping[str, Any], expected: set[str], context: str) -> None:
+    actual = set(payload)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        details = []
+        if missing:
+            details.append(f"missing {missing}")
+        if extra:
+            details.append(f"unexpected {extra}")
+        raise CapsuleError(f"{context} has invalid fields: {', '.join(details)}")
 
 
 def build_decay_payload(
