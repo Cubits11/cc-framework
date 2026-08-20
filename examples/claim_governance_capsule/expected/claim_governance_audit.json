@@ -147,13 +147,13 @@
       "status": "present"
     },
     {
-      "bytes_actual": 189,
-      "bytes_expected": 189,
+      "bytes_actual": 1289,
+      "bytes_expected": 1289,
       "path": "calibration.json",
       "reason": "Evidence artifact hash and byte count verified.",
       "role": "calibration_evidence",
-      "sha256_actual": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014",
-      "sha256_expected": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014",
+      "sha256_actual": "a7d8be80173008354fd1936a45136f88ba3c62a524e4f42dc763ad0c019eb3d4",
+      "sha256_expected": "a7d8be80173008354fd1936a45136f88ba3c62a524e4f42dc763ad0c019eb3d4",
       "status": "present"
     },
     {
@@ -247,7 +247,7 @@
   "reasons": [],
   "receipt": {
     "artifact_hashes_verified": true,
-    "canonical_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
+    "canonical_hash": "5c7be9e1e0cdb2cba8db2935ab6cb36d45aef918299737ce027d7f91267496a3",
     "reason": "Canonical report hash verified. Evidence artifact hashes verified. Receipt verification checks artifact integrity only; it does not prove statistical validity, deployment safety, production readiness, or compliance.",
     "report_hash_verified": true
   },

@@ -77,6 +77,8 @@ rung 4 of the ladder in
 - Closing rung 4 requires an anchor outside the repository. There is none today,
   and the documents now say so rather than implying otherwise.
 
+## Open / partially answered
+
 ### CH-002 — Close rung 4
 
 **Challenge.** Propose a mechanism that would let an outside reviewer
@@ -136,6 +138,32 @@ field means — the same error class this whole program is about, committed in t
 act of defending against it. The correct next step is to establish what the field
 denotes, then check it.
 
+#### Continuation — make the missing semantics executable
+
+The fixture now carries three independent facts about `realized_fpr`:
+`semantics.status: unresolved`, `origin.kind: asserted`, and
+`external_anchor: null`. That makes the absence of a derivation visible in the
+generated calibration artifact instead of allowing the value's `1/24` form to
+imply one.
+
+The capsule also has two opt-in mechanisms for a future value whose meaning has
+actually been declared:
+
+- `origin.kind: deterministic_derivation` accepts only a named binary column
+  of the checked-in matrix and verifies its source digest, numerator,
+  denominator, decimal rendering, and scalar value. It verifies arithmetic, not
+  that the named column is semantically an FPR or that the matrix represents an
+  external population.
+- `external_anchor` requires a URI, issuer, timestamp, and a digest over the
+  exact value, semantics, and origin. It records that reference without
+  fetching it. It binds a declaration to an external object; it does not
+  establish that the issuer measured correctly.
+
+Neither mechanism is applied to the current field. In particular, there is still no
+derivability check that silently interprets the current `realized_fpr` as a
+matrix-column rate. The remaining next artifact is a real external anchor at
+collection time, not a richer local label.
+
 #### What would actually close it
 
 Ranked by cost, each closing a different threat:
@@ -162,10 +190,12 @@ hardware-attestation direction. Two tracks, one wall.
 #### Status
 
 Partially answered. The impossibility argument is stated and demonstrated; the
-anchors are named and **none is implemented**. CH-002 stays open for anyone who
-can refute the argument or implement the first anchor.
+current field's unresolved semantics and asserted origin are now explicit and
+machine-checked. No independent external anchor has been recorded or verified.
+CH-002 stays open for anyone who can refute the argument or implement the first
+anchor.
 
-## Open
+### Further open challenges
 
 ### CH-003 — Make the film show something false
 

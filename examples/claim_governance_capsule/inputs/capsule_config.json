@@ -13,6 +13,18 @@
       "upper": 0.07
     },
     "realized_fpr": 0.041666666667,
+    "realized_fpr_provenance": {
+      "external_anchor": null,
+      "field": "realized_fpr",
+      "origin": {
+        "kind": "asserted"
+      },
+      "schema": "cc.calibration.realized-fpr-provenance.v1",
+      "semantics": {
+        "reason": "The repository does not establish realized_fpr's numerator, denominator, event, or source population.",
+        "status": "unresolved"
+      }
+    },
     "status": "pass",
     "target_fpr": 0.05,
     "threshold": 0.42
