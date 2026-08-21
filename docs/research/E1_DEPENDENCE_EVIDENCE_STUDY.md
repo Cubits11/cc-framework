@@ -34,9 +34,9 @@ output is interpreted.
 ## Controlled suite and results
 
 The implementation reuses
-[`cc.evals.dependence_benchmark`](https://github.com/Cubits11/cc-framework/blob/main/src/cc/evals/dependence_benchmark.py),
+[`cc.evals.dependence_benchmark`](https://github.com/Cubits11/cc-framework/blob/febeba5c9193e33d468fc4694df002cdd5a8420e/src/cc/evals/dependence_benchmark.py),
 not a parallel evaluation system. Its full deterministic output is in
-[`artifacts/empirical/e1/study.json`](https://github.com/Cubits11/cc-framework/tree/main/artifacts/empirical/e1)
+[`artifacts/empirical/e1/study.json`](https://github.com/Cubits11/cc-framework/tree/febeba5c9193e33d468fc4694df002cdd5a8420e/artifacts/empirical/e1)
 with a hash manifest and replay verifier.
 
 | Surface | Declared law | True primary event | B0 product | I0 interval | I1 interval | I2 interval | I3 interval |
