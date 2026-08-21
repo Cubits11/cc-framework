@@ -1,22 +1,51 @@
 {
-  "files": [
-    {
-      "bytes": 46168,
-      "filename": "study.json",
-      "sha256": "ba1f76707f02ed5492a839a1526e470007ac7d02d1945aa7fc7d8e24728e0ea8"
+  "execution_provenance": {
+    "generation_command": "scripts/reproduce_e1_dependence_evidence.py --output-dir artifacts/empirical/e1",
+    "hashed_by_manifest_payload_sha256": false,
+    "output_dir": "artifacts/empirical/e1"
+  },
+  "identity_payload": {
+    "design": {
+      "confidence_method": "simultaneous_hoeffding_union_bound",
+      "coverage_decision_rule": "Wilson 95% lower confidence limit for simulated coverage must be at least nominal_coverage - 0.06; this is a Monte Carlo diagnostic, not a proof.",
+      "delta": 0.1,
+      "nominal_coverage": 0.9,
+      "regimes": {
+        "B0": "product baseline; explicit independence assumption, not an LP constraint",
+        "I0": "declared exact singleton moments only",
+        "I1": "I0 plus fixed-before-output pair g1&g2",
+        "I2": "I0 plus all declared pairwise moments",
+        "I3": "declared full joint record; measured reference only"
+      },
+      "replicates": 128,
+      "sample_sizes": [
+        64,
+        256
+      ],
+      "seed": 20260821,
+      "target_selection": "fixed_pre_sampling"
     },
-    {
-      "bytes": 6962,
-      "filename": "coverage.csv",
-      "sha256": "c2714e9723fd9fdeef12e1bf699f6c7f00c049722d477cc6e5f40c0ebea151de"
-    }
-  ],
-  "generation_command": "scripts/reproduce_e1_dependence_evidence.py --output-dir artifacts/empirical/e1",
-  "manifest_payload_sha256": "46cb169abf2e686066b69e9d0dbcedc22ad7787c58668cac1d25ba800c2a0561",
-  "required_files": [
-    "study.json",
-    "coverage.csv",
-    "manifest.json"
-  ],
-  "schema_version": "cc.evals.dependence_evidence_manifest.v1"
+    "files": [
+      {
+        "bytes": 46168,
+        "filename": "study.json",
+        "sha256": "ba1f76707f02ed5492a839a1526e470007ac7d02d1945aa7fc7d8e24728e0ea8"
+      },
+      {
+        "bytes": 6962,
+        "filename": "coverage.csv",
+        "sha256": "c2714e9723fd9fdeef12e1bf699f6c7f00c049722d477cc6e5f40c0ebea151de"
+      }
+    ],
+    "manifest_schema_version": "cc.evals.dependence_evidence_manifest.v2",
+    "required_files": [
+      "study.json",
+      "coverage.csv",
+      "manifest.json"
+    ],
+    "study_id": "E1-dependence-evidence",
+    "study_schema_version": "cc.evals.dependence_evidence_study.v1"
+  },
+  "manifest_payload_sha256": "b78683c3b32091e21955a649dc211f5143a776db182f04d147e5e4a82fa93394",
+  "schema_version": "cc.evals.dependence_evidence_manifest.v2"
 }

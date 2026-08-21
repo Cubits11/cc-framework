@@ -62,8 +62,10 @@ E1_DEFAULT_SAMPLE_SIZES = (64, 256)
 E1_WILSON_Z = 1.959963984540054
 E1_COVERAGE_TOLERANCE = 0.06
 E1_ARTIFACT_FILENAMES = ("study.json", "coverage.csv", "manifest.json")
+E1_MANIFEST_SCHEMA_VERSION = "cc.evals.dependence_evidence_manifest.v2"
 
 __all__ = [
+    "E1_MANIFEST_SCHEMA_VERSION",
     "E1_SCHEMA_VERSION",
     "SCHEMA_VERSION",
     "BenchmarkInputError",
@@ -495,7 +497,7 @@ def write_e1_artifacts(
     (output_dir / "coverage.csv").write_text(
         _e1_coverage_csv(payload["coverage_rows"]), encoding="utf-8"
     )
-    manifest = _e1_manifest(output_dir, generation_command=generation_command)
+    manifest = _e1_manifest(output_dir, generation_command=generation_command, study=payload)
     _write_e1_json(output_dir / "manifest.json", manifest)
     return payload
 
@@ -534,7 +536,7 @@ def verify_e1_artifacts(
             errors.append("coverage.csv does not exactly represent study.json coverage_rows")
     except OSError as exc:
         errors.append(f"cannot read coverage.csv: {exc}")
-    errors.extend(_verify_e1_manifest(output_dir, manifest))
+    errors.extend(_verify_e1_manifest(output_dir, manifest, study))
     if regenerate and not errors:
         try:
             design = _mapping(study["design"])
@@ -1140,7 +1142,25 @@ def _write_e1_json(path: Path, payload: Mapping[str, Any]) -> None:
     )
 
 
-def _e1_manifest(output_dir: Path, *, generation_command: str) -> dict[str, Any]:
+def _e1_canonical_digest(payload: Mapping[str, Any]) -> str:
+    """Hash a payload under a canonical JSON encoding (sorted keys, no whitespace)."""
+
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _e1_identity_payload(output_dir: Path, study: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the location-independent scientific identity of an E1 artifact set.
+
+    Identity answers "is this the same scientific payload?".  It therefore
+    contains the frozen design, the study identifiers, and the content hashes of
+    the data files -- and deliberately excludes every field whose only meaning is
+    *where* the artifacts happened to be written.  See ``_e1_manifest`` for the
+    provenance half of the split.
+    """
+
     filenames = ("study.json", "coverage.csv")
     files = [
         {
@@ -1150,35 +1170,64 @@ def _e1_manifest(output_dir: Path, *, generation_command: str) -> dict[str, Any]
         }
         for filename in filenames
     ]
-    payload: dict[str, Any] = {
-        "schema_version": "cc.evals.dependence_evidence_manifest.v1",
-        "generation_command": generation_command,
+    return {
+        "manifest_schema_version": E1_MANIFEST_SCHEMA_VERSION,
+        "study_schema_version": study.get("schema_version"),
+        "study_id": study.get("study_id"),
+        "design": json.loads(json.dumps(study.get("design", {}), sort_keys=True)),
         "required_files": list(E1_ARTIFACT_FILENAMES),
         "files": files,
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
-        "utf-8"
-    )
-    payload["manifest_payload_sha256"] = hashlib.sha256(encoded).hexdigest()
-    return payload
 
 
-def _verify_e1_manifest(output_dir: Path, manifest: Mapping[str, Any]) -> list[str]:
+def _e1_manifest(
+    output_dir: Path, *, generation_command: str, study: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Split artifact identity from execution provenance.
+
+    ``manifest_payload_sha256`` covers ``identity_payload`` only, so the digest
+    is invariant under relocation (replaying into any output directory yields
+    the same value) while remaining sensitive to any epistemically material
+    mutation.  ``execution_provenance`` preserves *where* and *how* this
+    particular run happened without contaminating scientific identity.
+    """
+
+    identity = _e1_identity_payload(output_dir, study)
+    return {
+        "schema_version": E1_MANIFEST_SCHEMA_VERSION,
+        "identity_payload": identity,
+        "manifest_payload_sha256": _e1_canonical_digest(identity),
+        "execution_provenance": {
+            "generation_command": generation_command,
+            "output_dir": str(output_dir),
+            "hashed_by_manifest_payload_sha256": False,
+        },
+    }
+
+
+def _verify_e1_manifest(
+    output_dir: Path, manifest: Mapping[str, Any], study: Mapping[str, Any] | None = None
+) -> list[str]:
     errors: list[str] = []
-    if manifest.get("schema_version") != "cc.evals.dependence_evidence_manifest.v1":
+    if manifest.get("schema_version") != E1_MANIFEST_SCHEMA_VERSION:
         errors.append("E1 manifest schema_version mismatch")
         return errors
-    if manifest.get("required_files") != list(E1_ARTIFACT_FILENAMES):
+    identity = manifest.get("identity_payload")
+    if not isinstance(identity, Mapping):
+        return [*errors, "E1 manifest identity_payload must be an object"]
+    if identity.get("required_files") != list(E1_ARTIFACT_FILENAMES):
         errors.append("E1 manifest required_files mismatch")
-    expected_payload = {
-        key: value for key, value in manifest.items() if key != "manifest_payload_sha256"
-    }
-    encoded = json.dumps(
-        expected_payload, sort_keys=True, separators=(",", ":"), allow_nan=False
-    ).encode("utf-8")
-    if manifest.get("manifest_payload_sha256") != hashlib.sha256(encoded).hexdigest():
+    if manifest.get("manifest_payload_sha256") != _e1_canonical_digest(identity):
         errors.append("E1 manifest payload hash mismatch")
-    files = manifest.get("files")
+    if study is not None:
+        if identity.get("study_id") != study.get("study_id"):
+            errors.append("E1 manifest study_id does not match study.json")
+        if identity.get("study_schema_version") != study.get("schema_version"):
+            errors.append("E1 manifest study_schema_version does not match study.json")
+        expected_design = json.loads(json.dumps(study.get("design", {}), sort_keys=True))
+        if identity.get("design") != expected_design:
+            errors.append("E1 manifest design does not match study.json design")
+    files = identity.get("files")
     if not isinstance(files, list) or len(files) != 2:
         return [*errors, "E1 manifest file records are invalid"]
     by_name = {item.get("filename"): item for item in files if isinstance(item, Mapping)}
