@@ -267,9 +267,7 @@ def validate_paper_manifest(repo_root: Path = REPO_ROOT) -> list[Finding]:
 
     required_files = set(manifest.get("required_files", []))
     manifest_entries = {
-        entry.get("filename")
-        for entry in manifest.get("files", [])
-        if isinstance(entry, dict)
+        entry.get("filename") for entry in manifest.get("files", []) if isinstance(entry, dict)
     }
     expected_hashed = PAPER_ARTIFACT_FILES - {"manifest.json"}
     findings: list[Finding] = []
@@ -321,9 +319,21 @@ def validate_e1_manifest(repo_root: Path = REPO_ROOT) -> list[Finding]:
                 "regenerate or repair the E1 artifacts",
             )
         ]
-    required_files = set(manifest.get("required_files", []))
+    # Manifest schema v2 splits scientific identity from execution provenance:
+    # required_files and the hashed file records live under identity_payload,
+    # so that the digest stays invariant under relocation.
+    identity = manifest.get("identity_payload")
+    if not isinstance(identity, dict):
+        return [
+            Finding(
+                "artifacts/empirical/e1/manifest.json",
+                "E1 manifest has no identity_payload (expected manifest schema v2)",
+                "run make reproduce-empirical-e1 to regenerate under the current schema",
+            )
+        ]
+    required_files = set(identity.get("required_files", []))
     entries = {
-        entry.get("filename") for entry in manifest.get("files", []) if isinstance(entry, dict)
+        entry.get("filename") for entry in identity.get("files", []) if isinstance(entry, dict)
     }
     findings: list[Finding] = []
     if required_files != E1_EMPIRICAL_ARTIFACT_FILES:
