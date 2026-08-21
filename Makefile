@@ -50,6 +50,7 @@ FIG_DIR    := paper/figures
 SMOKE_CSV  := results/smoke/aggregates/summary.csv
 AUDIT_LOG  := runs/audit.jsonl
 PAPER_ARTIFACT_DIR := artifacts/paper
+E1_ARTIFACT_DIR := artifacts/empirical/e1
 
 # ----------------------------------------------------------------------
 # Week-3 fixed params
@@ -118,6 +119,7 @@ GOV_CAPSULE_TESTS    := tests/integration/test_claim_governance_capsule.py
 	enterprise-smoke \
 	reproduce-smoke reproduce-mvp reproduce-figures figures reports ccc \
 	reproduce-paper verify-paper-artifacts paper-smoke \
+	reproduce-empirical-e1 verify-empirical-e1 test-empirical-e1 \
 	verify-invariants verify-statistics verify-audit \
 	docs docs-serve \
 	film film-ghost-ark \
@@ -177,6 +179,9 @@ help:
 	@echo "check-repro-clean   Run short repro lane and fail on new generated diffs"
 	@echo "reproduce-paper     Build deterministic paper artifacts under $(PAPER_ARTIFACT_DIR)"
 	@echo "verify-paper-artifacts Verify hashes, schemas, metrics, and LP witnesses"
+	@echo "reproduce-empirical-e1 Rebuild controlled synthetic E1 evidence artifacts"
+	@echo "verify-empirical-e1 Verify E1 hashes, witnesses, and deterministic replay"
+	@echo "test-empirical-e1 Focused E1 unit and integration tests"
 	@echo "paper-smoke         Static Paper-1 source checks; compile if latexmk exists"
 	@echo "reproduce-smoke     $(SESS_SMOKE) sessions quick run + CSV + figs"
 	@echo "reproduce-mvp       $(SESS_MVP) sessions main run"
@@ -472,6 +477,19 @@ reproduce-paper: install
 verify-paper-artifacts: install
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_paper_artifacts.py \
 		--artifact-dir $(PAPER_ARTIFACT_DIR)
+
+reproduce-empirical-e1: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/reproduce_e1_dependence_evidence.py \
+		--output-dir $(E1_ARTIFACT_DIR)
+
+verify-empirical-e1: install
+	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/verify_e1_dependence_evidence.py \
+		--artifact-dir $(E1_ARTIFACT_DIR)
+
+test-empirical-e1: install
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest \
+		tests/unit/evals/test_dependence_evidence.py \
+		tests/integration/test_e1_dependence_evidence.py -q
 
 paper-smoke: install
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/check_paper_source.py --latex

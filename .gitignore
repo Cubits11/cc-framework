@@ -18,6 +18,12 @@ coverage.*
 htmlcov/
 site/
 
+# Frozen, manifest-checked E1 empirical study artifacts (not runtime coverage).
+!/artifacts/
+!/artifacts/empirical/
+!/artifacts/empirical/e1/
+!/artifacts/empirical/e1/coverage.csv
+
 # runtime outputs (tracked artifacts live in explicit fixture/archive/release dirs)
 /results/**
 !/results/

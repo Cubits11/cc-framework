@@ -1,0 +1,22 @@
+{
+  "files": [
+    {
+      "bytes": 46168,
+      "filename": "study.json",
+      "sha256": "ba1f76707f02ed5492a839a1526e470007ac7d02d1945aa7fc7d8e24728e0ea8"
+    },
+    {
+      "bytes": 6962,
+      "filename": "coverage.csv",
+      "sha256": "c2714e9723fd9fdeef12e1bf699f6c7f00c049722d477cc6e5f40c0ebea151de"
+    }
+  ],
+  "generation_command": "scripts/reproduce_e1_dependence_evidence.py --output-dir artifacts/empirical/e1",
+  "manifest_payload_sha256": "46cb169abf2e686066b69e9d0dbcedc22ad7787c58668cac1d25ba800c2a0561",
+  "required_files": [
+    "study.json",
+    "coverage.csv",
+    "manifest.json"
+  ],
+  "schema_version": "cc.evals.dependence_evidence_manifest.v1"
+}

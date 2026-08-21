@@ -31,6 +31,12 @@ PAPER_ARTIFACT_FILES = {
     "table_5_runtime_scaling.csv",
 }
 
+E1_EMPIRICAL_ARTIFACT_FILES = {
+    "coverage.csv",
+    "manifest.json",
+    "study.json",
+}
+
 PAPER_FIGURE_FILES = {
     "paper/figures/cc_convergence.pdf",
     "paper/figures/fig_week3_power_curve.png",
@@ -136,6 +142,12 @@ def classify_tracked_path(path: str) -> str:
             return "paper_release_artifact"
         return "unexpected_paper_artifact"
 
+    if is_under(normalized, "artifacts/empirical/e1/"):
+        filename = normalized.removeprefix("artifacts/empirical/e1/")
+        if filename in E1_EMPIRICAL_ARTIFACT_FILES:
+            return "e1_empirical_artifact"
+        return "unexpected_e1_empirical_artifact"
+
     if is_under(normalized, "artifacts/"):
         return "unexpected_artifact"
 
@@ -186,6 +198,14 @@ def validate_tracked_paths(tracked_paths: Iterable[str]) -> list[Finding]:
                     "move it to a fixture/archive path or document a new release-artifact root",
                 )
             )
+        elif classification == "unexpected_e1_empirical_artifact":
+            findings.append(
+                Finding(
+                    path,
+                    "tracked E1 empirical artifact is not in the study allowlist",
+                    "update E1_EMPIRICAL_ARTIFACT_FILES and its manifest deliberately",
+                )
+            )
         elif classification == "unexpected_paper_figure":
             findings.append(
                 Finding(
@@ -201,6 +221,7 @@ def validate_required_files(repo_root: Path = REPO_ROOT) -> list[Finding]:
     findings: list[Finding] = []
     required_paths = (
         {f"artifacts/paper/{filename}" for filename in PAPER_ARTIFACT_FILES}
+        | {f"artifacts/empirical/e1/{filename}" for filename in E1_EMPIRICAL_ARTIFACT_FILES}
         | PAPER_FIGURE_FILES
         | REQUIRED_FIXTURES
         | RUNTIME_MARKERS
@@ -218,6 +239,7 @@ def validate_required_files(repo_root: Path = REPO_ROOT) -> list[Finding]:
             )
 
     findings.extend(validate_paper_manifest(repo_root))
+    findings.extend(validate_e1_manifest(repo_root))
     return findings
 
 
@@ -274,6 +296,53 @@ def validate_paper_manifest(repo_root: Path = REPO_ROOT) -> list[Finding]:
             )
         )
 
+    return findings
+
+
+def validate_e1_manifest(repo_root: Path = REPO_ROOT) -> list[Finding]:
+    """Check that the frozen E1 artifact manifest names its compact files."""
+
+    manifest_path = repo_root / "artifacts/empirical/e1/manifest.json"
+    if not manifest_path.is_file():
+        return [
+            Finding(
+                "artifacts/empirical/e1/manifest.json",
+                "missing required E1 empirical artifact manifest",
+                "run make reproduce-empirical-e1 and review the resulting manifest",
+            )
+        ]
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [
+            Finding(
+                "artifacts/empirical/e1/manifest.json",
+                f"E1 manifest is not valid JSON ({exc})",
+                "regenerate or repair the E1 artifacts",
+            )
+        ]
+    required_files = set(manifest.get("required_files", []))
+    entries = {
+        entry.get("filename") for entry in manifest.get("files", []) if isinstance(entry, dict)
+    }
+    findings: list[Finding] = []
+    if required_files != E1_EMPIRICAL_ARTIFACT_FILES:
+        findings.append(
+            Finding(
+                "artifacts/empirical/e1/manifest.json",
+                "manifest required_files does not exactly match the E1 artifact allowlist",
+                "regenerate artifacts or update the allowlist deliberately",
+            )
+        )
+    expected_hashed = E1_EMPIRICAL_ARTIFACT_FILES - {"manifest.json"}
+    if entries != expected_hashed:
+        findings.append(
+            Finding(
+                "artifacts/empirical/e1/manifest.json",
+                "manifest file entries do not exactly match E1 hashed artifacts",
+                "regenerate artifacts or update the allowlist deliberately",
+            )
+        )
     return findings
 
 

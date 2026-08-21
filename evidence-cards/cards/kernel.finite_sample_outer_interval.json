@@ -58,6 +58,6 @@
   "result_detail": null,
   "retraction_reason": null,
   "schema_version": "cc.evidence_card.v1",
-  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+  "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
   "supersedes": null
 }
