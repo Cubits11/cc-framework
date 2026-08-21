@@ -251,11 +251,18 @@ Verified in the local environment at the time of writing:
 - `ruff check`, `ruff format`, `isort`, `black` clean on changed files;
 - `mkdocs build --strict` passes.
 
-**Not verified:** the complete repository test suite. The run aborted on
-`OSError: [Errno 28] No space left on device` in an unrelated end-to-end
-enterprise smoke test. That is an environment limitation, not a result. Any
-statement that the full suite passes is **unverified** until it is rerun on a
-machine with sufficient disk.
+The complete repository suite was also verified, but only on the second
+attempt: **958 collected tests, all passing, with exactly seven skips** — all
+optional-dependency or opt-in gates (`CC_RUN_EXPERIMENTS`, `CC_RUN_PERF`,
+guardrails, fastavro, protobuf ×2, SQLAlchemy).
+
+The first attempt aborted on `OSError: [Errno 28] No space left on device` in an
+unrelated enterprise smoke test. That was an environment limitation, not a
+result. The rerun also exposed one genuine failure worth recording: the
+committed evidence cards pinned the pre-upgrade `README.md` size and hash and
+had to be regenerated. Only three values moved across the eight cards and the
+site manifest — README's byte count, README's sha256, and `source_revision` —
+with no change to any verdict, evidence state, assumption, or claim text.
 
 This supports *"the declared E1 checks passed in the tested local
 environment."* It does **not** support *"the result has been independently
@@ -284,7 +291,7 @@ implementation.
 | CC predicts adaptive attack success. | **Not supported** | No adaptive attacker implemented |
 | Interval narrowing is worth its measurement cost. | **Untested** | No value-of-information analysis |
 | The results are independently reproduced. | **Untested** | Internal replay only |
-| The full repository suite passes. | **Unverified** | Aborted on disk exhaustion |
+| The full repository suite passes. | Supported within scope | 958 tests, 7 optional skips, single local environment |
 | Artifact hashes prove empirical truth. | **False by category** | Hashes establish identity, not validity |
 
 ## 10. The three bridges
@@ -328,7 +335,7 @@ claim expansion must apply that discipline to itself.
 | 1 | `0.984375` is spurious six-decimal precision. | It is exactly `126/128`. The criticism was aimed at the wrong level and is withdrawn. |
 | 2 | The report should disclose seed, replicates, nominal coverage, grid, covered counts, and the `0.84` rationale. | All six were already disclosed in `study.json` before the criticism was written. |
 | 3 | Seven categories of new tests were added. | 14 test functions across three files. Verifier capabilities were miscounted as tests. |
-| 4 | The complete `pytest -q` suite passed with seven expected skips. | Unverified. The run aborted on disk exhaustion. |
+| 4 | The complete `pytest -q` suite passed with seven expected skips. | Unevidenced when written — that run aborted on disk exhaustion. Since confirmed: 958 tests, exactly seven skips. The statement was true, but it was not verified at the time it was made, which is the same failure as an overclaim. |
 | 5 | The artifact set is manifest-hashed and replayable. | True, but the manifest digest was path-dependent until it was fixed; external replay would have appeared to fail. |
 
 ## 13. Public research summary
