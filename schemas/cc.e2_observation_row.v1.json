@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Cubits11/cc-framework/schemas/cc.e2_observation_row.v1.json",
+  "title": "CC E2 shared-item guardrail observation row",
+  "description": "One (item, guardrail, replicate) observation. This is the least-collapsed defensible unit: pair-level and study-level tables MUST be derived from these rows, never recorded directly. Frozen before dataset selection as part of the E2 preregistration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "run_id",
+    "item_id",
+    "item_source",
+    "item_source_version",
+    "item_hash",
+    "guardrail_id",
+    "guardrail_version",
+    "policy_version",
+    "configuration_hash",
+    "raw_input_hash",
+    "execution_timestamp",
+    "execution_status",
+    "missingness_code",
+    "predeclared_exclusion",
+    "replicate_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cc.e2_observation_row.v1",
+      "description": "Frozen row-schema identity. Any change to row semantics requires a new version."
+    },
+
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of the E2 study instance this row belongs to."
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of one execution sweep. Distinguishes re-runs of the same design."
+    },
+
+    "item_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Immutable identifier of the evaluated item. MUST be stable across guardrails: this is the key that makes observations paired."
+    },
+    "item_source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Named provenance of the item (dataset, corpus, or generation procedure)."
+    },
+    "item_source_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Version/snapshot of the item source. 'unknown' is permitted and MUST be recorded explicitly rather than omitted."
+    },
+    "item_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical item content. Detects silent item drift and duplicate items across sources."
+    },
+
+    "guardrail_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier of the guardrail system under evaluation."
+    },
+    "guardrail_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Observed version of the guardrail. 'unknown' is a valid value and MUST NOT be silently omitted: externally hosted systems drift, and an unknown version is itself a finding."
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Version or snapshot hash of the policy the guardrail was enforcing."
+    },
+    "configuration_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 over the canonical configuration (thresholds, prompt, parameters) used for this observation."
+    },
+    "shared_dependency_group": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Declared latent-dependency group. Guardrails sharing a base model, vendor, training corpus, or upstream moderation layer MUST declare the same group. Non-null values are a standing warning that observed dependence may be mechanism-induced."
+    },
+
+    "raw_input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the exact bytes submitted to the guardrail, after any templating."
+    },
+    "raw_output_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "default": null,
+      "description": "SHA-256 of the exact guardrail response. Null only when nothing was returned (see missingness_code)."
+    },
+    "raw_outcome": {
+      "type": ["string", "null"],
+      "enum": ["allow", "warn", "soft_block", "hard_block", "error", null],
+      "default": null,
+      "description": "Rich ordinal outcome, preserved uncollapsed. Recording only a binary here destroys structure that later analysis cannot recover."
+    },
+    "raw_outcome_detail": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "Optional provider-specific payload (scores, categories, reasons). Never required for the primary estimand; kept so the reduction can be re-questioned."
+    },
+
+    "normalized_outcome": {
+      "type": ["integer", "null"],
+      "enum": [0, 1, null],
+      "default": null,
+      "description": "The frozen derived binary event Y = h(raw). 1 means guardrail failure / unsafe pass. Null when the row is not observed. This field is DERIVED, never observed."
+    },
+    "normalizer_version": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Version of the reduction h that produced normalized_outcome. Changing h REQUIRES a new normalizer_version so the collapse remains auditable."
+    },
+
+    "execution_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC timestamp of the observation. Supports drift and temporal-dependence analysis."
+    },
+    "execution_status": {
+      "type": "string",
+      "enum": ["success", "error", "timeout", "skipped"],
+      "description": "Mechanical outcome of the execution attempt, independent of the guardrail's decision."
+    },
+    "missingness_code": {
+      "type": "string",
+      "enum": [
+        "observed",
+        "timeout",
+        "execution_error",
+        "unparseable_output",
+        "unsupported_input",
+        "quota_exceeded",
+        "upstream_moderation",
+        "provider_refusal",
+        "excluded_pre",
+        "excluded_post"
+      ],
+      "description": "WHY a value is or is not present. These are NOT interchangeable. 'upstream_moderation' is especially load-bearing: content filtered before reaching the guardrail induces dependence between guardrails that share an upstream layer. 'excluded_post' marks an exclusion decided after outcomes were visible and MUST be reported separately."
+    },
+
+    "predeclared_exclusion": {
+      "type": "boolean",
+      "description": "True only if this row was excluded under a rule frozen BEFORE any outcome was observed. Post-hoc exclusions MUST set this false and use missingness_code 'excluded_post'."
+    },
+    "exclusion_reason": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Required whenever the row is excluded. Free text naming the frozen rule or the post-hoc justification."
+    },
+
+    "replicate_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Index of the repeat observation for a given (item, guardrail). Non-zero values expose stochastic guardrail behaviour."
+    },
+    "seed_if_applicable": {
+      "type": ["integer", "null"],
+      "default": null,
+      "description": "Seed controlling this observation where the guardrail exposes one. Null for non-seedable external systems."
+    },
+
+    "annotator_id": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Present only when the reference label for this item was human-adjudicated."
+    },
+    "reference_label": {
+      "type": ["integer", "null"],
+      "enum": [0, 1, null],
+      "default": null,
+      "description": "Ground-truth/reference label for the item, where one exists. MUST be created before guardrail outcomes are visible."
+    },
+    "reference_label_uncertainty": {
+      "type": ["number", "null"],
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": null,
+      "description": "Annotator disagreement or calibrated uncertainty for reference_label. A single label with no uncertainty representation is a declared limitation, not a neutral default."
+    }
+  },
+
+  "allOf": [
+    {
+      "$comment": "Observed rows must carry a decision; unobserved rows must not fabricate one.",
+      "if": { "properties": { "missingness_code": { "const": "observed" } } },
+      "then": {
+        "required": ["raw_output_hash", "raw_outcome", "normalized_outcome", "normalizer_version"],
+        "properties": {
+          "raw_output_hash": { "type": "string" },
+          "raw_outcome": { "type": "string" },
+          "normalized_outcome": { "type": "integer" },
+          "normalizer_version": { "type": "string" },
+          "execution_status": { "const": "success" }
+        }
+      },
+      "else": {
+        "properties": { "normalized_outcome": { "const": null } }
+      }
+    },
+    {
+      "$comment": "Any exclusion must state a reason.",
+      "if": {
+        "properties": {
+          "missingness_code": { "enum": ["excluded_pre", "excluded_post"] }
+        },
+        "required": ["missingness_code"]
+      },
+      "then": {
+        "required": ["exclusion_reason"],
+        "properties": { "exclusion_reason": { "type": "string", "minLength": 1 } }
+      }
+    },
+    {
+      "$comment": "predeclared_exclusion is reserved for rules frozen before outcomes were visible.",
+      "if": {
+        "properties": { "predeclared_exclusion": { "const": true } },
+        "required": ["predeclared_exclusion"]
+      },
+      "then": {
+        "properties": { "missingness_code": { "const": "excluded_pre" } }
+      }
+    }
+  ]
+}
