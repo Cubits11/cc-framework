@@ -38,9 +38,9 @@ measurement*.
 
 | Artifact | Role |
 | --- | --- |
-| [`schemas/cc.e2_observation_row.v1.json`](https://github.com/Cubits11/cc-framework/blob/main/schemas/cc.e2_observation_row.v1.json) | Frozen row schema, including conditional validity rules |
-| [`scripts/validate_e2_observations.py`](https://github.com/Cubits11/cc-framework/blob/main/scripts/validate_e2_observations.py) | Conformance validator and disclosure audit |
-| [`examples/e2/observations.example.jsonl`](https://github.com/Cubits11/cc-framework/blob/main/examples/e2/observations.example.jsonl) | Minimal conforming reference dataset |
+| [`schemas/cc.e2_observation_row.v1.json`](https://github.com/Cubits11/cc-framework/blob/febeba5c9193e33d468fc4694df002cdd5a8420e/schemas/cc.e2_observation_row.v1.json) | Frozen row schema, including conditional validity rules |
+| [`scripts/validate_e2_observations.py`](https://github.com/Cubits11/cc-framework/blob/febeba5c9193e33d468fc4694df002cdd5a8420e/scripts/validate_e2_observations.py) | Conformance validator and disclosure audit |
+| [`examples/e2/observations.example.jsonl`](https://github.com/Cubits11/cc-framework/blob/febeba5c9193e33d468fc4694df002cdd5a8420e/examples/e2/observations.example.jsonl) | Minimal conforming reference dataset |
 
 ```bash
 python scripts/validate_e2_observations.py examples/e2/observations.example.jsonl
