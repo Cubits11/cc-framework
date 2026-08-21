@@ -296,10 +296,14 @@ def test_schema_contract_matches_report_builder_constants() -> None:
     )
 
     assert schema_claim_levels == CLAIM_LEVELS
-    assert (
-        schema["properties"]["receipt"]["properties"]["canonicalization_method"]["const"]
-        == CANONICALIZATION_METHOD
-    )
+    # The schema accepts both canonicalization profiles so pre-migration
+    # receipts stay verifiable; the builder writes the first of them.
+    schema_profiles = schema["properties"]["receipt"]["properties"]["canonicalization_method"][
+        "enum"
+    ]
+    assert CANONICALIZATION_METHOD in schema_profiles
+    assert schema_profiles[0] == CANONICALIZATION_METHOD
+    assert len(schema_profiles) == 2
 
     report = _report()
     report["claim"]["non_claims"] = []

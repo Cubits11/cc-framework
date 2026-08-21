@@ -148,12 +148,47 @@ def test_merkle_canonicalization_matches_reporting_canonical_json() -> None:
     assert MerkleLog(records=[record]).leaf_hashes == [expected]
 
 
-def test_merkle_log_normalizes_unicode_nfc_like_reporting() -> None:
+def test_merkle_log_does_not_normalize_unicode() -> None:
+    """Byte-distinct strings stay distinct. Their normal forms are not the log's business.
+
+    This test previously asserted the opposite -- that a composed and a
+    decomposed spelling produce the *same* leaf hash -- and was named
+    ``test_merkle_log_normalizes_unicode_nfc_like_reporting``. That behavior was
+    finding F-03: canonicalization applied NFC to every key and wrote the
+    results into a fresh dict, so two byte-distinct keys sharing a normal form
+    silently became one, with no error, and the receipt attested to a document
+    with a field missing.
+
+    RFC 8785 is explicit that normalization is the producer's responsibility. A
+    canonicalizer that mutates content is not a canonicalizer, and a
+    transparency log must record what was written rather than a normalized
+    rendering of it. Under ``cc.canonical.v2`` the two spellings are two
+    strings, which is what JSON says they are.
+
+    Producers that would rather refuse such a document can call
+    ``assert_no_confusable_keys`` before hashing; it is deliberately not on the
+    hash path.
+    """
     composed = {"é": "café", "event": "audit"}
     decomposed = {"e\u0301": "cafe\u0301", "event": "audit"}
 
-    assert canonical_json_bytes(composed) == canonical_json_bytes(decomposed)
-    assert leaf_hash(composed) == leaf_hash(decomposed)
+    assert canonical_json_bytes(composed) != canonical_json_bytes(decomposed)
+    assert leaf_hash(composed) != leaf_hash(decomposed)
+
+
+def test_merkle_log_keeps_both_key_spellings_in_one_record() -> None:
+    """The silent key loss of F-03, asserted not to recur.
+
+    Under the legacy profile this record went in with two keys and came out
+    with one, and nothing raised.
+    """
+    record = {"é": 1, "e\u0301": 2, "event": "audit"}
+
+    decoded = json.loads(canonical_json_bytes(record).decode("utf-8"))
+
+    assert len(decoded) == 3
+    assert decoded["é"] == 1
+    assert decoded["e\u0301"] == 2
 
 
 def test_merkle_log_rejects_non_string_mapping_keys(tmp_path: Path) -> None:

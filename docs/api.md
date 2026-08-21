@@ -19,6 +19,52 @@ The supported stable kernel symbols are the names exported by
 `independence_regret`, `independent_event_probability`, endpoint witness result
 types, and finite-sample count-to-constraint helpers.
 
+`cc.compose` is the stable composition surface for named binary events. It
+takes marginal probabilities keyed by event name and returns a sharp identified
+interval, with the independence baseline, the binding event, the marginal
+provenance, and the non-claims attached to the result. Its supported symbols are
+the names exported by `cc.compose.__all__`, including `compose_bounds`,
+`sensitivity`, `CompositionBounds`, `CountermonotoneUndefinedError`, and
+`marginal_from_operating_point`.
+
+The surface deliberately contains no ROC, Youden, threshold, or operating-point
+concept: a deterministic refusal rule is as valid an input as a tuned
+classifier, and detectors reach the same surface through
+`marginal_from_operating_point`. That direction is part of the contract and is
+enforced by a test.
+
+Its behavior is pinned by the language-agnostic corpus in
+`conformance/cc-kernel-v1/`, whose `SPEC.md` is the normative statement.
+Changing a value the corpus pins is a breaking change to this contract.
+
+`cc.compose` does not certify safety, validate the supplied marginals, or claim
+novelty for the Frechet-Hoeffding inequality, which is classical.
+
+`cc.cli.guard` (the `cc-guard` console script) is the stable surface for the
+inference guards. Its `check` subcommand reads a JSON request on stdin and
+writes a verdict on stdout; its `table` subcommand emits the decision rules as
+pure data for callers that cannot spawn a Python process. `DECISION_TABLE` is
+the normative statement of the rules and is asserted to agree with the
+implementation.
+
+A permitted verdict means the guard found no reason to refuse. It does not mean
+an estimate is correct or a measurement was well designed.
+
+`cc.evidence_card` is the stable surface for emitting `cc.evidence_card.v1`
+cards and the `cc.site_evidence_manifest.v1` bundle. Its supported symbols are
+the names exported by `cc.evidence_card.__all__`, including `EvidenceCard`,
+`ArtifactRef`, `cards_to_site_manifest`, and `render_labels`.
+
+Its three labels — `evidence_state`, `verdict`, and `publication_state` — are
+orthogonal and part of the contract. No consumer may collapse them into a single
+status, and the module deliberately provides no composite property, no aggregate
+field, and no single-label renderer. Adding one is a breaking change to this
+contract, not a convenience.
+
+`cc.evidence_card` does not establish that any claim is true. A card records a
+claim, the command that tests it, what would falsify it, and what it does not
+claim.
+
 The evidence/reporting surface is stable only where it is used for release
 evidence and claim-governance capsules:
 
@@ -50,7 +96,7 @@ guarantees of `cc.kernel.strict`:
 - `cc.exp`: experiment runners and two-world workflow support.
 - `cc.guardrails`: local toy guardrail implementations.
 - `cc.io`, `cc.cli`, and `cc.utils`: storage, manifest, plotting, dashboard, and
-  utility helpers.
+  utility helpers, outside the named stable `cc.cli.guard` behavior above.
 - `cc._legacy`: retained only for backward compatibility and migration context.
 
 Experimental/backcompat APIs may change without compatibility guarantees unless

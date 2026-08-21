@@ -46,10 +46,10 @@
         "sha256": "ce2cbba19dbfee5516143ce8f94cd8c8acc7b1ab2517809695cd52f8bd62fe74"
       },
       {
-        "bytes": 189,
+        "bytes": 1289,
         "path": "calibration.json",
         "role": "calibration_evidence",
-        "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014"
+        "sha256": "a7d8be80173008354fd1936a45136f88ba3c62a524e4f42dc763ad0c019eb3d4"
       },
       {
         "bytes": 3712,
@@ -73,13 +73,13 @@
         "bytes": 4559,
         "path": "extremal_lower.json",
         "role": "extremal_scenario",
-        "sha256": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f"
+        "sha256": "bb9e9cf4e1aec1aef6e670c06e10bad89cb96ccdb7222d1ec3919e79b3c7a120"
       },
       {
         "bytes": 4557,
         "path": "extremal_upper.json",
         "role": "extremal_scenario",
-        "sha256": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3"
+        "sha256": "f2aaf4d8b700069449f3364068fc024f28f718173aa9f9312137b29788541925"
       }
     ],
     "audit_log": {
@@ -111,15 +111,15 @@
     }
   },
   "receipt": {
-    "canonical_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
-    "canonicalization_method": "json.dumps(sort_keys=True,separators=(',', ':'),ensure_ascii=False,allow_nan=False); receipt.canonical_hash excluded",
+    "canonical_hash": "9742e11a31f35697d6170b4ea228a0371b60fd708b57606a01ac91b5385cdad2",
+    "canonicalization_method": "cc.canonical.v2/RFC8785; receipt.canonical_hash excluded",
     "hash_algorithm": "sha256",
     "previous_hash": null
   },
   "report_id": "cc-claim-governance-capsule",
   "run": {
     "command": "examples/claim_governance_capsule/reproduce.sh",
-    "config_hash": "7342579696302b3673c868baf7affb4ffe794ec00d0e51b70e8e5f61d74639d2",
+    "config_hash": "1451bd242ca3069cac394eb2f84f4833db303938e90bf451dea41d4bcd1784e0",
     "config_path": "examples/claim_governance_capsule/inputs/capsule_config.json",
     "run_id": "claim-governance-capsule-run",
     "seed": 314159

@@ -1,0 +1,68 @@
+{
+  "artifacts": [
+    {
+      "bytes": 18487,
+      "missing": false,
+      "path": "docs/release/V0_3_RC1_CHECKLIST.md",
+      "sha256": "87cbba56c855c978f37d31c63f6354b025c5cb8a2e37bebc944e4a2f0794dc3f"
+    },
+    {
+      "bytes": 7871,
+      "missing": false,
+      "path": "docs/validation_matrix.md",
+      "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+    },
+    {
+      "bytes": 7346,
+      "missing": false,
+      "path": "docs/api.md",
+      "sha256": "34db452fa048483afc06caaf7806703b53ea984e6625d681a31b35db11d71c33"
+    },
+    {
+      "bytes": 8198,
+      "missing": false,
+      "path": "docs/research/PAPER_CORE.md",
+      "sha256": "ca05c26005224d62a288d2c9f396fe08fc3fca3f48e5f8c10f45421898a61ff8"
+    },
+    {
+      "bytes": 7225,
+      "missing": false,
+      "path": "docs/research/NON_CLAIMS.md",
+      "sha256": "8ba6e6a27c445a282b07d1ba704544382570b2c7285f4f73238dec7658428627"
+    }
+  ],
+  "assumptions": [
+    "The pinned environment and seeds reproduce the recorded run.",
+    "Artifact determinism is a property of this host and toolchain, not of the mathematics."
+  ],
+  "card_id": "release.paper_core_v0_3_rc1",
+  "claim": "Paper Core v0.3 is release-candidate quality for the finite atom kernel, canonical metrics, endpoint witnesses, deterministic paper artifacts, and documentation spine.",
+  "command": [
+    "make test-kernel",
+    "make test-release",
+    "make docs",
+    "make paper-smoke",
+    "make verify-paper-artifacts"
+  ],
+  "counterevidence": [],
+  "falsifier": "A paper artifact that reproduce_paper.py regenerates with different bytes, or a theorem-ledger row whose named test does not exist or does not exercise the stated implementation.",
+  "label_meanings": {
+    "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "local-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C0/C3",
+  "non_claims": [
+    "Does not promote enterprise, dashboard, vendor, cloud, or experimental lanes into paper core."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+  "supersedes": null
+}

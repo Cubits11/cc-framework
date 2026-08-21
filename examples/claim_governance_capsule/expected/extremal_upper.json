@@ -139,7 +139,7 @@
     "Scenario kind and feasibility status are evidence-artifact properties, not claim lifecycle states."
   ],
   "objective": null,
-  "scenario_id": "scenario-frechet-upper-bff6e6e0b031",
+  "scenario_id": "scenario-frechet-upper-2292c147ab06",
   "schema": "cc.extremal_scenario.v1",
   "schema_version": "cc.extremal_scenario.v1",
   "source": "frechet",

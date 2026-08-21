@@ -30,7 +30,6 @@ import pytest
 
 from cc.kernel.cliff import cliff_certificate
 
-
 CRITICAL = 0.20
 
 

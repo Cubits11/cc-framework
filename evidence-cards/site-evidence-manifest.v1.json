@@ -1,0 +1,569 @@
+{
+  "card_count": 8,
+  "cards": [
+    {
+      "artifacts": [
+        {
+          "bytes": 19959,
+          "missing": false,
+          "path": "README.md",
+          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+        },
+        {
+          "bytes": 10127,
+          "missing": false,
+          "path": "docs/theory/theorem_ledger.md",
+          "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+        },
+        {
+          "bytes": 21621,
+          "missing": false,
+          "path": "src/cc/kernel/frechet_classes.py",
+          "sha256": "60109fb97bc22bc732b1aa7fe660b5e4c4d03c5d1f2e13e4b2e54b1e032d1c58"
+        },
+        {
+          "bytes": 33874,
+          "missing": false,
+          "path": "src/cc/kernel/sensitivity.py",
+          "sha256": "6ff24bf54969a046c774c8b3ab251de31fbb4c0d505db88a9b4b283aea562422"
+        }
+      ],
+      "assumptions": [
+        "Exact singleton marginals are supplied; they are not estimated here.",
+        "No side constraints beyond the marginals.",
+        "Finite binary atom space with deterministic atom ordering.",
+        "IEEE-754 double arithmetic; agreement is asserted only to the declared tolerance."
+      ],
+      "card_id": "kernel.frechet_bounds",
+      "claim": "The strict kernel computes classical Fréchet-Hoeffding bounds for finite binary guardrail failure composition under exact singleton marginals and no additional side constraints.",
+      "command": [
+        "pytest tests/unit/kernel/test_classical_frechet_special_cases.py",
+        "make test-kernel"
+      ],
+      "counterevidence": [],
+      "falsifier": "A marginal configuration in which identified_region returns an interval differing from max(0, sum(p) - (m-1)) and min(p) by more than the declared solver tolerance.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C3",
+      "non_claims": [
+        "Does not assume independence.",
+        "Does not prove deployment safety.",
+        "Does not prove marginals are representative."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 10127,
+          "missing": false,
+          "path": "docs/theory/theorem_ledger.md",
+          "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+        },
+        {
+          "bytes": 33874,
+          "missing": false,
+          "path": "src/cc/kernel/sensitivity.py",
+          "sha256": "6ff24bf54969a046c774c8b3ab251de31fbb4c0d505db88a9b4b283aea562422"
+        },
+        {
+          "bytes": 7346,
+          "missing": false,
+          "path": "docs/api.md",
+          "sha256": "34db452fa048483afc06caaf7806703b53ea984e6625d681a31b35db11d71c33"
+        }
+      ],
+      "assumptions": [
+        "The constraint set defines a nonempty feasible polytope.",
+        "Constraints and the query are linear in the atom probabilities.",
+        "The LP solver reports optimal status rather than a tolerance-limited stop."
+      ],
+      "card_id": "kernel.identified_interval",
+      "claim": "The finite atom LP computes sharp lower and upper values for declared linear composition queries over feasible finite binary atom distributions.",
+      "command": [
+        "pytest tests/unit/kernel/test_sensitivity.py",
+        "pytest tests/unit/kernel/test_monotonic_tightening.py",
+        "make test-kernel"
+      ],
+      "counterevidence": [],
+      "falsifier": "A feasible atom distribution whose query value falls outside the reported interval, or a value strictly inside the interval attained by no feasible distribution.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C3",
+      "non_claims": [
+        "Does not validate upstream data collection.",
+        "Does not validate semantic safety.",
+        "Does not establish representativeness."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 4317,
+          "missing": false,
+          "path": "docs/theory/finite_sample_identification.md",
+          "sha256": "a7228c069ed5cc20677f9b06fadf81112fc9f604e310cbe6fd080b522c9709c0"
+        },
+        {
+          "bytes": 10127,
+          "missing": false,
+          "path": "docs/theory/theorem_ledger.md",
+          "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+        },
+        {
+          "bytes": 20804,
+          "missing": false,
+          "path": "src/cc/kernel/sample_complexity.py",
+          "sha256": "aaef21b3d037a4e23cd067bdf2585227899feefe05634d9b7cd07a03223295f6"
+        },
+        {
+          "bytes": 33874,
+          "missing": false,
+          "path": "src/cc/kernel/sensitivity.py",
+          "sha256": "6ff24bf54969a046c774c8b3ab251de31fbb4c0d505db88a9b4b283aea562422"
+        }
+      ],
+      "assumptions": [
+        "Labels and the query are fixed before the data are seen.",
+        "Counts are iid Bernoulli draws from the target population.",
+        "Moment coverage holds simultaneously across constraints.",
+        "The exact assumptions supplied to the LP are true of that population."
+      ],
+      "card_id": "kernel.finite_sample_outer_interval",
+      "claim": "Under stated iid Bernoulli sampling assumptions and simultaneous moment coverage, count-derived LP intervals form an outer confidence interval for the target query.",
+      "command": [
+        "pytest tests/unit/kernel/test_finite_sample_constraints.py",
+        "pytest tests/unit/kernel/test_sample_complexity.py",
+        "make test-kernel"
+      ],
+      "counterevidence": [],
+      "falsifier": "A simulation under the stated iid Bernoulli sampling in which count-derived intervals cover the true query value at a rate materially below the nominal level.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C3",
+      "non_claims": [
+        "Not valid after uncorrected adaptive target selection.",
+        "Not a deployment certificate."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 10127,
+          "missing": false,
+          "path": "docs/theory/theorem_ledger.md",
+          "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+        },
+        {
+          "bytes": 7871,
+          "missing": false,
+          "path": "docs/validation_matrix.md",
+          "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+        },
+        {
+          "bytes": 17592,
+          "missing": false,
+          "path": "src/cc/reporting/canonical.py",
+          "sha256": "64e9c1f1efaa1b53fdfeec8c26a070089dc36e46c82f2e13ce1404d9088288c4"
+        },
+        {
+          "bytes": 29932,
+          "missing": false,
+          "path": "src/cc/reporting/report.py",
+          "sha256": "31c3e6f192b671a40e272e95c5177dc6c36f69bfb428016dca1ccfa958ab7f7d"
+        },
+        {
+          "bytes": 19054,
+          "missing": false,
+          "path": "src/cc/evidence/merkle_log.py",
+          "sha256": "66ee5c8b9931f64b3a1e05e71375ca73f315252de280780fd7b4ad45aeb8e58a"
+        },
+        {
+          "bytes": 10654,
+          "missing": false,
+          "path": "src/cc/evidence/anchoring.py",
+          "sha256": "c38d55e7baafd860bc46bd05e52b08f2de8cdd6cec1f64e2722be24d92e48d8c"
+        }
+      ],
+      "assumptions": [
+        "SHA-256 remains collision resistant.",
+        "The canonicalization profile named on the receipt is the one used to verify it.",
+        "Receipt-covered JSON is read with strict duplicate-key rejection."
+      ],
+      "card_id": "reporting.receipt_integrity",
+      "claim": "Receipt/hash verification can provide tamper evidence for recorded bytes under canonical serialization and verification rules.",
+      "command": [
+        "pytest tests/unit/reporting/test_reporting.py",
+        "pytest tests/unit/evidence/test_transparency_log_adversarial.py",
+        "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence tests/unit/reporting"
+      ],
+      "counterevidence": [],
+      "falsifier": "Two byte-distinct payloads that a consumer needs distinguished receiving the same canonical hash, or a payload whose recomputed hash differs from its receipt while its bytes are unchanged.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C2",
+      "non_claims": [
+        "Does not prove statistical validity.",
+        "Does not prove source data truth.",
+        "Does not prove representativeness.",
+        "Does not prove compliance.",
+        "Does not prove safety."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 19959,
+          "missing": false,
+          "path": "README.md",
+          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+        },
+        {
+          "bytes": 7871,
+          "missing": false,
+          "path": "docs/validation_matrix.md",
+          "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+        },
+        {
+          "bytes": 10127,
+          "missing": false,
+          "path": "docs/theory/theorem_ledger.md",
+          "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+        },
+        {
+          "bytes": 4687,
+          "missing": false,
+          "path": "docs/briefs/rick_mergenthaler_ai_safety_disclosure_controls.md",
+          "sha256": "65240508d532ad7467aa4c2c14b67ae32a1acd68a3b21c5b6f37dd8984536b2f"
+        },
+        {
+          "bytes": 2437,
+          "missing": false,
+          "path": "docs/briefs/three_minute_demo.md",
+          "sha256": "ef4ae474b3fe93aa1aa0b5d02a3ea58fda616da30b4a47c7a640a84fa115bd40"
+        },
+        {
+          "bytes": 7225,
+          "missing": false,
+          "path": "docs/research/NON_CLAIMS.md",
+          "sha256": "8ba6e6a27c445a282b07d1ba704544382570b2c7285f4f73238dec7658428627"
+        }
+      ],
+      "assumptions": [
+        "The producer declares evidence roles honestly; the verifier checks structure, not sincerity.",
+        "The v0 non-claims engine detects the intended substance rather than only exact strings."
+      ],
+      "card_id": "evidence.non_claim_boundaries",
+      "claim": "Documentation and reporting surfaces explicitly separate what each validation result supports from what it does not support.",
+      "command": [
+        ".venv/bin/mkdocs build --strict",
+        "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence",
+        "PYTHONPATH=src .venv/bin/python -m pytest -q tests/integration/test_claim_governance_capsule.py"
+      ],
+      "counterevidence": [],
+      "falsifier": "An evidence-bound claim package that passes verify-claim-governance while omitting a non-claim its declared evidence roles require.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C4",
+      "non_claims": [
+        "Does not prevent bad-faith actors from making misleading claims outside the framework."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 18487,
+          "missing": false,
+          "path": "docs/release/V0_3_RC1_CHECKLIST.md",
+          "sha256": "87cbba56c855c978f37d31c63f6354b025c5cb8a2e37bebc944e4a2f0794dc3f"
+        },
+        {
+          "bytes": 7871,
+          "missing": false,
+          "path": "docs/validation_matrix.md",
+          "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+        },
+        {
+          "bytes": 7346,
+          "missing": false,
+          "path": "docs/api.md",
+          "sha256": "34db452fa048483afc06caaf7806703b53ea984e6625d681a31b35db11d71c33"
+        },
+        {
+          "bytes": 8198,
+          "missing": false,
+          "path": "docs/research/PAPER_CORE.md",
+          "sha256": "ca05c26005224d62a288d2c9f396fe08fc3fca3f48e5f8c10f45421898a61ff8"
+        },
+        {
+          "bytes": 7225,
+          "missing": false,
+          "path": "docs/research/NON_CLAIMS.md",
+          "sha256": "8ba6e6a27c445a282b07d1ba704544382570b2c7285f4f73238dec7658428627"
+        }
+      ],
+      "assumptions": [
+        "The pinned environment and seeds reproduce the recorded run.",
+        "Artifact determinism is a property of this host and toolchain, not of the mathematics."
+      ],
+      "card_id": "release.paper_core_v0_3_rc1",
+      "claim": "Paper Core v0.3 is release-candidate quality for the finite atom kernel, canonical metrics, endpoint witnesses, deterministic paper artifacts, and documentation spine.",
+      "command": [
+        "make test-kernel",
+        "make test-release",
+        "make docs",
+        "make paper-smoke",
+        "make verify-paper-artifacts"
+      ],
+      "counterevidence": [],
+      "falsifier": "A paper artifact that reproduce_paper.py regenerates with different bytes, or a theorem-ledger row whose named test does not exist or does not exercise the stated implementation.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C0/C3",
+      "non_claims": [
+        "Does not promote enterprise, dashboard, vendor, cloud, or experimental lanes into paper core."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 7871,
+          "missing": false,
+          "path": "docs/validation_matrix.md",
+          "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+        },
+        {
+          "bytes": 18487,
+          "missing": false,
+          "path": "docs/release/V0_3_RC1_CHECKLIST.md",
+          "sha256": "87cbba56c855c978f37d31c63f6354b025c5cb8a2e37bebc944e4a2f0794dc3f"
+        },
+        {
+          "bytes": 16907,
+          "missing": false,
+          "path": "src/cc/enterprise/aws_reference.py",
+          "sha256": "f9138cd1d0cd1eaa2b5db0b1be5b95f0ff507a3081cec4a4aa7cad9bcdaaa9d4"
+        },
+        {
+          "bytes": 5144,
+          "missing": false,
+          "path": "infra/lambda/verify_handler.py",
+          "sha256": "d1bbcefddda9c91578ac9d4d6fda9113da6fccbd965cd42c49b7592f602e8ee2"
+        },
+        {
+          "bytes": 634,
+          "missing": false,
+          "path": "apps/dashboard/scripts/require-enterprise-bundle.mjs",
+          "sha256": "013caae404ca3b0ed3557dc61bb1887d4708f1f0d6803499702444f1f12414c5"
+        }
+      ],
+      "assumptions": [
+        "moto emulates the AWS behaviours under test faithfully enough for the checks performed.",
+        "Emulated evidence is never live evidence, and no live-AWS claim rests on this lane."
+      ],
+      "card_id": "enterprise.reference_v0_1",
+      "claim": "Enterprise Reference v0.1 is an experimental evidence-integrity reference architecture with moto-backed smoke tests.",
+      "command": [
+        "make enterprise-smoke",
+        "PYTHONPATH=src .venv/bin/pytest tests/integration/test_enterprise_aws_emulation.py tests/e2e/test_enterprise_smoke.py -q"
+      ],
+      "counterevidence": [],
+      "falsifier": "An enterprise emulation run that reports success while omitting a KMS verification or object-integrity check the reference claims to perform.",
+      "label_meanings": {
+        "evidence_state": "Produced against synthesized or emulated AWS, not a live account. Synthetic evidence is never live evidence.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "aws-synth-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C0/C2",
+      "non_claims": [
+        "Not enterprise-ready.",
+        "Not live-AWS proof.",
+        "Not compliance certification.",
+        "Not deployment safety."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    },
+    {
+      "artifacts": [
+        {
+          "bytes": 2303,
+          "missing": false,
+          "path": "docs/product/OPEN_CORE_STRATEGY.md",
+          "sha256": "5aafa0ce83ebd3eba11dad99326efaa8516b6fcbd51f62304f3bceee25622baa"
+        },
+        {
+          "bytes": 19959,
+          "missing": false,
+          "path": "README.md",
+          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+        }
+      ],
+      "assumptions": [
+        "The wheel built in CI is the artifact the strategy describes.",
+        "Classification in docs/api.md is kept current by the packaging boundary test."
+      ],
+      "card_id": "open_core.strategy",
+      "claim": "The public research core is intended to remain inspectable for credibility and reproducibility, while possible private/commercial layers may operationalize the primitives.",
+      "command": [
+        ".venv/bin/mkdocs build --strict"
+      ],
+      "counterevidence": [],
+      "falsifier": "A module the strategy document places in the open core that is absent from the published wheel, or an importable wheel surface classified nowhere in docs/api.md.",
+      "label_meanings": {
+        "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+        "publication_state": "Not yet reviewed for publication.",
+        "verdict": "The command has not been executed for this card. No result is claimed."
+      },
+      "labels": {
+        "evidence_state": "local-only",
+        "publication_state": "draft",
+        "verdict": "not-run"
+      },
+      "maturity": "C0",
+      "non_claims": [
+        "Does not make the project a product today.",
+        "Does not claim enterprise readiness."
+      ],
+      "result_detail": null,
+      "retraction_reason": null,
+      "schema_version": "cc.evidence_card.v1",
+      "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+      "supersedes": null
+    }
+  ],
+  "counts_by_label": {
+    "evidence_state": {
+      "aws-live": 0,
+      "aws-synth-only": 1,
+      "illustrative": 0,
+      "local-only": 7
+    },
+    "publication_state": {
+      "draft": 8,
+      "released": 0,
+      "retracted": 0,
+      "superseded": 0
+    },
+    "verdict": {
+      "fail": 0,
+      "not-run": 8,
+      "pass": 0,
+      "unverifiable": 0
+    }
+  },
+  "generated_note": "Generated from docs/claims/claim_boundary_manifest.v0.1.json. Verdicts are 'not-run': no command was executed during generation.",
+  "label_meanings": {
+    "evidence_state": {
+      "aws-live": "Produced against a live AWS account, for the named run only.",
+      "aws-synth-only": "Produced against synthesized or emulated AWS, not a live account. Synthetic evidence is never live evidence.",
+      "illustrative": "A worked example or figure. Not measured evidence, and must never be cited as a result.",
+      "local-only": "Produced on a local machine. Says nothing about cloud or deployed behaviour."
+    },
+    "publication_state": {
+      "draft": "Not yet reviewed for publication.",
+      "released": "Published. Says nothing about whether the claim is true, only that it was reviewed for release.",
+      "retracted": "Withdrawn. The reason is on the card; the card is not deleted.",
+      "superseded": "A later card replaces this one. Retained so the record is not rewritten."
+    },
+    "verdict": {
+      "fail": "The command ran and its checks did not succeed.",
+      "not-run": "The command has not been executed for this card. No result is claimed.",
+      "pass": "The command ran and its checks succeeded. Scope is whatever the command covers -- no wider.",
+      "unverifiable": "The check could not be performed. This is not a pass and not a fail."
+    }
+  },
+  "non_claims": [
+    "This manifest lists claims and the commands that test them. It does not establish that any claim is true.",
+    "The three labels are orthogonal. A passing verdict on local-only evidence says nothing about deployed behaviour, and a released publication state says only that a card was reviewed for release.",
+    "Counts are reported per label. There is no aggregate score, and any surface that computes one from this file is misusing it.",
+    "A card with verdict 'not-run' has no result. It must not be displayed as passing, pending, or healthy."
+  ],
+  "schema_version": "cc.site_evidence_manifest.v1",
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53"
+}

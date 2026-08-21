@@ -43,6 +43,14 @@ The project does not claim:
   validated by a separate confirmatory procedure.
 - A receipt verifies artifact integrity, not statistical validity or deployment
   safety.
+- A capsule that reproduces deterministically from its declared inputs does not
+  establish that those inputs were measured rather than asserted. Changing an
+  input and regenerating the chain yields a fully self-consistent capsule, a
+  valid receipt, and a PASS verdict over a fabricated value. See
+  `docs/research/epistemic-program/challenges.md` (CH-001).
+- A scalar that happens to be expressible over a checked-in row count is not
+  thereby derived from that matrix. The event, population, and numerator must
+  be explicitly declared and checked before any derivation claim is made.
 - A PASS verdict from `cc-report verify-claim-governance` means the
   evidence-bound claim package is internally consistent under the verifier
   rules. It does not mean the AI system is safe in deployment.

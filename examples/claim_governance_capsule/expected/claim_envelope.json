@@ -118,7 +118,7 @@
     "claim_id": "cc-claim-governance-capsule",
     "created_at": "2026-01-01T00:00:00Z",
     "evaluated_at": "2026-01-02T00:00:00Z",
-    "source_report_hash": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
+    "source_report_hash": "9742e11a31f35697d6170b4ea228a0371b60fd708b57606a01ac91b5385cdad2",
     "source_report_id": "cc-claim-governance-capsule",
     "source_report_schema": "cc.report.v0.3.1",
     "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
@@ -220,7 +220,7 @@
         "reason": null,
         "role": "measurement_evidence",
         "schema": "cc.report.measurement.v0.3.1",
-        "sha256": "569331caa16c17cdaf1531a4cbc318f1b6ccf44204dc0d0018dfa1af4a0c261b",
+        "sha256": "dac150e456c0fbd1294e866cc24b76f11e6d553ef51a7a87a72b74be01fad717",
         "status": null,
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       },
@@ -256,7 +256,7 @@
       },
       {
         "artifact_id": "evidence:calibration_evidence:0001:calibration.json",
-        "bytes": 189,
+        "bytes": 1289,
         "created_at": null,
         "evaluated_at": null,
         "metadata": {},
@@ -264,7 +264,7 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "calibration_evidence",
         "schema": null,
-        "sha256": "fb6632f6958567326a2e31a41e62a839dd31ea751ff0af69a562adeccaded014",
+        "sha256": "a7d8be80173008354fd1936a45136f88ba3c62a524e4f42dc763ad0c019eb3d4",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       },
@@ -322,7 +322,7 @@
         "reason": "Canonical report receipt binds the report bytes and named evidence hashes.",
         "role": "receipt_integrity",
         "schema": "cc.report.receipt.v0.3.1",
-        "sha256": "209fa93b57dda3ceccf4b7680211a19f2e07105fc6b1561c89b64ab8093fd811",
+        "sha256": "9742e11a31f35697d6170b4ea228a0371b60fd708b57606a01ac91b5385cdad2",
         "status": null,
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }
@@ -339,7 +339,7 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "extremal_scenario",
         "schema": null,
-        "sha256": "ab5bf859ed132c8f9f68262a00470d6312c035953b14696e7dda368a569d437f",
+        "sha256": "bb9e9cf4e1aec1aef6e670c06e10bad89cb96ccdb7222d1ec3919e79b3c7a120",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       },
@@ -353,7 +353,7 @@
         "reason": "Evidence artifact hash and byte count verified.",
         "role": "extremal_scenario",
         "schema": null,
-        "sha256": "ce08e2c34974d8187824413deec8b7314e3a95559c1a2b5c0d53beaf15dceba3",
+        "sha256": "f2aaf4d8b700069449f3364068fc024f28f718173aa9f9312137b29788541925",
         "status": "present",
         "subject_ref": "cc.report.v0.3.1:cc-claim-governance-capsule"
       }

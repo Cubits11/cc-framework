@@ -1,0 +1,47 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2303,
+      "missing": false,
+      "path": "docs/product/OPEN_CORE_STRATEGY.md",
+      "sha256": "5aafa0ce83ebd3eba11dad99326efaa8516b6fcbd51f62304f3bceee25622baa"
+    },
+    {
+      "bytes": 19959,
+      "missing": false,
+      "path": "README.md",
+      "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+    }
+  ],
+  "assumptions": [
+    "The wheel built in CI is the artifact the strategy describes.",
+    "Classification in docs/api.md is kept current by the packaging boundary test."
+  ],
+  "card_id": "open_core.strategy",
+  "claim": "The public research core is intended to remain inspectable for credibility and reproducibility, while possible private/commercial layers may operationalize the primitives.",
+  "command": [
+    ".venv/bin/mkdocs build --strict"
+  ],
+  "counterevidence": [],
+  "falsifier": "A module the strategy document places in the open core that is absent from the published wheel, or an importable wheel surface classified nowhere in docs/api.md.",
+  "label_meanings": {
+    "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "local-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C0",
+  "non_claims": [
+    "Does not make the project a product today.",
+    "Does not claim enterprise readiness."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+  "supersedes": null
+}

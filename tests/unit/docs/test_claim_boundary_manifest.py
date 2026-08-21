@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from scripts.validate_claim_boundary_manifest import CLAIM_REQUIRED, load_manifest, validate_manifest
-
+from scripts.validate_claim_boundary_manifest import (
+    CLAIM_REQUIRED,
+    load_manifest,
+    validate_manifest,
+)
 
 MAJOR_FORBIDDEN_UPGRADES = {
     ("Governance PASS", "deployment safety"),
@@ -23,7 +26,7 @@ def test_claim_boundary_manifest_required_fields_and_unique_ids() -> None:
     seen: set[str] = set()
 
     for claim in manifest["claims"]:
-        assert CLAIM_REQUIRED <= claim.keys()
+        assert claim.keys() >= CLAIM_REQUIRED
         assert claim["id"] not in seen
         seen.add(claim["id"])
         assert claim["non_claims"]
@@ -33,4 +36,4 @@ def test_claim_boundary_manifest_contains_major_forbidden_upgrades() -> None:
     manifest = load_manifest()
     upgrades = {(item["from"], item["to"]) for item in manifest["forbidden_upgrades"]}
 
-    assert MAJOR_FORBIDDEN_UPGRADES <= upgrades
+    assert upgrades >= MAJOR_FORBIDDEN_UPGRADES

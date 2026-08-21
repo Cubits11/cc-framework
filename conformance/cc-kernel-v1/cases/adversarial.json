@@ -1,0 +1,107 @@
+{
+  "case_count": 8,
+  "cases": [
+    {
+      "description": "Countermonotonicity is strictly bivariate. The FH lower bound is not a copula in dimension >= 3, though it stays pointwise sharp. An implementation that returns a number here is wrong.",
+      "expect_refusal": "countermonotone_undefined",
+      "id": "reject-countermonotone-three-events",
+      "input": {
+        "dependence": "countermonotone",
+        "event": "all",
+        "marginals": {
+          "A": 0.3,
+          "B": 0.4,
+          "C": 0.5
+        }
+      }
+    },
+    {
+      "description": "Countermonotonicity is a relation between two events; with fewer than two there is nothing to be countermonotone with. Found by differential fuzz (seed 1): the Python reference raised IndexError and the Node implementation silently returned NaN. Both were wrong, differently.",
+      "expect_refusal": "countermonotone_undefined",
+      "id": "reject-countermonotone-one-event",
+      "input": {
+        "dependence": "countermonotone",
+        "event": "all",
+        "marginals": {
+          "A": 0.3
+        }
+      }
+    },
+    {
+      "description": "A marginal outside [0, 1] is not a probability.",
+      "expect_refusal": "marginal_out_of_range",
+      "id": "reject-marginal-above-one",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": 1.5,
+          "B": 0.2
+        }
+      }
+    },
+    {
+      "description": "A negative marginal is not a probability.",
+      "expect_refusal": "marginal_out_of_range",
+      "id": "reject-marginal-negative",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": -0.1,
+          "B": 0.2
+        }
+      }
+    },
+    {
+      "description": "A composition over zero events has no meaning.",
+      "expect_refusal": "no_events",
+      "id": "reject-empty-marginals",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {}
+      }
+    },
+    {
+      "description": "Only conjunction and union are defined by this corpus.",
+      "expect_refusal": "unknown_event_kind",
+      "id": "reject-unknown-event-kind",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "xor",
+        "marginals": {
+          "A": 0.1
+        }
+      }
+    },
+    {
+      "description": "An unrecognized dependence assumption must fail closed, not default.",
+      "expect_refusal": "unknown_dependence",
+      "id": "reject-unknown-dependence",
+      "input": {
+        "dependence": "sorta-dependent",
+        "event": "all",
+        "marginals": {
+          "A": 0.1,
+          "B": 0.2
+        }
+      }
+    },
+    {
+      "description": "NaN is not a probability. Note this case is expressed as a string in JSON because JSON has no NaN literal; see the spec.",
+      "expect_refusal": "marginal_not_finite",
+      "id": "reject-non-finite-marginal",
+      "input": {
+        "dependence": "unconstrained",
+        "event": "all",
+        "marginals": {
+          "A": "NaN",
+          "B": 0.2
+        }
+      }
+    }
+  ],
+  "corpus": "cc-kernel-v1",
+  "kind": "reject"
+}

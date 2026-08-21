@@ -1,0 +1,77 @@
+{
+  "artifacts": [
+    {
+      "bytes": 10127,
+      "missing": false,
+      "path": "docs/theory/theorem_ledger.md",
+      "sha256": "a8ed8bb949c97ad2a157654e7121f0d8150ce65f876a94ef6577b8b185a3ae20"
+    },
+    {
+      "bytes": 7871,
+      "missing": false,
+      "path": "docs/validation_matrix.md",
+      "sha256": "0c4aeb300be94508644c7ca2f38b1cb6552ce4fb31c10cdea0769b809904c5d5"
+    },
+    {
+      "bytes": 17592,
+      "missing": false,
+      "path": "src/cc/reporting/canonical.py",
+      "sha256": "64e9c1f1efaa1b53fdfeec8c26a070089dc36e46c82f2e13ce1404d9088288c4"
+    },
+    {
+      "bytes": 29932,
+      "missing": false,
+      "path": "src/cc/reporting/report.py",
+      "sha256": "31c3e6f192b671a40e272e95c5177dc6c36f69bfb428016dca1ccfa958ab7f7d"
+    },
+    {
+      "bytes": 19054,
+      "missing": false,
+      "path": "src/cc/evidence/merkle_log.py",
+      "sha256": "66ee5c8b9931f64b3a1e05e71375ca73f315252de280780fd7b4ad45aeb8e58a"
+    },
+    {
+      "bytes": 10654,
+      "missing": false,
+      "path": "src/cc/evidence/anchoring.py",
+      "sha256": "c38d55e7baafd860bc46bd05e52b08f2de8cdd6cec1f64e2722be24d92e48d8c"
+    }
+  ],
+  "assumptions": [
+    "SHA-256 remains collision resistant.",
+    "The canonicalization profile named on the receipt is the one used to verify it.",
+    "Receipt-covered JSON is read with strict duplicate-key rejection."
+  ],
+  "card_id": "reporting.receipt_integrity",
+  "claim": "Receipt/hash verification can provide tamper evidence for recorded bytes under canonical serialization and verification rules.",
+  "command": [
+    "pytest tests/unit/reporting/test_reporting.py",
+    "pytest tests/unit/evidence/test_transparency_log_adversarial.py",
+    "PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/evidence tests/unit/reporting"
+  ],
+  "counterevidence": [],
+  "falsifier": "Two byte-distinct payloads that a consumer needs distinguished receiving the same canonical hash, or a payload whose recomputed hash differs from its receipt while its bytes are unchanged.",
+  "label_meanings": {
+    "evidence_state": "Produced on a local machine. Says nothing about cloud or deployed behaviour.",
+    "publication_state": "Not yet reviewed for publication.",
+    "verdict": "The command has not been executed for this card. No result is claimed."
+  },
+  "labels": {
+    "evidence_state": "local-only",
+    "publication_state": "draft",
+    "verdict": "not-run"
+  },
+  "maturity": "C2",
+  "non_claims": [
+    "Does not prove statistical validity.",
+    "Does not prove source data truth.",
+    "Does not prove representativeness.",
+    "Does not prove compliance.",
+    "Does not prove safety."
+  ],
+  "result_detail": null,
+  "retraction_reason": null,
+  "schema_version": "cc.evidence_card.v1",
+  "source_revision": "faf81103b9eceaa1a47daac8d6cd76d7cb382f53",
+  "supersedes": null
+}

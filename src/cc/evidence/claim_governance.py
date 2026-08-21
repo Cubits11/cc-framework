@@ -73,7 +73,7 @@ from cc.evidence.role_ontology import (
     roles_requiring_semantic_payload_validation,
     validate_role_payload,
 )
-from cc.reporting.canonical import sha256_canonical
+from cc.reporting.canonical import sha256_canonical, strict_json_loads
 from cc.reporting.report import (
     ALLOWED_CLAIM_LEVELS,
     CLAIM_LEVELS,
@@ -325,7 +325,8 @@ def verify_claim_governance(
     evaluated_at = _utc_iso(evaluation_time)
 
     try:
-        report = json.loads(report_file.read_text(encoding="utf-8"))
+        # A repeated key here would change which report is verified (F-07).
+        report = strict_json_loads(report_file.read_text(encoding="utf-8"))
     except Exception as exc:
         return _failure_audit(
             report_id=report_file.stem or "<unreadable>",
@@ -824,7 +825,7 @@ def _read_semantic_payload(
     root_dir: Path,
 ) -> Mapping[str, Any] | None:
     try:
-        payload = json.loads(_resolve_path(artifact_audit.path, root_dir).read_text())
+        payload = strict_json_loads(_resolve_path(artifact_audit.path, root_dir).read_text())
     except Exception as exc:
         artifact_audit.status = EvidenceRoleStatus.UNREADABLE
         artifact_audit.reason = f"Artifact could not be parsed as JSON: {exc}"
