@@ -5,9 +5,10 @@ against the standard set by the flagship sibling repository
 [`PSUCyberSecurityLab/ghost-ark`](https://github.com/PSUCyberSecurityLab/ghost-ark),
 and a plan to close the gap.
 
-> **Status: plan and measurements.** The measurements are real and reproducible.
-> The plan is not implemented. Nothing here claims cc-framework is safe, correct,
-> or production-ready, and nothing here relaxes a boundary in
+> **Status: baseline measurements, plan, and delivery records.** The measurements
+> are real and reproducible at their recorded revision. W3 and W5 are delivered;
+> the remaining workstreams are proposals. Nothing here claims cc-framework is
+> safe, correct, or production-ready, and nothing here relaxes a boundary in
 > [`NON_CLAIMS.md`](../research/NON_CLAIMS.md).
 
 ---
@@ -60,10 +61,11 @@ Three failures, stated once:
 2. **Enforcement.** Prose 8.8, enforcement 4.0. Strict typing declared over 90
    files, enforced on 7. No forbidden-phrase scanner anywhere. The claim ledger
    itself *is* enforced — an earlier draft said otherwise and was wrong.
-3. **Unexamined foundations.** The canonicalization kernel every signed artifact
-   routes through silently merges Unicode-distinct keys, diverges from RFC 8785
-   on five of six number forms, and had never been attacked. One hour of probing
-   found four defects. **Open — this is W3, the highest-severity work remaining.**
+3. **Unexamined foundations (baseline; W3 delivered).** The baseline
+   canonicalization kernel silently merged Unicode-distinct keys, diverged from
+   RFC 8785, and had never been attacked. W3 shipped `cc.canonical.v2` and gates
+   its declared census in CI. That is repair evidence, not proof that the kernel
+   has no other flaws.
 
 ---
 
@@ -96,27 +98,31 @@ scenario family.
 
 ---
 
-## Reproduce the S1 findings
+## Verify the delivered canonicalization repair (W3)
 
-The canonicalization defects — [F-03](FINDINGS_REGISTER.md#f-03) through
-[F-07](FINDINGS_REGISTER.md#f-07) — reproduce in one command:
+The historical canonicalization defects —
+[F-03](FINDINGS_REGISTER.md#f-03) through [F-07](FINDINGS_REGISTER.md#f-07) —
+remain visible in the read-only v1 census. The gated v2 profile is verified in
+one command:
 
 ```bash
 PYTHONPATH=src python scripts/canonicalization_probe.py
 ```
 
-The probe exits non-zero while any class carries an `unintended-kernel` verdict,
-so the finding is falsifiable: fix the canonicalizer and the probe goes green.
+The probe exits non-zero if v2 carries an `unintended-kernel` or
+`rejection-asymmetry` verdict. A green result establishes only that its declared
+cases behave as declared; the corpus is curated and does not prove completeness.
 
-Headline:
+Historical v1 behavior, preserved only so legacy receipts remain verifiable:
 
 ```python
 >>> canonical_json_bytes({"é": 1, "é": 2})   # U+00E9 key, then U+0065 U+0301 key
 b'{"\xc3\xa9":2}'
 ```
 
-Two distinct input keys. One output key. No exception. The receipt hash covers a
-document that is not the document supplied.
+Two distinct input keys. One output key. No exception. Under v2, the same input
+keeps both keys, and the profile conforms to RFC 8785 for the census's tested
+number forms.
 
 ---
 

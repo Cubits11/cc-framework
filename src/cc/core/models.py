@@ -802,11 +802,13 @@ class ModelBase(BaseModel):
     @classmethod
     def migrate(cls: type[TModel], old_data: Mapping[str, Any]) -> TModel:
         """
-        Best-effort migration entrypoint for schema upgrades.
+        Migration entrypoint for schema upgrades.
 
         Default behavior:
         - Accept arbitrary mapping (e.g. legacy JSON payload).
-        - Extra keys ignored per model_config.
+        - Unknown keys are ignored per model_config.
+        - Known fields are validated; malformed known values fail closed rather
+          than being silently repaired or discarded.
         - Any embedded `schema_version` is discarded in favour of current.
 
         Override in subclasses when:

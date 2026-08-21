@@ -9,7 +9,7 @@ Scope:
 - Thread-safety of blake3_hash cache
 - Avro / Protobuf export (feature-gated)
 - OpenAPI schema generation
-- migrate() best-effort behaviour
+- migrate() behaviour
 - AuditColumnsMixin + OrmBase SQLAlchemy wiring
 """
 
@@ -338,10 +338,17 @@ def test_modelbase_openapi_schema_includes_field_description():
 # ---------------------------------------------------------------------
 
 
-@given(st.dictionaries(st.text(min_size=1, max_size=10), st.text()))
-def test_modelbase_migrate_best_effort(old_data: dict[str, str]):
+@given(
+    st.dictionaries(
+        st.text(min_size=1, max_size=10).filter(
+            lambda key: key not in {"schema_version", "creator_id", "updated_at", "optional_field"}
+        ),
+        st.text(),
+    )
+)
+def test_modelbase_migrate_ignores_unknown_fields(old_data: dict[str, str]):
     """
-    migrate() should be best-effort and never throw on arbitrary old dicts.
+    migrate() should ignore arbitrary *unknown* legacy fields.
 
     We don't assert exact semantics; we only require that:
     - an instance is created
@@ -351,13 +358,19 @@ def test_modelbase_migrate_best_effort(old_data: dict[str, str]):
     class TestModel(ModelBase):
         optional_field: str | None = None
 
-    # Ensure schema_version is not present to exercise defaulting behaviour
-    old_data = {k: v for k, v in old_data.items() if k != "schema_version"}
-
     m = TestModel.migrate(old_data)
     assert isinstance(m, TestModel)
     assert m.schema_version == "4.2"
-    # The optional field may or may not be populated, depending on keys.
+
+
+def test_modelbase_migrate_rejects_malformed_known_field():
+    """migrate() must not silently repair a malformed recognized value."""
+
+    class TestModel(ModelBase):
+        optional_field: str | None = None
+
+    with pytest.raises(ValidationError, match="timestamp must be numeric"):
+        TestModel.migrate({"updated_at": ""})
 
 
 def test_modelbase_migrate_preserves_known_fields_ignores_extra():

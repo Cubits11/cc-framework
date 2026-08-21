@@ -1,8 +1,10 @@
 # Epistemic Upgrade Plan — cc-framework
 
-> **Status: plan.** Nothing in this document is implemented. It describes work
-> proposed for v0.4, grounded in measurements taken at commit `3e22c39` on
-> 2026-08-19.
+> **Status: baseline plan + delivery record.** This document was grounded in
+> measurements taken at commit `3e22c39` on 2026-08-19. Workstreams explicitly
+> marked **DELIVERED** (currently W3 and W5) record shipped work; the remaining
+> workstreams are proposals. Baseline findings are retained as historical
+> evidence, not assertions about the current repository state.
 >
 > **Non-claim.** This plan does not assert that cc-framework is safe, correct,
 > production-ready, or fit for any deployment. It does not claim the work

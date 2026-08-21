@@ -22,20 +22,22 @@ The framework already refuses to certify safety. The vision does not weaken that
 refusal; it makes the honest object — the identified interval under adversarial
 dependence — sharper, sourced, certified, and empirically grounded.
 
-## Why now — the empirical anchor
+## Why now — an empirical motivation, not validation
 
-A late-2025 result co-authored across OpenAI, Anthropic, and Google DeepMind
-found adaptive attacks bypassing published defenses at success rates above ~90%,
-against defenses first reported near 0%. Universal and transferable adversarial
-suffixes generalize across prompts and across model families. The operational
-reading is exact: **composed defenses fail together, not independently, and an
-adversary induces the correlation on purpose.** The independence assumption that
-most composition analysis silently ships is not merely imprecise — it is the
-specific lie the state-of-the-art attack exploits.
+A 2026 USENIX Security paper, [*The Attacker Moves
+Second*](https://www.usenix.org/conference/usenixsecurity26/presentation/nasr),
+reports that adaptive attacks bypassed twelve recent defenses at success rates
+above 90% for most of the evaluated defenses. Its narrower operational lesson is
+that evaluations against static or weak attackers can substantially overstate a
+defense's performance.
 
-That is CC-Framework's thesis, now validated by the frontier labs. It moves the
-framework from "a mathematically neat idea" to "the required measurement calculus
-for the current state of the attack."
+That result motivates dependence-aware composition analysis: a stack should not
+inherit an independence assumption merely because each component was measured in
+isolation. It does **not** measure CC-Framework's variables, validate this
+engine, establish that any particular defenses fail together in a given joint
+distribution, or make this framework a required calculus. The evidence is
+consistent with the motivation for this work; it is not an independent
+confirmation of its claims.
 
 ## The object, restated
 

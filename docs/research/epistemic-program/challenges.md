@@ -255,10 +255,18 @@ So the defect is plausibly in the *contract*, not the code:
 **Recommendation: B**, with the Hypothesis strategy excluding known field names
 and an explicit test asserting that an invalid known field *does* raise.
 
-**Not applied.** This is a semantic decision in the core model layer, made on a
-pre-existing bug that is unrelated to this branch's work. Changing it
-unilaterally would be its own kind of scope inflation — repairing something
-quietly because it was inconvenient to the session's green build.
+#### Resolution
+
+**Option B was adopted.** `ModelBase.migrate()` remains unchanged: it ignores
+unknown legacy keys, discards an embedded `schema_version`, and validates every
+recognized field. A malformed known value such as `updated_at: ""` therefore
+raises rather than being silently repaired or discarded.
+
+The method's docstring now states that contract. The property test generates
+unknown keys only, and a deterministic unit test asserts the fail-closed path
+for the formerly hidden counterexample. This corrects a false promise in the
+test and documentation; it does not make migration more permissive or turn a
+validation failure into a green result.
 
 ## How results are handled
 
