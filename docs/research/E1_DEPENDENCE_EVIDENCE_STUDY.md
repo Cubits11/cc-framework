@@ -4,7 +4,10 @@
 > pretend we know more than the evidence permits.
 
 **Frozen protocol — controlled synthetic study complete; real-world pilot
-UNTESTED.** This document is the sole active empirical wager for the current
+UNTESTED.** This document is the frozen wager. The verdict and its corrections
+are recorded in [E1_DECISION_RECORD.md](E1_DECISION_RECORD.md); the successor
+wager is frozen in [E2_MEASUREMENT_CONTRACT.md](E2_MEASUREMENT_CONTRACT.md).
+This document is the sole active empirical wager for the current
 research cycle. It replaces neither the kernel nor the repository's
 non-claims, and it does not license a deployment-safety claim.
 
@@ -59,10 +62,15 @@ predeclared 0.84 threshold for nominal 0.90 coverage. This supports the stated
 simulation diagnostic; it does not prove performance beyond this generator and
 finite grid.
 
-S6 is the broken-data control suite. Focused tests reject malformed designs and
-tampered artifacts; the verifier reconstructs exact regime bounds, rechecks
-endpoint witnesses, checks parity, validates the rendered CSV against the JSON
-study, hashes both files, and can regenerate the full study in memory.
+S6 is the broken-data control suite: 14 focused test functions across
+`tests/unit/evals/test_dependence_evidence.py` (3),
+`tests/unit/evals/test_e1_artifact_identity.py` (10), and
+`tests/integration/test_e1_dependence_evidence.py` (1). They reject malformed
+designs and tampered artifacts and pin artifact identity. The verifier itself
+reconstructs exact regime bounds, rechecks endpoint witnesses, checks parity,
+validates the rendered CSV against the JSON study, hashes both files, and can
+regenerate the full study in memory — these are verifier capabilities exercised
+by those tests, not additional test functions.
 
 ## Identification is not sampling is not measurement
 
@@ -78,7 +86,12 @@ study, hashes both files, and can regenerate the full study in memory.
   guardrail versions/configuration, missingness, deduplication, and population
   limits before its numbers can be called empirical evidence.
 
-## Real-pilot data contract — template only
+## Real-pilot data contract — superseded
+
+**This template has been superseded by the frozen
+[E2 measurement contract](E2_MEASUREMENT_CONTRACT.md)**, which specifies the
+same obligations at row-schema resolution and makes conformance machine-checkable
+(`make verify-e2-contract`). The summary below is retained for continuity.
 
 The real-pilot gate remains closed. If it opens, the pilot must supply this
 small contract before a model is run:
@@ -112,6 +125,13 @@ try to find a declared synthetic law for which the coverage or sharpness claim
 fails. A passing replay establishes artifact and conditional mathematical
 consistency—not external validity.
 
+Replay into **any** output directory. `manifest_payload_sha256` covers the
+study identity (design, schema versions, and content hashes) and is invariant
+under relocation; the absolute path is recorded separately under
+`execution_provenance` and is deliberately excluded from the digest. A digest
+that differs across two clean checkouts is a genuine divergence, not a path
+artifact.
+
 ## Source ledger
 
 | Source | Role in E1 | What it supports | Limit |
@@ -126,6 +146,7 @@ consistency—not external validity.
 | --- | --- | --- |
 | The existing finite atom-LP produces the declared exact E1 bounds and feasible endpoint witnesses. | Supported in controlled synthetic suite | Five declared distributions, deterministic artifacts, and witness verifier. |
 | Singleton and pairwise evidence can fail to identify a three-way event. | Supported by constructive counterexample | The parity pair only; it is a mathematical fact for this specified finite setting. |
+| Artifact identity is invariant under relocation and sensitive to design mutation. | Supported | Manifest schema v2; pinned by `tests/unit/evals/test_e1_artifact_identity.py`. |
 | Count-derived E1 I0–I2 intervals met the frozen Monte Carlo coverage rule. | Supported as a simulation diagnostic | Five generators, two sample sizes, two events, fixed seed/grid; conditional on generator and method. |
 | CC improves real guardrail safety or robustness. | **Not supported** | No credible real-world pilot or adaptive evaluation has been performed. |
 
