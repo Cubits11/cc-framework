@@ -4,10 +4,10 @@
     {
       "artifacts": [
         {
-          "bytes": 19959,
+          "bytes": 25824,
           "missing": false,
           "path": "README.md",
-          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+          "sha256": "21ad693d9e615beaf01221b11b086062211fa7e07483836807ce07db3fc5d522"
         },
         {
           "bytes": 10127,
@@ -61,7 +61,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
@@ -118,7 +118,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
@@ -181,7 +181,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
@@ -258,16 +258,16 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
       "artifacts": [
         {
-          "bytes": 19959,
+          "bytes": 25824,
           "missing": false,
           "path": "README.md",
-          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+          "sha256": "21ad693d9e615beaf01221b11b086062211fa7e07483836807ce07db3fc5d522"
         },
         {
           "bytes": 8366,
@@ -330,7 +330,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
@@ -398,7 +398,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
@@ -466,7 +466,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     },
     {
@@ -478,10 +478,10 @@
           "sha256": "5aafa0ce83ebd3eba11dad99326efaa8516b6fcbd51f62304f3bceee25622baa"
         },
         {
-          "bytes": 19959,
+          "bytes": 25824,
           "missing": false,
           "path": "README.md",
-          "sha256": "f314d19df1890888a9e69131004e1ef6bfc7ab67f721e7211ad468c824159c36"
+          "sha256": "21ad693d9e615beaf01221b11b086062211fa7e07483836807ce07db3fc5d522"
         }
       ],
       "assumptions": [
@@ -513,7 +513,7 @@
       "result_detail": null,
       "retraction_reason": null,
       "schema_version": "cc.evidence_card.v1",
-      "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty",
+      "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf",
       "supersedes": null
     }
   ],
@@ -565,5 +565,5 @@
     "A card with verdict 'not-run' has no result. It must not be displayed as passing, pending, or healthy."
   ],
   "schema_version": "cc.site_evidence_manifest.v1",
-  "source_revision": "5980b88a64a2a1a6684aa77837b2a5ba83736238-dirty"
+  "source_revision": "27350d434f9c180a2f6f6880441f93dcd5a34abf"
 }
