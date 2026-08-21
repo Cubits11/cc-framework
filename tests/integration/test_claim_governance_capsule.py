@@ -429,6 +429,10 @@ def run_capsule_at(capsule_dir: Path, *args: str) -> subprocess.CompletedProcess
 def env(*, extra_pythonpath: str | None = None) -> dict[str, str]:
     values = os.environ.copy()
     values["PYTHONHASHSEED"] = "0"
+    # The shell entry point intentionally supports an explicit interpreter
+    # override. Use the interpreter collecting this test so the subprocess
+    # cannot accidentally fall through to a globally installed `python3`.
+    values["PYTHON"] = sys.executable
 
     pythonpath = "src"
     if extra_pythonpath is not None:

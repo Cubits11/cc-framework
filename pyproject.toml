@@ -8,7 +8,7 @@ version = "0.3.0-rc1"
 description = "Dependence-aware partial-identification bounds for composed AI guardrail failures"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = { text = "MIT" }
 authors = [{ name = "Pranav Bhave" }]
 keywords = ["AI safety", "guardrails", "security", "evaluation", "statistics", "composability"]
 classifiers = [
@@ -96,6 +96,10 @@ dev = [
   "mypy>=1.10",
   "pre-commit>=4.0",
   "build>=1.2",
+  # tests/unit/packaging invokes `python -m build --no-isolation`; the
+  # frontend and its setuptools backend must therefore be installed together.
+  "setuptools>=69,<76.0",
+  "wheel>=0.42,<1.0",
   "twine>=5.1",
   "types-PyYAML>=6.0.12",
   "types-jsonschema>=4.22",
@@ -121,8 +125,8 @@ test = [
   # environment. Without these three the declared test extra cannot run the
   # test suite (upgrade finding F-01).
   "build>=1.2",
-  "setuptools>=69",
-  "wheel",
+  "setuptools>=69,<76.0",
+  "wheel>=0.42,<1.0",
 ]
 
 security = [

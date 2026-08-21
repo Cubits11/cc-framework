@@ -1,8 +1,6 @@
 """Test that Week 2 deliverables are complete"""
 
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -33,14 +31,6 @@ def test_smoke_runs(smoke_artifacts: tuple[Path, Path]):
     """Smoke-style artifact generation completes in a temp directory."""
     _, out_dir = smoke_artifacts
     assert (out_dir / "summary.csv").exists()
-
-
-def test_unit_tests_pass():
-    """Unit tests are green"""
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/unit", "-q"], capture_output=True
-    )
-    assert result.returncode == 0, result.stderr.decode()
 
 
 def test_three_figures_exist(smoke_artifacts: tuple[Path, Path]):
