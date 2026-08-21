@@ -117,7 +117,6 @@ __all__ = [
     "ChainedJSONLLogger",
     "LoggingError",
     "aaudit_context",
-    "aaudit_context",
     "audit_context",
 ]
 

@@ -31,6 +31,7 @@ Fix all five to unlock the rest of the roadmap.
 **Validation Snippet**
 ```python
 from src.cc.core.dependence_correction import apply_fh_correction
+
 assert apply_fh_correction(0.40, 0.60, 0.50, 1.5) == (0.25, 0.75)
 ```
 
@@ -87,8 +88,9 @@ assert apply_fh_correction(0.40, 0.60, 0.50, 1.5) == (0.25, 0.75)
 **Validation:**
 ```python
 from src.cc.analysis.power_analysis import power_curve_analysis
+
 results = power_curve_analysis()
-assert results['power_constructive'][0] > 0.7
+assert results["power_constructive"][0] > 0.7
 ```
 
 ---

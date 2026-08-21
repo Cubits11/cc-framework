@@ -83,7 +83,7 @@ freezegun>=1.4,<2.0           # time-freezing for deterministic tests (optional)
 # -----------------------------------------------------------------------------
 # Linting / formatting / type checking (dev)
 # -----------------------------------------------------------------------------
-ruff>=0.6,<1.0
+ruff==0.16.4
 mypy>=1.8,<2.0
 types-PyYAML>=6.0.12.20240808
 types-tqdm>=4.66.0.20240106
