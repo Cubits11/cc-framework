@@ -124,6 +124,13 @@ upper witness: [ 0.9 -0.   0.   0.1]
 
 ## The complete epistemic machine
 
+<p align="center">
+  <img src="docs/assets/epistemic-machine.png" width="900"
+       alt="Five stages: Claim Contract (population, event, falsifier, non-claim); Evidence (marginals, pairs, provenance, uncertainty); Feasible Worlds (all joint laws not ruled out); Bounds and Witnesses (min/max risk, attaining distributions); Claim Envelope (scope, replay, expiry, decision). Captioned: CC does not tell you which convenient world to believe; it tells you which worlds the evidence has not yet ruled out.">
+</p>
+
+<p align="center"><sub><a href="docs/assets/epistemic-machine.gif">Animated</a> &middot; <a href="docs/assets/epistemic-machine.mp4">MP4</a><br>The figure groups the two middle stages differently from the table below: it shows <em>Feasible Worlds</em> for the identification kernel, and merges bounds with their witnesses into one panel. Six rows, five panels, same machine.</sub></p>
+
 | Layer | What it contributes |
 | --- | --- |
 | **Claim contract** | Population, target event, falsifier, assumptions, and non-claims |
