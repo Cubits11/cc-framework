@@ -59,7 +59,8 @@ partial-identification setting:
 - finite-atom Frechet/LP composition bounds,
 - independence regret relative to an explicit product-coupling baseline,
 - endpoint witness distributions returned by the LP,
-- the correlation-cliff phenomenon as dependence sensitivity,
+- the controlled E1 Dependence-Evidence Study as a synthetic check of what
+  singleton and pairwise evidence can identify,
 - claim-bounded reproducibility and non-theatrical receipts as discipline, not
   proof of safety.
 
@@ -132,26 +133,23 @@ an independence baseline can be from feasible dependence-aware conclusions.
 - Non-claim: Independence regret is not a universal safety metric and does not
   show which dependence structure will occur in deployment.
 
-### 4. Correlation Cliffs
+### 4. Dependence-Evidence Value Study (E1)
 
-- Name: Correlation Cliffs
-- Status: Partially supported
-- Formal object: A region in dependence-parameter or constraint space where a
-  small change in dependence evidence produces a large movement in a composed
-  event risk, interval endpoint, or diagnostic.
-- Research question: Which guardrail compositions are stable under dependence
-  perturbation, and which become fragile near feasible-set boundaries?
-- What current CC kernel supports: Dependence-sensitive LP intervals, FH width,
-  FH position, independence regret, and experimental scripts for correlation
-  cliff demonstrations.
-- What is missing: A final formal definition, robustness criteria, and
-  empirical protocols that separate numerical artifacts from substantive
-  dependence sensitivity.
-- Possible paper contribution: A toy and empirical demonstration that
-  dependence can induce abrupt changes in composition conclusions even when
-  singleton rates are stable.
-- Non-claim: A correlation cliff is not proof of an attack or of real-world
-  deployment failure without an empirical link to the evaluated system.
+- Name: Dependence-Evidence Value Study
+- Status: Controlled synthetic validation complete; real-world pilot untested.
+- Formal object: A fixed suite of finite three-indicator joint laws evaluated
+  under singleton-only, fixed-pair, all-pair, and full-joint evidence regimes.
+- Research question: What does each additional evidence regime identify about
+  a declared composed failure event, and where does pairwise evidence remain
+  insufficient?
+- What current CC kernel supports: Exact finite-atom LP intervals, count-derived
+  simultaneous moment intervals, product baselines, and endpoint witnesses.
+- What is missing: A legally usable, well-specified real data pilot with a
+  defensible population, measurement instrument, labels, and red-team plan.
+- Possible paper contribution: A compact, challengeable demonstration that the
+  information value of pairwise evidence is structural rather than automatic.
+- Non-claim: E1 does not evaluate a deployed guardrail system, prove
+  representativeness, or establish attack robustness.
 
 ### 5. Witness Distributions for Safety Bounds
 
@@ -278,7 +276,7 @@ an independence baseline can be from feasible dependence-aware conclusions.
 | FH width and FH position | Identified-set diagnostics | Yes | No | Examples still needed | They are diagnostics, not causal effects. |
 | Product-coupling baseline | Independent Bernoulli coupling | Yes | No | Examples still needed | Product coupling is a baseline, not a default truth model. |
 | Independence regret | Difference from product-coupling event risk | Yes | No | Examples still needed | Regret does not identify the deployed joint law. |
-| Correlation cliffs | Dependence sensitivity of event risk or endpoints | Partially supported | Yes, final definition needed | Yes | A cliff demonstration is not proof of realized harm. |
+| Dependence-Evidence Value Study (E1) | Evidence-regime value for a declared three-way event | Controlled synthetic suite | No for the finite construction | Yes for any real-world pilot | Synthetic identification/coverage checks are not deployment evidence. |
 | Common-cause failure analysis | Latent common-cause dependence | Partially supported | Yes | Yes | The kernel does not infer causality. |
 | Guardrail portfolio optimization | Robust optimization under dependence uncertainty | No | Yes | Yes | No current deployment recommendations are implied. |
 | Adversarial dependence amplification | Threat-model-driven dependence search | No | Yes | Yes | Worst-case couplings are not automatically realizable attacks. |

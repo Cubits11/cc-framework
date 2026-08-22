@@ -1,7 +1,7 @@
 # CC-Framework
 
-**Dependence-aware composition of AI guardrails: Frechet-Hoeffding bounds on
-stacked-system failure, not a safety certification.**
+**Dependence-aware partial identification of failure risk in composed AI
+guardrails. Sharp bounds and endpoint witnesses — not a safety certification.**
 
 [![CI](https://github.com/Cubits11/cc-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/Cubits11/cc-framework/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -39,10 +39,111 @@ was not given.
 
 ---
 
-CC-Framework is a Python research framework for dependence-aware analysis of
-composed binary guardrail failures. It computes what available guardrail
-evidence supports under stated dependence assumptions. It does not certify that
-a stacked system is safe.
+## What is CC-Framework?
+
+**CC-Framework is a Python research framework for dependence-aware partial
+identification of failure risk in composed AI guardrails.**
+
+It does not ask:
+
+> "What single safety number looks plausible?"
+
+It asks:
+
+> **"Across every joint failure world still compatible with the evidence, what
+> is the smallest and largest system-level failure probability?"**
+
+It then exposes concrete **endpoint witnesses** — joint distributions that
+actually attain those limits — so the reported range is inspectable rather than
+rhetorical. It is explicitly **not** a deployment-safety certificate.
+
+## The correct meaning of "CC"
+
+"CC" is **not** a correlation coefficient, and CC-Framework is **not** the name
+of one magical scalar. Earlier Composition Coefficient ratios (`cc_gain`,
+`cc_shift`, and the deprecated `cc_max` / `cc_rel` family) remain legacy or
+secondary metric surfaces. The current front-door theory is:
+
+> **Dependence-aware composition of guardrail evidence through partial
+> identification, sharp bounds, and endpoint witnesses.**
+
+**CC-Framework is the project name — not the name of a number.**
+
+## The canonical example
+
+Suppose two guardrails each fail 10% of the time:
+
+```text
+P(A) = P(B) = 0.10
+```
+
+Multiplying them gives `0.10 × 0.10 = 0.01`. But that multiplication silently
+selected the **independent coupling**. Independence was never contained in the
+two marginal scores; it was assumed on their behalf.
+
+Without dependence evidence, the Fréchet bounds are all that is licensed:
+
+```text
+max(0, P(A) + P(B) - 1)  ≤  P(A ∩ B)  ≤  min(P(A), P(B))
+
+                     0%  ≤  P(A ∩ B)  ≤  10%
+```
+
+The 1% answer is one point inside a range ten times its own width. The **lower
+witness** places the two failure sets apart; the **upper witness** makes their
+blind spots coincide perfectly. Both are consistent with the same two scores.
+
+<p align="center">
+  <img src="docs/assets/independence-is-a-choice.svg" width="900"
+       alt="Two guardrails each fail 10% of the time. The probability that both fail together is pinned only to the range 0% to 10%. Independence picks 1% from inside that range; it is an assumption, not a measurement.">
+</p>
+
+Reproduce both witnesses:
+
+```bash
+PYTHONPATH=src python -c "
+from cc.kernel.strict import AssumptionSet, LinearQuery
+labels = ('A_failure', 'B_failure')
+a = AssumptionSet.empty(labels)
+for label in labels:
+    a = a.with_marginal_interval(label, 0.10, 0.10)
+r = a.identify(LinearQuery.intersection(labels, labels, name='P(both fail)'))
+print(f'identified interval: [{r.lower_bound:.2f}, {r.upper_bound:.2f}]')
+print('independence would say:', 0.10 * 0.10)
+print('lower witness:', r.lower_solution)
+print('upper witness:', r.upper_solution)
+"
+```
+
+```text
+identified interval: [0.00, 0.10]
+independence would say: 0.010000000000000002
+lower witness: [0.8 0.1 0.1 0. ]
+upper witness: [ 0.9 -0.   0.   0.1]
+```
+
+## The complete epistemic machine
+
+<p align="center">
+  <img src="docs/assets/epistemic-machine.png" width="900"
+       alt="Five stages: Claim Contract (population, event, falsifier, non-claim); Evidence (marginals, pairs, provenance, uncertainty); Feasible Worlds (all joint laws not ruled out); Bounds and Witnesses (min/max risk, attaining distributions); Claim Envelope (scope, replay, expiry, decision). Captioned: CC does not tell you which convenient world to believe; it tells you which worlds the evidence has not yet ruled out.">
+</p>
+
+<p align="center"><sub><a href="docs/assets/epistemic-machine.gif">Animated</a> &middot; <a href="docs/assets/epistemic-machine.mp4">MP4</a><br>The figure groups the two middle stages differently from the table below: it shows <em>Feasible Worlds</em> for the identification kernel, and merges bounds with their witnesses into one panel. Six rows, five panels, same machine.</sub></p>
+
+| Layer | What it contributes |
+| --- | --- |
+| **Claim contract** | Population, target event, falsifier, assumptions, and non-claims |
+| **Evidence** | Marginals, pairwise observations, uncertainty, and provenance |
+| **Identification kernel** | The complete class of joint worlds not ruled out |
+| **Sharp bounds** | Minimum and maximum supported event risk |
+| **Witnesses** | Concrete distributions attaining both endpoints |
+| **Claim envelope** | Scope, replay path, limitations, expiry, and decision status |
+
+Receipts and hashes establish artifact identity and replayability. The
+repository explicitly refuses to treat integrity as proof of measurement
+validity, representativeness, or safety. Its conclusions remain conditional on
+the supplied binary events, evidence, and assumptions.
 
 ## Public Boundary
 
@@ -147,6 +248,37 @@ finite binary atom kernel for sharp Frechet composition intervals, metric
 diagnostics, and endpoint witness distributions. It is not a deployment safety
 certificate, not a product platform, and not an AI alignment solution.
 
+### The evidence ladder
+
+Empirical claims are staged. **Passing an earlier rung confers no authority at
+a later one**, and claims do not inherit upward by default — every enlargement
+of scope must be separately earned.
+
+| Rung | Meaning | Status |
+| --- | --- | --- |
+| **E0** | Mathematical proposition | Established |
+| **E1** | Controlled synthetic realization | **Complete — decision: Narrow** |
+| **E2** | Shared-item empirical guardrail pilot | **Contract frozen, UNTESTED** |
+| **E3** | Multi-system / multi-dataset replication | Not started |
+| **E4** | Prospective external evaluation | Not started |
+| **E5** | Operational decision consequence | Not started |
+
+[E1](docs/research/E1_DEPENDENCE_EVIDENCE_STUDY.md) established constructively
+that identical singleton **and** pairwise moments can coexist with different
+three-way failure probabilities — so "we measured every pair, so we know the
+stack" is false in general. It also showed that a product baseline is neither
+reliably conservative nor reliably optimistic: it understated a common-cause
+generator fourfold and invented risk under a mutually exclusive one. E1 is
+synthetic; its
+[decision record](docs/research/E1_DECISION_RECORD.md) carries the Narrow
+verdict, the standing objections, and the corrections made to its own first
+draft.
+
+[E2](docs/research/E2_MEASUREMENT_CONTRACT.md) is frozen **before** any dataset
+was inspected, and no conforming dataset has been collected. The phrase "we
+validated CC" is prohibited at every rung: it names no population, no event,
+and no evidence regime.
+
 The validation tracks are intentionally separated:
 
 - **Paper Core v0.3** is release-candidate quality in v0.3-rc1 for the
@@ -224,16 +356,27 @@ and optional pairwise constraints
 q_ij = P(Z_i = 1, Z_j = 1).
 ```
 
-For a declared Boolean composition event `phi(Z)`, define the feasible Frechet
-class `F` as the set of atom distributions satisfying the supplied assumptions
-and evidence. The kernel computes:
+Observed evidence — marginal failure rates, pairwise overlaps, or any other
+declared linear constraints — defines a feasible class:
 
 ```text
-L_phi = inf_{pi in F} E_pi[phi(Z)]
-U_phi = sup_{pi in F} E_pi[phi(Z)]
+F(E) = { pi in simplex(2^m) : pi satisfies the supplied evidence and assumptions }
 ```
 
-These are sharp bounds conditional on supplied assumptions and evidence.
+For a declared Boolean composition event `phi(Z)`, the kernel computes:
+
+```text
+L_phi = inf_{pi in F(E)} E_pi[phi(Z)]
+U_phi = sup_{pi in F(E)} E_pi[phi(Z)]
+```
+
+`[L_phi, U_phi]` is the **sharp identified interval**: every excluded value is
+incompatible with the declared evidence, and both endpoints are attained by
+explicit feasible worlds. Widening the evidence set `E` can only narrow the
+interval; it can never widen it. If it does, that is a falsifier.
+
+These are sharp bounds conditional on supplied assumptions and evidence — never
+on the quality of the measurement that produced them.
 
 ## Implemented Kernel Surface
 
@@ -355,6 +498,9 @@ available.
 ## Research Program Documents
 
 - [Research Program](docs/research/RESEARCH_PROGRAM.md)
+- [E1 — Dependence-Evidence Study (frozen wager)](docs/research/E1_DEPENDENCE_EVIDENCE_STUDY.md)
+- [E1 — Epistemic Decision Record (verdict: Narrow)](docs/research/E1_DECISION_RECORD.md)
+- [E2 — Shared-Item Measurement Contract (frozen, untested)](docs/research/E2_MEASUREMENT_CONTRACT.md)
 - [Paper Core](docs/research/PAPER_CORE.md)
 - [Public API Contract](docs/api.md)
 - [Evidence-Bound Claim Governance Memo](docs/research/CLAIM_GOVERNANCE_OS.md)

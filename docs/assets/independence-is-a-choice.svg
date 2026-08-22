@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 610" width="960" height="610" role="img"
+     aria-label="Two guardrails each fail 10 percent of the time. The probability that both fail together is pinned only to the range 0 to 10 percent. Independence picks 1 percent from inside that range; it is an assumption, not a measurement.">
+<title>Independence is a choice, not a measurement</title>
+<style>
+  :root { --ink:#12151a; --dim:#5b6472; --line:#c9d1dc; --panel:#f2f5f9;
+           --a:#2f6df6; --b:#e0632c; --both:#7b3fbf; --band:#8fa3bd; --mark:#12151a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e8edf5; --dim:#9aa6b8; --line:#39424f; --panel:#1a1f27;
+             --a:#6f9dff; --b:#ff9a63; --both:#c39bf5; --band:#5d6d84; --mark:#e8edf5; } }
+  text { font-family: ui-sans-serif,-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif; fill: var(--ink); }
+  .h1 { font-size: 26px; font-weight: 680; letter-spacing:-.2px; }
+  .sub { font-size: 14.5px; fill: var(--dim); }
+  .cap { font-size: 13.5px; fill: var(--dim); }
+  .lbl { font-size: 13px; font-weight: 620; }
+  .mono { font-size: 15px; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .marklbl { font-size: 13px; font-weight: 700; text-anchor: middle; }
+  .both-lbl { font-size: 12px; font-weight: 700; text-anchor: middle; fill: var(--both); }
+  .unit { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+  .setA { fill: var(--a); opacity:.55; } .setB { fill: var(--b); opacity:.55; }
+  .setBoth { fill: var(--both); opacity:.95; }
+  .band { fill: var(--band); opacity:.3; }
+  .axis { stroke: var(--line); stroke-width: 2; } .tick { stroke: var(--line); stroke-width: 1.5; }
+  .mark { stroke: var(--mark); stroke-width: 2; } .markdot { fill: var(--mark); }
+  .indep { stroke: var(--b); stroke-width: 2; stroke-dasharray: 4 3; }
+  .f { animation-duration: 7.0s; animation-iteration-count: infinite;
+        animation-direction: alternate; animation-timing-function: steps(1,end); opacity: 0; }
+  .f0{animation-name:k0}.f1{animation-name:k1}.f2{animation-name:k2}.f3{animation-name:k3}.f4{animation-name:k4}.f5{animation-name:k5}.f6{animation-name:k6}.f7{animation-name:k7}.f8{animation-name:k8}.f9{animation-name:k9}.f10{animation-name:k10}
+  @keyframes k0{0.000%,9.091%{opacity:1}9.101%,100%{opacity:0}}@keyframes k1{0%,9.081%{opacity:0}9.091%,18.182%{opacity:1}18.192%,100%{opacity:0}}@keyframes k2{0%,18.172%{opacity:0}18.182%,27.273%{opacity:1}27.283%,100%{opacity:0}}@keyframes k3{0%,27.263%{opacity:0}27.273%,36.364%{opacity:1}36.374%,100%{opacity:0}}@keyframes k4{0%,36.354%{opacity:0}36.364%,45.455%{opacity:1}45.465%,100%{opacity:0}}@keyframes k5{0%,45.445%{opacity:0}45.455%,54.545%{opacity:1}54.555%,100%{opacity:0}}@keyframes k6{0%,54.535%{opacity:0}54.545%,63.636%{opacity:1}63.646%,100%{opacity:0}}@keyframes k7{0%,63.626%{opacity:0}63.636%,72.727%{opacity:1}72.737%,100%{opacity:0}}@keyframes k8{0%,72.717%{opacity:0}72.727%,81.818%{opacity:1}81.828%,100%{opacity:0}}@keyframes k9{0%,81.808%{opacity:0}81.818%,90.909%{opacity:1}90.919%,100%{opacity:0}}@keyframes k10{0%,90.899%{opacity:0}90.909%,100.000%{opacity:1}}
+  @media (prefers-reduced-motion: reduce) { .f { animation: none } .f0 { opacity:1 } }
+</style>
+
+<text x="56" y="46" class="h1">10% &#215; 10% = 1% is a choice, not a measurement.</text>
+<text x="56" y="74" class="sub">Two guardrails each fail 10% of the time. Every frame below is consistent with exactly that evidence.</text>
+<text x="56" y="96" class="sub">Only the joint structure &#8212; never the two scores alone &#8212; decides where inside the range the truth sits.</text>
+
+<rect x="56" y="124" width="640" height="170" class="unit"/>
+<text x="56" y="114" class="lbl">the population (area = 1)</text>
+
+<g class="cap">
+  <rect x="730" y="130"  width="13" height="13" class="setA"/><text x="750" y="141">A fails (10%)</text>
+  <rect x="730" y="160" width="13" height="13" class="setB"/><text x="750" y="171">B fails (10%)</text>
+  <rect x="730" y="190" width="13" height="13" class="setBoth"/><text x="750" y="201">both fail</text>
+  <text x="750" y="217" style="font-size:12px">the composed event</text>
+</g>
+
+<text x="56" y="408" class="lbl">sharp identified interval for P(both fail), given only the two 10% scores</text>
+<line x1="140.0" y1="436" x2="140.0" y2="500" class="indep"/>
+<text x="150.0" y="432" class="cap">1% &#8212; the single point that assuming independence picks out</text>
+<rect x="56" y="500" width="840" height="16" class="band"/>
+<line x1="56" y1="508" x2="896" y2="508" class="axis"/>
+<line x1="56" y1="500" x2="56" y2="516" class="tick"/>
+<line x1="896" y1="500" x2="896" y2="516" class="tick"/>
+<text x="56" y="542" class="lbl" text-anchor="middle">0%</text>
+<text x="896" y="542" class="lbl" text-anchor="middle">10%</text>
+<text x="56" y="560" class="cap" text-anchor="middle">lower witness</text>
+<text x="896" y="560" class="cap" text-anchor="middle">upper witness</text>
+
+<g class="f f0"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="120.0" y="124" width="64.0" height="170" class="setB"/><text x="56" y="352" class="mono">π(q) = (0.80, 0.10, 0.10, 0.00)</text><text x="56" y="376" class="cap">q = P(both fail) = 0%  &#8212; the lower witness: blind spots never coincide</text><g transform="translate(56.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">0%</text></g></g><g class="f f1"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="113.6" y="124" width="64.0" height="170" class="setB"/><rect x="113.6" y="124" width="6.4" height="170" class="setBoth"/><text x="116.8" y="314" class="both-lbl">1%</text><text x="56" y="352" class="mono">π(q) = (0.81, 0.09, 0.09, 0.01)</text><text x="56" y="376" class="cap">q = P(both fail) = 1%</text><g transform="translate(140.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">1%</text></g></g><g class="f f2"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="107.2" y="124" width="64.0" height="170" class="setB"/><rect x="107.2" y="124" width="12.8" height="170" class="setBoth"/><text x="113.6" y="314" class="both-lbl">2%</text><text x="56" y="352" class="mono">π(q) = (0.82, 0.08, 0.08, 0.02)</text><text x="56" y="376" class="cap">q = P(both fail) = 2%</text><g transform="translate(224.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">2%</text></g></g><g class="f f3"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="100.8" y="124" width="64.0" height="170" class="setB"/><rect x="100.8" y="124" width="19.2" height="170" class="setBoth"/><text x="110.4" y="314" class="both-lbl">3%</text><text x="56" y="352" class="mono">π(q) = (0.83, 0.07, 0.07, 0.03)</text><text x="56" y="376" class="cap">q = P(both fail) = 3%</text><g transform="translate(308.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">3%</text></g></g><g class="f f4"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="94.4" y="124" width="64.0" height="170" class="setB"/><rect x="94.4" y="124" width="25.6" height="170" class="setBoth"/><text x="107.2" y="314" class="both-lbl">4%</text><text x="56" y="352" class="mono">π(q) = (0.84, 0.06, 0.06, 0.04)</text><text x="56" y="376" class="cap">q = P(both fail) = 4%</text><g transform="translate(392.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">4%</text></g></g><g class="f f5"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="88.0" y="124" width="64.0" height="170" class="setB"/><rect x="88.0" y="124" width="32.0" height="170" class="setBoth"/><text x="104.0" y="314" class="both-lbl">5%</text><text x="56" y="352" class="mono">π(q) = (0.85, 0.05, 0.05, 0.05)</text><text x="56" y="376" class="cap">q = P(both fail) = 5%</text><g transform="translate(476.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">5%</text></g></g><g class="f f6"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="81.6" y="124" width="64.0" height="170" class="setB"/><rect x="81.6" y="124" width="38.4" height="170" class="setBoth"/><text x="100.8" y="314" class="both-lbl">6%</text><text x="56" y="352" class="mono">π(q) = (0.86, 0.04, 0.04, 0.06)</text><text x="56" y="376" class="cap">q = P(both fail) = 6%</text><g transform="translate(560.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">6%</text></g></g><g class="f f7"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="75.2" y="124" width="64.0" height="170" class="setB"/><rect x="75.2" y="124" width="44.8" height="170" class="setBoth"/><text x="97.6" y="314" class="both-lbl">7%</text><text x="56" y="352" class="mono">π(q) = (0.87, 0.03, 0.03, 0.07)</text><text x="56" y="376" class="cap">q = P(both fail) = 7%</text><g transform="translate(644.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">7%</text></g></g><g class="f f8"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="68.8" y="124" width="64.0" height="170" class="setB"/><rect x="68.8" y="124" width="51.2" height="170" class="setBoth"/><text x="94.4" y="314" class="both-lbl">8%</text><text x="56" y="352" class="mono">π(q) = (0.88, 0.02, 0.02, 0.08)</text><text x="56" y="376" class="cap">q = P(both fail) = 8%</text><g transform="translate(728.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">8%</text></g></g><g class="f f9"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="62.4" y="124" width="64.0" height="170" class="setB"/><rect x="62.4" y="124" width="57.6" height="170" class="setBoth"/><text x="91.2" y="314" class="both-lbl">9%</text><text x="56" y="352" class="mono">π(q) = (0.89, 0.01, 0.01, 0.09)</text><text x="56" y="376" class="cap">q = P(both fail) = 9%</text><g transform="translate(812.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">9%</text></g></g><g class="f f10"><rect x="56.0" y="124" width="64.0" height="170" class="setA"/><rect x="56.0" y="124" width="64.0" height="170" class="setB"/><rect x="56.0" y="124" width="64.0" height="170" class="setBoth"/><text x="88.0" y="314" class="both-lbl">10%</text><text x="56" y="352" class="mono">π(q) = (0.90, 0.00, 0.00, 0.10)</text><text x="56" y="376" class="cap">q = P(both fail) = 10%  &#8212; the upper witness: blind spots coincide exactly</text><g transform="translate(896.0,0)"><line x1="0" y1="476" x2="0" y2="524" class="mark"/><circle cx="0" cy="508" r="7" class="markdot"/><text x="0" y="468" class="marklbl">10%</text></g></g>
+
+<text x="56" y="588" class="cap">CC-Framework reports the whole range and the joint worlds that attain its ends. It does not silently pick a point inside it.</text>
+</svg>

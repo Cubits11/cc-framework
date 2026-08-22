@@ -1,0 +1,1798 @@
+{
+  "atom_order": "little_endian",
+  "controls": {
+    "broken_data": {
+      "checks": [
+        "non-binary indicator matrix is rejected",
+        "duplicate labels are rejected",
+        "empty sample sizes and invalid confidence parameters are rejected",
+        "permuting label order preserves named-query results"
+      ],
+      "status": "tested_in_unit_suite"
+    },
+    "parity_oracle": {
+      "claim": "even and odd parity have equal singleton and pairwise moments but different three-way unsafe-pass probability",
+      "status": "verified"
+    }
+  },
+  "coverage_rows": [
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.631608074474436,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.125,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.4342934765375998,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.125,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.4084845794293451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.125,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.626603191661936,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.875,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6253335156000996,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.875,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6434699309918451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.875,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.559731039190343,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.125,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.3448628027219248,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.125,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.32988315885529756,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.125,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5625996915340928,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.875,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5277097594864683,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.875,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5175120253940177,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S1_independent_reference",
+      "target_rate": 0.875,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.6831217463494359,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.6834003265127965,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.6702162517786132,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.668473308849436,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 0.9921875,
+      "coverage_rule_passed": true,
+      "covered": 127,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6812417187250996,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9570737405611394,
+      "wilson_95_upper": 0.9986195681071257
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6918097747418451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.588326009893468,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.5936115820188002,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.38679337760869037,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5923848477840928,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 0.984375,
+      "coverage_rule_passed": true,
+      "covered": 126,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5929096777219252,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9448190233201829,
+      "wilson_95_upper": 0.9957045502898559
+    },
+    {
+      "coverage": 0.984375,
+      "coverage_rule_passed": true,
+      "covered": 126,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5723277131755207,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S2_common_cause",
+      "target_rate": 0.5,
+      "wilson_95_lower": 0.9448190233201829,
+      "wilson_95_upper": 0.9957045502898559
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.37550455884943607,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.18502589841259984,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.19339668880434516,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.8740397150994359,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.8814370312250994,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.8880988372418451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.312660726690343,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.09251294920629992,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.09669834440217258,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.8075158451453784,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.7731529423113456,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.7620384928320267,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S3_mutually_exclusive",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.630265301036936,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.4289223827875998,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.3882209075543451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.627213543224436,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6249673046625996,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6390753997418451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.564583334112218,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.3422993261594248,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.32136875455842256,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5626607266903428,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5277300933468276,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5392232416312801,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_even",
+      "target_rate": 0.75,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.626481121349436,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 0.25,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.4372231640375998,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 0.25,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.4403449309918451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 0.25,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.629288738536936,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 1.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6329018749750996,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 1.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.6356574309918451,
+      "n": 64,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 1.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.565224203252843,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 0.25,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.3419025976437998,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 0.25,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "stack_unsafe_pass",
+      "mean_width": 0.34822422330842256,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 0.25,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5617451993465928,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I0",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 1.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5238777767607793,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I1",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 1.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    },
+    {
+      "coverage": 1.0,
+      "coverage_rule_passed": true,
+      "covered": 128,
+      "event": "any_guardrail_failure",
+      "mean_width": 0.5137583632846427,
+      "n": 256,
+      "nominal_coverage": 0.9,
+      "regime": "I2",
+      "replicates": 128,
+      "scenario_id": "S4_parity_odd",
+      "target_rate": 1.0,
+      "wilson_95_lower": 0.9708630437264916,
+      "wilson_95_upper": 1.0
+    }
+  ],
+  "design": {
+    "confidence_method": "simultaneous_hoeffding_union_bound",
+    "coverage_decision_rule": "Wilson 95% lower confidence limit for simulated coverage must be at least nominal_coverage - 0.06; this is a Monte Carlo diagnostic, not a proof.",
+    "delta": 0.1,
+    "nominal_coverage": 0.9,
+    "regimes": {
+      "B0": "product baseline; explicit independence assumption, not an LP constraint",
+      "I0": "declared exact singleton moments only",
+      "I1": "I0 plus fixed-before-output pair g1&g2",
+      "I2": "I0 plus all declared pairwise moments",
+      "I3": "declared full joint record; measured reference only"
+    },
+    "replicates": 128,
+    "sample_sizes": [
+      64,
+      256
+    ],
+    "seed": 20260821,
+    "target_selection": "fixed_pre_sampling"
+  },
+  "failure_event_convention": "Z_i=1 means guardrail failure or unsafe pass.",
+  "labels": [
+    "g1",
+    "g2",
+    "g3"
+  ],
+  "nonclaims": [
+    "No real-world guardrail population was sampled.",
+    "No adapter, benchmark, label, or deployment claim is validated here.",
+    "I3 is a measured synthetic reference, not deployment truth.",
+    "The coverage simulation checks this declared generator and estimator scope only."
+  ],
+  "primary_event": "stack_unsafe_pass",
+  "scenarios": [
+    {
+      "B0_product_baseline": 0.125,
+      "atom_probabilities": [
+        0.125,
+        0.125,
+        0.125,
+        0.125,
+        0.125,
+        0.125,
+        0.125,
+        0.125
+      ],
+      "description": "Independent Bernoulli(0.5) reference distribution.",
+      "moments": {
+        "pairwise": {
+          "g1&g2": 0.25,
+          "g1&g3": 0.25,
+          "g2&g3": 0.25
+        },
+        "singletons": {
+          "g1": 0.5,
+          "g2": 0.5,
+          "g3": 0.5
+        }
+      },
+      "primary_event": "stack_unsafe_pass",
+      "regimes": {
+        "I0": {
+          "assumptions_hash": "c2053b8e745e983d16bd3cebb567fca2766ea44bb697c59a5177221ba17f6d7b",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.5,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.0,
+              0.0,
+              -0.0,
+              0.5,
+              0.5,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.5,
+              0.0,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        "I1": {
+          "assumptions_hash": "f973a9e1018ba850926bc34ccb8c6314c97e93a8fade079416097366dcbea29a",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              -0.0,
+              0.0,
+              0.25,
+              0.0,
+              0.25,
+              0.25,
+              0.0
+            ],
+            "upper": [
+              0.25,
+              0.25,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.25,
+              0.25
+            ]
+          }
+        },
+        "I2": {
+          "assumptions_hash": "f616fc10faac5aed2cf39ba4e03aea4b152ccb81dd84f9eb30d9bbaffbcb4967",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              0.0,
+              -0.0,
+              0.25,
+              -0.0,
+              0.25,
+              0.25,
+              -0.0
+            ],
+            "upper": [
+              0.0,
+              0.25,
+              0.25,
+              -0.0,
+              0.25,
+              -0.0,
+              -0.0,
+              0.25
+            ]
+          }
+        },
+        "I3": {
+          "assumptions_hash": "00b27606c61529159880faf25633763e08bbab5c1091d99563f33e1edf78b960",
+          "contains_declared_truth": true,
+          "lower_bound": 0.125,
+          "solver_status": "optimal",
+          "upper_bound": 0.125,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125
+            ],
+            "upper": [
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125,
+              0.125
+            ]
+          }
+        }
+      },
+      "scenario_id": "S1_independent_reference",
+      "surface": "S1",
+      "true_primary_event_rate": 0.125
+    },
+    {
+      "B0_product_baseline": 0.125,
+      "atom_probabilities": [
+        0.5,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.5
+      ],
+      "description": "A shared latent cause makes all three failures co-occur.",
+      "moments": {
+        "pairwise": {
+          "g1&g2": 0.5,
+          "g1&g3": 0.5,
+          "g2&g3": 0.5
+        },
+        "singletons": {
+          "g1": 0.5,
+          "g2": 0.5,
+          "g3": 0.5
+        }
+      },
+      "primary_event": "stack_unsafe_pass",
+      "regimes": {
+        "I0": {
+          "assumptions_hash": "c2053b8e745e983d16bd3cebb567fca2766ea44bb697c59a5177221ba17f6d7b",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.5,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.0,
+              0.0,
+              -0.0,
+              0.5,
+              0.5,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.5,
+              0.0,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        "I1": {
+          "assumptions_hash": "1aebe586314c243f8f1312e0e6460c1ed428b483c58780b0f6ee9236afcd8044",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.5,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.0,
+              0.0,
+              0.0,
+              0.5,
+              0.5,
+              -0.0,
+              -0.0,
+              -0.0
+            ],
+            "upper": [
+              0.5,
+              -0.0,
+              -0.0,
+              0.0,
+              0.0,
+              -0.0,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        "I2": {
+          "assumptions_hash": "5ac3acf4bdf366cc19ba7b2a71719a9a281f5e7eab22d5904ba5a3e7b3bc211f",
+          "contains_declared_truth": true,
+          "lower_bound": 0.5,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.5,
+              0.0,
+              -0.0,
+              -0.0,
+              0.0,
+              -0.0,
+              -0.0,
+              0.5
+            ],
+            "upper": [
+              0.5,
+              0.0,
+              -0.0,
+              -0.0,
+              -0.0,
+              0.0,
+              -0.0,
+              0.5
+            ]
+          }
+        },
+        "I3": {
+          "assumptions_hash": "6bfe814897538b3f712f1a3f84a2df2fd44c530d1c233b8be9e4a16afbc19eda",
+          "contains_declared_truth": true,
+          "lower_bound": 0.5,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.5,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ],
+            "upper": [
+              0.5,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ]
+          }
+        }
+      },
+      "scenario_id": "S2_common_cause",
+      "surface": "S2",
+      "true_primary_event_rate": 0.5
+    },
+    {
+      "B0_product_baseline": 0.015625,
+      "atom_probabilities": [
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+        0.25,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "description": "At most one failure occurs on any row.",
+      "moments": {
+        "pairwise": {
+          "g1&g2": 0.0,
+          "g1&g3": 0.0,
+          "g2&g3": 0.0
+        },
+        "singletons": {
+          "g1": 0.25,
+          "g2": 0.25,
+          "g3": 0.25
+        }
+      },
+      "primary_event": "stack_unsafe_pass",
+      "regimes": {
+        "I0": {
+          "assumptions_hash": "6ebb268687ff0fdb63d43eeb9be924ed91acf331ce9d346c25a1ebfcb81d88bb",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.5,
+              0.0,
+              -0.0,
+              0.25,
+              0.25,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.75,
+              0.0,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.25
+            ]
+          }
+        },
+        "I1": {
+          "assumptions_hash": "c8a3a06b433f43d94dcfa368215edc42193e19bee93fe199dd99f4a95dfd7c25",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.0,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.5,
+              0.25,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.25,
+              0.0
+            ],
+            "upper": [
+              0.5,
+              0.25,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.25,
+              -0.0
+            ]
+          }
+        },
+        "I2": {
+          "assumptions_hash": "7a19551e48178f7b1a1c5e5d88c92cec278b12d8d70cf8efcd5f23c32143c8fe",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.0,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              0.25,
+              0.25,
+              0.0,
+              0.25,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.25,
+              0.25,
+              0.25,
+              0.0,
+              0.25,
+              0.0,
+              0.0,
+              -0.0
+            ]
+          }
+        },
+        "I3": {
+          "assumptions_hash": "1cdbd5192dbc621d030ae9e98e43ab2e4ca1679275471bc723f6239f4bfe3163",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.0,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              0.25,
+              0.25,
+              0.0,
+              0.25,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.25,
+              0.25,
+              0.25,
+              0.0,
+              0.25,
+              0.0,
+              0.0,
+              -0.0
+            ]
+          }
+        }
+      },
+      "scenario_id": "S3_mutually_exclusive",
+      "surface": "S3",
+      "true_primary_event_rate": 0.0
+    },
+    {
+      "B0_product_baseline": 0.125,
+      "atom_probabilities": [
+        0.25,
+        0.0,
+        0.0,
+        0.25,
+        0.0,
+        0.25,
+        0.25,
+        0.0
+      ],
+      "description": "Uniform even parity: 000, 110, 101, 011.",
+      "moments": {
+        "pairwise": {
+          "g1&g2": 0.25,
+          "g1&g3": 0.25,
+          "g2&g3": 0.25
+        },
+        "singletons": {
+          "g1": 0.5,
+          "g2": 0.5,
+          "g3": 0.5
+        }
+      },
+      "primary_event": "stack_unsafe_pass",
+      "regimes": {
+        "I0": {
+          "assumptions_hash": "c2053b8e745e983d16bd3cebb567fca2766ea44bb697c59a5177221ba17f6d7b",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.5,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.0,
+              0.0,
+              -0.0,
+              0.5,
+              0.5,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.5,
+              0.0,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        "I1": {
+          "assumptions_hash": "f973a9e1018ba850926bc34ccb8c6314c97e93a8fade079416097366dcbea29a",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              -0.0,
+              0.0,
+              0.25,
+              0.0,
+              0.25,
+              0.25,
+              0.0
+            ],
+            "upper": [
+              0.25,
+              0.25,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.25,
+              0.25
+            ]
+          }
+        },
+        "I2": {
+          "assumptions_hash": "f616fc10faac5aed2cf39ba4e03aea4b152ccb81dd84f9eb30d9bbaffbcb4967",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              0.0,
+              -0.0,
+              0.25,
+              -0.0,
+              0.25,
+              0.25,
+              -0.0
+            ],
+            "upper": [
+              0.0,
+              0.25,
+              0.25,
+              -0.0,
+              0.25,
+              -0.0,
+              -0.0,
+              0.25
+            ]
+          }
+        },
+        "I3": {
+          "assumptions_hash": "437b5625d8ce664f10b3e4f953fe07dd558efc801da0f1333aceb5b6b7df27a6",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.0,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              0.0,
+              0.0,
+              0.25,
+              0.0,
+              0.25,
+              0.25,
+              0.0
+            ],
+            "upper": [
+              0.25,
+              0.0,
+              0.0,
+              0.25,
+              0.0,
+              0.25,
+              0.25,
+              -0.0
+            ]
+          }
+        }
+      },
+      "scenario_id": "S4_parity_even",
+      "surface": "S4",
+      "true_primary_event_rate": 0.0
+    },
+    {
+      "B0_product_baseline": 0.125,
+      "atom_probabilities": [
+        0.0,
+        0.25,
+        0.25,
+        0.0,
+        0.25,
+        0.0,
+        0.0,
+        0.25
+      ],
+      "description": "Uniform odd parity: 100, 010, 001, 111.",
+      "moments": {
+        "pairwise": {
+          "g1&g2": 0.25,
+          "g1&g3": 0.25,
+          "g2&g3": 0.25
+        },
+        "singletons": {
+          "g1": 0.5,
+          "g2": 0.5,
+          "g3": 0.5
+        }
+      },
+      "primary_event": "stack_unsafe_pass",
+      "regimes": {
+        "I0": {
+          "assumptions_hash": "c2053b8e745e983d16bd3cebb567fca2766ea44bb697c59a5177221ba17f6d7b",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.5,
+          "width": 0.5,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.0,
+              0.0,
+              -0.0,
+              0.5,
+              0.5,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "upper": [
+              0.5,
+              0.0,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        "I1": {
+          "assumptions_hash": "f973a9e1018ba850926bc34ccb8c6314c97e93a8fade079416097366dcbea29a",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              -0.0,
+              0.0,
+              0.25,
+              0.0,
+              0.25,
+              0.25,
+              0.0
+            ],
+            "upper": [
+              0.25,
+              0.25,
+              -0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.25,
+              0.25
+            ]
+          }
+        },
+        "I2": {
+          "assumptions_hash": "f616fc10faac5aed2cf39ba4e03aea4b152ccb81dd84f9eb30d9bbaffbcb4967",
+          "contains_declared_truth": true,
+          "lower_bound": 0.0,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.25,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.25,
+              0.0,
+              -0.0,
+              0.25,
+              -0.0,
+              0.25,
+              0.25,
+              -0.0
+            ],
+            "upper": [
+              0.0,
+              0.25,
+              0.25,
+              -0.0,
+              0.25,
+              -0.0,
+              -0.0,
+              0.25
+            ]
+          }
+        },
+        "I3": {
+          "assumptions_hash": "639fe40da08b811d6efb22b11d7099613c035a00b96e0decc2799e4dbe035f24",
+          "contains_declared_truth": true,
+          "lower_bound": 0.25,
+          "solver_status": "optimal",
+          "upper_bound": 0.25,
+          "width": 0.0,
+          "witness_checks": {
+            "lower": true,
+            "upper": true
+          },
+          "witnesses": {
+            "lower": [
+              0.0,
+              0.25,
+              0.25,
+              0.0,
+              0.25,
+              0.0,
+              0.0,
+              0.25
+            ],
+            "upper": [
+              0.0,
+              0.25,
+              0.25,
+              0.0,
+              0.25,
+              0.0,
+              0.0,
+              0.25
+            ]
+          }
+        }
+      },
+      "scenario_id": "S4_parity_odd",
+      "surface": "S4",
+      "true_primary_event_rate": 0.25
+    }
+  ],
+  "schema_version": "cc.evals.dependence_evidence_study.v1",
+  "status": "controlled_synthetic_complete; real_world_pilot_untested",
+  "study_id": "E1-dependence-evidence"
+}
