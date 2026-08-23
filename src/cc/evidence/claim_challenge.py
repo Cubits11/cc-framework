@@ -62,6 +62,8 @@ _FIXED_SURFACES: tuple[str, ...] = (
     "envelope/claim_envelope.json",
     "lifecycle/projection.json",
     "reviews/review_status.json",
+    "README.md",
+    "CHALLENGE.md",
 )
 
 

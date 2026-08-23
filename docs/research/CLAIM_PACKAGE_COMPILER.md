@@ -33,13 +33,20 @@ below. `tests/unit/evidence/test_claim_compiler.py` is the evidence.
 - A byte flipped in the report, any bound evidence file, or any generated
   surface (audit / envelope / lifecycle / review) — `FAIL`.
 - A bound evidence file deleted — `FAIL`.
+- **A byte flipped in `README.md` or `CHALLENGE.md`** — the two human-facing
+  surfaces are bound like any other. `README.md` carries the PASS caveat and
+  every non-claim; `CHALLENGE.md` carries the falsification protocol. A package
+  whose boundary text can be rewritten silently is one whose PASS can be
+  misrepresented, which is the single thing this format exists to prevent.
 - **A manifest edited to lie** — the verifier re-derives every verdict-bearing
   manifest field (the artifact list, the subject-report binding, the
-  generated-surface hashes, the non-claims, and the lifecycle/review
-  projections) from the receipt-bound report, so a manifest that repoints an
-  artifact hash or smuggles in a false non-claim (`"This system is certified
-  safe."`) is rejected — even when the attacker also edits the file the manifest
-  now points at.
+  generated-surface hashes including the two boundary documents, the non-claims,
+  the lifecycle/review projections, and the recorded verifier result) from the
+  receipt-bound report and the hash-bound stored audit, so a manifest that
+  repoints an artifact hash, smuggles in a false non-claim (`"This system is
+  certified safe."`), re-labels tampered boundary text, or flips
+  `required_human_review` to understate its own review obligation is rejected —
+  even when the attacker also edits the file the manifest now points at.
 
 The verifier has two modes. With no `now`, it reuses the package's recorded time
 and checks *reproduction* of the recorded verdict. With a `now`, it performs a
@@ -82,6 +89,26 @@ receipt-bound report. The adversary caught the builder twice; both catches are
 now regression tests. That is the intended lifecycle of this subsystem — the
 falsifier is not decoration, it is how the compiler earns its one claim.
 
+## Two gaps the adversary found after the first release
+
+The falsifier is only as good as its surface list, and the first list was short.
+Both gaps below were found by attacking a compiled package, and both are now
+regression tests.
+
+1. **The boundary text was unbound.** `README.md` and `CHALLENGE.md` were written
+   into every package but named in neither `PackageIntegrityChecks` nor the
+   challenge's surface list. Appending `"This package CERTIFIES the system is
+   SAFE for deployment."` to `README.md` — directly contradicting the non-claim
+   printed above it — left verification at `PASS`. The document a recipient reads
+   to learn what a `PASS` means was the one document a `PASS` did not cover.
+2. **The recorded verifier result was asserted, not derived.** Flipping
+   `verifier_result.required_human_review` from `true` to `false` in the manifest
+   was not detected, so a package could understate its own review obligation and
+   still verify. It is now checked against the stored governance audit, which is
+   itself hash-bound and re-derived.
+
+The challenge now mutates sixteen surfaces rather than fourteen.
+
 ## The honest boundary
 
 - A `PASS` means the package is internally consistent under the verifier rules
@@ -93,6 +120,7 @@ falsifier is not decoration, it is how the compiler earns its one claim.
   state — the manifest records that absence explicitly rather than rebranding a
   governance verdict as a lifecycle state.
 - The challenge demonstrates detection of the single-byte mutations it applies
-  to each named surface; it is not a proof that no undetectable modification
+  to each named surface — a surface absent from that list is untested, which is
+  exactly how both gaps above survived the first release; it is not a proof that no undetectable modification
   exists. `package_id` and `created_at` are pure input labels the verifier
   cannot re-derive and are, correctly, not verdict-bearing.

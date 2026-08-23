@@ -154,6 +154,8 @@ def _first_evidence_file(package: Path) -> Path:
         "envelope/claim_envelope.json",
         "lifecycle/projection.json",
         "reviews/review_status.json",
+        "README.md",
+        "CHALLENGE.md",
     ],
 )
 def test_byte_tamper_of_each_surface_fails_closed(package: Path, surface: str) -> None:
@@ -185,6 +187,49 @@ def test_manifest_lying_about_an_artifact_hash_fails_closed(package: Path) -> No
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     audit = verify_claim_package(package, now=RECORDED)
     assert audit.verdict == "fail"
+
+
+def test_appending_a_safety_claim_to_the_readme_fails_closed(package: Path) -> None:
+    """The boundary text is a bound surface, not decoration.
+
+    README.md carries the PASS caveat and every non-claim. Before these surfaces
+    were bound, appending "this package CERTIFIES the system is SAFE" to it left
+    verification at PASS -- so a recipient could be handed a package whose stated
+    boundary had been silently inverted. That is the one misrepresentation this
+    package exists to make impossible.
+    """
+
+    readme = package / "README.md"
+    readme.write_text(
+        readme.read_text() + "\n\nThis package CERTIFIES the system is SAFE for deployment.\n"
+    )
+    audit = verify_claim_package(package, now=RECORDED)
+    assert audit.verdict == "fail"
+    assert any("README" in reason for reason in audit.reasons)
+
+
+def test_manifest_relabelling_a_tampered_readme_fails_closed(package: Path) -> None:
+    """The manifest cannot bless boundary text the verifier can re-derive."""
+
+    import hashlib
+
+    readme = package / "README.md"
+    readme.write_text(readme.read_text() + "\n\nThis package CERTIFIES safety.\n")
+    manifest_path = package / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["integrity_checks"]["readme_sha256"] = hashlib.sha256(readme.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    audit = verify_claim_package(package, now=RECORDED)
+    assert audit.verdict == "fail", "a manifest that re-labels tampered boundary text must fail"
+    assert any("readme_sha256" in reason for reason in audit.reasons)
+
+
+def test_challenge_doc_is_a_bound_surface(package: Path) -> None:
+    """CHALLENGE.md tells a recipient how to falsify the package; it must bind."""
+
+    doc = package / "CHALLENGE.md"
+    doc.write_text(doc.read_text().replace("Do not trust that claim", "Trust this claim"))
+    assert verify_claim_package(package, now=RECORDED).verdict == "fail"
 
 
 def test_manifest_smuggling_an_extra_non_claim_fails_closed(package: Path) -> None:

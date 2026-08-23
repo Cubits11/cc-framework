@@ -220,6 +220,8 @@ class PackageIntegrityChecks(ClaimPackageModel):
     claim_envelope_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     lifecycle_projection_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     review_status_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    readme_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    challenge_doc_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ClaimPackageManifest(ClaimPackageModel):
@@ -407,6 +409,8 @@ def compile_claim_package(
         _write_json(envelope_path, package_envelope.to_canonical_dict())
         _write_json(lifecycle_path, lifecycle.model_dump(mode="json", by_alias=True))
         _write_json(review_path, review_status.model_dump(mode="json", by_alias=True))
+        readme_path = temp_dir / "README.md"
+        challenge_path = temp_dir / "CHALLENGE.md"
         _write_readme(temp_dir, package_audit, source_artifacts)
         _write_challenge_doc(temp_dir, source_artifacts)
 
@@ -424,6 +428,8 @@ def compile_claim_package(
             envelope_path=envelope_path,
             lifecycle_path=lifecycle_path,
             review_path=review_path,
+            readme_path=readme_path,
+            challenge_path=challenge_path,
         )
         _write_json(temp_dir / "manifest.json", manifest.to_canonical_dict())
 
@@ -728,6 +734,8 @@ def _build_manifest(
     envelope_path: Path,
     lifecycle_path: Path,
     review_path: Path,
+    readme_path: Path,
+    challenge_path: Path,
 ) -> ClaimPackageManifest:
     receipt = report.get("receipt")
     canonical_hash = receipt.get("canonical_hash") if isinstance(receipt, Mapping) else None
@@ -782,15 +790,16 @@ def _build_manifest(
             claim_envelope_sha256=_sha256_file_at(envelope_path),
             lifecycle_projection_sha256=_sha256_file_at(lifecycle_path),
             review_status_sha256=_sha256_file_at(review_path),
+            readme_sha256=_sha256_file_at(readme_path),
+            challenge_doc_sha256=_sha256_file_at(challenge_path),
         ),
     )
 
 
-def _write_readme(
-    root: Path,
+def _render_readme(
     audit: ClaimGovernanceAudit,
     artifacts: Sequence[PackageArtifact],
-) -> None:
+) -> str:
     artifact_lines = (
         "\n".join(
             f"- `{artifact.package_path}` — `{artifact.role}` — `{artifact.sha256}`"
@@ -812,6 +821,10 @@ The report is copied byte-for-byte as `report.json`; its evidence paths resolve 
 ## Recorded verifier result
 
 `{audit.verdict.value.upper()}` at `{audit.evaluated_at}`.
+
+This file is itself a bound surface: its bytes are hashed in `manifest.json` and
+re-derived by the verifier, so the boundary stated below cannot be rewritten
+without verification falling to `FAIL`.
 
 {PACKAGE_PASS_CAVEAT}
 
@@ -842,11 +855,19 @@ package.
 
 {artifact_lines}
 """
-    (root / "README.md").write_text(text, encoding="utf-8")
+    return text
 
 
-def _write_challenge_doc(root: Path, artifacts: Sequence[PackageArtifact]) -> None:
-    """Ship the falsification protocol so a recipient need not trust the compiler.
+def _write_readme(
+    root: Path,
+    audit: ClaimGovernanceAudit,
+    artifacts: Sequence[PackageArtifact],
+) -> None:
+    (root / "README.md").write_text(_render_readme(audit, artifacts), encoding="utf-8")
+
+
+def _render_challenge_doc(artifacts: Sequence[PackageArtifact]) -> str:
+    """Render the falsification protocol so a recipient need not trust the compiler.
 
     The package asserts it is tamper-evident. This document tells a skeptic how
     to disprove that assertion offline: mutate one byte of any bound surface and
@@ -864,8 +885,9 @@ def _write_challenge_doc(root: Path, artifacts: Sequence[PackageArtifact]) -> No
     text = f"""# Falsify this package
 
 This package claims one narrow, checkable thing: it is **tamper-evident** — if
-any byte of the report, the bound evidence, or the generated audit surfaces is
-altered, package verification falls to `FAIL`. Do not trust that claim. Break it.
+any byte of the report, the bound evidence, the generated audit surfaces, or the
+boundary text you are reading is altered, package verification falls to `FAIL`.
+Do not trust that claim. Break it.
 
 ## The one-command challenge
 
@@ -888,6 +910,8 @@ harness that simply always fails cannot pass the challenge.
 - `report.json` (the byte-bound subject report)
 - `manifest.json` (the package manifest itself)
 - the generated audit, envelope, lifecycle, and review surfaces
+- `README.md` (the PASS caveat and the non-claims) and `CHALLENGE.md` (this
+  protocol) — the boundary text a reader relies on to know what the PASS means
 {surfaces}
 
 ## What a PASS on the challenge does and does not mean
@@ -898,7 +922,11 @@ mean the underlying claim is true, the evidence is valid, or that no undetectabl
 modification of any kind exists — only that this package's integrity binding
 catches the mutations it is challenged with. Integrity is not validity.
 """
-    (root / "CHALLENGE.md").write_text(text, encoding="utf-8")
+    return text
+
+
+def _write_challenge_doc(root: Path, artifacts: Sequence[PackageArtifact]) -> None:
+    (root / "CHALLENGE.md").write_text(_render_challenge_doc(artifacts), encoding="utf-8")
 
 
 def _verify_generated_surfaces(
@@ -926,6 +954,16 @@ def _verify_generated_surfaces(
             manifest.integrity_checks.review_status_sha256,
             "review status",
         ),
+        (
+            root / "README.md",
+            manifest.integrity_checks.readme_sha256,
+            "package README",
+        ),
+        (
+            root / "CHALLENGE.md",
+            manifest.integrity_checks.challenge_doc_sha256,
+            "challenge document",
+        ),
     )
     reasons: list[str] = []
     for path, expected_hash, label in checks:
@@ -943,7 +981,11 @@ def _manifest_matches_package(
     """Re-derive the manifest's verdict-bearing fields and reject disagreement.
 
     Everything the manifest asserts about what the package contains is recomputed
-    from the packaged report and files. Only pure input labels the verifier cannot
+    from the packaged report and files. This includes the two human-facing
+    surfaces — ``README.md`` (which carries the PASS caveat and the non-claims)
+    and ``CHALLENGE.md`` (which carries the falsification protocol) — because a
+    package whose boundary text can be rewritten without detection is one whose
+    PASS can be misrepresented. Only pure input labels the verifier cannot
     re-derive — ``package_id`` and ``created_at`` — remain outside this check, and
     those carry no verdict. Any tampered artifact list, subject-report binding, or
     generated-surface integrity hash is caught here even if the attacker edited
@@ -986,6 +1028,8 @@ def _manifest_matches_package(
                     mode="json", by_alias=True
                 )
             ),
+            "readme_sha256": _text_sha256(_render_readme(governance, expected_artifacts)),
+            "challenge_doc_sha256": _text_sha256(_render_challenge_doc(expected_artifacts)),
         }
     except Exception as exc:  # pragma: no cover - defensive re-derivation boundary
         return [*reasons, f"Manifest integrity checks cannot be re-derived: {exc}"]
@@ -1022,6 +1066,28 @@ def _manifest_matches_package(
         governance, expected_artifacts
     ).model_dump(mode="json", by_alias=True):
         reasons.append("Manifest human-review projection does not match the re-derived audit.")
+
+    # The recorded verifier result is bound to the stored audit, not asserted by
+    # the manifest. Without this, flipping ``required_human_review`` to false in
+    # the manifest would let a package understate its own review obligation while
+    # still verifying. The stored audit is itself hash-bound and re-derived above,
+    # so checking against it holds at the recorded time and under a freshness run.
+    stored_audit_path = root / manifest.verifier_result.audit_path
+    try:
+        stored = _load_model_json(
+            stored_audit_path, ClaimGovernanceAudit, "stored governance audit"
+        )
+    except (OSError, ValueError, ValidationError) as exc:
+        reasons.append(
+            f"Manifest verifier result cannot be re-derived from the stored audit: {exc}"
+        )
+        return reasons
+    if manifest.verifier_result.verdict != stored.verdict.value:
+        reasons.append("Manifest verifier verdict does not match the stored governance audit.")
+    if manifest.verifier_result.required_human_review != stored.required_human_review:
+        reasons.append("Manifest required_human_review does not match the stored governance audit.")
+    if manifest.verifier_result.evaluated_at != stored.evaluated_at:
+        reasons.append("Manifest verifier evaluated_at does not match the stored governance audit.")
     return reasons
 
 
@@ -1141,6 +1207,12 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
         json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n",
         encoding="utf-8",
     )
+
+
+def _text_sha256(text: str) -> str:
+    """Hash a generated text surface exactly as it is written to disk."""
+
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _sha256_file_at(path: Path) -> str:
