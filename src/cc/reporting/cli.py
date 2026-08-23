@@ -11,6 +11,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from cc.evidence.claim_challenge import challenge_claim_package, render_challenge_report
+from cc.evidence.claim_compiler import (
+    ClaimPackageError,
+    compile_claim_package,
+    verify_claim_package,
+)
 from cc.evidence.claim_governance import GovernanceVerdict, verify_claim_governance
 from cc.reporting.canonical import strict_json_loads
 from cc.reporting.report import (
@@ -88,6 +94,39 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--strict-unknown-roles", action="store_true")
     verify.add_argument("--out", type=Path)
     verify.set_defaults(func=_cmd_verify_claim_governance)
+
+    compile_pkg = subparsers.add_parser(
+        "compile-claim-package",
+        help="Compile a portable, self-verifying claim package from a verified report.",
+    )
+    compile_pkg.add_argument("report", type=Path)
+    compile_pkg.add_argument("out_dir", type=Path)
+    compile_pkg.add_argument("--base-dir", type=Path)
+    compile_pkg.add_argument("--package-id")
+    compile_pkg.add_argument("--now")
+    compile_pkg.add_argument("--strict-unknown-roles", action="store_true")
+    compile_pkg.add_argument("--require-pass", action="store_true")
+    compile_pkg.set_defaults(func=_cmd_compile_claim_package)
+
+    verify_pkg = subparsers.add_parser(
+        "verify-claim-package",
+        help="Verify a portable claim package without modifying it.",
+    )
+    verify_pkg.add_argument("package", type=Path)
+    verify_pkg.add_argument("--now")
+    verify_pkg.add_argument("--strict-unknown-roles", action="store_true")
+    verify_pkg.add_argument("--out", type=Path)
+    verify_pkg.set_defaults(func=_cmd_verify_claim_package)
+
+    challenge_pkg = subparsers.add_parser(
+        "challenge-claim-package",
+        help="Adversarially test a claim package's own tamper-evidence claim.",
+    )
+    challenge_pkg.add_argument("package", type=Path)
+    challenge_pkg.add_argument("--now")
+    challenge_pkg.add_argument("--strict-unknown-roles", action="store_true")
+    challenge_pkg.add_argument("--out", type=Path)
+    challenge_pkg.set_defaults(func=_cmd_challenge_claim_package)
     return parser
 
 
@@ -96,7 +135,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (FileNotFoundError, ReportValidationError, ValueError, TypeError) as exc:
+    except (
+        FileNotFoundError,
+        ReportValidationError,
+        ValueError,
+        TypeError,
+        ClaimPackageError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
@@ -233,6 +278,82 @@ def _cmd_verify_claim_governance(args: argparse.Namespace) -> int:
         GovernanceVerdict.NEEDS_REVIEW: 1,
         GovernanceVerdict.FAIL: 2,
     }[audit.verdict]
+
+
+def _cmd_compile_claim_package(args: argparse.Namespace) -> int:
+    manifest = compile_claim_package(
+        args.report,
+        args.out_dir,
+        package_id=args.package_id,
+        now=_parse_optional_datetime(args.now),
+        base_dir=args.base_dir,
+        strict_unknown_roles=args.strict_unknown_roles,
+        require_pass=args.require_pass,
+    )
+    print(f"package: {args.out_dir}")
+    print(f"package_id: {manifest.package_id}")
+    print(f"verifier verdict: {manifest.verifier_result.verdict.upper()}")
+    print(f"artifacts: {len(manifest.artifacts)}")
+    print(f"challenge: {manifest.reproducibility.challenge_command}")
+    return 0 if manifest.verifier_result.verdict == "pass" else 1
+
+
+def _cmd_verify_claim_package(args: argparse.Namespace) -> int:
+    audit = verify_claim_package(
+        args.package,
+        now=_parse_optional_datetime(args.now),
+        strict_unknown_roles=args.strict_unknown_roles,
+    )
+    print(f"Claim package verdict: {audit.verdict.upper()}")
+    print(f"Package: {audit.package_id}")
+    print(f"Report integrity: {'valid' if audit.report_integrity_valid else 'INVALID'}")
+    print(
+        f"Artifacts: {len(audit.artifacts)} checked, "
+        f"{sum(1 for a in audit.artifacts if a.valid)} valid"
+    )
+    print(f"Governance verdict: {audit.governance_verdict.upper()}")
+    print(f"Support edges preserved: {audit.support_edges_preserved}")
+    for reason in audit.reasons:
+        print(f"  - {reason}")
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(
+                audit.model_dump(mode="json", by_alias=True),
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"Audit written: {args.out}")
+    return {"pass": 0, "needs_review": 1, "fail": 2}[audit.verdict]
+
+
+def _cmd_challenge_claim_package(args: argparse.Namespace) -> int:
+    report = challenge_claim_package(
+        args.package,
+        now=_parse_optional_datetime(args.now),
+        strict_unknown_roles=args.strict_unknown_roles,
+    )
+    print(render_challenge_report(report))
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(
+                report.model_dump(mode="json", by_alias=True),
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"Challenge written: {args.out}")
+    return 0 if report.tamper_evident else 2
 
 
 def _read_json(path: Path) -> dict[str, Any]:

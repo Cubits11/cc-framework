@@ -122,6 +122,7 @@ GOV_CAPSULE_TESTS    := tests/integration/test_claim_governance_capsule.py
 	reproduce-paper verify-paper-artifacts paper-smoke \
 	reproduce-empirical-e1 verify-empirical-e1 test-empirical-e1 \
 	verify-e2-contract \
+	demo-claim-package verify-claim-package \
 	verify-invariants verify-statistics verify-audit \
 	docs docs-serve \
 	film film-ghost-ark \
@@ -501,6 +502,26 @@ verify-e2-contract: install
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/validate_e2_observations.py \
 		$(E2_EXAMPLE_OBSERVATIONS)
 	PYTHONPATH=src $(VENV_DIR)/bin/pytest tests/unit/research/test_e2_observation_contract.py -q
+
+CLAIM_PACKAGE_CAPSULE ?= examples/claim_governance_capsule/expected
+
+# Compile a portable claim package from the capsule and prove, adversarially,
+# that it is tamper-evident: the built-in challenge must catch a one-byte edit
+# of every bound surface. Exits non-zero if any mutation goes undetected.
+demo-claim-package: install
+	rm -rf build/claim-package-demo
+	PYTHONPATH=src $(VENV_DIR)/bin/python -m cc.reporting.cli compile-claim-package \
+		$(CLAIM_PACKAGE_CAPSULE)/cc_report.json build/claim-package-demo \
+		--base-dir $(CLAIM_PACKAGE_CAPSULE) --now 2026-01-02T00:00:00Z
+	PYTHONPATH=src $(VENV_DIR)/bin/python -m cc.reporting.cli \
+		verify-claim-package build/claim-package-demo --now 2026-01-02T00:00:00Z
+	PYTHONPATH=src $(VENV_DIR)/bin/python -m cc.reporting.cli \
+		challenge-claim-package build/claim-package-demo
+
+verify-claim-package: install
+	PYTHONPATH=src $(VENV_DIR)/bin/pytest \
+		tests/unit/evidence/test_claim_compiler.py \
+		tests/unit/evidence/test_claim_challenge.py -q
 
 paper-smoke: install
 	PYTHONPATH=src $(VENV_DIR)/bin/python scripts/check_paper_source.py --latex

@@ -26,6 +26,17 @@ from cc.evidence.assurance_schema import (
     export_assurance_case_markdown,
     write_assurance_case_exports,
 )
+from cc.evidence.claim_challenge import (
+    ClaimPackageChallengeReport,
+    challenge_claim_package,
+)
+from cc.evidence.claim_compiler import (
+    ClaimPackageAudit,
+    ClaimPackageError,
+    ClaimPackageManifest,
+    compile_claim_package,
+    verify_claim_package,
+)
 from cc.evidence.claim_envelope import (
     BOUNDARY_ENVELOPE_SCHEMA_VERSION,
     CLAIM_ENVELOPE_SCHEMA_VERSION,
@@ -148,6 +159,10 @@ __all__ = [
     "ClaimFragment",
     "ClaimGovernanceAudit",
     "ClaimIdentity",
+    "ClaimPackageAudit",
+    "ClaimPackageChallengeReport",
+    "ClaimPackageError",
+    "ClaimPackageManifest",
     "ClaimProposition",
     "ClusterBlockingPlan",
     "ConfirmatoryProtocolArtifact",
@@ -203,10 +218,12 @@ __all__ = [
     "WitnessSignature",
     "anchor_root",
     "assurance_case_from_run",
+    "challenge_claim_package",
     "claim_envelope_sha256",
     "claim_envelope_to_canonical_json",
     "classify_role",
     "compile_claim_envelope",
+    "compile_claim_package",
     "compile_epistemic_permissions",
     "evaluate_claim_decay",
     "explain_forbidden_claim",
@@ -223,6 +240,7 @@ __all__ = [
     "validate_role_payload",
     "verify_anchor",
     "verify_claim_governance",
+    "verify_claim_package",
     "verify_confirmatory_protocol_artifact",
     "verify_consistency",
     "verify_inclusion",
