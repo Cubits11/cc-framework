@@ -1,0 +1,34 @@
+{
+  "_readme": "Single source of truth for the epistemic-machine enumerations. The logical machine has SIX rows (README table); the cinematic machine has FIVE panels (poster/gif/mp4). The compression map records exactly how the film merges logical operations, and the bridge caption must accompany any embed of the media. tests/unit/docs/test_epistemic_machine_manifest.py holds README.md to this file so the two enumerations cannot silently diverge again; any surface embedding the media (including external sites) should copy the bridge caption or this mapping.",
+  "_non_claim": "This manifest describes an explainer graphic. It is not evidence for any mathematical or empirical claim; the theorem ledger and validation matrix carry those.",
+  "logical_rows": [
+    {"n": 1, "name": "Claim contract", "contributes": "Population, target event, falsifier, assumptions, and non-claims"},
+    {"n": 2, "name": "Evidence", "contributes": "Marginals, pairwise observations, uncertainty, and provenance"},
+    {"n": 3, "name": "Identification kernel", "contributes": "The complete class of joint worlds not ruled out"},
+    {"n": 4, "name": "Sharp bounds", "contributes": "Minimum and maximum supported event risk"},
+    {"n": 5, "name": "Witnesses", "contributes": "Concrete distributions attaining both endpoints"},
+    {"n": 6, "name": "Claim envelope", "contributes": "Scope, replay path, limitations, expiry, and decision status"}
+  ],
+  "cinematic_panels": [
+    {"n": 1, "poster_title": "CLAIM CONTRACT", "alt_title": "Claim Contract", "subtitle": "population • event / falsifier • non-claim", "represents_rows": [1]},
+    {"n": 2, "poster_title": "EVIDENCE", "alt_title": "Evidence", "subtitle": "marginals • pairs / provenance • uncertainty", "represents_rows": [2]},
+    {"n": 3, "poster_title": "FEASIBLE WORLDS", "alt_title": "Feasible Worlds", "subtitle": "F = all joint laws / not ruled out", "represents_rows": [3], "compression_note": "renames the identification kernel by its output"},
+    {"n": 4, "poster_title": "BOUNDS + WITNESSES", "alt_title": "Bounds and Witnesses", "subtitle": "min / max risk / attaining distributions", "represents_rows": [4, 5], "compression_note": "merges sharp bounds with their witnesses into one panel"},
+    {"n": 5, "poster_title": "CLAIM ENVELOPE", "alt_title": "Claim Envelope", "subtitle": "scope • replay / expiry • decision", "represents_rows": [6]}
+  ],
+  "bridge_caption": "The figure groups the two middle stages differently from the table below: it shows Feasible Worlds for the identification kernel, and merges bounds with their witnesses into one panel. Six rows, five panels, same machine.",
+  "poster_text": {
+    "scene_label": "04 / THE FULL EPISTEMIC MACHINE",
+    "headline": "CC is a claim discipline wrapped around a mathematical kernel.",
+    "subhead": "It separates what was measured, what was assumed, what was computed, and what remains unproved.",
+    "verdict_lines": ["CC does not tell you which convenient world to believe.", "It tells you which worlds the evidence has not yet ruled out."],
+    "badges": ["IS: SHARP, WITNESS-CARRYING CLAIM BOUNDS", "IS NOT: A SAFETY CERTIFICATE"],
+    "closing_quote": "Make the claim smaller. Make the evidence stronger."
+  },
+  "media": [
+    {"path": "docs/assets/epistemic-machine.png", "kind": "poster", "width": 1280, "height": 720},
+    {"path": "docs/assets/epistemic-machine.gif", "kind": "animation", "width": 1280, "height": 720},
+    {"path": "docs/assets/epistemic-machine.mp4", "kind": "film", "width": 1280, "height": 720, "duration_seconds": 18}
+  ],
+  "embedded_in": ["README.md"]
+}
