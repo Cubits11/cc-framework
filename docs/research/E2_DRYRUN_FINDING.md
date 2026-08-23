@@ -13,8 +13,12 @@ guardrails, and it does not move E2 off the `UNTESTED` rung.
 ## What was run
 
 Three genuinely distinct mechanism families, each an existing guardrail in this
-repository, calibrated to a common operating point (target FPR 0.10) on a frozen
-22-item benign subset *before* any harmful-item outcome was treated as data:
+repository, exercised against a frozen 22-item benign subset *before* any
+harmful-item outcome was treated as data. **Correction (2026-08-23):** this
+paragraph previously said all three were "calibrated to a common operating point
+(target FPR 0.10)". Two were; one was not, and none landed on the target. See
+[Correction — the operating point was not common](#correction--the-operating-point-was-not-common)
+below before reading any Δ as a comparison at matched FPR.
 
 | id | mechanism | family |
 | --- | --- | --- |
@@ -60,10 +64,48 @@ insignificance.
   **0.087**, *larger* than the observed max |Δ| of 0.050. The instrument correctly
   reports its own null: none of these deltas is distinguishable from independence
   at this scale.
+- **The permutation control is a single draw, which is luck rather than
+  inference.** `CONTROL_SEED = 20260823` (`experiments/e2_dryrun/run_dryrun.py:58`)
+  fixes exactly one column permutation, so the comparison above rests on one
+  sample from the null with no calibrated error rate. Re-running the same
+  statistic over 2000 independent column permutations of the committed failure
+  matrix (`results/observations.jsonl`, seed 20260823, each column permuted
+  independently, statistic = max over pairs of |p11 − pA·pB|) gives a null with
+  mean **0.0700**, median **0.0599**, and 95th percentile **0.1322**. The observed
+  max |Δ| of **0.049587** falls below the null *median*, at the **20th percentile**
+  of the null. The conclusion is unchanged and in fact strengthened: the observed
+  dependence is not merely indistinguishable from independence, it is less extreme
+  than a typical draw from the dependence-destroyed null. It should be read off
+  that distribution, not off the one draw the contract froze — a real E2 should
+  pre-register the draw count.
 - **The negative controls behaved exactly as specified.** The duplicate-column
   common-cause control gave Δ = pA(1−pA) = 0.2417 to within 1e-9; an independently
   written recompute of Δ matched the matrix computation. The controls that were
   supposed to move, moved; the one that was supposed to hit a closed form, hit it.
+
+## Correction — the operating point was not common
+
+Recorded 2026-08-23, after the finding was first written. The mechanisms were not
+all calibrated, and the ones that were did not reach the target:
+
+| id | calibrated? | achieved benign FPR (measured) |
+| --- | --- | ---: |
+| `gr.keyword` | yes — `calibrate(benign, target_fpr=0.10)` | 2/22 = **0.0909** |
+| `gr.regex` | **no** — constructed with `min_hits=2` and never calibrated; its config records no `target_fpr` | 2/22 = **0.0909** |
+| `gr.semantic` | yes — `calibrate(benign, target_fpr=0.10)` | 1/22 = **0.0455** |
+
+`gr.regex` reaches 0.0909 by construction, not by calibration; the agreement with
+`gr.keyword` is a coincidence of this 22-item benign subset, not a matched
+operating point. `gr.semantic` sits at less than half the stated target.
+
+This does not change the Δ values, the null verdict, or the HOLD decision — the
+deltas are reported as measured and remain statistically indistinguishable from
+independence. It does change what the deltas may be *compared to*: they are not
+three mechanisms observed at one shared FPR, so any reading that treats them as
+FPR-matched is unsupported. The E2 contract's calibration layer needs a
+conformance check that fails when a declared operating point is not actually
+applied to every mechanism — the dry run's stated purpose was to find exactly
+this class of defect before real data arrives, and it did.
 
 ## What this is not (Claimed)
 
