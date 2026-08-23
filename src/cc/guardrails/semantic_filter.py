@@ -39,7 +39,7 @@ class SemanticFilter(Guardrail):
 
     def score(self, text: str) -> float:
         """Compute maximum cosine similarity to harmful templates"""
-        if not self.template_vectors or not text.strip():
+        if self.template_vectors is None or not text.strip():
             return 0.0
 
         try:
@@ -49,8 +49,9 @@ class SemanticFilter(Guardrail):
             # Compute similarities
             similarities = cosine_similarity(text_vector, self.template_vectors)
 
-            # Return maximum similarity
-            return float(np.max(similarities))
+            # Return maximum similarity, clamped to [0, 1] (cosine can exceed 1
+            # by a floating-point epsilon, which would violate the score contract).
+            return float(np.clip(np.max(similarities), 0.0, 1.0))
 
         except Exception:
             # Fallback for unseen vocabulary
@@ -58,7 +59,7 @@ class SemanticFilter(Guardrail):
 
     def calibrate(self, benign_texts: list, target_fpr: float = 0.05) -> None:
         """Calibrate similarity threshold to achieve target FPR"""
-        if not benign_texts or not self.template_vectors:
+        if not benign_texts or self.template_vectors is None:
             return
 
         scores = [self.score(text) for text in benign_texts]
