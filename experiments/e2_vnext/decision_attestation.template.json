@@ -1,0 +1,11 @@
+{
+  "action_if_fail": "",
+  "action_if_hold": "",
+  "action_if_pass": "",
+  "attested_at_utc": "",
+  "decision_owner": "",
+  "joint_detector_miss_cap": null,
+  "rationale": "",
+  "serial_false_block_cap": null,
+  "study_id": "E2-VNEXT"
+}

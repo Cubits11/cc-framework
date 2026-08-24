@@ -1,0 +1,67 @@
+{
+  "evaluated_at_utc": "2026-08-24T00:00:00Z",
+  "screen_basis": "Outcome-blind public documentation and immutable-revision metadata only. No model artifact, loader, source row, score, or threshold calibration was accessed.",
+  "schema_version": "cc.e2_vnext.candidate_screen.v1",
+  "selected_candidate": {
+    "candidate_a": {
+      "evidence": {
+        "model_card_sha256": "bd4071508867018aac6a03ce29203c847c7ebac2daf81d16c39d65c4da836ac0",
+        "model_card_url": "https://raw.githubusercontent.com/securelayer7/PROMPTPurify/8a035c7979b36b8170a297fa93ddba1e68e31d6b/MODEL_CARD.md",
+        "security_policy_url": "https://raw.githubusercontent.com/securelayer7/PROMPTPurify/8a035c7979b36b8170a297fa93ddba1e68e31d6b/SECURITY.md"
+      },
+      "id": "securelayer7/PROMPTPurify@v0.0.1",
+      "license": "MIT",
+      "revision": "8a035c7979b36b8170a297fa93ddba1e68e31d6b",
+      "scope": "Single-turn untrusted text between user input, retrieved RAG chunk, or tool output and an LLM; benign versus prompt-injection score."
+    },
+    "candidate_b": {
+      "evidence": {
+        "model_card_sha256": "628abefdeaa3754e13a1c22c5b79910c60a2a1ce9715ec5b4c634d019a09160a",
+        "model_card_url": "https://huggingface.co/patronus-studio/wolf-defender-prompt-injection-small/raw/eff31df5c97ca127b7b55da255a160f88a625c97/README.md",
+        "repository_history_sha256": "9b00f3fbfbba2f7310239dbaa35daff2d9741386474655609d95c20050612ca8",
+        "repository_history_url": "https://huggingface.co/api/models/patronus-studio/wolf-defender-prompt-injection-small/commits/main?limit=100"
+      },
+      "id": "patronus-studio/wolf-defender-prompt-injection-small",
+      "license": "Apache-2.0",
+      "revision": "eff31df5c97ca127b7b55da255a160f88a625c97",
+      "scope": "English/German binary prompt-injection detector for LLM systems, including agents, chatbots, and CI systems."
+    },
+    "dataset": {
+      "created_at_utc": "2026-08-11T23:43:28Z",
+      "evidence": {
+        "dataset_card_sha256": "54f1c82cb26d22e1c48d9b18d72cad096df0b97ddb389d965c657db8ea8b0cf3",
+        "dataset_card_url": "https://huggingface.co/datasets/3nesdeniz/agentic-prompt-injection-5k/raw/e658d94dcafc133e3a4483f9f9aa13507f3848c4/README.md",
+        "dataset_metadata_sha256": "cbfea0b71a5c922dce59ac6826c496afc10dfe421132181f0325573b230850a1",
+        "dataset_metadata_url": "https://huggingface.co/api/datasets/3nesdeniz/agentic-prompt-injection-5k"
+      },
+      "id": "3nesdeniz/agentic-prompt-injection-5k",
+      "license": "CC-BY-4.0",
+      "revision": "e658d94dcafc133e3a4483f9f9aa13507f3848c4"
+    },
+    "id": "E2V-CANDIDATE-001",
+    "maintenance": "PASS",
+    "maintenance_rationale": "Both planned artifacts are public, revision-pinnable, evaluation-permitting, and not source-declared archived/EOL. PromptPurify publishes an MIT model card and a security contact; the Wolf Defender repository has a later public release history. This is reproducible-current-candidate eligibility only, not a claim of independently verified vendor support.",
+    "ontology": "PASS",
+    "ontology_rationale": "The source explicitly defines English agentic/indirect prompt injection across four named families. PromptPurify explicitly scores untrusted user/RAG/tool text for prompt injection; Wolf Defender explicitly detects prompt injection in LLM systems/agents/chatbots/CI. The protocol's construct is the source-declared injection subset, not jailbreak, direct-user, or downstream compromise.",
+    "training_overlap": "FAIL",
+    "training_overlap_rationale": "PromptPurify states that it was trained on curated internal corpora. The selected Wolf revision states that it combined public sources with internally generated examples and does not disclose a complete record-level training manifest or cutoff. The public dataset repository revision was created after both frozen model revisions, but publication time does not establish when its templates or text first existed and cannot exclude private/pre-release or template/semantic overlap. Under the frozen strict out-of-sample rule, unknown private material is a failure rather than evidence of no overlap."
+  },
+  "sampling_frame": {
+    "eligible_attack_items": 2750,
+    "eligible_benign_items": 2185,
+    "source_declared_attack_families": [
+      "memory_trust_boundary",
+      "rag_document_embedded",
+      "approval_authority_escalation",
+      "tool_function_abuse"
+    ],
+    "source_declared_language": "en",
+    "source_declared_provenance": "Human-designed templates, deterministically expanded, deduplicated, and scenario-isolated across splits."
+  },
+  "unselected_prior_triple": {
+    "id": "E2-FIELD-TEST-001",
+    "maintenance": "FAIL: ProtectAI's pinned card says the project is archived and no longer maintained.",
+    "ontology": "FAIL: S-Labs' positive INJECTION class includes jailbreak personas and lacks per-item subtype taxonomy.",
+    "status": "FROZEN_NOT_ACTIVATED; not modified or repaired by E2-VNEXT."
+  }
+}

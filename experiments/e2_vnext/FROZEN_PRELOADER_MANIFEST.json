@@ -1,0 +1,18 @@
+{
+  "base_repository_revision": "eb03f83595430a430a2fd9fac0a39c9fc08ef5dc",
+  "frozen_at_utc": "2026-08-24T18:49:31Z",
+  "hashes": {
+    "candidate_screen": "39941b8e833e36aeac19335006694414839cff26bc822b4f4485dc041022b269",
+    "decision_attestation_template": "bc6993c5726e8d714b857f9eaeced9d099e9ea0657468106a13eee87cdfad540",
+    "design": "bbe06f5543d049db1f254fbb239405f161c9c92207dd9c5429faedc4d39a4abe",
+    "power_design": "a998631a1edb341648201730960ff865f3516477b571c7cae2e692e1f0241436",
+    "preflight": "9fedd0efa88d3ade099452758e55345d7bfa39d68fca47efeab360247879105e",
+    "protocol": "8f4c5c96e3d35c2f10cd66bcf14398aef15d9f77a13b7fe295ff4b8ec160ae42",
+    "readme": "d84851c13fe8fa2589841d44e7f21469f500ec9fac9c5faf073d8e22e459ecc7",
+    "unit_test": "cccbe2d4cb0cf3e3a4cb994cdde3594a18e294819bb4ead020b36d01d80a6f26"
+  },
+  "materialization_prohibition": "This manifest was sealed before the valid preflight run. No model artifact may be retrieved, no loader may be imported, and no source row may be locally parsed unless every preflight gate passes.",
+  "schema_version": "cc.e2_vnext.frozen_preloader_manifest.v1",
+  "status": "FROZEN_PRE_VALID_PREFLIGHT",
+  "study_id": "E2-VNEXT"
+}
