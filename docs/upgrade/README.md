@@ -93,8 +93,9 @@ ask.
 
 **The honest limit:** both implementations were authored in the same project, so
 this is a differential-testing instrument, not an independent replication. The
-one genuinely non-same-author check is a single external oracle on a single
-scenario family.
+strongest check is a single external oracle on a single scenario family, and it
+is independent in *implementation* only -- it shares this project's author. **No
+check in this repository is author-independent.**
 
 ---
 

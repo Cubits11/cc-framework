@@ -12,10 +12,19 @@ exists": it is *their published numbers reproduce from this library*, so those
 214 lines could be deleted.
 
 The numbers below are quoted from that project's published composition
-document, not recomputed from its source. They are therefore an **external
-oracle**: an implementation written independently, for another purpose, without
-reference to this corpus or this code. Agreement with it is the only check in
-this repository that is not same-author.
+document, not recomputed from its source. They are therefore an **independent
+implementation**: different language, different purpose, written without
+reference to this corpus or this code, and published before this corpus existed.
+
+What that buys, and what it does not. It buys implementation independence: two
+codebases of the same understanding can still disagree on arithmetic, and this
+catches it when they do. It does NOT buy authorial independence -- that project
+and this one share an author. A misreading of the estimand, a wrong assumption
+about the event space, or a shared conceptual error survives this check
+untouched, because there is no second mind to hold it. Earlier revisions of this
+docstring called it "the only check in this repository that is not same-author."
+That was wrong, and it claimed credibility this repository has not earned. No
+check in this repository is currently author-independent.
 
 Their non-claim travels with their numbers and is asserted here too: every
 detection rate is ASSUMED. Zero records had been issued when they were

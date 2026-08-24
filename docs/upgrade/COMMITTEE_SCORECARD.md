@@ -318,10 +318,13 @@ is wrong yields two implementations that are wrong together. This is a
 differential-testing instrument, not an independent replication, and both the
 verifier's own output and the corpus manifest say so in their non-claims.
 
-The one check here that is *not* same-author is the external oracle: an
-outside project's **published** numbers, produced independently for its own
-purposes before this corpus existed, reproduced exactly. That is one oracle, on
-one scenario family.
+The strongest check here is the external oracle: an outside project's
+**published** numbers, produced for its own purposes before this corpus existed,
+reproduced exactly. That is one oracle, on one scenario family -- and it is an
+independent *implementation*, not an independent *author*. The two projects
+share one. **No check in this repository is author-independent.** A previous
+revision of this paragraph called the oracle "not same-author"; that sentence
+bought credibility this work has not earned, and it is withdrawn.
 
 **What would raise it.** Ghost-Ark's TypeScript `ccCorrelation.ts` running this
 corpus. A third implementation by someone who has not read either of these. More

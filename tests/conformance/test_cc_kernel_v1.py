@@ -130,10 +130,15 @@ def test_independent_node_implementation_agrees():
 
 @_requires_node
 def test_node_implementation_reproduces_the_external_oracle():
-    """The one check here that is not same-author.
+    """The one check here whose implementation is independent of this code.
 
     The oracle numbers were published by a separate project that implemented
-    these bounds for its own purposes, without reference to this corpus.
+    these bounds for its own purposes, without reference to this corpus. That
+    makes the *implementation* independent; it does not make the *author*
+    independent, because the two projects share one. This catches divergent
+    arithmetic between two codebases. It cannot catch a shared misreading of the
+    specification, which is what author independence would buy and what this
+    repository still lacks entirely.
     """
     proc = subprocess.run(
         ["node", str(VERIFIER), "--json"],

@@ -485,8 +485,10 @@ argument for randomized differential testing over a corpus alone.
 authored in the same project — a wrong specification yields two implementations
 wrong together. This is a differential-testing instrument, not an independent
 replication, and both the verifier output and the corpus manifest say so in
-their non-claims. The one genuinely non-same-author check is the external
-oracle, and it is **one** oracle on **one** scenario family. Neither the corpus
+their non-claims. The external oracle is the strongest check available, and it
+is **one** oracle on **one** scenario family -- independent in implementation,
+not in authorship, since it shares this project's author. **No check here is
+author-independent.** Neither the corpus
 nor the fuzzer covers the constrained LP path. No downstream project has adopted
 any of this yet: the obstacle is removed, the adoption is theirs.
 
