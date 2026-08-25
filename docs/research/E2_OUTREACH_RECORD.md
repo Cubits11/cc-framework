@@ -1,12 +1,21 @@
-# Outreach draft — UNSENT, pending explicit authorization
+# Outreach record — SENT
 
-**Status: NOT SENT. NOT POSTED. Nothing has been published anywhere.**
-Requires explicit per-message, per-venue human authorization before it exists in public.
+**Status: POSTED 2026-08-25T13:41:48Z, on explicit human authorization.**
 
-**Venue if authorized:** a plain HuggingFace Community discussion at
-`https://huggingface.co/datasets/3nesdeniz/agentic-prompt-injection-5k/discussions/new`
-Confirmed enabled, currently **zero threads**. Requires a signed-in HF account; the post
-carries that account's username, avatar, and profile link.
+| | |
+|---|---|
+| Thread | [discussions/1](https://huggingface.co/datasets/3nesdeniz/agentic-prompt-injection-5k/discussions/1) |
+| Title | Provenance question: is there a per-record scenario / generation identifier? |
+| Posted by | `Cubits11` (Pranav Bhave) — identity verified against `/api/whoami-v2` before submission |
+| Venue | HuggingFace Community discussion on the dataset repo — the first and only thread on it |
+| Body | exactly the text below, verified on screen before submission; unmodified since |
+
+**Response status: AWAITING REPLY. No answer received. The study remains RED.**
+
+Per [`E2_METADATA_QUESTION_FROZEN.md`](E2_METADATA_QUESTION_FROZEN.md) §5, silence and
+ambiguity both map to **remain RED**, and **no inference is drawn from non-response**. The
+maintainer has never participated in a discussion on any of their repositories, so silence
+is the modal expected outcome and must not be read as evidence of anything.
 
 ---
 
