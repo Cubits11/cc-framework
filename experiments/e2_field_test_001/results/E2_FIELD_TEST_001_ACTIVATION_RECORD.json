@@ -1,0 +1,114 @@
+{
+  "schema_version": "cc.e2_field_test_activation_record.v1",
+  "study_id": "E2-FIELD-TEST-001",
+  "recorded_at_utc": "2026-08-24T15:38:19Z",
+  "status": "NOT_ACTIVATED",
+  "frozen_run_manifest": {
+    "path": "../FROZEN_RUN_MANIFEST.json",
+    "sha256": "47e796c22ccede7f05de77f61c1a82b6e553bd92dfc31b947d64e29dc6ccb33f",
+    "protocol_sha256": "20d0817291887911be4ff6461c9178943ffa0853a940d56b5102e38d8e841a15",
+    "harness_source_hashes_verified": true
+  },
+  "retrieved_artifacts": {
+    "dataset_revision": "002a9dd18514abd021869823d6b0429b38606d99",
+    "dataset_csv_sha256": {
+      "data/test.csv": "4c7a9f0fff2bf7d3f6d3e7b84863a8f5d6c48c70c3ac7fe874917074c8f27853",
+      "data/train.csv": "bab012fec95d4214599b18777fd6efc5cc5e9545354df581880aeca5c1d487d7",
+      "data/validation.csv": "c7d14d24a14dd30a37ebe0de928b8ccdcdf6639c3c2e830b59561e2dd5fb7b55"
+    },
+    "dataset_card_sha256": "905e315a428350bdb9b132948f1d29c24b6d9274aa112e2f5aeb49e490588ad6",
+    "promptpurify_release_tarball_sha256": "e6cfa7194e1fb256782738e7342d83f5d382a60adb28dfacef30a44344a57b09",
+    "promptpurify_release_archive_safety": "PASS: 4 regular relative files; inner SHA256SUMS verified",
+    "promptpurify_license_snapshot_sha256": "4db7cdae2d7c83b117d66fc890b071d7f9f8082ba950ef6c62912a1c40c3f77f",
+    "protectai_revision": "90c9989b1a342275dd0d1a95aad283c04e075671",
+    "protectai_model_safetensors_sha256": "6521cb8d0ac08148c81464899c424e6148fcc62befa371089fa4061d8b6e0424",
+    "protectai_safe_asset_sha256": {
+      "added_tokens.json": "dc046d04c9b0ada7ae6f1dc89c465801799acdf0c9a6aab8c15a1b2d5ca4e91f",
+      "config.json": "05079f4735092040b780d459027afab413faa6eeb66a548571a58832304b60bb",
+      "special_tokens_map.json": "9463f61e1b109a8eb4688b829260d7c6b1e6dff04c98ff7269bb89e2b92369b9",
+      "tokenizer.json": "f0a66ad0d735d8dca9ecac4ff50fcdef4bb6adbadd2941a926844844d2c2059b",
+      "tokenizer_config.json": "557b3d33d3f41b81ad769244e506549e98a1857d41dd58160aacd4d98d710b5a"
+    },
+    "protectai_card_sha256": "37221a38df1e60ad56364c39a233c75b77fa08740ecdee248d1b4e07ccc8ef5a"
+  },
+  "confirmed_pre_score_contract": {
+    "dataset_card_label_mapping": "0=BENIGN, 1=INJECTION",
+    "dataset_card_license": "MIT",
+    "promptpurify_license": "MIT",
+    "protectai_card_license": "Apache-2.0",
+    "protectai_config_id2label": {
+      "0": "SAFE",
+      "1": "INJECTION"
+    },
+    "protectai_model_dir_allowlist": [
+      "added_tokens.json",
+      "config.json",
+      "model.safetensors",
+      "special_tokens_map.json",
+      "tokenizer.json",
+      "tokenizer_config.json"
+    ]
+  },
+  "runtime_locks": {
+    "node": "v22.22.3",
+    "npm_package_lock_sha256": "39b9c777ab7f7c504bace1412e1139dcc000232bb9e97b6727990d1a475d345d",
+    "promptpurify": {
+      "version": "0.0.1",
+      "integrity": "sha512-bRNwith6AL1d5QVTTcHKVeFpHdb/oEDvwtyoms1jUqMm56XjqheUlmKDorKGMOXxKtPu3muldvLVf646cbFg/g=="
+    },
+    "onnxruntime_node": {
+      "version": "1.21.0",
+      "integrity": "sha512-NeaCX6WW2L8cRCSqy3bInlo5ojjQqu2fD3D+9W5qb5irwxhEyWKXeH2vZ8W9r6VxaMPUan+4/7NDwZMtouZxEw=="
+    },
+    "python": "3.13.1",
+    "python_direct_packages": {
+      "huggingface-hub": "0.31.1",
+      "safetensors": "0.5.3",
+      "torch": "2.7.1",
+      "transformers": "4.39.3"
+    },
+    "python_wheelhouse_sorted_sha256": "230466ef23b887c4b56d547a29eb9220b90d799cda43970fa31ab330087b7c03"
+  },
+  "activation_gates": [
+    {
+      "gate": "frozen protocol and harness integrity",
+      "outcome": "PASS"
+    },
+    {
+      "gate": "pinned source, artifact, label, license, and package checks",
+      "outcome": "PASS"
+    },
+    {
+      "gate": "PromptPurify local-only smoke loader",
+      "outcome": "FAIL",
+      "observed_error": "L5e model artifact not found at /private/tmp/e2-field-activation.Qe8Mxp/promptpurify/npm-runtime/node_modules/promptpurify/models/l5e (run training/train_intelligent.py + export_intelligent.py).",
+      "condition_verified_before_failure": "The frozen runner had already verified the exact release tarball and the declared <workdir>/models/l5e directory. It then called createL5eRunner() without its documented modelDir override."
+    },
+    {
+      "gate": "ProtectAI smoke loader",
+      "outcome": "NOT_RUN",
+      "reason": "Protocol section 7 requires an immediate stop before scoring on any activation failure."
+    }
+  ],
+  "failure_consequence": {
+    "rule": "An unresolved loader issue is NOT ACTIVATED, not a reason to alter a frozen candidate, artifact placement, runner, or configuration.",
+    "actions_not_taken": [
+      "No private item selection was supplied to either classifier.",
+      "No classifier prediction was requested.",
+      "No observation row, event row, primary statistic, permutation result, bootstrap interval, duplicate control, or label-noise control was produced.",
+      "No model artifact was relocated, symlinked into a package path, copied, substituted, or accessed through a changed runner."
+    ]
+  },
+  "evidence_layers": {
+    "observed": [
+      "Artifact digests, source-card snapshots, package lock, runtime versions, static class mapping, and the single no-input loader error above."
+    ],
+    "derived": [],
+    "interpreted": [
+      "E2_FIELD_TEST_001 is not activated; it provides no pairwise dependence estimate."
+    ],
+    "not_established": [
+      "Any E2 result, guardrail effectiveness, guardrail independence, operational safety, or relevance-claim activation."
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": "cc.e2_field_test_frozen_run_manifest.v1",
+  "status": "FROZEN_PRE_MATERIALIZATION",
+  "study_id": "E2-FIELD-TEST-001",
+  "frozen_at_utc": "2026-08-24T15:26:39Z",
+  "base_repository_revision": "327f0684f49768531594d593902ed8907fc717af",
+  "protocol_sha256": "20d0817291887911be4ff6461c9178943ffa0853a940d56b5102e38d8e841a15",
+  "harness_sha256": {
+    "README.md": "2f730939973ccb5eb88ffd3d2974b480124316b1731b46531138f0ff4372b95e",
+    "analyze.py": "d8f7dfe1c7c634df93746a152c4c33faab88ccf20ac55c997198ce97e6116137",
+    "prepare_items.py": "f1f0236bb021b86bb79c52bd2fa31629699ff9abf4ed5e97f3b71b97ab214198",
+    "recompute.mjs": "2c35feebabd4c5c6ecab7b82eb0158544fd08d0e0eddd4df6ff78b4c909986fe",
+    "run_promptpurify.mjs": "5ab0e333fd415aab034d9f2baccb951aed47649c13f9f279f1bcbeb4e85e2189",
+    "run_protectai.py": "333fad1a2c68271029e32035f66985797706e42fe749e2bafe83605956cc0b91"
+  },
+  "frozen_inputs": {
+    "dataset": {
+      "id": "S-Labs/prompt-injection-dataset",
+      "revision": "002a9dd18514abd021869823d6b0429b38606d99",
+      "target_items": 1097,
+      "selection_rule": "protocol section 4 only"
+    },
+    "guardrail_a": {
+      "id": "sl7.promptpurify.v0.0.1",
+      "release_tarball_sha256": "e6cfa7194e1fb256782738e7342d83f5d382a60adb28dfacef30a44344a57b09"
+    },
+    "guardrail_b": {
+      "id": "protectai.deberta-v3-base-prompt-injection-v2",
+      "revision": "90c9989b1a342275dd0d1a95aad283c04e075671",
+      "model_safetensors_sha256": "6521cb8d0ac08148c81464899c424e6148fcc62befa371089fa4061d8b6e0424"
+    }
+  },
+  "runtime_observed_before_materialization": {
+    "machine_architecture": "arm64",
+    "macos_version": "26.6.2",
+    "node_version": "v22.22.3",
+    "python_version": "3.13.1"
+  },
+  "activation_rule": "Before first score, create a separate append-only activation record with every retrieved artifact and lockfile hash; then verify every hash above, execute smoke-only loaders, and stop NOT ACTIVATED on any gate failure. This frozen file is never edited to repair an activation failure."
+}
