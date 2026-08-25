@@ -109,6 +109,75 @@ def design_violations(rows: list[dict[str, Any]]) -> list[str]:
                 f"duplicate observation for item={key[0]!r} guardrail={key[1]!r} "
                 f"replicate={key[2]}: {count} rows"
             )
+
+    # Layer B2: pairing integrity. Two guardrails may carry the same item_id while
+    # having been offered different bytes. The pair table would then be built from
+    # rows that never shared an input, and p_11 -- and therefore Delta -- would be
+    # computed across mismatched content. The audit already reports the converse
+    # (one hash under several ids, i.e. benchmark duplication); this is the
+    # direction that silently corrupts the estimand rather than inflating it.
+    # item_hash is the canonical item content, so it must agree across arms.
+    # raw_input_hash is explicitly "after any templating" and therefore may
+    # legitimately differ between guardrails; it is pinned per arm below instead.
+    hashes_by_item: dict[str, set[str]] = defaultdict(set)
+    for row in rows:
+        value = row.get("item_hash")
+        if value is not None:
+            hashes_by_item[str(row.get("item_id"))].add(str(value))
+    for item, values in sorted(hashes_by_item.items()):
+        if len(values) > 1:
+            seen = ", ".join(sorted(values)[:3])
+            problems.append(
+                f"pairing violation: item {item!r} carries {len(values)} distinct "
+                f"item_hash values (e.g. {seen}). Rows sharing an item_id must share "
+                "the same canonical content, or the paired table is built from items "
+                "that were never jointly offered."
+            )
+
+    # Within one arm, the templated bytes for an item must be stable across
+    # replicates, or a replicate disagreement is an input change, not guardrail
+    # stochasticity.
+    inputs_by_arm: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for row in rows:
+        value = row.get("raw_input_hash")
+        if value is not None:
+            inputs_by_arm[(str(row.get("item_id")), str(row.get("guardrail_id")))].add(str(value))
+    for (item, guardrail), values in sorted(inputs_by_arm.items()):
+        if len(values) > 1:
+            problems.append(
+                f"replicate input drift: item {item!r} on guardrail {guardrail!r} was "
+                f"submitted under {len(values)} distinct raw_input_hash values. "
+                "Replicate disagreement would then measure an input change rather "
+                "than guardrail stochasticity."
+            )
+
+    # Layer B3: one study, one run, one source revision. Silent drift in any of
+    # these merges observations from different experiments into a single table.
+    for field in ("study_id", "run_id", "item_source", "item_source_version", "schema_version"):
+        values = {str(row.get(field)) for row in rows if row.get(field) is not None}
+        if len(values) > 1:
+            problems.append(
+                f"{field} is not frozen across the observation set: found "
+                f"{sorted(values)}. A single paired analysis must come from one "
+                "study, one run, and one immutable source revision."
+            )
+
+    # Layer B4: one frozen configuration per guardrail. A changed configuration_hash
+    # or policy_version mid-run means the arm is not one mechanism.
+    for field in ("configuration_hash", "policy_version", "guardrail_version"):
+        by_guardrail: dict[str, set[str]] = defaultdict(set)
+        for row in rows:
+            value = row.get(field)
+            if value is not None:
+                by_guardrail[str(row.get("guardrail_id"))].add(str(value))
+        for guardrail, values in sorted(by_guardrail.items()):
+            if len(values) > 1:
+                problems.append(
+                    f"configuration drift: guardrail {guardrail!r} has {len(values)} "
+                    f"distinct {field} values ({', '.join(sorted(values)[:3])}). One arm "
+                    "must be one frozen mechanism for the whole run."
+                )
+
     return problems
 
 

@@ -213,3 +213,96 @@ def test_complete_case_fraction_tracks_missingness() -> None:
     assert report["complete_case_items"] == 1
     assert report["items"] == 2
     assert report["complete_case_fraction"] == 0.5
+
+
+# -- pairing integrity: the direction that silently corrupts Delta ------------
+
+
+def test_same_item_id_with_different_item_hash_is_a_pairing_violation() -> None:
+    """Two arms may carry one item_id over different bytes.
+
+    The audit already reports one hash under several ids (duplication, which
+    inflates apparent agreement).  This is the converse and is worse: it builds
+    the paired table from rows that were never jointly offered, so p_11 -- and
+    therefore Delta -- is computed across mismatched content.
+    """
+
+    rows = [
+        _row(guardrail_id="gr.a", item_hash="a" * 64),
+        _row(guardrail_id="gr.b", item_hash="b" * 64),
+    ]
+    problems = design_violations(rows)
+    assert any("pairing violation" in p and "item_hash" in p for p in problems), problems
+
+
+def test_differing_raw_input_hash_across_arms_is_allowed() -> None:
+    """raw_input_hash is the bytes *after templating*, so arms may differ.
+
+    Pinning it across guardrails would reject every study whose two products
+    wrap the item differently -- which is most of them.
+    """
+
+    rows = [
+        _row(guardrail_id="gr.a", raw_input_hash="a" * 64),
+        _row(guardrail_id="gr.b", raw_input_hash="c" * 64),
+    ]
+    problems = design_violations(rows)
+    assert [p for p in problems if "pairing violation" in p] == []
+    assert [p for p in problems if "replicate input drift" in p] == []
+
+
+def test_replicate_input_drift_within_one_arm_is_rejected() -> None:
+    rows = [
+        _row(guardrail_id="gr.a", replicate_id=0, raw_input_hash="a" * 64),
+        _row(guardrail_id="gr.a", replicate_id=1, raw_input_hash="c" * 64),
+        _row(guardrail_id="gr.b", replicate_id=0),
+        _row(guardrail_id="gr.b", replicate_id=1),
+    ]
+    problems = design_violations(rows)
+    assert any("replicate input drift" in p for p in problems), problems
+
+
+def test_matched_hashes_across_arms_are_accepted() -> None:
+    """The check must not fire on a correctly paired two-arm set."""
+
+    rows = [_row(guardrail_id="gr.a"), _row(guardrail_id="gr.b")]
+    assert [p for p in design_violations(rows) if "pairing violation" in p] == []
+
+
+@pytest.mark.parametrize(
+    "field, other",
+    [
+        ("study_id", "S2"),
+        ("run_id", "R2"),
+        ("item_source", "other-src"),
+        ("item_source_version", "v2"),
+        ("schema_version", "cc.e2_observation_row.v2"),
+    ],
+)
+def test_study_run_and_source_revision_must_be_frozen(field: str, other: str) -> None:
+    """Drift in any of these merges different experiments into one table."""
+
+    rows = [_row(guardrail_id="gr.a"), _row(guardrail_id="gr.b", **{field: other})]
+    problems = design_violations(rows)
+    assert any(f"{field} is not frozen" in p for p in problems), problems
+
+
+@pytest.mark.parametrize(
+    "field, other",
+    [
+        ("configuration_hash", "d" * 64),
+        ("policy_version", "p2"),
+        ("guardrail_version", "2.0"),
+    ],
+)
+def test_configuration_drift_within_one_arm_is_rejected(field: str, other: str) -> None:
+    """One arm must be one frozen mechanism for the whole run."""
+
+    rows = [
+        _row(guardrail_id="gr.a", item_id="item-1"),
+        _row(guardrail_id="gr.a", item_id="item-2", **{field: other}),
+        _row(guardrail_id="gr.b", item_id="item-1"),
+        _row(guardrail_id="gr.b", item_id="item-2"),
+    ]
+    problems = design_violations(rows)
+    assert any("configuration drift" in p and field in p for p in problems), problems
