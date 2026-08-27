@@ -463,3 +463,65 @@ documented epistemic corrections in §3–§7, not as a convenience patch.
 
 **No loader may run. No artifact may be retrieved. No outreach may be sent without
 explicit authorization.**
+
+---
+
+## Addendum — 2026-08-25: the authorized operation was executed
+
+The verdict above stands unamended. This records what happened next.
+
+**The operation was carried out, and it changed the ask.** Before contacting anyone, the
+question was sealed in [`E2_METADATA_QUESTION_FROZEN.md`](E2_METADATA_QUESTION_FROZEN.md)
+— question, admissible evidence, inadmissible evidence, and all five consequence branches
+fixed in advance — so that no answer could be reinterpreted after arrival.
+
+Then public primary sources were exhausted *before* any outreach, on the principle that if
+the answer were already public, nobody needed to be contacted. Recorded in full in
+[`E2_ANCESTRY_PROBE_RESULT.md`](E2_ANCESTRY_PROBE_RESULT.md). The result:
+
+**Branch D — the resampling unit sits ABOVE the template.** §14 above authorized obtaining
+"a per-record `template_id`". That would have been **the wrong ask**. The author's own
+sibling corpora reveal a `seed → scenario → template → variation → record` ancestry with the
+split assigned at *scenario* level; `boundary-pairs` publishes `scenario_count: 50` against
+`total_rows: 1200` and a schema requiring both `scenario_id` **and** `pair_id`. A
+`template_id` alone would not have identified the unit, and requesting one would likely have
+produced a confidently useless answer. **The frozen question's insistence on asking about
+generation ancestry rather than a named column is what caught this.**
+
+Branch C is **affirmatively refuted** — shared parent structure is not a hypothesis here, it
+is documented in the author's own published generator.
+
+**Quantified consequence (a hypothesis about a *different* corpus, never a measurement of the
+study population):** at the author's own published 24× expansion ratio, the candidate frame's
+effective n would be ~115 rather than 2,750, putting the smallest resolvable |Δ| near **0.082**
+against the designed **0.020** — short by roughly 18×.
+
+**One new finding of our own:** the released parquet carries a **ninth column, `source`**,
+absent from both the dataset card's schema table and `CANDIDATE_SCREEN.json`. In the author's
+Python sibling the equivalent field is a struct holding `seed` and `scenario_family`. Whether
+it retains provenance here cannot be determined without reading rows, making it the single
+cheapest thing a maintainer could resolve.
+
+**Outreach sent** 2026-08-25, on explicit authorization, recorded in
+[`E2_OUTREACH_RECORD.md`](E2_OUTREACH_RECORD.md):
+[discussions/1](https://huggingface.co/datasets/3nesdeniz/agentic-prompt-injection-5k/discussions/1).
+Minimal disclosure — no estimand, no preregistration, no blocker — because the maintainer is
+an active researcher in this exact area who shipped a companion evaluation harness minutes
+before the dataset.
+
+**Status: AWAITING REPLY. The verdict remains RED.** Silence maps to remain-RED under the
+sealed branch table and **no inference is drawn from non-response**; the maintainer has never
+participated in a discussion on any of his repositories, so silence is the modal expected
+outcome, not a signal.
+
+**Blocker 4 is therefore refined, not resolved.** It is no longer "obtain a `template_id`" but
+"obtain the scenario-level ancestry, of which `template_id` is one insufficient component."
+
+### Related record
+
+E2-FIELD-TEST-001 existed only as untracked files and is now preserved on branch
+`codex/e2-field-test-001-preserved`. Two E2 attempts have now failed for **different**
+epistemic reasons — FIELD-TEST-001 reached artifact acquisition and a loader invocation and
+stopped on a configuration failure it refused to repair; E2-VNEXT never reached a loader and
+stopped because admissibility itself was underspecified. Neither is a "preliminary attempt"
+and neither should be rewritten as one.
