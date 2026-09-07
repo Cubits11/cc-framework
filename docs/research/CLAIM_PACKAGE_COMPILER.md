@@ -1,126 +1,103 @@
-# The claim-package compiler — a portable claim that carries its own falsifier
+# Claim-package compiler
 
-**Status: implemented, tested, tamper-evident under adversarial challenge.**
-Modules: `cc.evidence.claim_compiler`, `cc.evidence.claim_challenge`. CLI:
-`compile-claim-package`, `verify-claim-package`, `challenge-claim-package`.
+**Status: implemented.** Modules: `cc.evidence.claim_compiler` and
+`cc.evidence.claim_challenge`; CLI: `compile-claim-package`,
+`verify-claim-package`, and `challenge-claim-package`.
 
-## What it is
+The compiler copies one receipt-bound `cc.report` and its bound evidence into a
+portable directory. It is an integrity and inspection tool, not a truth engine,
+semantic validator, source authenticator, or assurance certificate.
 
-A compiler that turns one already-verified `cc.report` into a **portable,
-self-verifying, tamper-evident claim package**: the report copied byte-for-byte,
-its bound evidence copied under `evidence/`, the governance audit, claim
-envelope, lifecycle projection, and human-review projection regenerated, and a
-manifest that records exactly what the package must contain. A recipient with no
-access to the original run can re-verify the whole thing offline, and — this is
-the point — can *disprove* its integrity claim without trusting the compiler.
+## Do not collapse the verdicts
 
-It does deliberately less than its name invites. It does not decide whether a
-claim is true, safe, deployable, or certified. Its one promise is narrow and
-checkable: **if any byte of a bound surface is altered, verification falls to
-`FAIL`.** Integrity is not validity, a `PASS` is not safety, and the package
-says so on every surface.
+Every newly compiled package records three separate results. They answer
+different questions and must not be read as substitutes for one another.
 
-## Fail-closed guarantees (each has a test)
+| Axis | Values | What it checks | What it does not establish |
+| --- | --- | --- | --- |
+| Integrity | `PASS` / `FAIL` | The copied report, evidence, manifest bindings, and generated package surfaces are byte/package-consistent. | The report's claim is true, the evidence was measured rather than asserted, or the package came from a particular author. |
+| Entailment | `PASS` / `FAIL` / `NOT_CHECKED` | An explicitly declared structured upper- or lower-bound proposition against the report measurement interval. | Natural-language meaning, point claims, denominators, populations, confidence interpretation, or unstructured prose. |
+| Independence | `NONE` | Whether this package contains independently established evidence. Claim-package v1 has none. | That a second invocation, same-author challenge, or public canonicalizer is an independent witness. |
 
-The compiler refuses to build, and the verifier refuses to pass, in every case
-below. `tests/unit/evidence/test_claim_compiler.py` is the evidence.
+An honest package can therefore report:
 
-- Governance `FAIL` — never packaged.
-- Expired decay at the compile time — refused (the capsule is expired by
-  2026-08-23 and the compiler declines).
-- Non-portable evidence paths (absolute, `..` traversal) — refused before any
-  directory is created.
-- A byte flipped in the report, any bound evidence file, or any generated
-  surface (audit / envelope / lifecycle / review) — `FAIL`.
-- A bound evidence file deleted — `FAIL`.
-- **A byte flipped in `README.md` or `CHALLENGE.md`** — the two human-facing
-  surfaces are bound like any other. `README.md` carries the PASS caveat and
-  every non-claim; `CHALLENGE.md` carries the falsification protocol. A package
-  whose boundary text can be rewritten silently is one whose PASS can be
-  misrepresented, which is the single thing this format exists to prevent.
-- **A manifest edited to lie** — the verifier re-derives every verdict-bearing
-  manifest field (the artifact list, the subject-report binding, the
-  generated-surface hashes including the two boundary documents, the non-claims,
-  the lifecycle/review projections, and the recorded verifier result) from the
-  receipt-bound report and the hash-bound stored audit, so a manifest that
-  repoints an artifact hash, smuggles in a false non-claim (`"This system is
-  certified safe."`), re-labels tampered boundary text, or flips
-  `required_human_review` to understate its own review obligation is rejected —
-  even when the attacker also edits the file the manifest now points at.
+```text
+Integrity: PASS
+Entailment: FAIL
+Independence: NONE
+```
 
-The verifier has two modes. With no `now`, it reuses the package's recorded time
-and checks *reproduction* of the recorded verdict. With a `now`, it performs a
-*freshness* check at that time, whose verdict may legitimately differ (the
-capsule's claim verifies at its recorded time and fails a freshness check once
-its decay window has passed).
+That combination means its bytes are consistent while its declared numerical
+proposition is contradicted by the measurement interval. It is deliberately not
+rewritten into an integrity failure.
 
-## The built-in falsifier
+The aggregate package result remains conservative: an integrity or governance
+failure, or a structured-entailment failure, makes it `FAIL`; unresolved
+governance review makes it `NEEDS_REVIEW`. An aggregate `PASS` still does not
+establish semantic truth or real-world validity.
 
-Every package ships `CHALLENGE.md` and records a `challenge_command`. The
-challenge is a separate adversary module — the builder and the attacker share no
-private assumptions:
+## The deliberately narrow interval check
+
+The compiler never parses `claim.statement`. Free-text claim prose receives
+`NOT_CHECKED`, even when package integrity is `PASS`.
+
+An author who wants the one supported machine check must add a receipt-bound
+structure under `claim.quantitative_proposition`:
+
+```json
+{
+  "metric_family": "CC",
+  "relation": "upper_bound",
+  "threshold": 0.20
+}
+```
+
+For `upper_bound`, the compiler checks `measurement.interval.upper <= threshold`.
+For `lower_bound`, it checks `measurement.interval.lower >= threshold`. The
+metric family must exactly match. This is intentionally a small comparison,
+not natural-language entailment, source-data validation, external anchoring, or
+statistical re-analysis.
+
+## What integrity means
+
+`verify-claim-package` replays the record at the package's fixed verification
+time (or at an explicitly supplied time) and checks copied bytes, evidence,
+generated surfaces, and re-derived manifest fields. It also re-derives the
+report receipt hash recorded in the manifest and the reproducibility commands;
+those values are not trusted merely because the manifest says them.
+
+The verifier has no signing authority or external immutable anchor. A party
+able to rewrite a report, recompute its public canonical receipt, and recompile
+the package can produce a new internally consistent package. That reissue can
+be byte-valid without proving provenance or interpretation. See
+[`CLAIM_PACKAGE_COMPILER_ATTACK_REPORT.md`](CLAIM_PACKAGE_COMPILER_ATTACK_REPORT.md)
+for the reproduced cases.
+
+## The built-in byte-mutation challenge
+
+Every package ships `CHALLENGE.md` and records:
 
 ```bash
 python -m cc.reporting.cli challenge-claim-package .
 ```
 
-It copies the package to a scratch directory (never touching the original),
-flips one byte of **each** bound surface in turn, re-verifies, and records
-whether the verdict fell to `FAIL`. A control run over the untouched copy must
-reproduce the recorded verdict, so a harness that merely always fails cannot
-pass, and a package missing a bound surface cannot pass either. The report's
-`tamper_evident` is true only if the control reproduced *and* every mutated
-surface was detected.
+The challenge copies the package to scratch space and applies one named minimal
+byte mutation to each fixed surface and copied evidence artifact. It passes only
+when the untouched control reproduces the recorded axes and every tested
+mutation makes the **integrity** verdict `FAIL`. It neither evaluates semantic
+entailment nor supplies independent evidence.
 
-This is the portable, offline analogue of the site's "one real check" widget:
-a recipient does not take the compiler's word that the package is tamper-evident
-— they run the challenge and watch each mutation caught.
+The challenge demonstrates detection for those named mutations only. It does
+not prove that every possible modification is detectable, that a coherent full
+reissue is impossible, or that a claim is true.
 
-## How this invention was hardened
+## Scope limits
 
-The first real compile revealed the compiler never self-verified: the manifest
-hashed the governance audit as compact in-memory JSON while the verifier hashed
-the indented on-disk file — two serializations, so the check could never pass.
-Fixed. The first run of the built-in falsifier then found a genuine
-tamper-evidence gap: a one-byte edit of `manifest.json` (landing in a non-claim
-string) was **not** detected, because the manifest carried authority no verifier
-re-derived. Closed by re-deriving every verdict-bearing manifest field from the
-receipt-bound report. The adversary caught the builder twice; both catches are
-now regression tests. That is the intended lifecycle of this subsystem — the
-falsifier is not decoration, it is how the compiler earns its one claim.
-
-## Two gaps the adversary found after the first release
-
-The falsifier is only as good as its surface list, and the first list was short.
-Both gaps below were found by attacking a compiled package, and both are now
-regression tests.
-
-1. **The boundary text was unbound.** `README.md` and `CHALLENGE.md` were written
-   into every package but named in neither `PackageIntegrityChecks` nor the
-   challenge's surface list. Appending `"This package CERTIFIES the system is
-   SAFE for deployment."` to `README.md` — directly contradicting the non-claim
-   printed above it — left verification at `PASS`. The document a recipient reads
-   to learn what a `PASS` means was the one document a `PASS` did not cover.
-2. **The recorded verifier result was asserted, not derived.** Flipping
-   `verifier_result.required_human_review` from `true` to `false` in the manifest
-   was not detected, so a package could understate its own review obligation and
-   still verify. It is now checked against the stored governance audit, which is
-   itself hash-bound and re-derived.
-
-The challenge now mutates sixteen surfaces rather than fourteen.
-
-## The honest boundary
-
-- A `PASS` means the package is internally consistent under the verifier rules
-  at the recorded time. It does not mean the AI system is safe in deployment.
-- Package hashes bind copied bytes and report references; they do not prove
-  statistical validity, data representativeness, label correctness, or
-  sufficiency for a release decision.
-- The compiler does not assign, transition, revoke, or approve a claim lifecycle
-  state — the manifest records that absence explicitly rather than rebranding a
-  governance verdict as a lifecycle state.
-- The challenge demonstrates detection of the single-byte mutations it applies
-  to each named surface — a surface absent from that list is untested, which is
-  exactly how both gaps above survived the first release; it is not a proof that no undetectable modification
-  exists. `package_id` and `created_at` are pure input labels the verifier
-  cannot re-derive and are, correctly, not verdict-bearing.
+- A canonical receipt binds a document under the declared profile; it is not an
+  author signature or external timestamp.
+- Legacy receipts are checked using their receipt-declared canonicalization
+  profile, rather than the current default profile.
+- `source_path`, `package_id`, and `created_at` are labels, not provenance
+  evidence.
+- No natural-language entailment, external anchoring, signatures, or
+  independently run verifier is implemented by this package format.

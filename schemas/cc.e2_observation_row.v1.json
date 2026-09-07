@@ -231,6 +231,28 @@
       "then": {
         "properties": { "missingness_code": { "const": "excluded_pre" } }
       }
+    },
+    {
+      "$comment": "The excluded_pre code itself is an assertion that the exclusion was frozen before outcomes.",
+      "if": {
+        "properties": { "missingness_code": { "const": "excluded_pre" } },
+        "required": ["missingness_code"]
+      },
+      "then": {
+        "properties": { "predeclared_exclusion": { "const": true } }
+      }
+    },
+    {
+      "$comment": "A timeout cannot be recorded as a successful execution.",
+      "if": {
+        "properties": { "missingness_code": { "const": "timeout" } },
+        "required": ["missingness_code"]
+      },
+      "then": {
+        "properties": {
+          "execution_status": { "not": { "const": "success" } }
+        }
+      }
     }
   ]
 }

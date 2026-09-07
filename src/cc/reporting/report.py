@@ -41,6 +41,7 @@ from pydantic import (
     ValidationError,
     field_serializer,
     field_validator,
+    model_serializer,
     model_validator,
 )
 
@@ -253,6 +254,37 @@ class MeasurementSummaryModel(_StrictReportModel):
         return self
 
 
+QuantitativeRelation = Literal["upper_bound", "lower_bound"]
+
+
+class QuantitativePropositionModel(_StrictReportModel):
+    """A narrowly machine-checkable quantitative claim.
+
+    This is deliberately not a parser for ``claim.statement``.  It records the
+    small subset of a quantitative proposition whose relationship to the
+    report's measurement interval is explicit: a named metric is either bounded
+    above or below a declared threshold.
+    """
+
+    metric_family: str = Field(min_length=1)
+    relation: QuantitativeRelation
+    threshold: float
+
+    @field_validator("metric_family")
+    @classmethod
+    def _metric_family_is_nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("quantitative_proposition.metric_family cannot be empty")
+        return value
+
+    @field_validator("threshold")
+    @classmethod
+    def _threshold_is_finite(cls, value: float) -> float:
+        if not _is_finite_number(value):
+            raise ValueError("quantitative_proposition.threshold must be finite")
+        return value
+
+
 class EvidenceArtifactModel(_StrictReportModel):
     path: str = Field(min_length=1)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -291,6 +323,7 @@ class ClaimSummaryModel(_StrictReportModel):
     statement: str = Field(min_length=1)
     allowed_claim_level: ClaimLevel
     non_claims: tuple[str, ...]
+    quantitative_proposition: QuantitativePropositionModel | None = None
 
     @field_validator("non_claims", mode="before")
     @classmethod
@@ -319,6 +352,15 @@ class ClaimSummaryModel(_StrictReportModel):
         if self.allowed_claim_level != "diagnostic" and not self.non_claims:
             raise ValueError("non-diagnostic claims require explicit non_claims")
         return self
+
+    @model_serializer(mode="wrap")
+    def _preserve_pre_proposition_wire_shape(self, handler: Any) -> Any:
+        """Do not synthesize a null field into an already-receipted report."""
+
+        payload = handler(self)
+        if isinstance(payload, dict) and "quantitative_proposition" not in self.model_fields_set:
+            payload.pop("quantitative_proposition", None)
+        return payload
 
 
 class ReportReceiptModel(_StrictReportModel):
@@ -382,6 +424,12 @@ class CCReport(_StrictReportModel):
                 )
 
         payload = self.model_dump(mode="json")
+        # ``quantitative_proposition`` was added after existing reports had
+        # already been receipted. Pydantic materializes its default while
+        # validating an older document, but the receipt must continue to bind
+        # the original wire shape rather than a synthetic null field.
+        if "quantitative_proposition" not in self.claim.model_fields_set:
+            payload["claim"].pop("quantitative_proposition", None)
         overclaims = _find_reserved_overclaim_paths(payload)
         if overclaims:
             raise ValueError(
@@ -406,7 +454,10 @@ class CCReport(_StrictReportModel):
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-native public report shape."""
 
-        return self.model_dump(mode="json")
+        payload = self.model_dump(mode="json")
+        if "quantitative_proposition" not in self.claim.model_fields_set:
+            payload["claim"].pop("quantitative_proposition", None)
+        return payload
 
 
 @dataclass(frozen=True)
@@ -544,12 +595,37 @@ class ClaimSummary:
     statement: str
     allowed_claim_level: ClaimLevel
     non_claims: Sequence[str] = dataclass_field(default_factory=list)
+    quantitative_proposition: QuantitativeProposition | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "statement": self.statement,
             "allowed_claim_level": self.allowed_claim_level,
             "non_claims": list(self.non_claims),
+        }
+        if self.quantitative_proposition is not None:
+            payload["quantitative_proposition"] = self.quantitative_proposition.to_dict()
+        return payload
+
+
+@dataclass(frozen=True)
+class QuantitativeProposition:
+    """Programmatic counterpart of :class:`QuantitativePropositionModel`.
+
+    The claim compiler can check this structure against the report's measurement
+    interval.  Free-text claim statements remain unstructured and are therefore
+    not semantic-entailment checked.
+    """
+
+    metric_family: str
+    relation: QuantitativeRelation
+    threshold: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "metric_family": self.metric_family,
+            "relation": self.relation,
+            "threshold": self.threshold,
         }
 
 

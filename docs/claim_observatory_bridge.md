@@ -46,15 +46,20 @@ error`.
 
 ## UI Language
 
-The dashboard says `PASS under verifier rules`, not `safe`.
+The dashboard says `Integrity PASS under package byte checks`, not `safe` or
+`semantically validated`. Integrity must be shown separately from governance,
+entailment, and independence.
 
-That wording is intentional. A `pass` verdict means the claim package is
-internally consistent under the claim-governance verifier rules. It is not a
-deployment-safety proof, not an approval statement, and not a guarantee.
+That wording is intentional. An integrity `PASS` means the copied package is
+byte/package-consistent under its verifier rules. It is not a truth claim,
+deployment-safety proof, approval statement, or guarantee. Free-text claim
+prose is not semantic-entailment checked; an explicitly structured interval
+proposition may instead show `PASS` or `FAIL`, and claim-package v1 reports
+independence as `NONE`.
 
 The bridge surfaces the capsule caveat:
 
-> PASS means internal consistency under verifier rules; it does not mean the AI system is safe in deployment.
+> Integrity PASS means byte/package consistency only; it does not establish claim truth, source validity, or deployment safety.
 
 ## Tests
 

@@ -17,7 +17,9 @@ A report separates:
   threshold, and pass/fail status;
 * evidence: file paths, byte sizes, and SHA-256 hashes for artifacts, audit logs,
   and figure manifests;
-* claim boundary: one allowed claim level plus explicit non-claims;
+* claim boundary: one allowed claim level plus explicit non-claims and, when an
+  interval relationship must be machine-checked, an optional explicitly
+  structured quantitative proposition;
 * receipt: a canonical SHA-256 hash over the report.
 
 Allowed claim levels are `diagnostic`, `bounded_empirical`,
@@ -39,6 +41,18 @@ not infer a stronger claim from the receipt.
 Any claim above `diagnostic` must include explicit non-claims. In review, these
 non-claims are part of the receipt contract: they say which tempting conclusions
 the report is deliberately not making.
+
+### Optional structured quantitative proposition
+
+`claim.statement` remains free text. A receipt binds that text but does not
+establish what it means. A producer may instead include
+`claim.quantitative_proposition` with an exact metric family, relation
+(`upper_bound` or `lower_bound`), and threshold. The claim-package compiler can
+compare that small structure with `measurement.interval`; it does not infer a
+proposition from prose or validate population, denominator, confidence, or
+source-data meaning. See
+[`CLAIM_PACKAGE_COMPILER.md`](CLAIM_PACKAGE_COMPILER.md) for the separate
+integrity, entailment, and independence results.
 
 ## What The Receipt Verifies
 

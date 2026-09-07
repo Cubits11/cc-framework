@@ -27,6 +27,7 @@ from cc.evidence.extremal_scenario import (
     ExtremalScenario,
 )
 from cc.kernel.frechet_classes import frechet_bounds
+from cc.reporting.canonical import LEGACY_SORT_KEYS, sha256_canonical
 from cc.reporting.report import (
     CalibrationSummary,
     ClaimSummary,
@@ -208,6 +209,29 @@ def test_passing_claim_package_verifies_governance(tmp_path: Path) -> None:
     assert CLAIM_LEVEL_NON_CLAIM in audit.non_claims
     assert "does not prove safety" in GOVERNANCE_PASS_CAVEAT
     assert "deployment safety" in audit.receipt.reason
+
+
+def test_governance_verifies_a_valid_legacy_receipt_under_its_declared_profile(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_package(tmp_path)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["receipt"]["canonicalization_method"] = LEGACY_SORT_KEYS
+    report["receipt"]["canonical_hash"] = sha256_canonical(report, profile=LEGACY_SORT_KEYS)
+    _write_json(report_path, report)
+
+    audit = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+
+    assert audit.verdict is GovernanceVerdict.PASS
+    assert audit.receipt.report_hash_verified is True
+    assert audit.receipt.canonical_hash == report["receipt"]["canonical_hash"]
+
+    # Changing the declared profile without reissuing the receipt must fail.
+    report["receipt"]["canonicalization_method"] = "unsupported-profile"
+    _write_json(report_path, report)
+    tampered = verify_claim_governance(report_path, now=_issued_at() + timedelta(days=1))
+    assert tampered.verdict is GovernanceVerdict.FAIL
+    assert tampered.receipt.report_hash_verified is False
 
 
 def test_builder_supplies_extremal_scenario_non_claim_for_governance_pass(

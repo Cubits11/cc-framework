@@ -34,6 +34,8 @@ from cc.evidence.claim_compiler import (
     ClaimPackageAudit,
     ClaimPackageError,
     ClaimPackageManifest,
+    PackageEntailmentResult,
+    PackageIndependenceResult,
     compile_claim_package,
     verify_claim_package,
 )
@@ -196,6 +198,8 @@ __all__ = [
     "MeasurementInterval",
     "MerkleLog",
     "MerkleLogError",
+    "PackageEntailmentResult",
+    "PackageIndependenceResult",
     "PermissionCompilationResult",
     "PermissionEdge",
     "PermissionReviewRequirement",

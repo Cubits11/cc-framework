@@ -23,6 +23,7 @@ from cc.evidence.claim_challenge import (
     CHALLENGE_COMPLETENESS_NON_CLAIM,
     render_challenge_report,
 )
+from cc.reporting.canonical import sha256_canonical
 
 ROOT = Path(__file__).resolve().parents[3]
 CAPSULE = ROOT / "examples" / "claim_governance_capsule" / "expected"
@@ -108,6 +109,38 @@ def test_render_is_one_line_per_surface(package: Path) -> None:
     assert rendered.count("[detected]") == len(report.surfaces)
 
 
+def test_challenge_checks_integrity_even_when_structured_entailment_fails(tmp_path: Path) -> None:
+    """The byte challenge must not mistake a semantic FAIL for broken integrity."""
+
+    source = tmp_path / "source"
+    shutil.copytree(CAPSULE, source)
+    report_path = source / "cc_report.json"
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    payload["claim"]["quantitative_proposition"] = {
+        "metric_family": "CC",
+        "relation": "upper_bound",
+        "threshold": 0.01,
+    }
+    receipt = payload["receipt"]
+    receipt["canonical_hash"] = sha256_canonical(
+        payload, profile=receipt["canonicalization_method"]
+    )
+    report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    package = tmp_path / "pkg"
+    compile_claim_package(report_path, package, base_dir=source, now=RECORDED)
+    audit = verify_claim_package(package, now=RECORDED)
+    challenge = challenge_claim_package(package)
+
+    assert audit.verdict == "fail"
+    assert audit.integrity_verdict == "pass"
+    assert audit.entailment.status == "fail"
+    assert challenge.control_verdict == "fail"
+    assert challenge.control_reproduced is True
+    assert challenge.tamper_evident is True
+    assert all(surface.integrity_verdict_after_mutation == "fail" for surface in challenge.surfaces)
+
+
 # --------------------------------------------------------------------------- #
 # CLI integration — the commands packages actually record                     #
 # --------------------------------------------------------------------------- #
@@ -133,8 +166,16 @@ def test_cli_compile_verify_challenge_roundtrip(
         )
         == 0
     )
+    compile_output = capsys.readouterr().out
+    assert "Entailment: NOT_CHECKED" in compile_output
+    assert "Independence: NONE" in compile_output
     assert main(["verify-claim-package", str(out), "--now", "2026-01-02T00:00:00Z"]) == 0
+    verify_output = capsys.readouterr().out
+    assert "Integrity verdict: PASS" in verify_output
+    assert "Entailment: NOT_CHECKED" in verify_output
+    assert "Independence: NONE" in verify_output
     assert main(["challenge-claim-package", str(out)]) == 0
+    capsys.readouterr()
 
     # a tampered package makes the shipped verify command exit non-zero
     data = bytearray((out / "report.json").read_bytes())

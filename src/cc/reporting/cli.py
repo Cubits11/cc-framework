@@ -97,7 +97,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     compile_pkg = subparsers.add_parser(
         "compile-claim-package",
-        help="Compile a portable, self-verifying claim package from a verified report.",
+        help=(
+            "Compile a portable byte-integrity package; it does not infer truth from claim prose."
+        ),
     )
     compile_pkg.add_argument("report", type=Path)
     compile_pkg.add_argument("out_dir", type=Path)
@@ -292,7 +294,9 @@ def _cmd_compile_claim_package(args: argparse.Namespace) -> int:
     )
     print(f"package: {args.out_dir}")
     print(f"package_id: {manifest.package_id}")
-    print(f"verifier verdict: {manifest.verifier_result.verdict.upper()}")
+    print(f"Governance verdict: {manifest.verifier_result.verdict.upper()}")
+    print(f"Entailment: {manifest.entailment.status.upper()} — {manifest.entailment.reason}")
+    print(f"Independence: {manifest.independence.status.upper()} — {manifest.independence.reason}")
     print(f"artifacts: {len(manifest.artifacts)}")
     print(f"challenge: {manifest.reproducibility.challenge_command}")
     return 0 if manifest.verifier_result.verdict == "pass" else 1
@@ -304,14 +308,17 @@ def _cmd_verify_claim_package(args: argparse.Namespace) -> int:
         now=_parse_optional_datetime(args.now),
         strict_unknown_roles=args.strict_unknown_roles,
     )
-    print(f"Claim package verdict: {audit.verdict.upper()}")
+    print(f"Package result: {audit.verdict.upper()}")
     print(f"Package: {audit.package_id}")
-    print(f"Report integrity: {'valid' if audit.report_integrity_valid else 'INVALID'}")
+    print(f"Integrity verdict: {audit.integrity_verdict.upper()} (byte/package consistency)")
+    print(f"Report bytes: {'valid' if audit.report_integrity_valid else 'INVALID'}")
     print(
         f"Artifacts: {len(audit.artifacts)} checked, "
         f"{sum(1 for a in audit.artifacts if a.valid)} valid"
     )
     print(f"Governance verdict: {audit.governance_verdict.upper()}")
+    print(f"Entailment: {audit.entailment.status.upper()} — {audit.entailment.reason}")
+    print(f"Independence: {audit.independence.status.upper()} — {audit.independence.reason}")
     print(f"Support edges preserved: {audit.support_edges_preserved}")
     for reason in audit.reasons:
         print(f"  - {reason}")

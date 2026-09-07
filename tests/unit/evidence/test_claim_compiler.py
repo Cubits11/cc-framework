@@ -16,6 +16,7 @@ adversarial challenge in test_claim_challenge.py is the second, independent one.
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from cc.evidence import (
     verify_claim_package,
 )
 from cc.evidence.claim_compiler import _source_artifacts_from_report
+from cc.reporting.canonical import sha256_canonical
 
 ROOT = Path(__file__).resolve().parents[3]
 CAPSULE = ROOT / "examples" / "claim_governance_capsule" / "expected"
@@ -58,6 +60,9 @@ def test_public_api_exports() -> None:
 def test_compile_and_self_verify_pass(package: Path) -> None:
     audit = verify_claim_package(package, now=RECORDED)
     assert audit.verdict == "pass"
+    assert audit.integrity_verdict == "pass"
+    assert audit.entailment.status == "not_checked"
+    assert audit.independence.status == "none"
     assert audit.report_integrity_valid is True
     assert audit.support_edges_preserved is True
     assert audit.governance_verdict == "pass"
@@ -90,6 +95,69 @@ def test_manifest_records_working_reproduce_and_challenge_commands(package: Path
         "python -m cc.reporting.cli verify-claim-package ."
     )
     assert repro["challenge_command"] == "python -m cc.reporting.cli challenge-claim-package ."
+
+
+def test_unstructured_claim_prose_is_not_semantically_checked(package: Path) -> None:
+    """Free text must remain NOT_CHECKED rather than inherit integrity PASS."""
+
+    audit = verify_claim_package(package, now=RECORDED)
+
+    assert audit.integrity_verdict == "pass"
+    assert audit.entailment.status == "not_checked"
+    assert audit.entailment.check == "not_checked"
+    assert audit.independence.status == "none"
+    assert "not parsed" in audit.entailment.reason
+
+
+def test_structured_false_upper_bound_fails_entailment_but_not_integrity(tmp_path: Path) -> None:
+    """A reissued report cannot turn an interval-inconsistent bound into semantic PASS."""
+
+    source = tmp_path / "source"
+    shutil.copytree(CAPSULE, source)
+    source_report = source / "cc_report.json"
+    report = json.loads(source_report.read_text(encoding="utf-8"))
+    report["claim"]["quantitative_proposition"] = {
+        "metric_family": "CC",
+        "relation": "upper_bound",
+        "threshold": 0.01,
+    }
+    _reissue_receipt(report)
+    source_report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    package = tmp_path / "pkg"
+    manifest = compile_claim_package(source_report, package, base_dir=source, now=RECORDED)
+    audit = verify_claim_package(package, now=RECORDED)
+
+    assert manifest.entailment.status == "fail"
+    assert audit.integrity_verdict == "pass"
+    assert audit.entailment.status == "fail"
+    assert audit.entailment.check == "structured_measurement_interval"
+    assert audit.independence.status == "none"
+    assert audit.verdict == "fail"
+    assert "interval upper" in audit.entailment.reason
+
+
+def test_structured_true_upper_bound_passes_entailment(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    shutil.copytree(CAPSULE, source)
+    source_report = source / "cc_report.json"
+    report = json.loads(source_report.read_text(encoding="utf-8"))
+    report["claim"]["quantitative_proposition"] = {
+        "metric_family": "CC",
+        "relation": "upper_bound",
+        "threshold": 0.2,
+    }
+    _reissue_receipt(report)
+    source_report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    package = tmp_path / "pkg"
+    compile_claim_package(source_report, package, base_dir=source, now=RECORDED)
+    audit = verify_claim_package(package, now=RECORDED)
+
+    assert audit.verdict == "pass"
+    assert audit.integrity_verdict == "pass"
+    assert audit.entailment.status == "pass"
+    assert audit.independence.status == "none"
 
 
 # --------------------------------------------------------------------------- #
@@ -141,6 +209,14 @@ def _flip_middle_byte(path: Path) -> None:
     path.write_bytes(bytes(data))
 
 
+def _reissue_receipt(report: dict[str, object]) -> None:
+    receipt = report["receipt"]
+    assert isinstance(receipt, dict)
+    profile = receipt["canonicalization_method"]
+    assert isinstance(profile, str)
+    receipt["canonical_hash"] = sha256_canonical(report, profile=profile)
+
+
 def _first_evidence_file(package: Path) -> Path:
     return sorted((package / "evidence").glob("*"))[0]
 
@@ -187,6 +263,39 @@ def test_manifest_lying_about_an_artifact_hash_fails_closed(package: Path) -> No
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     audit = verify_claim_package(package, now=RECORDED)
     assert audit.verdict == "fail"
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "reason_fragment"),
+    [
+        (
+            ("subject_report", "canonical_receipt_sha256"),
+            "f" * 64,
+            "canonical_receipt_sha256",
+        ),
+        (
+            ("reproducibility", "challenge_command"),
+            "echo forged-challenge",
+            "reproducibility commands",
+        ),
+    ],
+)
+def test_manifest_fields_are_rederived_not_trusted(
+    package: Path,
+    path: tuple[str, str],
+    value: str,
+    reason_fragment: str,
+) -> None:
+    manifest_path = package / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest[path[0]][path[1]] = value
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+
+    audit = verify_claim_package(package, now=RECORDED)
+
+    assert audit.integrity_verdict == "fail"
+    assert audit.verdict == "fail"
+    assert any(reason_fragment in reason for reason in audit.reasons)
 
 
 def test_appending_a_safety_claim_to_the_readme_fails_closed(package: Path) -> None:

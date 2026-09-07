@@ -39,7 +39,12 @@ from cc.evidence.claim_governance import (
     verify_claim_governance,
 )
 from cc.reporting.canonical import strict_json_loads
-from cc.reporting.report import CCReport, sha256_file
+from cc.reporting.report import (
+    CCReport,
+    MeasurementIntervalModel,
+    QuantitativePropositionModel,
+    sha256_file,
+)
 
 CLAIM_PACKAGE_MANIFEST_SCHEMA_VERSION: Literal["cc.claim_package_manifest.v1"] = (
     "cc.claim_package_manifest.v1"
@@ -55,8 +60,8 @@ CLAIM_PACKAGE_REVIEW_STATUS_SCHEMA_VERSION: Literal["cc.claim_package.review_sta
 )
 
 PACKAGE_PASS_CAVEAT = (
-    "A packaged PASS means the copied evidence package is internally consistent under the "
-    "verifier rules at the recorded time; it does not mean the AI system is safe in deployment."
+    "A package-level PASS means only that the package's declared checks passed at the recorded "
+    "time; it does not establish free-text claim truth, source validity, or deployment safety."
 )
 PACKAGE_INTEGRITY_NON_CLAIM = (
     "Package hashes bind copied bytes and report references; they do not prove statistical "
@@ -224,6 +229,137 @@ class PackageIntegrityChecks(ClaimPackageModel):
     challenge_doc_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class PackageEntailmentResult(ClaimPackageModel):
+    """Whether a declared structured proposition follows from report interval data.
+
+    The compiler never infers a proposition from prose.  ``not_checked`` is the
+    expected result when the report has only a free-text claim statement.
+    """
+
+    status: Literal["pass", "fail", "not_checked"]
+    check: Literal["structured_measurement_interval", "not_checked", "unavailable"]
+    proposition: QuantitativePropositionModel | None = None
+    measurement_interval: MeasurementIntervalModel | None = None
+    reason: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _result_has_the_right_evidence(self) -> PackageEntailmentResult:
+        if self.status == "not_checked":
+            if (
+                self.check != "not_checked"
+                or self.proposition is not None
+                or self.measurement_interval is not None
+            ):
+                raise ValueError("not_checked entailment must not carry a proposition")
+            return self
+        if self.check == "unavailable":
+            if self.status != "fail" or self.proposition is not None:
+                raise ValueError("unavailable entailment must be a failure without a proposition")
+            return self
+        if (
+            self.check != "structured_measurement_interval"
+            or self.proposition is None
+            or self.measurement_interval is None
+        ):
+            raise ValueError("checked entailment requires a structured proposition and interval")
+        return self
+
+
+class PackageIndependenceResult(ClaimPackageModel):
+    """Independence evidence visible to the package verifier.
+
+    Claim-package v1 has no independently verified witness declaration, so it
+    must report ``none`` rather than promote a same-author build or challenge
+    into an independence result.
+    """
+
+    status: Literal["none"]
+    reason: str = Field(min_length=1)
+
+
+def _unstructured_entailment_result() -> PackageEntailmentResult:
+    return PackageEntailmentResult(
+        status="not_checked",
+        check="not_checked",
+        reason=(
+            "No structured quantitative proposition was declared; free-text claim prose is "
+            "not parsed or semantic-entailment checked."
+        ),
+    )
+
+
+def _no_independence_result() -> PackageIndependenceResult:
+    return PackageIndependenceResult(
+        status="none",
+        reason=(
+            "No independent implementation, recomputation, or external review is established "
+            "by claim-package v1."
+        ),
+    )
+
+
+def _evaluate_entailment(report: Mapping[str, Any]) -> PackageEntailmentResult:
+    """Evaluate the one deliberately narrow machine-checkable proposition.
+
+    This function never interprets ``claim.statement``.  A report author must
+    explicitly declare an upper- or lower-bound proposition over the exact
+    measurement metric before the compiler compares it with the report's
+    already receipt-bound interval.
+    """
+
+    try:
+        parsed = CCReport.model_validate(report)
+    except ValidationError as exc:
+        return PackageEntailmentResult(
+            status="fail",
+            check="unavailable",
+            reason=(
+                "The packaged report cannot be validated, so structured quantitative "
+                f"entailment is unavailable: {exc}"
+            ),
+        )
+
+    proposition = parsed.claim.quantitative_proposition
+    if proposition is None:
+        return _unstructured_entailment_result()
+
+    interval = parsed.measurement.interval
+    metric_family = parsed.measurement.metric_family
+    if proposition.metric_family != metric_family:
+        return PackageEntailmentResult(
+            status="fail",
+            check="structured_measurement_interval",
+            proposition=proposition,
+            measurement_interval=interval,
+            reason=(
+                "Structured proposition metric_family does not match the report measurement "
+                f"metric (proposition={proposition.metric_family!r}, measurement={metric_family!r})."
+            ),
+        )
+
+    if proposition.relation == "upper_bound":
+        passed = interval.upper <= proposition.threshold
+        comparison = (
+            f"interval upper {interval.upper:g} <= declared threshold {proposition.threshold:g}"
+        )
+    else:
+        passed = interval.lower >= proposition.threshold
+        comparison = (
+            f"interval lower {interval.lower:g} >= declared threshold {proposition.threshold:g}"
+        )
+
+    return PackageEntailmentResult(
+        status="pass" if passed else "fail",
+        check="structured_measurement_interval",
+        proposition=proposition,
+        measurement_interval=interval,
+        reason=(
+            f"Structured {proposition.relation.replace('_', ' ')} check {'passed' if passed else 'failed'}: "
+            f"{comparison}."
+        ),
+    )
+
+
 class ClaimPackageManifest(ClaimPackageModel):
     """The portable manifest for one evidence-bound claim package."""
 
@@ -243,6 +379,8 @@ class ClaimPackageManifest(ClaimPackageModel):
     non_claims: tuple[str, ...] = Field(default_factory=tuple)
     reproducibility: PackageReproducibility
     integrity_checks: PackageIntegrityChecks
+    entailment: PackageEntailmentResult = Field(default_factory=_unstructured_entailment_result)
+    independence: PackageIndependenceResult = Field(default_factory=_no_independence_result)
 
     @model_validator(mode="after")
     def _manifest_preserves_boundaries(self) -> ClaimPackageManifest:
@@ -289,6 +427,9 @@ class ClaimPackageAudit(ClaimPackageModel):
     package_id: str = Field(min_length=1)
     evaluated_at: str = Field(min_length=1)
     verdict: Literal["pass", "needs_review", "fail"]
+    integrity_verdict: Literal["pass", "fail"]
+    entailment: PackageEntailmentResult
+    independence: PackageIndependenceResult
     manifest_valid: bool
     report_integrity_valid: bool
     artifacts: tuple[PackageArtifactAudit, ...] = Field(default_factory=tuple)
@@ -342,6 +483,8 @@ def compile_claim_package(
         CCReport.model_validate_json(source_report.read_text(encoding="utf-8"))
     except ValidationError as exc:
         raise ClaimPackageError(f"Source report failed strict receipt validation: {exc}") from exc
+    entailment = _evaluate_entailment(report)
+    independence = _no_independence_result()
     source_audit = verify_claim_governance(
         source_report,
         now=verification_time,
@@ -411,7 +554,7 @@ def compile_claim_package(
         _write_json(review_path, review_status.model_dump(mode="json", by_alias=True))
         readme_path = temp_dir / "README.md"
         challenge_path = temp_dir / "CHALLENGE.md"
-        _write_readme(temp_dir, package_audit, source_artifacts)
+        _write_readme(temp_dir, package_audit, source_artifacts, entailment, independence)
         _write_challenge_doc(temp_dir, source_artifacts)
 
         manifest = _build_manifest(
@@ -423,6 +566,8 @@ def compile_claim_package(
             envelope=package_envelope,
             lifecycle=lifecycle,
             review_status=review_status,
+            entailment=entailment,
+            independence=independence,
             now=verification_time,
             audit_path=audit_path,
             envelope_path=envelope_path,
@@ -438,9 +583,15 @@ def compile_claim_package(
             now=verification_time,
             strict_unknown_roles=strict_unknown_roles,
         )
-        if package_check.verdict == "fail":
+        if package_check.integrity_verdict == "fail":
             raise ClaimPackageError(
-                "Newly compiled package did not self-verify: " + "; ".join(package_check.reasons)
+                "Newly compiled package did not pass its integrity check: "
+                + "; ".join(package_check.reasons)
+            )
+        if package_check.entailment != entailment or package_check.independence != independence:
+            raise ClaimPackageError(
+                "Newly compiled package did not reproduce its declared verdict axes: "
+                + "; ".join(package_check.reasons)
             )
         if require_pass and package_check.verdict != "pass":
             raise ClaimPackageError("Newly compiled package still requires review")
@@ -500,6 +651,7 @@ def verify_claim_package(
         effective_time = fallback_time
 
     fatal_reasons: list[str] = []
+    integrity_reasons: list[str] = []
     review_reasons: list[str] = []
     artifact_audits: list[PackageArtifactAudit] = []
     report_path = root / manifest.subject_report.package_path
@@ -509,7 +661,9 @@ def verify_claim_package(
         manifest.subject_report.bytes,
     )
     if not report_valid[0]:
-        fatal_reasons.append(f"Subject report integrity failed: {report_valid[1]}")
+        reason = f"Subject report integrity failed: {report_valid[1]}"
+        fatal_reasons.append(reason)
+        integrity_reasons.append(reason)
 
     for artifact in manifest.artifacts:
         file_path = root / artifact.package_path
@@ -529,10 +683,24 @@ def verify_claim_package(
             )
         )
         if not valid:
-            fatal_reasons.append(f"Artifact {artifact.package_path} integrity failed: {reason}")
+            integrity_reason = f"Artifact {artifact.package_path} integrity failed: {reason}"
+            fatal_reasons.append(integrity_reason)
+            integrity_reasons.append(integrity_reason)
 
     _generated_valid, generated_reasons = _verify_generated_surfaces(root, manifest)
     fatal_reasons.extend(generated_reasons)
+    integrity_reasons.extend(generated_reasons)
+
+    try:
+        packaged_report = _read_json_object(report_path, "packaged report")
+        entailment = _evaluate_entailment(packaged_report)
+    except (OSError, ValueError) as exc:
+        entailment = PackageEntailmentResult(
+            status="fail",
+            check="unavailable",
+            reason=f"The packaged report cannot be read for entailment checking: {exc}",
+        )
+    independence = _no_independence_result()
 
     governance = verify_claim_governance(
         report_path,
@@ -549,15 +717,17 @@ def verify_claim_package(
 
     support_edges_preserved = _support_edges_match(root, manifest, governance)
     if not support_edges_preserved:
-        fatal_reasons.append(
-            "Package manifest support edges do not match the compiled claim envelope."
-        )
+        reason = "Package manifest support edges do not match the compiled claim envelope."
+        fatal_reasons.append(reason)
+        integrity_reasons.append(reason)
 
     # The manifest is the package's root of trust, so it must carry no authority
     # a verifier cannot re-derive. Recompute every verdict-bearing manifest field
     # from the receipt-bound report and the package files; a manifest that
     # disagrees with what the package actually contains is a tampered manifest.
-    fatal_reasons.extend(_manifest_matches_package(root, manifest, governance))
+    manifest_reasons = _manifest_matches_package(root, manifest, governance)
+    fatal_reasons.extend(manifest_reasons)
+    integrity_reasons.extend(manifest_reasons)
 
     if use_recorded_time:
         stored_audit_path = root / manifest.verifier_result.audit_path
@@ -578,6 +748,9 @@ def verify_claim_package(
             "Fresh governance verdict differs from the packaged verdict at the supplied verification time."
         )
 
+    if entailment.status == "fail":
+        fatal_reasons.append("Structured quantitative entailment failed: " + entailment.reason)
+
     if fatal_reasons:
         verdict: Literal["pass", "needs_review", "fail"] = "fail"
     elif governance.verdict is GovernanceVerdict.NEEDS_REVIEW or review_reasons:
@@ -589,6 +762,9 @@ def verify_claim_package(
         package_id=manifest.package_id,
         evaluated_at=_utc_iso(effective_time),
         verdict=verdict,
+        integrity_verdict="fail" if integrity_reasons else "pass",
+        entailment=entailment,
+        independence=independence,
         manifest_valid=True,
         report_integrity_valid=report_valid[0],
         artifacts=tuple(artifact_audits),
@@ -719,6 +895,22 @@ def _review_status(
     )
 
 
+def _reproducibility_projection(fixed_now: str) -> PackageReproducibility:
+    """Return the fully re-derived command projection for a recorded time."""
+
+    return PackageReproducibility(
+        fixed_now=fixed_now,
+        verification_command=(
+            "python -m cc.reporting.cli verify-claim-governance report.json "
+            f"--base-dir evidence --now {fixed_now}"
+        ),
+        package_verification_command=(
+            f"python -m cc.reporting.cli verify-claim-package . --now {fixed_now}"
+        ),
+        challenge_command="python -m cc.reporting.cli challenge-claim-package .",
+    )
+
+
 def _build_manifest(
     *,
     package_id: str,
@@ -729,6 +921,8 @@ def _build_manifest(
     envelope: ClaimEnvelope,
     lifecycle: PackageLifecycleProjection,
     review_status: PackageHumanReviewStatus,
+    entailment: PackageEntailmentResult,
+    independence: PackageIndependenceResult,
     now: datetime,
     audit_path: Path,
     envelope_path: Path,
@@ -773,18 +967,10 @@ def _build_manifest(
         ),
         lifecycle_state=lifecycle,
         human_review_status=review_status,
+        entailment=entailment,
+        independence=independence,
         non_claims=non_claims,
-        reproducibility=PackageReproducibility(
-            fixed_now=now_iso,
-            verification_command=(
-                "python -m cc.reporting.cli verify-claim-governance report.json "
-                f"--base-dir evidence --now {now_iso}"
-            ),
-            package_verification_command=(
-                f"python -m cc.reporting.cli verify-claim-package . --now {now_iso}"
-            ),
-            challenge_command="python -m cc.reporting.cli challenge-claim-package .",
-        ),
+        reproducibility=_reproducibility_projection(now_iso),
         integrity_checks=PackageIntegrityChecks(
             source_governance_audit_sha256=_sha256_file_at(audit_path),
             claim_envelope_sha256=_sha256_file_at(envelope_path),
@@ -799,6 +985,8 @@ def _build_manifest(
 def _render_readme(
     audit: ClaimGovernanceAudit,
     artifacts: Sequence[PackageArtifact],
+    entailment: PackageEntailmentResult,
+    independence: PackageIndependenceResult,
 ) -> str:
     artifact_lines = (
         "\n".join(
@@ -818,9 +1006,20 @@ This directory is a portable copy of one already-bound CC report and its evidenc
 The report is copied byte-for-byte as `report.json`; its evidence paths resolve under
 `evidence/`, so the original receipt stays meaningful without being rewritten.
 
-## Recorded verifier result
+## Separate recorded verdicts
 
-`{audit.verdict.value.upper()}` at `{audit.evaluated_at}`.
+At `{audit.evaluated_at}`:
+
+- **Integrity:** checked by `verify-claim-package` against the copied bytes,
+  manifest bindings, and generated surfaces. It does not establish claim truth.
+- **Governance:** `{audit.verdict.value.upper()}` under the report's evidence and
+  freshness rules.
+- **Entailment:** `{entailment.status.upper()}` — {entailment.reason}
+- **Independence:** `{independence.status.upper()}` — {independence.reason}
+
+The compiler does not infer entailment from `claim.statement`. Free-text prose
+therefore remains `NOT_CHECKED`; only an explicitly declared structured upper-
+or lower-bound proposition is compared with the report measurement interval.
 
 This file is itself a bound surface: its bytes are hashed in `manifest.json` and
 re-derived by the verifier, so the boundary stated below cannot be rewritten
@@ -862,17 +1061,20 @@ def _write_readme(
     root: Path,
     audit: ClaimGovernanceAudit,
     artifacts: Sequence[PackageArtifact],
+    entailment: PackageEntailmentResult,
+    independence: PackageIndependenceResult,
 ) -> None:
-    (root / "README.md").write_text(_render_readme(audit, artifacts), encoding="utf-8")
+    (root / "README.md").write_text(
+        _render_readme(audit, artifacts, entailment, independence), encoding="utf-8"
+    )
 
 
 def _render_challenge_doc(artifacts: Sequence[PackageArtifact]) -> str:
     """Render the falsification protocol so a recipient need not trust the compiler.
 
-    The package asserts it is tamper-evident. This document tells a skeptic how
-    to disprove that assertion offline: mutate one byte of any bound surface and
-    watch the verdict fall to FAIL. If it does not, the package is not
-    tamper-evident and its PASS must not be trusted.
+    The package asserts a narrow byte-integrity property. This document tells a
+    skeptic how to disprove that assertion offline: apply the named one-byte
+    mutations and watch the integrity verdict fall to FAIL.
     """
 
     surfaces = (
@@ -884,10 +1086,10 @@ def _render_challenge_doc(artifacts: Sequence[PackageArtifact]) -> str:
     )
     text = f"""# Falsify this package
 
-This package claims one narrow, checkable thing: it is **tamper-evident** — if
-any byte of the report, the bound evidence, the generated audit surfaces, or the
-boundary text you are reading is altered, package verification falls to `FAIL`.
-Do not trust that claim. Break it.
+This package claims one narrow, checkable thing: it detects the **specific
+single-byte mutations** this challenge applies to its report, bound evidence,
+generated audit surfaces, and boundary text. A detected mutation makes the
+package's **integrity verdict** `FAIL`. Do not trust that claim. Break it.
 
 ## The one-command challenge
 
@@ -899,11 +1101,12 @@ python -m cc.reporting.cli challenge-claim-package .
 
 The challenge copies this package to a scratch directory, then for each bound
 surface applies the minimal mutation (flips or appends a single byte), re-runs
-`verify_claim_package` at the recorded time, and records whether the verdict
-fell to `FAIL`. It restores nothing in place — your package is never modified —
+`verify_claim_package` at the recorded time, and records whether the integrity
+verdict fell to `FAIL`. It restores nothing in place — your package is never modified —
 and it prints one line per surface. Every mutated surface must be **detected**.
-A control run over the untouched copy must reproduce the recorded verdict, so a
-harness that simply always fails cannot pass the challenge.
+A control run over the untouched copy must reproduce the package's recorded
+integrity, governance, entailment, and independence results, so a harness that
+simply always fails cannot pass the challenge.
 
 ## The surfaces it mutates
 
@@ -920,7 +1123,8 @@ It means: the specific single-byte mutations the challenge applies to each named
 surface are all detected, and the untouched control reproduces. It does **not**
 mean the underlying claim is true, the evidence is valid, or that no undetectable
 modification of any kind exists — only that this package's integrity binding
-catches the mutations it is challenged with. Integrity is not validity.
+catches the mutations it is challenged with. It does not test semantic
+entailment or independence. Integrity is not validity.
 """
     return text
 
@@ -1012,6 +1216,28 @@ def _manifest_matches_package(
     expected_schema = str(report.get("schema_version") or "unknown")
     if subject.schema_version != expected_schema:
         reasons.append("Manifest subject schema_version does not match the packaged report.")
+    receipt = report.get("receipt")
+    expected_receipt_hash = receipt.get("canonical_hash") if isinstance(receipt, Mapping) else None
+    if subject.canonical_receipt_sha256 != expected_receipt_hash:
+        reasons.append(
+            "Manifest subject canonical_receipt_sha256 does not match the packaged report receipt."
+        )
+
+    expected_entailment = _evaluate_entailment(report)
+    if manifest.entailment != expected_entailment:
+        reasons.append(
+            "Manifest entailment result does not match the re-derived report interval check."
+        )
+    expected_independence = _no_independence_result()
+    if manifest.independence != expected_independence:
+        reasons.append(
+            "Manifest independence result does not match claim-package v1's available evidence."
+        )
+    expected_reproducibility = _reproducibility_projection(manifest.reproducibility.fixed_now)
+    if manifest.reproducibility != expected_reproducibility:
+        reasons.append(
+            "Manifest reproducibility commands do not match the re-derived package commands."
+        )
 
     try:
         envelope = compile_claim_envelope(report, governance_audit=governance)
@@ -1028,7 +1254,14 @@ def _manifest_matches_package(
                     mode="json", by_alias=True
                 )
             ),
-            "readme_sha256": _text_sha256(_render_readme(governance, expected_artifacts)),
+            "readme_sha256": _text_sha256(
+                _render_readme(
+                    governance,
+                    expected_artifacts,
+                    expected_entailment,
+                    expected_independence,
+                )
+            ),
             "challenge_doc_sha256": _text_sha256(_render_challenge_doc(expected_artifacts)),
         }
     except Exception as exc:  # pragma: no cover - defensive re-derivation boundary
@@ -1163,6 +1396,14 @@ def _package_failure_audit(*, package_id: str, evaluated_at: str, reason: str) -
         package_id=package_id,
         evaluated_at=evaluated_at,
         verdict="fail",
+        integrity_verdict="fail",
+        entailment=PackageEntailmentResult(
+            status="fail",
+            check="unavailable",
+            reason="Entailment could not be evaluated because package verification failed: "
+            + reason,
+        ),
+        independence=_no_independence_result(),
         manifest_valid=False,
         report_integrity_valid=False,
         artifacts=(),
@@ -1292,7 +1533,9 @@ __all__ = [
     "ClaimPackageManifest",
     "PackageArtifact",
     "PackageArtifactAudit",
+    "PackageEntailmentResult",
     "PackageHumanReviewStatus",
+    "PackageIndependenceResult",
     "PackageIntegrityChecks",
     "PackageLifecycleProjection",
     "PackageReproducibility",

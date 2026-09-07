@@ -73,6 +73,11 @@ def design_violations(rows: list[dict[str, Any]]) -> list[str]:
     items_by_guardrail: dict[str, set[str]] = defaultdict(set)
     for row in rows:
         items_by_guardrail[str(row.get("guardrail_id"))].add(str(row.get("item_id")))
+    if len(items_by_guardrail) < 2:
+        problems.append(
+            "comparison violation: an E2 dependence study requires at least two "
+            "guardrails; one guardrail has no pairwise dependence estimand."
+        )
     if len(items_by_guardrail) > 1:
         universe = set.union(*items_by_guardrail.values())
         for guardrail, items in sorted(items_by_guardrail.items()):

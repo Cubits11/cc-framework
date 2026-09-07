@@ -22,6 +22,7 @@ from cc.reporting.report import (
     EvidenceArtifact,
     GitMetadata,
     MeasurementSummary,
+    QuantitativeProposition,
     ReportValidationError,
     RunSummary,
     build_cc_report,
@@ -81,6 +82,26 @@ def test_report_builder_happy_path_validates_against_schema() -> None:
     assert report["receipt"]["hash_algorithm"] == "sha256"
     assert report["receipt"]["canonical_hash"] == sha256_canonical(report)
     assert report["evidence"]["artifacts"][0]["sha256"]
+
+
+def test_structured_quantitative_proposition_is_receipt_bound_and_schema_valid() -> None:
+    report = _report(
+        claim=ClaimSummary(
+            statement="The structured interval proposition is checked separately from prose.",
+            allowed_claim_level="bounded_empirical",
+            non_claims=["This does not certify production safety."],
+            quantitative_proposition=QuantitativeProposition(
+                metric_family="CC", relation="upper_bound", threshold=1.2
+            ),
+        )
+    )
+
+    Draft202012Validator(_schema()).validate(report)
+    parsed = CCReport.model_validate(report)
+
+    assert parsed.claim.quantitative_proposition is not None
+    assert parsed.claim.quantitative_proposition.threshold == 1.2
+    assert report["receipt"]["canonical_hash"] == sha256_canonical(report)
 
 
 def test_report_model_round_trip_preserves_canonical_json_identity() -> None:

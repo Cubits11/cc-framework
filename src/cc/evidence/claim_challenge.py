@@ -1,9 +1,10 @@
 """Falsify a claim package's own tamper-evidence claim.
 
 A compiled claim package asserts one narrow, checkable property: it is
-*tamper-evident*. If any byte of the byte-bound report, the bound evidence, the
-manifest, or the generated audit surfaces is altered, package verification must
-fall to ``FAIL``. This module is the adversary that tries to disprove that
+*tamper-evident for the challenge's named byte mutations*. If a tested byte
+mutation changes the byte-bound report, bound evidence, manifest, or generated
+audit surfaces, the package's **integrity verdict** must fall to ``FAIL``. This
+module is the adversary that tries to disprove that
 assertion, so a recipient does not have to trust the compiler that made the
 package.
 
@@ -73,6 +74,7 @@ class ClaimPackageChallengeSurface(ClaimPackageModel):
     package_path: str = Field(min_length=1)
     mutation: Literal["flip_byte", "append_byte"]
     verdict_after_mutation: Literal["pass", "needs_review", "fail"]
+    integrity_verdict_after_mutation: Literal["pass", "fail"]
     detected: bool
     reason: str = Field(min_length=1)
 
@@ -105,9 +107,10 @@ def challenge_claim_package(
     The challenge copies the package to a scratch directory and, for each bound
     surface, applies the minimal single-byte mutation, re-runs
     ``verify_claim_package`` at the package's recorded time, and records whether
-    the verdict fell to ``fail``. A control run over the untouched copy must
-    reproduce the recorded verdict. ``tamper_evident`` is true only if the
-    control reproduced *and* every mutated surface was detected.
+    the **integrity verdict** fell to ``fail``. A control run over the untouched
+    copy must reproduce the package's recorded axis results. ``tamper_evident``
+    is true only if the control reproduced *and* every mutated surface was
+    detected.
 
     Passing ``now`` runs the whole challenge at that time instead of the
     recorded time; the control then checks reproduction against a fresh verdict.
@@ -156,12 +159,17 @@ def challenge_claim_package(
             work, now=effective_time, strict_unknown_roles=strict_unknown_roles
         )
         control_verdict = control.verdict
-        control_reproduced = control_verdict == manifest.verifier_result.verdict
+        control_reproduced = (
+            control.integrity_verdict == "pass"
+            and control.governance_verdict == manifest.verifier_result.verdict
+            and control.entailment == manifest.entailment
+            and control.independence == manifest.independence
+        )
         if not control_reproduced:
             reasons.append(
-                "Control run did not reproduce the recorded verdict "
-                f"(recorded={manifest.verifier_result.verdict}, control={control_verdict}); "
-                "the package must self-verify before its tamper-evidence can be challenged."
+                "Control run did not reproduce the recorded integrity, governance, entailment, "
+                "and independence results; the package must self-verify before its "
+                "tamper-evidence can be challenged."
             )
 
         surface_results: list[ClaimPackageChallengeSurface] = []
@@ -173,6 +181,7 @@ def challenge_claim_package(
                         package_path=relative,
                         mutation="flip_byte",
                         verdict_after_mutation="fail",
+                        integrity_verdict_after_mutation="fail",
                         detected=False,
                         reason="surface missing from package; a bound surface cannot be absent",
                     )
@@ -187,25 +196,31 @@ def challenge_claim_package(
                     work, now=effective_time, strict_unknown_roles=strict_unknown_roles
                 )
                 verdict = audit.verdict
+                integrity_verdict = audit.integrity_verdict
             finally:
                 target.write_bytes(original)
-            detected = verdict == "fail"
+            detected = integrity_verdict == "fail"
             surface_results.append(
                 ClaimPackageChallengeSurface(
                     package_path=relative,
                     mutation=mutation,
                     verdict_after_mutation=verdict,
+                    integrity_verdict_after_mutation=integrity_verdict,
                     detected=detected,
                     reason=(
-                        "mutation detected: verdict fell to FAIL"
+                        "mutation detected: integrity verdict fell to FAIL"
                         if detected
-                        else f"mutation NOT detected: verdict stayed {verdict.upper()}"
+                        else (
+                            "mutation NOT detected: integrity verdict stayed "
+                            f"{integrity_verdict.upper()} (package verdict {verdict.upper()})"
+                        )
                     ),
                 )
             )
             if not detected:
                 reasons.append(
-                    f"Undetected mutation of {relative}: verdict stayed {verdict.upper()}."
+                    f"Undetected mutation of {relative}: integrity verdict stayed "
+                    f"{integrity_verdict.upper()}."
                 )
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
@@ -277,8 +292,8 @@ def render_challenge_report(report: ClaimPackageChallengeReport) -> str:
 
     lines = [
         f"Challenge: {report.package_id}",
-        f"Control verdict: {report.control_verdict.upper()} "
-        f"(reproduced recorded verdict: {report.control_reproduced})",
+        f"Control package verdict: {report.control_verdict.upper()} "
+        f"(reproduced recorded axes: {report.control_reproduced})",
     ]
     for surface in report.surfaces:
         mark = "detected" if surface.detected else "UNDETECTED"

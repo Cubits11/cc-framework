@@ -845,20 +845,27 @@ def _audit_receipt(
 ) -> ReceiptAudit:
     receipt = report.get("receipt")
     canonical_hash = receipt.get("canonical_hash") if isinstance(receipt, Mapping) else None
+    canonicalization_method = (
+        receipt.get("canonicalization_method") if isinstance(receipt, Mapping) else None
+    )
 
     hash_verified: bool | None
     reason_parts: list[str] = []
 
     if isinstance(canonical_hash, str):
         try:
-            computed_hash = sha256_canonical(report)
+            if not isinstance(canonicalization_method, str):
+                raise ValueError("receipt.canonicalization_method is absent or not a string")
+            computed_hash = sha256_canonical(report, profile=canonicalization_method)
             hash_verified = computed_hash == canonical_hash
             if hash_verified:
+                # Preserve the historical audit bytes for already-bound capsules.
+                # The declared profile controls verification above, not prose drift.
                 reason_parts.append("Canonical report hash verified.")
             else:
                 reason_parts.append(
                     f"Canonical report hash mismatch: expected {canonical_hash}, "
-                    f"computed {computed_hash}."
+                    f"computed {computed_hash} under profile {canonicalization_method!r}."
                 )
         except Exception as exc:
             hash_verified = False

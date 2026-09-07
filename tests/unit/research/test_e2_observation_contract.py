@@ -122,6 +122,11 @@ def test_recorded_missingness_satisfies_pairing() -> None:
     assert schema_violations(rows, SCHEMA) == []
 
 
+def test_one_guardrail_cannot_form_an_e2_dependence_study() -> None:
+    problems = design_violations([_row()])
+    assert any("at least two guardrails" in problem for problem in problems)
+
+
 # -- layer C: the reduction h must be frozen ---------------------------------
 
 
@@ -179,6 +184,36 @@ def test_predeclared_exclusion_cannot_relabel_a_post_hoc_drop() -> None:
             normalized_outcome=None,
             normalizer_version=None,
             exclusion_reason="dropped after seeing results",
+        )
+    ]
+    assert schema_violations(rows, SCHEMA)
+
+
+def test_excluded_pre_must_affirm_predeclared_exclusion() -> None:
+    rows = [
+        _row(
+            predeclared_exclusion=False,
+            missingness_code="excluded_pre",
+            execution_status="skipped",
+            raw_outcome=None,
+            raw_output_hash=None,
+            normalized_outcome=None,
+            normalizer_version=None,
+            exclusion_reason="frozen eligibility rule",
+        )
+    ]
+    assert schema_violations(rows, SCHEMA)
+
+
+def test_timeout_cannot_be_recorded_as_success() -> None:
+    rows = [
+        _row(
+            missingness_code="timeout",
+            execution_status="success",
+            raw_outcome=None,
+            raw_output_hash=None,
+            normalized_outcome=None,
+            normalizer_version=None,
         )
     ]
     assert schema_violations(rows, SCHEMA)

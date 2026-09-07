@@ -353,6 +353,17 @@
             "minLength": 1,
             "pattern": "\\S"
           }
+        },
+        "quantitative_proposition": {
+          "description": "Optional explicit interval proposition. It is not inferred from claim.statement; a package compiler may check only this declared relation against the report measurement interval.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/quantitative_proposition"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
@@ -465,6 +476,31 @@
         "role": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "quantitative_proposition": {
+      "type": "object",
+      "description": "A deliberately narrow machine-checkable upper or lower bound over the named measurement metric.",
+      "additionalProperties": false,
+      "required": [
+        "metric_family",
+        "relation",
+        "threshold"
+      ],
+      "properties": {
+        "metric_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": [
+            "upper_bound",
+            "lower_bound"
+          ]
+        },
+        "threshold": {
+          "type": "number"
         }
       }
     }
