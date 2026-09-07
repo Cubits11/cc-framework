@@ -4,14 +4,14 @@
     {
       "path": "FINDING.md",
       "classification": "PUBLIC",
-      "sha256": "f03f1775dbb6954be93984a7e503dcbf494ea2f6c1afdc89347ff267dbc49c49",
+      "sha256": "f03f1775dbb6954be93984a7e503dcbf494ea2f6c1afdc89347ff267dbc49c49", "checksum_note": "Public file digest; # pragma: allowlist secret",
       "provenance": "Existing untracked workspace artifact, reviewed for release 2026-09-07; original generation metadata unavailable.",
       "deployment": "not part of Cubits11 Pages"
     },
     {
       "path": "identical_shadows.py",
       "classification": "PUBLIC",
-      "sha256": "7d4d3e332dfee7123d2f2ce8de4b1458bf94ee40ffdef1d410b58ebc5ce7d990",
+      "sha256": "7d4d3e332dfee7123d2f2ce8de4b1458bf94ee40ffdef1d410b58ebc5ce7d990", "checksum_note": "Public file digest; # pragma: allowlist secret",
       "provenance": "Existing untracked workspace artifact, reviewed for release 2026-09-07; original generation metadata unavailable.",
       "deployment": "not part of Cubits11 Pages"
     }
