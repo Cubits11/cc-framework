@@ -122,6 +122,8 @@ lower witness: [0.8 0.1 0.1 0. ]
 upper witness: [ 0.9 -0.   0.   0.1]
 ```
 
+**Interactive companion:** [Ghost Visualizer](https://cubits11.github.io/ghost-visualizer/) walks through the same bounds on a constructed 100-row toy dataset; it is a separate TypeScript repository with its own implementation, and its data is not a measurement.
+
 ## The complete epistemic machine
 
 <p align="center">
