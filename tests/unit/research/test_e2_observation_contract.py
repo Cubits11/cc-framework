@@ -40,6 +40,7 @@ def _row(**overrides: Any) -> dict[str, Any]:
         "study_id": "S",
         "run_id": "R",
         "item_id": "item-1",
+        "stratum": "harmful",
         "item_source": "src",
         "item_source_version": "v1",
         "item_hash": digest,

@@ -1,0 +1,5 @@
+COMMAND: E2_SITE_ROOT=/Users/pranavbhave/Developer/GitHub/e2-wave1-site PYTHONPATH=/tmp/e2-wave1-20261024/test-dependencies:src:. PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /tmp/cc-validation-20261023/bin/python -B -m pytest -o addopts= -p no:cacheprovider -q -rs tests/unit/research/test_e2_stratum.py tests/unit/research/test_e2_observation_contract.py tests/unit/research/test_e2_dryrun.py
+....................................                                     [100%]
+36 passed in 21.01s
+
+EXIT_CODE=0

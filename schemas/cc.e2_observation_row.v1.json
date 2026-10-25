@@ -10,6 +10,7 @@
     "study_id",
     "run_id",
     "item_id",
+    "stratum",
     "item_source",
     "item_source_version",
     "item_hash",
@@ -45,6 +46,11 @@
       "type": "string",
       "minLength": 1,
       "description": "Immutable identifier of the evaluated item. MUST be stable across guardrails: this is the key that makes observations paired."
+    },
+    "stratum": {
+      "type": "string",
+      "enum": ["harmful", "benign_eval", "harmful_jbb", "benign_jbb"],
+      "description": "Frozen evaluation population from E2 PREREG_SELECTION section 1: AdvBench harmful, OR-Bench benign evaluation, JBB harmful, or JBB benign. Strata are never folded. Calibration observations are not evaluation rows."
     },
     "item_source": {
       "type": "string",

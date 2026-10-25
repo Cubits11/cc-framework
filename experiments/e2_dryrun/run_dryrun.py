@@ -182,6 +182,7 @@ def emit_rows(corpus: list[dict[str, Any]], guardrails: dict[str, dict[str, Any]
                     "study_id": STUDY_ID,
                     "run_id": RUN_ID,
                     "item_id": item["item_id"],
+                    "stratum": "harmful",
                     "item_source": "e2_dryrun.corpus",
                     "item_source_version": "2026-08-23",
                     "item_hash": item_hash,
