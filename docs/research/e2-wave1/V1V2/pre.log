@@ -1,0 +1,517 @@
+COMMAND: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /tmp/cc-validation-20261023/bin/python -B -m pytest -o addopts= -p no:cacheprovider -q --tb=short tests/unit/research/test_e2_validator_malformed.py
+FF....FFFF...........FFFFFFFFFFFFFFFFFF....                              [100%]
+=================================== FAILURES ===================================
+_________ test_malformed_replicate_is_structured_violation[replicate0] _________
+tests/unit/research/test_e2_validator_malformed.py:63: in test_malformed_replicate_is_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "replicate_id")
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 240, in main
+E         violations = schema_violations(rows, schema) + design_violations(rows)
+E                                                        ^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 107, in design_violations
+E         keys = Counter(
+E                ^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py", line 607, in __init__
+E         self.update(iterable, **kwds)
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py", line 699, in update
+E         _count_elements(self, iterable)
+E     TypeError: unhashable type: 'list'
+E     
+E   assert 'Traceback' not in "Traceback (...pe: 'list'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (11 lines hidden), use '-vv' to show
+_________ test_malformed_replicate_is_structured_violation[replicate1] _________
+tests/unit/research/test_e2_validator_malformed.py:63: in test_malformed_replicate_is_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "replicate_id")
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 240, in main
+E         violations = schema_violations(rows, schema) + design_violations(rows)
+E                                                        ^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 107, in design_violations
+E         keys = Counter(
+E                ^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py", line 607, in __init__
+E         self.update(iterable, **kwds)
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py", line 699, in update
+E         _count_elements(self, iterable)
+E     TypeError: unhashable type: 'dict'
+E     
+E   assert 'Traceback' not in "Traceback (...pe: 'dict'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (11 lines hidden), use '-vv' to show
+_______________ test_mixed_replicate_types_do_not_crash_sorting ________________
+tests/unit/research/test_e2_validator_malformed.py:69: in test_mixed_replicate_types_do_not_crash_sorting
+    _reject(_run(_write_rows(tmp_path, rows)), "replicate_id")
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 240, in main
+E         violations = schema_violations(rows, schema) + design_violations(rows)
+E                                                        ^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 111, in design_violations
+E         for key, count in sorted(keys.items()):
+E                           ^^^^^^^^^^^^^^^^^^^^
+E     TypeError: '<' not supported between instances of 'str' and 'int'
+E     
+E   assert 'Traceback' not in "Traceback (... and 'int'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (7 lines hidden), use '-vv' to show
+_____________ test_malformed_outcome_is_structured_violation[junk] _____________
+tests/unit/research/test_e2_validator_malformed.py:76: in test_malformed_outcome_is_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "normalized_outcome")
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 241, in main
+E         report = audit(rows)
+E                  ^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 154, in audit
+E         replicate_outcomes[key].add(int(row["normalized_outcome"]))
+E                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E     ValueError: invalid literal for int() with base 10: 'junk'
+E     
+E   assert 'Traceback' not in "Traceback (...10: 'junk'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (7 lines hidden), use '-vv' to show
+___________ test_malformed_outcome_is_structured_violation[outcome1] ___________
+tests/unit/research/test_e2_validator_malformed.py:76: in test_malformed_outcome_is_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "normalized_outcome")
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 241, in main
+E         report = audit(rows)
+E                  ^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 154, in audit
+E         replicate_outcomes[key].add(int(row["normalized_outcome"]))
+E                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E     TypeError: int() argument must be a string, a bytes-like object or a real number, not 'list'
+E     
+E   assert 'Traceback' not in "Traceback (...not 'list'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (7 lines hidden), use '-vv' to show
+___________ test_malformed_outcome_is_structured_violation[outcome2] ___________
+tests/unit/research/test_e2_validator_malformed.py:76: in test_malformed_outcome_is_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "normalized_outcome")
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 241, in main
+E         report = audit(rows)
+E                  ^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 154, in audit
+E         replicate_outcomes[key].add(int(row["normalized_outcome"]))
+E                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E     TypeError: int() argument must be a string, a bytes-like object or a real number, not 'dict'
+E     
+E   assert 'Traceback' not in "Traceback (...not 'dict'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (7 lines hidden), use '-vv' to show
+__________ test_non_object_jsonl_rows_are_structured_violations[row0] __________
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:104: in test_non_object_jsonl_rows_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_non_object_jsonl_rows_are0/not-an-object.jsonl:1: each line must be a JSON object\n'
+__________ test_non_object_jsonl_rows_are_structured_violations[None] __________
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:104: in test_non_object_jsonl_rows_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_non_object_jsonl_rows_are1/not-an-object.jsonl:1: each line must be a JSON object\n'
+__________ test_non_object_jsonl_rows_are_structured_violations[row] ___________
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:104: in test_non_object_jsonl_rows_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_non_object_jsonl_rows_are2/not-an-object.jsonl:1: each line must be a JSON object\n'
+___________ test_non_object_jsonl_rows_are_structured_violations[1] ____________
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:104: in test_non_object_jsonl_rows_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_non_object_jsonl_rows_are3/not-an-object.jsonl:1: each line must be a JSON object\n'
+__________ test_non_object_jsonl_rows_are_structured_violations[True] __________
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:104: in test_non_object_jsonl_rows_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_non_object_jsonl_rows_are4/not-an-object.jsonl:1: each line must be a JSON object\n'
+_ test_unreadable_or_empty_observations_are_structured_violations[{"item_id":] _
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:113: in test_unreadable_or_empty_observations_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_unreadable_or_empty_obser0/malformed.jsonl:1: invalid JSON: Expecting value: line 1 column 12 (char 11)\n'
+_ test_unreadable_or_empty_observations_are_structured_violations[\xff\xfe\n] __
+tests/unit/research/test_e2_validator_malformed.py:113: in test_unreadable_or_empty_observations_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 235, in main
+E         rows = load_rows(args.observations)
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 40, in load_rows
+E         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+E                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1028, in read_text
+E         return f.read()
+E                ^^^^^^^^
+E       File "<frozen codecs>", line 322, in decode
+E     UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+E     
+E   assert 'Traceback' not in 'Traceback (...start byte\n'
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (11 lines hidden), use '-vv' to show
+______ test_unreadable_or_empty_observations_are_structured_violations[] _______
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:113: in test_unreadable_or_empty_observations_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='E2 conformance error: no observation rows\n'
+__ test_unreadable_or_empty_observations_are_structured_violations[  \n\t\n] ___
+tests/unit/research/test_e2_validator_malformed.py:36: in _payload
+    payload, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../../.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py:356: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+tests/unit/research/test_e2_validator_malformed.py:113: in test_unreadable_or_empty_observations_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:38: in _payload
+    pytest.fail(f"no structured validator output: stdout={result.stdout!r}, stderr={result.stderr!r}")
+E   Failed: no structured validator output: stdout='', stderr='E2 conformance error: no observation rows\n'
+___________ test_input_io_errors_are_structured_violations[missing] ____________
+tests/unit/research/test_e2_validator_malformed.py:121: in test_input_io_errors_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 235, in main
+E         rows = load_rows(args.observations)
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 40, in load_rows
+E         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+E                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1027, in read_text
+E         with self.open(mode='r', encoding=encoding, errors=errors) as f:
+E              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open
+E         return io.open(self, mode, buffering, encoding, errors, newline)
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E     FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_input_io_errors_are_struc0/input.jsonl'
+E     
+E   assert 'Traceback' not in "Traceback (...put.jsonl'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (13 lines hidden), use '-vv' to show
+__________ test_input_io_errors_are_structured_violations[directory] ___________
+tests/unit/research/test_e2_validator_malformed.py:121: in test_input_io_errors_are_structured_violations
+    _reject(_run(path))
+tests/unit/research/test_e2_validator_malformed.py:45: in _reject
+    payload = _payload(result)
+              ^^^^^^^^^^^^^^^^
+tests/unit/research/test_e2_validator_malformed.py:32: in _payload
+    assert "Traceback" not in result.stdout + result.stderr, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 235, in main
+E         rows = load_rows(args.observations)
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 40, in load_rows
+E         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+E                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1027, in read_text
+E         with self.open(mode='r', encoding=encoding, errors=errors) as f:
+E              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "/Users/pranavbhave/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open
+E         return io.open(self, mode, buffering, encoding, errors, newline)
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E     IsADirectoryError: [Errno 21] Is a directory: '/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-16/test_input_io_errors_are_struc1/input.jsonl'
+E     
+E   assert 'Traceback' not in "Traceback (...put.jsonl'\n"
+E     
+E     'Traceback' is contained here:
+E       Traceback (most recent call last):
+E     ? +++++++++
+E         File "/Users/pranavbhave/Developer/GitHub/e2-wave1-contract/scripts/validate_e2_observations.py", line 265, in <module>
+E           raise SystemExit(main())
+E                            ^^^^^^...
+E     
+E     ...Full output truncated (13 lines hidden), use '-vv' to show
+__________ test_invalid_rfc3339_timestamp_is_a_violation[not-a-date] ___________
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+__________ test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24] ___________
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+______ test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T20:00:00] ______
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+_____ test_invalid_rfc3339_timestamp_is_a_violation[2026-13-24T20:00:00Z] ______
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+_____ test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T25:00:00Z] ______
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+___ test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T20:00:00+24:00] ___
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+____ test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T20:00:00+04] _____
+tests/unit/research/test_e2_validator_malformed.py:139: in test_invalid_rfc3339_timestamp_is_a_violation
+    _reject(_run(_write_rows(tmp_path, rows)), "execution_timestamp")
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c...her than a property of composition."\n  ]\n}\n\nE2 conformance OK (warnings are disclosures, not passes)\n', stderr='').returncode
+=========================== short test summary info ============================
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_malformed_replicate_is_structured_violation[replicate0]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_malformed_replicate_is_structured_violation[replicate1]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_mixed_replicate_types_do_not_crash_sorting
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_malformed_outcome_is_structured_violation[junk]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_malformed_outcome_is_structured_violation[outcome1]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_malformed_outcome_is_structured_violation[outcome2]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_non_object_jsonl_rows_are_structured_violations[row0]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_non_object_jsonl_rows_are_structured_violations[None]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_non_object_jsonl_rows_are_structured_violations[row]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_non_object_jsonl_rows_are_structured_violations[1]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_non_object_jsonl_rows_are_structured_violations[True]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_unreadable_or_empty_observations_are_structured_violations[{"item_id":]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_unreadable_or_empty_observations_are_structured_violations[\xff\xfe\n]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_unreadable_or_empty_observations_are_structured_violations[]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_unreadable_or_empty_observations_are_structured_violations[  \n\t\n]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_input_io_errors_are_structured_violations[missing]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_input_io_errors_are_structured_violations[directory]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[not-a-date]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T20:00:00]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[2026-13-24T20:00:00Z]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T25:00:00Z]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T20:00:00+24:00]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_invalid_rfc3339_timestamp_is_a_violation[2026-10-24T20:00:00+04]
+24 failed, 19 passed in 4.65s
+
+EXIT_CODE=1

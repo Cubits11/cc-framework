@@ -18,19 +18,43 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import jsonschema
 
 DEFAULT_SCHEMA = Path("schemas/cc.e2_observation_row.v1.json")
+FORMAT_CHECKER = jsonschema.FormatChecker()
+
+# jsonschema's date-time checker depends on an optional package. Register a
+# stdlib fallback when it is absent, rather than silently ignoring the format.
+if "date-time" not in FORMAT_CHECKER.checkers:
+    _RFC3339 = re.compile(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt](?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]"
+        r"(?:\.[0-9]+)?(?:[Zz]|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])"
+    )
+
+    @FORMAT_CHECKER.checks("date-time", raises=ValueError)
+    def _is_rfc3339(value: Any) -> bool:
+        if not isinstance(value, str):
+            return True  # The schema's type check reports non-string values.
+        if _RFC3339.fullmatch(value) is None:
+            return False
+        datetime.fromisoformat(value.upper().replace("Z", "+00:00"))
+        return True
 
 # Missingness codes whose presence changes how a dependence estimate must be read.
 INFORMATIVE_MISSINGNESS = frozenset(
     {"upstream_moderation", "provider_refusal", "unsupported_input", "excluded_post"}
 )
+
+
+def _reject_json_constant(value: str) -> NoReturn:
+    raise ValueError(f"non-JSON numeric constant {value!r}")
 
 
 def load_rows(path: Path) -> list[dict[str, Any]]:
@@ -42,11 +66,11 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
         if not stripped:
             continue
         try:
-            parsed = json.loads(stripped)
-        except json.JSONDecodeError as exc:
-            raise SystemExit(f"{path}:{number}: invalid JSON: {exc}") from exc
+            parsed = json.loads(stripped, parse_constant=_reject_json_constant)
+        except ValueError as exc:
+            raise ValueError(f"{path}:{number}: invalid JSON: {exc}") from exc
         if not isinstance(parsed, dict):
-            raise SystemExit(f"{path}:{number}: each line must be a JSON object")
+            raise ValueError(f"{path}:{number}: each line must be a JSON object")
         rows.append(parsed)
     return rows
 
@@ -54,10 +78,10 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
 def schema_violations(rows: list[dict[str, Any]], schema: dict[str, Any]) -> list[str]:
     """Return schema violations, including the required typed evaluation stratum."""
 
-    validator = jsonschema.Draft202012Validator(schema)
+    validator = jsonschema.Draft202012Validator(schema, format_checker=FORMAT_CHECKER)
     problems: list[str] = []
     for index, row in enumerate(rows, start=1):
-        for error in sorted(validator.iter_errors(row), key=lambda err: list(err.path)):
+        for error in sorted(validator.iter_errors(row), key=lambda err: tuple(map(str, err.path))):
             location = "/".join(str(part) for part in error.path) or "<row>"
             problems.append(f"row {index}: {location}: {error.message}")
     return problems
@@ -231,24 +255,34 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Emit the audit report as JSON")
     args = parser.parse_args()
 
-    schema = json.loads(args.schema.read_text(encoding="utf-8"))
-    rows = load_rows(args.observations)
-    if not rows:
-        print("E2 conformance error: no observation rows", file=sys.stderr)
-        return 1
-
-    violations = schema_violations(rows, schema) + design_violations(rows)
-    report = audit(rows)
-    notes = warnings_from(report)
+    report = None
+    notes: list[str] = []
+    try:
+        schema = json.loads(
+            args.schema.read_text(encoding="utf-8"), parse_constant=_reject_json_constant
+        )
+        jsonschema.Draft202012Validator.check_schema(schema)
+        rows = load_rows(args.observations)
+    except (OSError, UnicodeError, ValueError, jsonschema.SchemaError) as exc:
+        violations = [f"input violation: {type(exc).__name__}: {exc}"]
+    else:
+        violations = schema_violations(rows, schema) if rows else ["no observation rows"]
+        # Design keys and audit calculations require schema-valid types. Never
+        # hash malformed replicate ids or coerce malformed outcomes into bits.
+        if not violations:
+            violations = design_violations(rows)
+            report = audit(rows)
+            notes = warnings_from(report)
 
     if args.json:
         print(json.dumps({"report": report, "violations": violations, "warnings": notes}, indent=2))
     else:
-        print(f"rows={report['rows']}  items={report['items']}  guardrails={report['guardrails']}")
-        print(
-            f"complete-case items: {report['complete_case_items']}/{report['items']} "
-            f"({report['complete_case_fraction']:.1%})"
-        )
+        if report is not None:
+            print(f"rows={report['rows']}  items={report['items']}  guardrails={report['guardrails']}")
+            print(
+                f"complete-case items: {report['complete_case_items']}/{report['items']} "
+                f"({report['complete_case_fraction']:.1%})"
+            )
         for note in notes:
             print(f"  warning: {note}")
         for violation in violations:
@@ -257,7 +291,8 @@ def main() -> int:
     if violations:
         print(f"\nE2 conformance FAILED with {len(violations)} violation(s)", file=sys.stderr)
         return 1
-    print("\nE2 conformance OK (warnings are disclosures, not passes)")
+    if not args.json:
+        print("\nE2 conformance OK (warnings are disclosures, not passes)")
     return 0
 
 

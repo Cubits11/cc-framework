@@ -1,0 +1,34 @@
+COMMAND: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /tmp/cc-validation-20261023/bin/python -B -m pytest -o addopts= -p no:cacheprovider -q --tb=short tests/unit/research/test_e2_validator_malformed.py -k nonstandard_json_number
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_________ test_nonstandard_json_number_is_a_structured_violation[NaN] __________
+tests/unit/research/test_e2_validator_malformed.py:128: in test_nonstandard_json_number_is_a_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)))
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c..., gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."\n  ]\n}\n', stderr='').returncode
+_______ test_nonstandard_json_number_is_a_structured_violation[Infinity] _______
+tests/unit/research/test_e2_validator_malformed.py:128: in test_nonstandard_json_number_is_a_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)))
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c..., gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."\n  ]\n}\n', stderr='').returncode
+______ test_nonstandard_json_number_is_a_structured_violation[-Infinity] _______
+tests/unit/research/test_e2_validator_malformed.py:128: in test_nonstandard_json_number_is_a_structured_violation
+    _reject(_run(_write_rows(tmp_path, rows)))
+tests/unit/research/test_e2_validator_malformed.py:46: in _reject
+    assert result.returncode == 1, (result.returncode, payload, result.stderr)
+E   AssertionError: (0, {'report': {'rows': 3, 'guardrails': ['gr.alpha', 'gr.beta', 'gr.gamma'], 'items': 1, 'complete_case_items': 1, .....' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."]}, '')
+E   assert 0 == 1
+E    +  where 0 = CompletedProcess(args=['/tmp/cc-validation-20261023/bin/python', '-B', '/Users/pranavbhave/Developer/GitHub/e2-wave1-c..., gr.gamma; observed dependence may be mechanism-induced rather than a property of composition."\n  ]\n}\n', stderr='').returncode
+=========================== short test summary info ============================
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_nonstandard_json_number_is_a_structured_violation[NaN]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_nonstandard_json_number_is_a_structured_violation[Infinity]
+FAILED tests/unit/research/test_e2_validator_malformed.py::test_nonstandard_json_number_is_a_structured_violation[-Infinity]
+3 failed, 43 deselected in 0.46s
+
+EXIT_CODE=1

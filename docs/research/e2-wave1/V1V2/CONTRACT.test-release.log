@@ -1,0 +1,48 @@
+COMMAND: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 make -o install VENV_DIR=/tmp/cc-validation-20261023 test-release
+PYTHONPATH=src /tmp/cc-validation-20261023/bin/pytest tests/unit/kernel -q
+........................................................................ [ 47%]
+........................................................................ [ 95%]
+.......                                                                  [100%]
+PYTHONPATH=src /tmp/cc-validation-20261023/bin/pytest tests/unit/kernel/test_sensitivity.py tests/unit/kernel/test_frechet_classes.py -q
+..............................................................           [100%]
+PYTHONPATH=src /tmp/cc-validation-20261023/bin/mypy src/cc/kernel --strict
+src/cc/kernel/frechet_classes.py:441: error: Redundant cast to
+"ndarray[tuple[Any, ...], dtype[float64]]"  [redundant-cast]
+        return cast(FloatArray, clipped)
+               ^
+src/cc/kernel/frechet_classes.py:586: error: Returning Any from function
+declared to return "ndarray[tuple[Any, ...], dtype[float64]]"  [no-any-return]
+            return np.all(states == 1.0, axis=1).astype(float)
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/cc/kernel/frechet_classes.py:587: error: Returning Any from function
+declared to return "ndarray[tuple[Any, ...], dtype[float64]]"  [no-any-return]
+        return np.any(states == 1.0, axis=1).astype(float)
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/cc/kernel/frechet_classes.py:631: error: Redundant cast to
+"ndarray[tuple[Any, ...], dtype[float64]]"  [redundant-cast]
+        return cast(FloatArray, normalized)
+               ^
+src/cc/kernel/cliff.py:596: error: Returning Any from function declared to
+return "ndarray[tuple[Any, ...], dtype[float64]]"  [no-any-return]
+        return log_c
+        ^~~~~~~~~~~~
+src/cc/kernel/cliff.py:703: error: Returning Any from function declared to
+return "ndarray[tuple[Any, ...], dtype[float64]]"  [no-any-return]
+        return numerator / denominator * factor
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/cc/kernel/stress.py:611: error: Returning Any from function declared to
+return "ndarray[tuple[Any, ...], dtype[float64]]"  [no-any-return]
+        return np.mean(np.abs(states[:, None, :] - states[None, :, :]), ax...
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~...
+src/cc/kernel/stress.py:706: error: Redundant cast to
+"ndarray[tuple[Any, ...], dtype[float64]]"  [redundant-cast]
+        return cast(FloatArray, pmf / float(np.sum(pmf)))
+               ^
+src/cc/kernel/ccf_models.py:347: error: Redundant cast to
+"ndarray[tuple[Any, ...], dtype[Any]]"  [redundant-cast]
+        return cast(np.ndarray, np.clip(arr, 0.0, 1.0).astype(float, copy=...
+               ^
+Found 9 errors in 4 files (checked 12 source files)
+make: *** [test-kernel] Error 1
+
+EXIT_CODE=2
