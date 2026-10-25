@@ -1,0 +1,117 @@
+PASS metadata-only: examples/e2/observations.example.jsonl: 24 rows, stratum=harmful added, all existing fields equal HEAD
+COMMAND: /tmp/cc-validation-20261023/bin/python -B scripts/validate_e2_observations.py examples/e2/observations.example.jsonl --json
+{
+  "report": {
+    "rows": 24,
+    "guardrails": [
+      "gr.alpha",
+      "gr.beta",
+      "gr.gamma"
+    ],
+    "items": 8,
+    "complete_case_items": 6,
+    "complete_case_fraction": 0.75,
+    "missingness_by_guardrail": {
+      "gr.alpha": {
+        "observed": 8
+      },
+      "gr.beta": {
+        "observed": 7,
+        "timeout": 1
+      },
+      "gr.gamma": {
+        "observed": 7,
+        "upstream_moderation": 1
+      }
+    },
+    "guardrail_versions": {
+      "gr.alpha": [
+        "1.4.2"
+      ],
+      "gr.beta": [
+        "2026.07"
+      ],
+      "gr.gamma": [
+        "unknown"
+      ]
+    },
+    "shared_dependency_groups": {
+      "base:alpha-llm": [
+        "gr.alpha",
+        "gr.gamma"
+      ]
+    },
+    "duplicate_item_content": {
+      "4d818b3323ae6c36decf05fc9794f7ef81726902d1c1e68102e6f2583776d0d3": [
+        "item-003",
+        "item-007"
+      ]
+    },
+    "replicate_unstable_pairs": []
+  },
+  "violations": [],
+  "warnings": [
+    "gr.gamma: 1 row(s) with missingness_code 'upstream_moderation'; complete-case analysis may itself manufacture or suppress dependence.",
+    "gr.gamma: version is 'unknown'; this limits any replication claim.",
+    "declared shared dependency 'base:alpha-llm' spans gr.alpha, gr.gamma; observed dependence may be mechanism-induced rather than a property of composition.",
+    "duplicate item content 4d818b3323ae... under ids item-003, item-007.",
+    "complete-case population is 6/8 items (75.0%); the missingness sensitivity analysis is mandatory, not optional."
+  ]
+}
+
+E2 conformance OK (warnings are disclosures, not passes)
+
+EXIT_CODE=0
+PASS metadata-only: experiments/e2_dryrun/results/observations.jsonl: 66 rows, stratum=harmful added, all existing fields equal HEAD
+COMMAND: /tmp/cc-validation-20261023/bin/python -B scripts/validate_e2_observations.py experiments/e2_dryrun/results/observations.jsonl --json
+{
+  "report": {
+    "rows": 66,
+    "guardrails": [
+      "gr.keyword",
+      "gr.regex",
+      "gr.semantic"
+    ],
+    "items": 22,
+    "complete_case_items": 22,
+    "complete_case_fraction": 1.0,
+    "missingness_by_guardrail": {
+      "gr.keyword": {
+        "observed": 22
+      },
+      "gr.regex": {
+        "observed": 22
+      },
+      "gr.semantic": {
+        "observed": 22
+      }
+    },
+    "guardrail_versions": {
+      "gr.keyword": [
+        "keyword_blocker.v1"
+      ],
+      "gr.regex": [
+        "regex_filter.v1"
+      ],
+      "gr.semantic": [
+        "semantic_filter.tfidf.v1"
+      ]
+    },
+    "shared_dependency_groups": {},
+    "duplicate_item_content": {},
+    "replicate_unstable_pairs": []
+  },
+  "violations": [],
+  "warnings": []
+}
+
+E2 conformance OK (warnings are disclosures, not passes)
+
+EXIT_CODE=0
+COMMAND: /tmp/cc-validation-20261023/bin/python -m ruff check scripts/validate_e2_observations.py tests/unit/research/test_e2_stratum.py tests/unit/research/test_e2_observation_contract.py
+All checks passed!
+
+EXIT_CODE=0
+COMMAND: git diff --check
+
+EXIT_CODE=0

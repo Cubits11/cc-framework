@@ -52,7 +52,7 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
 
 
 def schema_violations(rows: list[dict[str, Any]], schema: dict[str, Any]) -> list[str]:
-    """Return one message per schema-invalid row."""
+    """Return schema violations, including the required typed evaluation stratum."""
 
     validator = jsonschema.Draft202012Validator(schema)
     problems: list[str] = []

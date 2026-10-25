@@ -1,0 +1,135 @@
+COMMAND: E2_SITE_ROOT=/Users/pranavbhave/Developer/GitHub/e2-wave1-site PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /tmp/cc-validation-20261023/bin/python -B -m pytest -o addopts= -p no:cacheprovider -q tests/unit/research/test_e2_stratum.py
+FFFFF.......FF                                                           [100%]
+=================================== FAILURES ===================================
+___________ test_stratum_is_required_and_has_the_frozen_string_enum ____________
+
+    def test_stratum_is_required_and_has_the_frozen_string_enum() -> None:
+>       assert "stratum" in SCHEMA["required"]
+E       AssertionError: assert 'stratum' in ['schema_version', 'study_id', 'run_id', 'item_id', 'item_source', 'item_source_version', ...]
+
+tests/unit/research/test_e2_stratum.py:34: AssertionError
+_________ test_frozen_evaluation_stratum_is_schema_valid[benign_eval] __________
+
+stratum = 'benign_eval'
+
+    @pytest.mark.parametrize("stratum", sorted(STRATA))
+    def test_frozen_evaluation_stratum_is_schema_valid(stratum: str) -> None:
+        row = load_rows(REFERENCE)[0]
+        row["stratum"] = stratum
+>       assert schema_violations([row], SCHEMA) == []
+E       assert ['row 1: <row... unexpected)'] == []
+E         
+E         Left contains one more item: "row 1: <row>: Additional properties are not allowed ('stratum' was unexpected)"
+E         Use -v to get more diff
+
+tests/unit/research/test_e2_stratum.py:44: AssertionError
+__________ test_frozen_evaluation_stratum_is_schema_valid[benign_jbb] __________
+
+stratum = 'benign_jbb'
+
+    @pytest.mark.parametrize("stratum", sorted(STRATA))
+    def test_frozen_evaluation_stratum_is_schema_valid(stratum: str) -> None:
+        row = load_rows(REFERENCE)[0]
+        row["stratum"] = stratum
+>       assert schema_violations([row], SCHEMA) == []
+E       assert ['row 1: <row... unexpected)'] == []
+E         
+E         Left contains one more item: "row 1: <row>: Additional properties are not allowed ('stratum' was unexpected)"
+E         Use -v to get more diff
+
+tests/unit/research/test_e2_stratum.py:44: AssertionError
+___________ test_frozen_evaluation_stratum_is_schema_valid[harmful] ____________
+
+stratum = 'harmful'
+
+    @pytest.mark.parametrize("stratum", sorted(STRATA))
+    def test_frozen_evaluation_stratum_is_schema_valid(stratum: str) -> None:
+        row = load_rows(REFERENCE)[0]
+        row["stratum"] = stratum
+>       assert schema_violations([row], SCHEMA) == []
+E       assert ['row 1: <row... unexpected)'] == []
+E         
+E         Left contains one more item: "row 1: <row>: Additional properties are not allowed ('stratum' was unexpected)"
+E         Use -v to get more diff
+
+tests/unit/research/test_e2_stratum.py:44: AssertionError
+_________ test_frozen_evaluation_stratum_is_schema_valid[harmful_jbb] __________
+
+stratum = 'harmful_jbb'
+
+    @pytest.mark.parametrize("stratum", sorted(STRATA))
+    def test_frozen_evaluation_stratum_is_schema_valid(stratum: str) -> None:
+        row = load_rows(REFERENCE)[0]
+        row["stratum"] = stratum
+>       assert schema_violations([row], SCHEMA) == []
+E       assert ['row 1: <row... unexpected)'] == []
+E         
+E         Left contains one more item: "row 1: <row>: Additional properties are not allowed ('stratum' was unexpected)"
+E         Use -v to get more diff
+
+tests/unit/research/test_e2_stratum.py:44: AssertionError
+__________________ test_missing_stratum_is_a_schema_violation __________________
+
+    def test_missing_stratum_is_a_schema_violation() -> None:
+        row = load_rows(REFERENCE)[0]
+        row.pop("stratum", None)
+>       assert any("stratum" in message for message in schema_violations([row], SCHEMA))
+E       assert False
+E        +  where False = any(<generator object test_missing_stratum_is_a_schema_violation.<locals>.<genexpr> at 0x107272670>)
+
+tests/unit/research/test_e2_stratum.py:57: AssertionError
+________ test_three_reference_rows_round_trip_into_actual_site_analyzer ________
+
+tmp_path = PosixPath('/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-12/test_three_reference_rows_roun0')
+
+    def test_three_reference_rows_round_trip_into_actual_site_analyzer(tmp_path: Path) -> None:
+        site_root = os.environ.get("E2_SITE_ROOT")
+        if not site_root:
+            pytest.skip("set E2_SITE_ROOT for the cross-repository analyzer check")
+        run_dir = Path(site_root) / "experiments/e2/run"
+        sys.path.insert(0, str(run_dir))
+        spec = importlib.util.spec_from_file_location("e2_stratum_analyzer", run_dir / "analyze.py")
+        assert spec is not None and spec.loader is not None
+        analyzer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(analyzer)
+    
+        rows = load_rows(REFERENCE)[:3]
+        for row, guard in zip(rows, ("lg4", "lg3", "sg2b"), strict=True):
+            row["guardrail_id"] = guard
+        assert schema_violations(rows, SCHEMA) == []
+        assert design_violations(rows) == []
+        fixture = tmp_path / "reference-three.jsonl"
+        fixture.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    
+>       events, missing, synthetic = analyzer.load(fixture)
+                                     ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/unit/research/test_e2_stratum.py:79: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/private/var/folders/nj/2c1_c61j3hn7h5fgv1gk0q2m0000gn/T/pytest-of-pranavbhave/pytest-12/test_three_reference_rows_roun0/reference-three.jsonl')
+
+    def load(path: Path):
+        """rows -> {stratum: {item_id: {guard: event_bit}}}, plus missing map."""
+        events: dict = {}
+        missing: dict = {}
+        synthetic = False
+        for line in path.read_text().splitlines():
+            r = json.loads(line)
+            synthetic = synthetic or bool(r.get("synthetic"))
+>           s = r["stratum"]
+                ^^^^^^^^^^^^
+E           KeyError: 'stratum'
+
+../e2-wave1-site/experiments/e2/run/analyze.py:70: KeyError
+=========================== short test summary info ============================
+FAILED tests/unit/research/test_e2_stratum.py::test_stratum_is_required_and_has_the_frozen_string_enum
+FAILED tests/unit/research/test_e2_stratum.py::test_frozen_evaluation_stratum_is_schema_valid[benign_eval]
+FAILED tests/unit/research/test_e2_stratum.py::test_frozen_evaluation_stratum_is_schema_valid[benign_jbb]
+FAILED tests/unit/research/test_e2_stratum.py::test_frozen_evaluation_stratum_is_schema_valid[harmful]
+FAILED tests/unit/research/test_e2_stratum.py::test_frozen_evaluation_stratum_is_schema_valid[harmful_jbb]
+FAILED tests/unit/research/test_e2_stratum.py::test_missing_stratum_is_a_schema_violation
+FAILED tests/unit/research/test_e2_stratum.py::test_three_reference_rows_round_trip_into_actual_site_analyzer
+7 failed, 7 passed in 0.27s
+
+EXIT_CODE=1
